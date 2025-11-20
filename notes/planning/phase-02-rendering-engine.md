@@ -357,7 +357,7 @@ We optimize the actual write operation for maximum throughput. This includes usi
 
 ## 2.6 Framerate Limiter
 
-- [ ] **Section 2.6 Complete**
+- [x] **Section 2.6 Complete**
 
 The framerate limiter caps rendering to a maximum FPS (default 60, configurable up to 120), preventing the renderer from overwhelming the terminal or wasting CPU on invisible updates. Components can request redraws at any rate—the limiter coalesces requests and renders at the next frame boundary. This creates smooth animation while being efficient.
 
@@ -365,59 +365,59 @@ The limiter uses a GenServer with timer-based frame ticks. Render requests mark 
 
 ### 2.6.1 Frame Timer
 
-- [ ] **Task 2.6.1 Complete**
+- [x] **Task 2.6.1 Complete**
 
 The frame timer triggers render cycles at regular intervals. We use Process.send_after for scheduling to avoid timer drift. The interval is 16ms for 60 FPS, 8ms for 120 FPS. The timer runs continuously while the application is active, pausing when minimized or backgrounded if focus events are available.
 
-- [ ] 2.6.1.1 Implement frame timer using `Process.send_after/3` for interval scheduling
-- [ ] 2.6.1.2 Implement FPS configuration allowing 30, 60, or 120 FPS settings
-- [ ] 2.6.1.3 Implement timer drift compensation adjusting next interval based on actual elapsed time
-- [ ] 2.6.1.4 Implement timer pause/resume for application backgrounding (optional focus event integration)
+- [x] 2.6.1.1 Implement frame timer using `Process.send_after/3` for interval scheduling
+- [x] 2.6.1.2 Implement FPS configuration allowing 30, 60, or 120 FPS settings
+- [x] 2.6.1.3 Implement timer drift compensation adjusting next interval based on actual elapsed time
+- [x] 2.6.1.4 Implement timer pause/resume for application backgrounding (optional focus event integration)
 
 ### 2.6.2 Dirty Flag Management
 
-- [ ] **Task 2.6.2 Complete**
+- [x] **Task 2.6.2 Complete**
 
 The dirty flag tracks whether the buffer needs rendering. Any buffer write sets the flag; rendering clears it. Multiple writes between frames coalesce—we render once with all changes. The flag is atomic to handle concurrent writes from multiple component processes.
 
-- [ ] 2.6.2.1 Implement atomic dirty flag using `:atomics` module for lock-free concurrent access
-- [ ] 2.6.2.2 Implement `mark_dirty/0` setting flag when buffer is modified
-- [ ] 2.6.2.3 Implement `clear_dirty/0` resetting flag after render completes
-- [ ] 2.6.2.4 Implement `is_dirty?/0` checking flag for render decision
+- [x] 2.6.2.1 Implement atomic dirty flag using `:atomics` module for lock-free concurrent access
+- [x] 2.6.2.2 Implement `mark_dirty/0` setting flag when buffer is modified
+- [x] 2.6.2.3 Implement `clear_dirty/0` resetting flag after render completes
+- [x] 2.6.2.4 Implement `is_dirty?/0` checking flag for render decision
 
 ### 2.6.3 Render Scheduling
 
-- [ ] **Task 2.6.3 Complete**
+- [x] **Task 2.6.3 Complete**
 
 Render scheduling coordinates frame timing with dirty state. On each tick, we check if dirty and render if so. We skip rendering for clean frames, saving CPU. Immediate mode bypasses the scheduler for urgent updates. We track frame statistics: rendered frames, skipped frames, actual FPS.
 
-- [ ] 2.6.3.1 Implement tick handler checking dirty flag and triggering render
-- [ ] 2.6.3.2 Implement frame skip for clean buffers with skip counting for statistics
-- [ ] 2.6.3.3 Implement immediate render mode bypassing frame timing for urgent updates
-- [ ] 2.6.3.4 Implement frame statistics tracking actual FPS, render time, and skip ratio
+- [x] 2.6.3.1 Implement tick handler checking dirty flag and triggering render
+- [x] 2.6.3.2 Implement frame skip for clean buffers with skip counting for statistics
+- [x] 2.6.3.3 Implement immediate render mode bypassing frame timing for urgent updates
+- [x] 2.6.3.4 Implement frame statistics tracking actual FPS, render time, and skip ratio
 
 ### 2.6.4 Performance Monitoring
 
-- [ ] **Task 2.6.4 Complete**
+- [x] **Task 2.6.4 Complete**
 
 Performance monitoring tracks rendering metrics for debugging and optimization. We measure: frame render time, diff calculation time, escape sequence generation time, write time, and total frame time. Metrics are available via API and optionally displayed in debug overlay.
 
-- [ ] 2.6.4.1 Implement timing instrumentation measuring each render phase duration
-- [ ] 2.6.4.2 Implement FPS calculation from rendered frame timestamps
-- [ ] 2.6.4.3 Implement performance metrics API exposing current and historical statistics
-- [ ] 2.6.4.4 Implement slow frame detection warning when frame time exceeds target interval
+- [x] 2.6.4.1 Implement timing instrumentation measuring each render phase duration
+- [x] 2.6.4.2 Implement FPS calculation from rendered frame timestamps
+- [x] 2.6.4.3 Implement performance metrics API exposing current and historical statistics
+- [x] 2.6.4.4 Implement slow frame detection warning when frame time exceeds target interval
 
 ### Unit Tests - Section 2.6
 
-- [ ] **Unit Tests 2.6 Complete**
-- [ ] Test frame timer fires at correct intervals for configured FPS
-- [ ] Test dirty flag is set by buffer modifications
-- [ ] Test dirty flag is cleared after render
-- [ ] Test concurrent dirty flag writes don't lose updates
-- [ ] Test render is triggered only when buffer is dirty
-- [ ] Test clean frames are skipped without rendering
-- [ ] Test immediate mode renders without waiting for next tick
-- [ ] Test performance metrics accurately reflect render times
+- [x] **Unit Tests 2.6 Complete**
+- [x] Test frame timer fires at correct intervals for configured FPS
+- [x] Test dirty flag is set by buffer modifications
+- [x] Test dirty flag is cleared after render
+- [x] Test concurrent dirty flag writes don't lose updates
+- [x] Test render is triggered only when buffer is dirty
+- [x] Test clean frames are skipped without rendering
+- [x] Test immediate mode renders without waiting for next tick
+- [x] Test performance metrics accurately reflect render times
 
 ---
 
