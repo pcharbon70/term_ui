@@ -291,7 +291,7 @@ We integrate cursor optimization into the render pipeline, converting diff outpu
 
 ## 2.5 Escape Sequence Batching
 
-- [ ] **Section 2.5 Complete**
+- [x] **Section 2.5 Complete**
 
 Escape sequence batching combines multiple operations into single write calls, reducing system call overhead. Each write syscall has fixed overhead—batching amortizes this across many operations. We also combine adjacent SGR sequences (style changes) into single sequences, reducing byte count. Batching is transparent to the rest of the renderer—we collect sequences in a buffer and flush periodically.
 
@@ -299,59 +299,59 @@ The batch buffer accumulates escape sequences and text until flush. We flush on:
 
 ### 2.5.1 Sequence Buffer
 
-- [ ] **Task 2.5.1 Complete**
+- [x] **Task 2.5.1 Complete**
 
 The sequence buffer accumulates escape sequences and text for batched output. We use iolist format for efficient concatenation without copying. The buffer tracks size for threshold-based flushing and provides append/flush operations. Buffer management is efficient—we avoid intermediate allocations.
 
-- [ ] 2.5.1.1 Implement sequence buffer using iolist accumulator for efficient append
-- [ ] 2.5.1.2 Implement `buffer_append/2` adding sequence to buffer and tracking size
-- [ ] 2.5.1.3 Implement size tracking counting bytes for flush threshold comparison
-- [ ] 2.5.1.4 Implement `buffer_flush/1` writing accumulated data to terminal and resetting buffer
+- [x] 2.5.1.1 Implement sequence buffer using iolist accumulator for efficient append
+- [x] 2.5.1.2 Implement `buffer_append/2` adding sequence to buffer and tracking size
+- [x] 2.5.1.3 Implement size tracking counting bytes for flush threshold comparison
+- [x] 2.5.1.4 Implement `buffer_flush/1` writing accumulated data to terminal and resetting buffer
 
 ### 2.5.2 SGR Sequence Combining
 
-- [ ] **Task 2.5.2 Complete**
+- [x] **Task 2.5.2 Complete**
 
 SGR (Select Graphic Rendition) sequences set text style. Multiple SGR sequences can combine into one: `ESC[1mESC[31m` becomes `ESC[1;31m`, saving 4 bytes. We track pending style changes and emit combined sequence before text output. We reset tracking after each flush or explicit reset.
 
-- [ ] 2.5.2.1 Implement SGR accumulator collecting style parameters during rendering
-- [ ] 2.5.2.2 Implement combined SGR emission before text output with all pending parameters
-- [ ] 2.5.2.3 Implement SGR delta tracking emitting only changed parameters from previous style
-- [ ] 2.5.2.4 Implement SGR reset handling clearing accumulator on style reset
+- [x] 2.5.2.1 Implement SGR accumulator collecting style parameters during rendering
+- [x] 2.5.2.2 Implement combined SGR emission before text output with all pending parameters
+- [x] 2.5.2.3 Implement SGR delta tracking emitting only changed parameters from previous style
+- [x] 2.5.2.4 Implement SGR reset handling clearing accumulator on style reset
 
 ### 2.5.3 Flush Management
 
-- [ ] **Task 2.5.3 Complete**
+- [x] **Task 2.5.3 Complete**
 
 Flush management determines when to write accumulated sequences. We flush on: size threshold (default 4KB) to bound memory usage, frame completion to ensure visibility, explicit flush requests, and process exit. Flushing must be atomic—partial frames cause visual glitches.
 
-- [ ] 2.5.3.1 Implement size threshold flush triggering write when buffer exceeds limit
-- [ ] 2.5.3.2 Implement frame completion flush ensuring all frame data is written
-- [ ] 2.5.3.3 Implement explicit flush API for immediate output when needed
-- [ ] 2.5.3.4 Implement exit flush using process trap_exit to flush on termination
+- [x] 2.5.3.1 Implement size threshold flush triggering write when buffer exceeds limit
+- [x] 2.5.3.2 Implement frame completion flush ensuring all frame data is written
+- [x] 2.5.3.3 Implement explicit flush API for immediate output when needed
+- [x] 2.5.3.4 Implement exit flush using process trap_exit to flush on termination
 
 ### 2.5.4 Write Optimization
 
-- [ ] **Task 2.5.4 Complete**
+- [x] **Task 2.5.4 Complete**
 
 We optimize the actual write operation for maximum throughput. This includes using IO.binwrite for raw output, handling EAGAIN for non-blocking writes, and measuring write performance. We consider synchronous vs asynchronous writing based on terminal latency.
 
-- [ ] 2.5.4.1 Implement raw binary write using `IO.binwrite/2` without text encoding
-- [ ] 2.5.4.2 Implement write retry handling EAGAIN/EWOULDBLOCK errors
-- [ ] 2.5.4.3 Implement write timing measurement for performance monitoring
-- [ ] 2.5.4.4 Implement async write option for high-latency connections (SSH)
+- [x] 2.5.4.1 Implement raw binary write using `IO.binwrite/2` without text encoding
+- [x] 2.5.4.2 Implement write retry handling EAGAIN/EWOULDBLOCK errors
+- [x] 2.5.4.3 Implement write timing measurement for performance monitoring
+- [x] 2.5.4.4 Implement async write option for high-latency connections (SSH)
 
 ### Unit Tests - Section 2.5
 
-- [ ] **Unit Tests 2.5 Complete**
-- [ ] Test sequence buffer accumulates data without premature writes
-- [ ] Test buffer size tracking counts bytes correctly
-- [ ] Test buffer flush writes all accumulated data
-- [ ] Test SGR combining produces single sequence from multiple style changes
-- [ ] Test SGR delta only emits changed parameters
-- [ ] Test size threshold triggers automatic flush
-- [ ] Test frame completion flush writes all pending data
-- [ ] Test raw binary write produces correct terminal output
+- [x] **Unit Tests 2.5 Complete**
+- [x] Test sequence buffer accumulates data without premature writes
+- [x] Test buffer size tracking counts bytes correctly
+- [x] Test buffer flush writes all accumulated data
+- [x] Test SGR combining produces single sequence from multiple style changes
+- [x] Test SGR delta only emits changed parameters
+- [x] Test size threshold triggers automatic flush
+- [x] Test frame completion flush writes all pending data
+- [x] Test raw binary write produces correct terminal output
 
 ---
 
