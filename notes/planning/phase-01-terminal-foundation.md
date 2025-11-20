@@ -393,53 +393,53 @@ The platform abstraction layer provides a unified API via the TermUI.Platform mo
 
 ## 1.6 Integration Tests
 
-- [ ] **Section 1.6 Complete**
+- [x] **Section 1.6 Complete**
 
 Integration tests validate that all terminal foundation components work together correctly. We test complete workflows: initialize terminal → enable raw mode → render content → handle input → restore terminal. These tests run on actual terminals (not mocks) when possible, using PTY allocation for CI environments. Integration tests catch interaction bugs that unit tests miss and validate real-world terminal behavior.
 
 ### 1.6.1 Terminal Lifecycle Testing
 
-- [ ] **Task 1.6.1 Complete**
+- [x] **Task 1.6.1 Complete**
 
 We test the complete terminal lifecycle from initialization through cleanup. Tests verify that raw mode enables correctly, alternate screen activates, input events parse correctly, and terminal restores on exit. We test both normal termination and crash recovery paths to ensure robust cleanup.
 
-- [ ] 1.6.1.1 Test complete initialization sequence: detect capabilities → enable raw mode → enter alternate screen → hide cursor
-- [ ] 1.6.1.2 Test clean shutdown sequence: show cursor → leave alternate screen → disable raw mode → restore settings
-- [ ] 1.6.1.3 Test crash recovery: simulate crash after partial initialization and verify terminal restoration
-- [ ] 1.6.1.4 Test reinitialization: verify terminal can be re-enabled after clean shutdown
+- [x] 1.6.1.1 Test complete initialization sequence: detect capabilities → enable raw mode → enter alternate screen → hide cursor
+- [x] 1.6.1.2 Test clean shutdown sequence: show cursor → leave alternate screen → disable raw mode → restore settings
+- [x] 1.6.1.3 Test crash recovery: simulate crash after partial initialization and verify terminal restoration
+- [x] 1.6.1.4 Test reinitialization: verify terminal can be re-enabled after clean shutdown
 
 ### 1.6.2 Input/Output Round-Trip Testing
 
-- [ ] **Task 1.6.2 Complete**
+- [x] **Task 1.6.2 Complete**
 
 Round-trip tests verify that output sequences produce expected terminal state and input bytes parse to expected events. We use a PTY pair where we can both send input and observe output. Tests verify cursor positioning accuracy, color rendering, and event parsing fidelity.
 
-- [ ] 1.6.2.1 Test cursor positioning round-trip: move cursor, query position, verify coordinates match
-- [ ] 1.6.2.2 Test key event round-trip: send key sequence bytes, verify parsed event matches expected
-- [ ] 1.6.2.3 Test mouse event round-trip: send mouse sequence, verify parsed coordinates and button
-- [ ] 1.6.2.4 Test style round-trip: set style, render text, verify visual appearance (where testable)
+- [x] 1.6.2.1 Test cursor positioning round-trip: move cursor, query position, verify coordinates match
+- [x] 1.6.2.2 Test key event round-trip: send key sequence bytes, verify parsed event matches expected
+- [x] 1.6.2.3 Test mouse event round-trip: send mouse sequence, verify parsed coordinates and button
+- [x] 1.6.2.4 Test style round-trip: set style, render text, verify visual appearance (where testable)
 
 ### 1.6.3 Capability Detection Accuracy
 
-- [ ] **Task 1.6.3 Complete**
+- [x] **Task 1.6.3 Complete**
 
 We validate that capability detection accurately reflects terminal features. Tests run on various terminal emulators (xterm, iTerm2, Alacritty, Windows Terminal) verifying detected capabilities match known terminal features. We test both positive cases (feature detected when present) and negative cases (feature not detected when absent).
 
-- [ ] 1.6.3.1 Test color capability detection matches known terminal capabilities for common emulators
-- [ ] 1.6.3.2 Test mouse support detection correctly identifies terminals with/without mouse tracking
-- [ ] 1.6.3.3 Test Unicode detection matches terminal Unicode rendering capability
-- [ ] 1.6.3.4 Test capability queries timeout correctly on non-responding terminals
+- [x] 1.6.3.1 Test color capability detection matches known terminal capabilities for common emulators
+- [x] 1.6.3.2 Test mouse support detection correctly identifies terminals with/without mouse tracking
+- [x] 1.6.3.3 Test Unicode detection matches terminal Unicode rendering capability
+- [x] 1.6.3.4 Test capability queries timeout correctly on non-responding terminals
 
 ### 1.6.4 Cross-Platform Integration
 
-- [ ] **Task 1.6.4 Complete**
+- [x] **Task 1.6.4 Complete**
 
 Cross-platform integration tests verify consistent behavior across operating systems. Tests run in CI matrix covering Linux (Ubuntu), macOS, and Windows. We verify that the same application code produces equivalent behavior on all platforms despite internal implementation differences.
 
-- [ ] 1.6.4.1 Test terminal initialization succeeds on all supported platforms
-- [ ] 1.6.4.2 Test input parsing produces consistent events across platforms for same key sequences
-- [ ] 1.6.4.3 Test terminal size detection returns valid dimensions on all platforms
-- [ ] 1.6.4.4 Test cleanup restores terminal correctly on all platforms
+- [x] 1.6.4.1 Test terminal initialization succeeds on all supported platforms
+- [x] 1.6.4.2 Test input parsing produces consistent events across platforms for same key sequences
+- [x] 1.6.4.3 Test terminal size detection returns valid dimensions on all platforms
+- [x] 1.6.4.4 Test cleanup restores terminal correctly on all platforms
 
 ---
 
