@@ -309,6 +309,53 @@ defmodule TermUI.Integration.TerminalLifecycleTest do
       # Unregister
       assert :ok = Terminal.unregister_resize_callback(self())
     end
+
+    test "resize callback receives notification" do
+      {:ok, pid} = IntegrationHelpers.start_terminal()
+
+      # Register for resize events
+      assert :ok = Terminal.register_resize_callback(self())
+
+      # Trigger a resize by sending sigwinch to the terminal process
+      send(pid, :sigwinch)
+
+      # Should receive resize notification with current terminal size
+      # In non-terminal environments, get_terminal_size fails so no notification is sent
+      receive do
+        {:terminal_resize, {rows, cols}} ->
+          assert is_integer(rows) and rows > 0
+          assert is_integer(cols) and cols > 0
+      after
+        100 ->
+          # No notification in non-terminal environment is expected
+          case Terminal.get_terminal_size() do
+            {:ok, _} -> flunk("Did not receive resize notification despite terminal being available")
+            {:error, _} -> :ok
+          end
+      end
+
+      # Cleanup
+      Terminal.unregister_resize_callback(self())
+    end
+
+    test "unregistered callback does not receive notification" do
+      {:ok, pid} = IntegrationHelpers.start_terminal()
+
+      # Register then unregister
+      assert :ok = Terminal.register_resize_callback(self())
+      assert :ok = Terminal.unregister_resize_callback(self())
+
+      # Trigger a resize
+      send(pid, :sigwinch)
+
+      # Should NOT receive notification
+      receive do
+        {:terminal_resize, _size} ->
+          flunk("Should not receive notification after unregistering")
+      after
+        100 -> :ok
+      end
+    end
   end
 
 end
