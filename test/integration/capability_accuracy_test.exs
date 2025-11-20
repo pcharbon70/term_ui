@@ -15,6 +15,16 @@ defmodule TermUI.Integration.CapabilityAccuracyTest do
   # These tests validate capability detection
   @moduletag :integration
 
+  setup do
+    IntegrationHelpers.stop_terminal()
+
+    on_exit(fn ->
+      IntegrationHelpers.cleanup_terminal()
+    end)
+
+    :ok
+  end
+
   describe "1.6.3.1 color capability detection" do
     test "detects color mode from TERM variable" do
       IntegrationHelpers.with_env(IntegrationHelpers.mock_terminal_env(:xterm_256color), fn ->

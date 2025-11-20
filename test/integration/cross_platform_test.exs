@@ -9,11 +9,12 @@ defmodule TermUI.Integration.CrossPlatformTest do
   use ExUnit.Case, async: false
 
   alias TermUI.IntegrationHelpers
-  alias TermUI.Parser
   alias TermUI.Parser.Events.KeyEvent
   alias TermUI.Platform
   alias TermUI.Platform.Unix
   alias TermUI.Platform.Windows
+
+  import IntegrationHelpers, only: [parse: 1]
 
   # These tests validate platform behavior
   @moduletag :integration
@@ -85,12 +86,6 @@ defmodule TermUI.Integration.CrossPlatformTest do
       assert info.windows == Platform.windows?()
       assert info.wsl == Platform.wsl?()
     end
-  end
-
-  # Helper to parse and extract events
-  defp parse(input) do
-    {events, remaining, _state} = Parser.parse(input, Parser.new())
-    {events, remaining}
   end
 
   describe "1.6.4.2 input parsing consistency" do
@@ -260,7 +255,7 @@ defmodule TermUI.Integration.CrossPlatformTest do
             File.dir?(path)
           end)
 
-        assert length(existing) >= 0, "Some terminfo paths should exist"
+        assert length(existing) > 0, "Some terminfo paths should exist"
       end
     end
 
