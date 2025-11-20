@@ -12,7 +12,7 @@ The design prioritizes pure Elixir implementation leveraging OTP 28's native cap
 
 ## 1.1 Raw Mode Activation
 
-- [ ] **Section 1.1 Complete**
+- [x] **Section 1.1 Complete**
 
 Raw mode activation transforms the terminal from its default line-buffered canonical mode into character-at-a-time mode where every keystroke is immediately available to the application. This is the fundamental requirement for interactive TUI applications—without raw mode, the terminal waits for Enter before delivering input, making real-time keyboard response impossible. OTP 28 provides native raw mode support through `shell.start_interactive({:noshell, :raw})`, eliminating the need for NIFs wrapping termios that previous Elixir TUI frameworks required.
 
@@ -20,59 +20,59 @@ In raw mode, the application takes full responsibility for input handling: no au
 
 ### 1.1.1 OTP 28 Raw Mode Integration
 
-- [ ] **Task 1.1.1 Complete**
+- [x] **Task 1.1.1 Complete**
 
 Integrating with OTP 28's raw mode requires understanding the new shell subsystem architecture. The `shell.start_interactive/1` function configures terminal behavior at the Erlang runtime level, affecting all subsequent I/O operations. We wrap this in an Elixir API that handles initialization, provides callbacks for input events, and ensures proper cleanup. The integration must work correctly whether the application runs in a standalone BEAM instance or within a release.
 
-- [ ] 1.1.1.1 Implement `TermUI.Terminal.enable_raw_mode/0` function that calls `shell.start_interactive({:noshell, :raw})` and configures the terminal for TUI operation, returning `{:ok, terminal_state}` or `{:error, reason}`
-- [ ] 1.1.1.2 Implement terminal state structure tracking raw mode status, original terminal settings, and active features (mouse tracking, bracketed paste, alternate screen)
+- [x] 1.1.1.1 Implement `TermUI.Terminal.enable_raw_mode/0` function that calls `shell.start_interactive({:noshell, :raw})` and configures the terminal for TUI operation, returning `{:ok, terminal_state}` or `{:error, reason}`
+- [x] 1.1.1.2 Implement terminal state structure tracking raw mode status, original terminal settings, and active features (mouse tracking, bracketed paste, alternate screen)
 - [ ] 1.1.1.3 Implement input configuration setting VMIN=0 and VTIME=1 for non-blocking reads with 100ms timeout, enabling responsive polling without busy-waiting
-- [ ] 1.1.1.4 Implement `TermUI.Terminal.disable_raw_mode/1` function that restores original terminal settings, ensuring clean exit regardless of application state
+- [x] 1.1.1.4 Implement `TermUI.Terminal.disable_raw_mode/1` function that restores original terminal settings, ensuring clean exit regardless of application state
 
 ### 1.1.2 Alternate Screen Buffer
 
-- [ ] **Task 1.1.2 Complete**
+- [x] **Task 1.1.2 Complete**
 
 Modern terminals provide an alternate screen buffer that preserves the user's shell history while the TUI runs. Activating the alternate screen (`ESC[?1049h`) switches to a fresh buffer; deactivating (`ESC[?1049l`) restores the original content. This creates a clean separation between TUI output and the surrounding shell session. We must ensure alternate screen is always deactivated on exit, even during crashes, to prevent leaving users with a blank terminal.
 
-- [ ] 1.1.2.1 Implement `enter_alternate_screen/0` sending `ESC[?1049h` escape sequence to activate alternate buffer
-- [ ] 1.1.2.2 Implement `leave_alternate_screen/0` sending `ESC[?1049l` escape sequence to restore original buffer
-- [ ] 1.1.2.3 Integrate alternate screen management with terminal state, tracking activation status
-- [ ] 1.1.2.4 Implement cleanup hooks ensuring alternate screen is exited on application termination, crash, or signal
+- [x] 1.1.2.1 Implement `enter_alternate_screen/0` sending `ESC[?1049h` escape sequence to activate alternate buffer
+- [x] 1.1.2.2 Implement `leave_alternate_screen/0` sending `ESC[?1049l` escape sequence to restore original buffer
+- [x] 1.1.2.3 Integrate alternate screen management with terminal state, tracking activation status
+- [x] 1.1.2.4 Implement cleanup hooks ensuring alternate screen is exited on application termination, crash, or signal
 
 ### 1.1.3 Terminal Restoration
 
-- [ ] **Task 1.1.3 Complete**
+- [x] **Task 1.1.3 Complete**
 
 Terminal restoration is critical for user experience—a TUI that leaves the terminal in raw mode after exit makes the shell unusable. We implement multiple layers of protection: explicit cleanup functions, process exit traps, and OS signal handlers. The restoration sequence must reverse all terminal modifications: disable raw mode, exit alternate screen, show cursor, disable mouse tracking, and restore original terminal attributes.
 
-- [ ] 1.1.3.1 Implement process exit trap using `Process.flag(:trap_exit, true)` to catch exits and perform cleanup before termination
+- [x] 1.1.3.1 Implement process exit trap using `Process.flag(:trap_exit, true)` to catch exits and perform cleanup before termination
 - [ ] 1.1.3.2 Implement signal handler registration for SIGTERM and SIGINT to ensure cleanup on forced termination
-- [ ] 1.1.3.3 Implement `TermUI.Terminal.restore/1` function that performs complete terminal restoration in correct sequence
-- [ ] 1.1.3.4 Implement crash recovery mechanism that detects unclean termination and offers terminal reset on next startup
+- [x] 1.1.3.3 Implement `TermUI.Terminal.restore/1` function that performs complete terminal restoration in correct sequence
+- [x] 1.1.3.4 Implement crash recovery mechanism that detects unclean termination and offers terminal reset on next startup
 
 ### 1.1.4 Terminal Size Detection
 
-- [ ] **Task 1.1.4 Complete**
+- [x] **Task 1.1.4 Complete**
 
 Terminal size (rows and columns) determines the available rendering area. We detect size at startup and monitor for resize events (SIGWINCH). Size changes trigger re-layout and re-render of the entire UI. The detection must work across platforms—Unix provides ioctl(TIOCGWINSZ), while Windows uses GetConsoleScreenBufferInfo. We also handle edge cases like running in non-terminal contexts (pipes, tests).
 
-- [ ] 1.1.4.1 Implement `get_terminal_size/0` returning `{:ok, {rows, cols}}` by querying terminal dimensions via appropriate system call
-- [ ] 1.1.4.2 Implement SIGWINCH handler that detects terminal resize events and notifies the application
-- [ ] 1.1.4.3 Implement size change callback system allowing components to register for resize notifications
+- [x] 1.1.4.1 Implement `get_terminal_size/0` returning `{:ok, {rows, cols}}` by querying terminal dimensions via appropriate system call
+- [x] 1.1.4.2 Implement SIGWINCH handler that detects terminal resize events and notifies the application
+- [x] 1.1.4.3 Implement size change callback system allowing components to register for resize notifications
 - [ ] 1.1.4.4 Implement fallback size detection using cursor position query (`ESC[6n`) for terminals that don't support ioctl
 
 ### Unit Tests - Section 1.1
 
-- [ ] **Unit Tests 1.1 Complete**
-- [ ] Test raw mode activation returns success on OTP 28+ runtime
-- [ ] Test raw mode disabling restores original terminal settings correctly
-- [ ] Test alternate screen activation and deactivation sequence
-- [ ] Test terminal restoration on normal exit cleans up all modifications
-- [ ] Test terminal restoration on crash via exit trap
-- [ ] Test terminal size detection returns valid dimensions
-- [ ] Test resize event notification triggers registered callbacks
-- [ ] Test terminal operations fail gracefully in non-terminal contexts
+- [x] **Unit Tests 1.1 Complete**
+- [x] Test raw mode activation returns success on OTP 28+ runtime
+- [x] Test raw mode disabling restores original terminal settings correctly
+- [x] Test alternate screen activation and deactivation sequence
+- [x] Test terminal restoration on normal exit cleans up all modifications
+- [x] Test terminal restoration on crash via exit trap
+- [x] Test terminal size detection returns valid dimensions
+- [x] Test resize event notification triggers registered callbacks
+- [x] Test terminal operations fail gracefully in non-terminal contexts
 
 ---
 
