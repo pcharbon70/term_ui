@@ -225,7 +225,7 @@ The diff output is a list of render operations that the escape sequence generato
 
 ## 2.4 Cursor Optimization
 
-- [ ] **Section 2.4 Complete**
+- [x] **Section 2.4 Complete**
 
 Cursor optimization selects the cheapest way to move the cursor between positions. Options include absolute positioning (`ESC[{row};{col}H`), relative movements (up/down/left/right), and special movements (home, newline, carriage return). We calculate byte cost for each option and choose the minimum. This optimization is critical for performance—naive absolute positioning adds significant overhead.
 
@@ -233,59 +233,59 @@ The optimizer maintains current cursor position and calculates cost for each mov
 
 ### 2.4.1 Movement Cost Model
 
-- [ ] **Task 2.4.1 Complete**
+- [x] **Task 2.4.1 Complete**
 
 We define cost functions for all cursor movement options. Absolute positioning costs 6-10 bytes depending on coordinate size. Relative movements cost 3-6 bytes. Special movements (CR, LF, home) cost 1-3 bytes. Literal spaces cost 1 byte each but also overwrite content. We model all costs and compare to find minimum.
 
-- [ ] 2.4.1.1 Implement absolute positioning cost `cost_absolute(row, col)` calculating escape sequence length
-- [ ] 2.4.1.2 Implement relative movement costs `cost_up(n)`, `cost_down(n)`, `cost_left(n)`, `cost_right(n)`
-- [ ] 2.4.1.3 Implement special movement costs for carriage return, newline, home, and their combinations
-- [ ] 2.4.1.4 Implement literal space cost for small rightward movements where spaces are cheaper
+- [x] 2.4.1.1 Implement absolute positioning cost `cost_absolute(row, col)` calculating escape sequence length
+- [x] 2.4.1.2 Implement relative movement costs `cost_up(n)`, `cost_down(n)`, `cost_left(n)`, `cost_right(n)`
+- [x] 2.4.1.3 Implement special movement costs for carriage return, newline, home, and their combinations
+- [x] 2.4.1.4 Implement literal space cost for small rightward movements where spaces are cheaper
 
 ### 2.4.2 Optimal Path Selection
 
-- [ ] **Task 2.4.2 Complete**
+- [x] **Task 2.4.2 Complete**
 
 Given current and target cursor positions, we select the optimal movement sequence. This may combine multiple movements (e.g., CR + down is cheaper than absolute for column 1). We enumerate viable options and select minimum cost. For complex cases, we use dynamic programming or A* search.
 
-- [ ] 2.4.2.1 Implement `optimal_move(from, to)` returning cheapest movement sequence
-- [ ] 2.4.2.2 Implement option enumeration generating all viable movement combinations
-- [ ] 2.4.2.3 Implement cost comparison selecting minimum total cost option
-- [ ] 2.4.2.4 Implement movement sequence generation converting chosen option to escape sequences
+- [x] 2.4.2.1 Implement `optimal_move(from, to)` returning cheapest movement sequence
+- [x] 2.4.2.2 Implement option enumeration generating all viable movement combinations
+- [x] 2.4.2.3 Implement cost comparison selecting minimum total cost option
+- [x] 2.4.2.4 Implement movement sequence generation converting chosen option to escape sequences
 
 ### 2.4.3 Cursor Position Tracking
 
-- [ ] **Task 2.4.3 Complete**
+- [x] **Task 2.4.3 Complete**
 
 We track cursor position throughout rendering to enable relative movement optimization. Position updates after each movement and text output (cursor advances with each character). We handle line wrapping (cursor moves to next row) and scrolling (screen content shifts). Position tracking must exactly match terminal behavior.
 
-- [ ] 2.4.3.1 Implement cursor state tracking current row and column during render
-- [ ] 2.4.3.2 Implement position update after movement operations
-- [ ] 2.4.3.3 Implement position advance after text output accounting for display width
-- [ ] 2.4.3.4 Implement wrap handling detecting when cursor advances past last column
+- [x] 2.4.3.1 Implement cursor state tracking current row and column during render
+- [x] 2.4.3.2 Implement position update after movement operations
+- [x] 2.4.3.3 Implement position advance after text output accounting for display width
+- [x] 2.4.3.4 Implement wrap handling detecting when cursor advances past last column
 
 ### 2.4.4 Movement Sequence Integration
 
-- [ ] **Task 2.4.4 Complete**
+- [x] **Task 2.4.4 Complete**
 
 We integrate cursor optimization into the render pipeline, converting diff output move operations to optimized escape sequences. The optimizer processes operations in order, maintaining cursor state and rewriting moves. We batch optimizations for efficiency and provide fallback to absolute positioning when optimization fails.
 
-- [ ] 2.4.4.1 Implement render operation processor that optimizes move operations in sequence
-- [ ] 2.4.4.2 Implement optimization fallback using absolute positioning when calculation exceeds time limit
-- [ ] 2.4.4.3 Implement optimization statistics tracking bytes saved for performance monitoring
-- [ ] 2.4.4.4 Implement cursor sync operation forcing known position when tracking may be incorrect
+- [x] 2.4.4.1 Implement render operation processor that optimizes move operations in sequence
+- [x] 2.4.4.2 Implement optimization fallback using absolute positioning when calculation exceeds time limit
+- [x] 2.4.4.3 Implement optimization statistics tracking bytes saved for performance monitoring
+- [x] 2.4.4.4 Implement cursor sync operation forcing known position when tracking may be incorrect
 
 ### Unit Tests - Section 2.4
 
-- [ ] **Unit Tests 2.4 Complete**
-- [ ] Test movement cost calculations return correct byte counts
-- [ ] Test optimal path selection chooses cheapest option for various position pairs
-- [ ] Test CR+down is chosen over absolute for column 1 movements
-- [ ] Test literal spaces are used for small rightward movements
-- [ ] Test cursor position tracking stays synchronized during rendering
-- [ ] Test text output advances cursor by display width
-- [ ] Test optimization produces shorter output than naive absolute positioning
-- [ ] Test fallback to absolute positioning works when optimization disabled
+- [x] **Unit Tests 2.4 Complete**
+- [x] Test movement cost calculations return correct byte counts
+- [x] Test optimal path selection chooses cheapest option for various position pairs
+- [x] Test CR+down is chosen over absolute for column 1 movements
+- [x] Test literal spaces are used for small rightward movements
+- [x] Test cursor position tracking stays synchronized during rendering
+- [x] Test text output advances cursor by display width
+- [x] Test optimization produces shorter output than naive absolute positioning
+- [x] Test fallback to absolute positioning works when optimization disabled
 
 ---
 
