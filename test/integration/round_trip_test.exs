@@ -402,8 +402,8 @@ defmodule TermUI.Integration.RoundTripTest do
     end
 
     test "cursor movement with large values" do
-      assert ANSI.cursor_up(10000) |> IO.iodata_to_binary() == "\e[10000A"
-      assert ANSI.cursor_down(10000) |> IO.iodata_to_binary() == "\e[10000B"
+      assert ANSI.cursor_up(10_000) |> IO.iodata_to_binary() == "\e[10000A"
+      assert ANSI.cursor_down(10_000) |> IO.iodata_to_binary() == "\e[10000B"
     end
 
     test "256 color boundary values" do
