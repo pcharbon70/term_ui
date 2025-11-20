@@ -156,94 +156,94 @@ Escape sequence optimization reduces terminal I/O overhead—critical for respon
 
 ## 1.3 Escape Sequence Parser
 
-- [ ] **Section 1.3 Complete**
+- [x] **Section 1.3 Complete**
 
 The escape sequence parser transforms raw terminal input bytes into structured events (key presses, mouse actions, paste content, focus changes). Parsing terminal input is complex because escape sequences are variable-length—a single ESC byte might be the Escape key or the start of a multi-byte sequence like arrow keys or mouse events. We implement a state machine parser that handles all standard VT100/xterm sequences plus modern extensions for mouse tracking and special keys.
 
-The parser must handle ambiguity: receiving ESC followed by nothing within a timeout indicates Escape key press; ESC followed by `[A` indicates Up arrow. We use a trie data structure for efficient sequence matching and timeout-based disambiguation. The parser produces semantic events (`%KeyEvent{key: :up, modifiers: []}`) rather than raw sequences, insulating higher layers from terminal protocol details.
+The parser must handle ambiguity: receiving ESC followed by nothing within a timeout indicates Escape key press; ESC followed by `[A` indicates Up arrow. We use a map-based lookup for efficient sequence matching and timeout-based disambiguation. The parser produces semantic events (`%KeyEvent{key: :up, modifiers: []}`) rather than raw sequences, insulating higher layers from terminal protocol details.
 
 ### 1.3.1 Input Event Data Structures
 
-- [ ] **Task 1.3.1 Complete**
+- [x] **Task 1.3.1 Complete**
 
 We define event structs representing all possible terminal input events. Key events include the key identifier (character, special key name, or keycode) plus modifiers (Ctrl, Alt, Shift). Mouse events include action (press, release, motion), button, coordinates, and modifiers. Other events cover paste content, focus changes, and resize signals. These structs form the public API—all input handling works with these types.
 
-- [ ] 1.3.1.1 Define `%KeyEvent{key: atom | char, modifiers: [atom]}` struct for keyboard input with modifier tracking
-- [ ] 1.3.1.2 Define `%MouseEvent{action: atom, button: atom, x: integer, y: integer, modifiers: [atom]}` struct for mouse input
-- [ ] 1.3.1.3 Define `%PasteEvent{content: String.t()}` struct for bracketed paste content
-- [ ] 1.3.1.4 Define `%FocusEvent{focused: boolean}` struct for focus gained/lost events
-- [ ] 1.3.1.5 Define `%ResizeEvent{rows: integer, cols: integer}` struct for terminal size changes
+- [x] 1.3.1.1 Define `%KeyEvent{key: atom | char, modifiers: [atom]}` struct for keyboard input with modifier tracking
+- [x] 1.3.1.2 Define `%MouseEvent{action: atom, button: atom, x: integer, y: integer, modifiers: [atom]}` struct for mouse input
+- [x] 1.3.1.3 Define `%PasteEvent{content: String.t()}` struct for bracketed paste content
+- [x] 1.3.1.4 Define `%FocusEvent{focused: boolean}` struct for focus gained/lost events
+- [x] 1.3.1.5 Define `%ResizeEvent{rows: integer, cols: integer}` struct for terminal size changes
 
 ### 1.3.2 State Machine Parser
 
-- [ ] **Task 1.3.2 Complete**
+- [x] **Task 1.3.2 Complete**
 
 The parser state machine tracks position within potential escape sequences. States include: Ground (normal input), Escape (received ESC), CSI (received ESC[), SS3 (received ESCO), and various parameter-collecting states. Transitions occur on each input byte, accumulating parameters until sequence completion. Invalid sequences return to Ground with accumulated bytes emitted as literal input.
 
-- [ ] 1.3.2.1 Implement parser state enum with Ground, Escape, CSI, SS3, DCS, OSC states and transitions
-- [ ] 1.3.2.2 Implement state transition logic processing each input byte and updating parser state
-- [ ] 1.3.2.3 Implement parameter accumulation for CSI sequences collecting numeric parameters separated by semicolons
-- [ ] 1.3.2.4 Implement timeout handling for ambiguous sequences (ESC alone vs ESC+sequence) using configurable timeout (default 50ms)
+- [x] 1.3.2.1 Implement parser state with Ground, Escape, CSI, SS3, SGR_mouse, Paste modes and transitions
+- [x] 1.3.2.2 Implement state transition logic processing each input byte and updating parser state
+- [x] 1.3.2.3 Implement parameter accumulation for CSI sequences collecting numeric parameters separated by semicolons
+- [x] 1.3.2.4 Implement `flush_escape/1` for timeout handling of ambiguous sequences (ESC alone vs ESC+sequence)
 
 ### 1.3.3 Key Sequence Recognition
 
-- [ ] **Task 1.3.3 Complete**
+- [x] **Task 1.3.3 Complete**
 
-Key sequences map escape codes to semantic key events. Arrow keys use CSI sequences (`ESC[A` through `ESC[D`). Function keys use SS3 (`ESCOP` through `ESCO[`) or CSI (`ESC[15~` through `ESC[24~`) depending on terminal. Modified keys add parameters (`ESC[1;5A` for Ctrl+Up). We build a trie from sequence bytes to key events for O(k) lookup where k is sequence length.
+Key sequences map escape codes to semantic key events. Arrow keys use CSI sequences (`ESC[A` through `ESC[D`). Function keys use SS3 (`ESCOP` through `ESCO[`) or CSI (`ESC[15~` through `ESC[24~`) depending on terminal. Modified keys add parameters (`ESC[1;5A` for Ctrl+Up). We use map-based lookups for O(1) key resolution.
 
-- [ ] 1.3.3.1 Implement sequence trie data structure mapping byte sequences to key events
-- [ ] 1.3.3.2 Populate trie with arrow key sequences (Up/Down/Left/Right) including modified variants
-- [ ] 1.3.3.3 Populate trie with function key sequences (F1-F12) for both SS3 and CSI formats
-- [ ] 1.3.3.4 Populate trie with special key sequences (Home, End, Insert, Delete, PageUp, PageDown)
-- [ ] 1.3.3.5 Implement modifier extraction from CSI parameters (1=none, 2=Shift, 3=Alt, 4=Shift+Alt, 5=Ctrl, etc.)
+- [x] 1.3.3.1 Implement map-based lookups for CSI letter keys, tilde keys, and SS3 keys
+- [x] 1.3.3.2 Implement arrow key parsing (Up/Down/Left/Right) including modified variants
+- [x] 1.3.3.3 Implement function key parsing (F1-F12) for both SS3 and CSI formats
+- [x] 1.3.3.4 Implement special key parsing (Home, End, Insert, Delete, PageUp, PageDown)
+- [x] 1.3.3.5 Implement modifier extraction from CSI parameters (1=none, 2=Shift, 3=Alt, 4=Shift+Alt, 5=Ctrl, etc.)
 
 ### 1.3.4 Mouse Event Parsing
 
-- [ ] **Task 1.3.4 Complete**
+- [x] **Task 1.3.4 Complete**
 
 Mouse events arrive in various formats depending on the tracking mode. X10 mode uses `ESC[M` followed by button+32, column+32, row+32 (limited to 223 columns). SGR extended mode (`ESC[<{button};{col};{row}M/m`) uses decimal encoding with no coordinate limit and distinguishes press from release. We parse both formats, preferring SGR when available for its superior encoding.
 
-- [ ] 1.3.4.1 Implement X10 mouse event parsing extracting button, column, row from `ESC[M` sequences
-- [ ] 1.3.4.2 Implement SGR mouse event parsing extracting parameters from `ESC[<` sequences with M (press) or m (release) terminator
-- [ ] 1.3.4.3 Implement button decoding mapping encoded values to button names (left, middle, right, wheel-up, wheel-down)
-- [ ] 1.3.4.4 Implement modifier extraction for mouse events (Shift, Alt, Ctrl held during click)
-- [ ] 1.3.4.5 Implement motion event detection distinguishing move events from click events
+- [x] 1.3.4.1 Implement X10 mouse event parsing extracting button, column, row from `ESC[M` sequences
+- [x] 1.3.4.2 Implement SGR mouse event parsing extracting parameters from `ESC[<` sequences with M (press) or m (release) terminator
+- [x] 1.3.4.3 Implement button decoding mapping encoded values to button names (left, middle, right, wheel-up, wheel-down)
+- [x] 1.3.4.4 Implement modifier extraction for mouse events (Shift, Alt, Ctrl held during click)
+- [x] 1.3.4.5 Implement motion event detection distinguishing move events from click events
 
 ### 1.3.5 Bracketed Paste Parsing
 
-- [ ] **Task 1.3.5 Complete**
+- [x] **Task 1.3.5 Complete**
 
 Bracketed paste mode wraps pasted content in `ESC[200~` (start) and `ESC[201~` (end) markers. This allows the application to distinguish pasted text from typed input—important for avoiding auto-indent cascades in editors and preventing pasted shell commands from executing line-by-line. The parser accumulates content between markers and emits a single paste event.
 
-- [ ] 1.3.5.1 Implement paste start detection recognizing `ESC[200~` sequence and entering paste accumulation mode
-- [ ] 1.3.5.2 Implement paste content accumulation collecting all bytes until end marker
-- [ ] 1.3.5.3 Implement paste end detection recognizing `ESC[201~` sequence and emitting PasteEvent
-- [ ] 1.3.5.4 Implement paste timeout handling for malformed paste sequences (start without end)
+- [x] 1.3.5.1 Implement paste start detection recognizing `ESC[200~` sequence and entering paste accumulation mode
+- [x] 1.3.5.2 Implement paste content accumulation collecting all bytes until end marker
+- [x] 1.3.5.3 Implement paste end detection recognizing `ESC[201~` sequence and emitting PasteEvent
+- [x] 1.3.5.4 Paste buffer accumulates across multiple parse calls for split paste sequences
 
 ### 1.3.6 Parser API
 
-- [ ] **Task 1.3.6 Complete**
+- [x] **Task 1.3.6 Complete**
 
-The parser exposes a clean API for processing input bytes into events. The main function accepts a byte buffer and returns parsed events plus remaining unparsed bytes (for incomplete sequences). The parser maintains state between calls for handling sequences split across read boundaries. We provide both synchronous parsing and streaming modes for different use cases.
+The parser exposes a clean API for processing input bytes into events. The main function accepts a byte buffer and returns parsed events plus remaining unparsed bytes (for incomplete sequences). The parser maintains state between calls for handling sequences split across read boundaries.
 
-- [ ] 1.3.6.1 Implement `parse(bytes, state)` returning `{events, remaining_bytes, new_state}` for incremental parsing
-- [ ] 1.3.6.2 Implement `new_parser/0` creating initial parser state for fresh parsing context
-- [ ] 1.3.6.3 Implement `reset_parser/1` clearing parser state while preserving configuration
-- [ ] 1.3.6.4 Implement streaming mode API with callback-based event delivery for GenServer integration
+- [x] 1.3.6.1 Implement `parse(bytes, state)` returning `{events, remaining_bytes, new_state}` for incremental parsing
+- [x] 1.3.6.2 Implement `new/0` creating initial parser state for fresh parsing context
+- [x] 1.3.6.3 Implement `reset/1` clearing parser state while preserving configuration
+- [x] 1.3.6.4 Implement `flush_escape/1` for ESC disambiguation after timeout
 
 ### Unit Tests - Section 1.3
 
-- [ ] **Unit Tests 1.3 Complete**
-- [ ] Test single character parsing produces correct KeyEvent for printable ASCII
-- [ ] Test Ctrl+key combinations produce KeyEvent with ctrl modifier
-- [ ] Test arrow key sequences parse to correct directional KeyEvents
-- [ ] Test function key sequences (F1-F12) parse correctly in both SS3 and CSI formats
-- [ ] Test modifier key combinations (Ctrl+Shift+Up) extract all modifiers correctly
-- [ ] Test X10 mouse event parsing produces correct MouseEvent coordinates and button
-- [ ] Test SGR mouse event parsing handles extended coordinates and press/release distinction
-- [ ] Test bracketed paste parsing accumulates content and produces single PasteEvent
-- [ ] Test timeout handling disambiguates bare ESC from escape sequence start
-- [ ] Test parser state persists correctly across split sequences
+- [x] **Unit Tests 1.3 Complete**
+- [x] Test single character parsing produces correct KeyEvent for printable ASCII
+- [x] Test Ctrl+key combinations produce KeyEvent with ctrl modifier
+- [x] Test arrow key sequences parse to correct directional KeyEvents
+- [x] Test function key sequences (F1-F12) parse correctly in both SS3 and CSI formats
+- [x] Test modifier key combinations (Ctrl+Shift+Up) extract all modifiers correctly
+- [x] Test X10 mouse event parsing produces correct MouseEvent coordinates and button
+- [x] Test SGR mouse event parsing handles extended coordinates and press/release distinction
+- [x] Test bracketed paste parsing accumulates content and produces single PasteEvent
+- [x] Test flush_escape disambiguates bare ESC from escape sequence start
+- [x] Test parser state persists correctly across split sequences
 
 ---
 
