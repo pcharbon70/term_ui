@@ -78,7 +78,7 @@ Terminal size (rows and columns) determines the available rendering area. We det
 
 ## 1.2 ANSI Escape Sequence Generation
 
-- [ ] **Section 1.2 Complete**
+- [x] **Section 1.2 Complete**
 
 ANSI escape sequences control terminal behavior through special character codes embedded in the output stream. Sequences beginning with ESC (0x1B) followed by control characters instruct the terminal to move the cursor, change colors, clear regions, and enable special modes. We implement a comprehensive sequence generator that produces correct codes for all operations while optimizing for minimal byte output. The generator abstracts the complexity of escape codes behind a semantic API—callers request "move cursor to row 5, column 10" rather than constructing raw byte sequences.
 
@@ -86,71 +86,71 @@ The VT100/ANSI X3.64 standard forms the foundation, with extensions for 256-colo
 
 ### 1.2.1 Cursor Control Sequences
 
-- [ ] **Task 1.2.1 Complete**
+- [x] **Task 1.2.1 Complete**
 
 Cursor control is fundamental to TUI rendering. We generate sequences for absolute positioning (`ESC[{row};{col}H`), relative movement (up/down/left/right), and cursor visibility. The generator tracks current cursor position to enable optimization—moving one column right is cheaper as `ESC[C` (3 bytes) than absolute positioning (6+ bytes). We provide both low-level sequence generation and higher-level movement functions that choose optimal sequences automatically.
 
-- [ ] 1.2.1.1 Implement `cursor_position(row, col)` returning `ESC[{row};{col}H` sequence for absolute positioning (1-indexed)
-- [ ] 1.2.1.2 Implement relative movement functions `cursor_up(n)`, `cursor_down(n)`, `cursor_forward(n)`, `cursor_back(n)` with parameter omission when n=1
-- [ ] 1.2.1.3 Implement `cursor_show/0` and `cursor_hide/0` returning `ESC[?25h` and `ESC[?25l` sequences
-- [ ] 1.2.1.4 Implement `save_cursor/0` and `restore_cursor/0` returning `ESC[s` and `ESC[u` for cursor position stack operations
+- [x] 1.2.1.1 Implement `cursor_position(row, col)` returning `ESC[{row};{col}H` sequence for absolute positioning (1-indexed)
+- [x] 1.2.1.2 Implement relative movement functions `cursor_up(n)`, `cursor_down(n)`, `cursor_forward(n)`, `cursor_back(n)` with parameter omission when n=1
+- [x] 1.2.1.3 Implement `cursor_show/0` and `cursor_hide/0` returning `ESC[?25h` and `ESC[?25l` sequences
+- [x] 1.2.1.4 Implement `save_cursor/0` and `restore_cursor/0` returning `ESC[s` and `ESC[u` for cursor position stack operations
 
 ### 1.2.2 Screen Manipulation Sequences
 
-- [ ] **Task 1.2.2 Complete**
+- [x] **Task 1.2.2 Complete**
 
 Screen manipulation sequences clear regions and scroll content. Clear operations range from entire screen (`ESC[2J`) to end-of-line (`ESC[K`). Scroll regions enable efficient content movement without redrawing—scrolling up by one line is much cheaper than redrawing the entire screen. We implement all standard clearing and scrolling operations with efficient parameterization.
 
-- [ ] 1.2.2.1 Implement screen clear functions: `clear_screen/0` (`ESC[2J`), `clear_screen_from_cursor/0` (`ESC[0J`), `clear_screen_to_cursor/0` (`ESC[1J`)
-- [ ] 1.2.2.2 Implement line clear functions: `clear_line/0` (`ESC[2K`), `clear_line_from_cursor/0` (`ESC[K`), `clear_line_to_cursor/0` (`ESC[1K`)
-- [ ] 1.2.2.3 Implement scroll region setting `set_scroll_region(top, bottom)` returning `ESC[{top};{bottom}r`
-- [ ] 1.2.2.4 Implement scroll operations `scroll_up(n)` and `scroll_down(n)` returning `ESC[{n}S` and `ESC[{n}T`
+- [x] 1.2.2.1 Implement screen clear functions: `clear_screen/0` (`ESC[2J`), `clear_screen_from_cursor/0` (`ESC[0J`), `clear_screen_to_cursor/0` (`ESC[1J`)
+- [x] 1.2.2.2 Implement line clear functions: `clear_line/0` (`ESC[2K`), `clear_line_from_cursor/0` (`ESC[K`), `clear_line_to_cursor/0` (`ESC[1K`)
+- [x] 1.2.2.3 Implement scroll region setting `set_scroll_region(top, bottom)` returning `ESC[{top};{bottom}r`
+- [x] 1.2.2.4 Implement scroll operations `scroll_up(n)` and `scroll_down(n)` returning `ESC[{n}S` and `ESC[{n}T`
 
 ### 1.2.3 Color and Style Sequences
 
-- [ ] **Task 1.2.3 Complete**
+- [x] **Task 1.2.3 Complete**
 
 Color sequences control text foreground and background colors plus text attributes like bold, italic, and underline. We support three color modes: basic 16-color (SGR 30-37, 40-47, 90-97, 100-107), 256-color palette (SGR 38;5;n and 48;5;n), and true-color RGB (SGR 38;2;r;g;b and 48;2;r;g;b). The generator selects the appropriate format based on terminal capabilities and optimizes by combining multiple attributes into single sequences.
 
-- [ ] 1.2.3.1 Implement basic color functions for 16-color mode with named colors (black, red, green, yellow, blue, magenta, cyan, white) and bright variants
-- [ ] 1.2.3.2 Implement `color_256(index)` for 256-color palette supporting both foreground and background
-- [ ] 1.2.3.3 Implement `color_rgb(r, g, b)` for true-color support with validation of RGB values (0-255)
-- [ ] 1.2.3.4 Implement text attribute functions: `bold/0`, `dim/0`, `italic/0`, `underline/0`, `blink/0`, `reverse/0`, `hidden/0`, `strikethrough/0`
-- [ ] 1.2.3.5 Implement `reset_style/0` returning `ESC[0m` and combined style function that merges multiple attributes into single SGR sequence
+- [x] 1.2.3.1 Implement basic color functions for 16-color mode with named colors (black, red, green, yellow, blue, magenta, cyan, white) and bright variants
+- [x] 1.2.3.2 Implement `color_256(index)` for 256-color palette supporting both foreground and background
+- [x] 1.2.3.3 Implement `color_rgb(r, g, b)` for true-color support with validation of RGB values (0-255)
+- [x] 1.2.3.4 Implement text attribute functions: `bold/0`, `dim/0`, `italic/0`, `underline/0`, `blink/0`, `reverse/0`, `hidden/0`, `strikethrough/0`
+- [x] 1.2.3.5 Implement `reset_style/0` returning `ESC[0m` and combined style function that merges multiple attributes into single SGR sequence
 
 ### 1.2.4 Special Mode Sequences
 
-- [ ] **Task 1.2.4 Complete**
+- [x] **Task 1.2.4 Complete**
 
 Special modes enable advanced terminal features beyond basic text display. Bracketed paste mode wraps pasted text in escape sequences, distinguishing it from typed input. Focus events report when the terminal gains or loses focus. Application cursor keys change arrow key sequences for better compatibility. We generate activation and deactivation sequences for all supported modes.
 
-- [ ] 1.2.4.1 Implement bracketed paste mode `enable_bracketed_paste/0` (`ESC[?2004h`) and `disable_bracketed_paste/0` (`ESC[?2004l`)
-- [ ] 1.2.4.2 Implement focus event reporting `enable_focus_events/0` (`ESC[?1004h`) and `disable_focus_events/0` (`ESC[?1004l`)
-- [ ] 1.2.4.3 Implement application cursor keys mode `enable_app_cursor/0` (`ESC[?1h`) and `disable_app_cursor/0` (`ESC[?1l`)
-- [ ] 1.2.4.4 Implement mouse tracking mode sequences for X10 (`ESC[?9h`), normal (`ESC[?1000h`), button (`ESC[?1002h`), and all motion (`ESC[?1003h`) modes
+- [x] 1.2.4.1 Implement bracketed paste mode `enable_bracketed_paste/0` (`ESC[?2004h`) and `disable_bracketed_paste/0` (`ESC[?2004l`)
+- [x] 1.2.4.2 Implement focus event reporting `enable_focus_events/0` (`ESC[?1004h`) and `disable_focus_events/0` (`ESC[?1004l`)
+- [x] 1.2.4.3 Implement application cursor keys mode `enable_app_cursor/0` (`ESC[?1h`) and `disable_app_cursor/0` (`ESC[?1l`)
+- [x] 1.2.4.4 Implement mouse tracking mode sequences for X10 (`ESC[?9h`), normal (`ESC[?1000h`), button (`ESC[?1002h`), and all motion (`ESC[?1003h`) modes
 
 ### 1.2.5 Sequence Optimization
 
-- [ ] **Task 1.2.5 Complete**
+- [x] **Task 1.2.5 Complete**
 
 Escape sequence optimization reduces terminal I/O overhead—critical for responsive TUIs, especially over SSH. We implement several optimizations: parameter omission (default parameters can be omitted), relative vs absolute movement (choose cheaper option based on current position), attribute combination (merge adjacent SGR sequences), and delta encoding (skip unchanged attributes). The optimizer processes sequence lists and produces minimal byte output.
 
-- [ ] 1.2.5.1 Implement parameter omission optimization removing default values (e.g., `ESC[1A` becomes `ESC[A`)
+- [x] 1.2.5.1 Implement parameter omission optimization removing default values (e.g., `ESC[1A` becomes `ESC[A`)
 - [ ] 1.2.5.2 Implement cursor movement optimization choosing between absolute and relative positioning based on distance
-- [ ] 1.2.5.3 Implement SGR sequence combination merging adjacent style changes into single sequence (`ESC[1;31;44m` instead of three sequences)
+- [x] 1.2.5.3 Implement SGR sequence combination merging adjacent style changes into single sequence (`ESC[1;31;44m` instead of three sequences)
 - [ ] 1.2.5.4 Implement style delta tracking only emitting changed attributes from previous state
 
 ### Unit Tests - Section 1.2
 
-- [ ] **Unit Tests 1.2 Complete**
-- [ ] Test cursor positioning generates correct escape sequences for various row/column combinations
-- [ ] Test relative cursor movement generates correct sequences with parameter omission for n=1
-- [ ] Test screen clear functions generate correct sequences for all clear modes
-- [ ] Test 16-color, 256-color, and true-color sequences generate correctly formatted SGR codes
-- [ ] Test text attribute sequences generate correct SGR codes for all attributes
-- [ ] Test combined styles merge into single SGR sequence
-- [ ] Test special mode activation/deactivation generates correct sequences
-- [ ] Test sequence optimization reduces byte count without changing semantics
+- [x] **Unit Tests 1.2 Complete**
+- [x] Test cursor positioning generates correct escape sequences for various row/column combinations
+- [x] Test relative cursor movement generates correct sequences with parameter omission for n=1
+- [x] Test screen clear functions generate correct sequences for all clear modes
+- [x] Test 16-color, 256-color, and true-color sequences generate correctly formatted SGR codes
+- [x] Test text attribute sequences generate correct SGR codes for all attributes
+- [x] Test combined styles merge into single SGR sequence
+- [x] Test special mode activation/deactivation generates correct sequences
+- [x] Test sequence optimization reduces byte count without changing semantics
 
 ---
 
