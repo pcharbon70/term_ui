@@ -152,7 +152,8 @@ defmodule TermUI.IntegrationHelpers do
         end
     end
   rescue
-    _ -> false
+    # ErlangError occurs when System.cmd fails (e.g., test command not found on Windows)
+    ErlangError -> false
   end
 
   @doc """
