@@ -81,7 +81,7 @@ The buffer holds all cells for the entire screen. We use ETS ordered_set tables 
 
 ## 2.2 ETS-Based Double Buffering
 
-- [ ] **Section 2.2 Complete**
+- [x] **Section 2.2 Complete**
 
 Double buffering uses two screen buffers: the current buffer being populated and the previous buffer showing the last rendered frame. Components write to the current buffer, then the renderer diffs current against previous to identify changes. After rendering, buffers swap roles. ETS tables provide concurrent access—multiple component processes can write cells simultaneously without message-passing bottlenecks.
 
@@ -89,60 +89,60 @@ ETS `:ordered_set` tables enable efficient iteration in row-major order for sequ
 
 ### 2.2.1 Buffer Manager
 
-- [ ] **Task 2.2.1 Complete**
+- [x] **Task 2.2.1 Complete**
 
 The buffer manager GenServer owns the ETS tables and coordinates buffer operations. It tracks current and previous buffer references, handles buffer swapping, and manages table lifecycle. The manager exposes a simple API: get current buffer for writing, trigger render, handle resize events that require buffer reallocation.
 
-- [ ] 2.2.1.1 Implement `TermUI.BufferManager` GenServer owning both buffer ETS tables
-- [ ] 2.2.1.2 Implement `init/1` callback creating initial buffers based on terminal size
-- [ ] 2.2.1.3 Implement `get_current_buffer/0` returning reference to current buffer for component writes
-- [ ] 2.2.1.4 Implement `swap_buffers/0` atomically swapping current and previous buffer references
-- [ ] 2.2.1.5 Implement `handle_resize/2` callback reallocating buffers on terminal size change
+- [x] 2.2.1.1 Implement `TermUI.BufferManager` GenServer owning both buffer ETS tables
+- [x] 2.2.1.2 Implement `init/1` callback creating initial buffers based on terminal size
+- [x] 2.2.1.3 Implement `get_current_buffer/0` returning reference to current buffer for component writes
+- [x] 2.2.1.4 Implement `swap_buffers/0` atomically swapping current and previous buffer references
+- [x] 2.2.1.5 Implement `handle_resize/2` callback reallocating buffers on terminal size change
 
 ### 2.2.2 Concurrent Write Support
 
-- [ ] **Task 2.2.2 Complete**
+- [x] **Task 2.2.2 Complete**
 
 Multiple processes (components) write to the buffer concurrently. ETS provides atomic single-key operations—concurrent writes to different cells are safe. We document the concurrency model: cell writes are atomic but not ordered, overlapping writes have undefined winner. Components should write non-overlapping regions for deterministic results.
 
-- [ ] 2.2.2.1 Implement concurrent cell write with `ets:insert/2` ensuring atomic operation
-- [ ] 2.2.2.2 Document concurrency semantics: last-writer-wins for same cell, no ordering guarantees
-- [ ] 2.2.2.3 Implement batch write `Buffer.set_cells(buffer, cells)` for efficient multi-cell updates
-- [ ] 2.2.2.4 Implement region locking mechanism (optional) for components requiring write ordering
+- [x] 2.2.2.1 Implement concurrent cell write with `ets:insert/2` ensuring atomic operation
+- [x] 2.2.2.2 Document concurrency semantics: last-writer-wins for same cell, no ordering guarantees
+- [x] 2.2.2.3 Implement batch write `Buffer.set_cells(buffer, cells)` for efficient multi-cell updates
+- [x] 2.2.2.4 Implement region locking mechanism (optional) for components requiring write ordering
 
 ### 2.2.3 Buffer Initialization and Clearing
 
-- [ ] **Task 2.2.3 Complete**
+- [x] **Task 2.2.3 Complete**
 
 Buffers must be initialized to a known state before use and cleared between frames when needed. Initialization fills all cells with empty (space, default colors). Clearing resets regions without reallocating the entire buffer. We optimize clearing for common patterns: full screen clear, row clear, rectangular region clear.
 
-- [ ] 2.2.3.1 Implement efficient full buffer initialization using `ets:insert/2` with cell list
-- [ ] 2.2.3.2 Implement row clear `Buffer.clear_row(buffer, row)` for single-row reset
-- [ ] 2.2.3.3 Implement column clear `Buffer.clear_col(buffer, col)` for single-column reset
-- [ ] 2.2.3.4 Implement selective initialization clearing only changed regions for faster reset
+- [x] 2.2.3.1 Implement efficient full buffer initialization using `ets:insert/2` with cell list
+- [x] 2.2.3.2 Implement row clear `Buffer.clear_row(buffer, row)` for single-row reset
+- [x] 2.2.3.3 Implement column clear `Buffer.clear_col(buffer, col)` for single-column reset
+- [x] 2.2.3.4 Implement selective initialization clearing only changed regions for faster reset
 
 ### 2.2.4 Buffer Lifecycle Management
 
-- [ ] **Task 2.2.4 Complete**
+- [x] **Task 2.2.4 Complete**
 
 Buffer lifecycle includes creation, resize, and cleanup. ETS tables persist until explicitly deleted or owning process dies. We ensure proper cleanup on renderer shutdown to avoid orphaned tables. Resize events require careful handling—we must preserve content where possible while adapting to new dimensions.
 
-- [ ] 2.2.4.1 Implement buffer cleanup in GenServer `terminate/2` callback deleting ETS tables
-- [ ] 2.2.4.2 Implement resize content preservation copying cell data from old to new buffer
-- [ ] 2.2.4.3 Implement resize content clipping truncating content that exceeds new dimensions
-- [ ] 2.2.4.4 Implement resize event coordination notifying components of dimension changes
+- [x] 2.2.4.1 Implement buffer cleanup in GenServer `terminate/2` callback deleting ETS tables
+- [x] 2.2.4.2 Implement resize content preservation copying cell data from old to new buffer
+- [x] 2.2.4.3 Implement resize content clipping truncating content that exceeds new dimensions
+- [x] 2.2.4.4 Implement resize event coordination notifying components of dimension changes
 
 ### Unit Tests - Section 2.2
 
-- [ ] **Unit Tests 2.2 Complete**
-- [ ] Test buffer manager creates two ETS tables on initialization
-- [ ] Test get_current_buffer returns valid buffer reference
-- [ ] Test swap_buffers exchanges current and previous buffer references
-- [ ] Test concurrent writes from multiple processes don't corrupt buffer
-- [ ] Test batch write updates multiple cells atomically
-- [ ] Test buffer clearing resets all cells to empty state
-- [ ] Test resize preserves content within new dimensions
-- [ ] Test cleanup deletes ETS tables preventing memory leaks
+- [x] **Unit Tests 2.2 Complete**
+- [x] Test buffer manager creates two ETS tables on initialization
+- [x] Test get_current_buffer returns valid buffer reference
+- [x] Test swap_buffers exchanges current and previous buffer references
+- [x] Test concurrent writes from multiple processes don't corrupt buffer
+- [x] Test batch write updates multiple cells atomically
+- [x] Test buffer clearing resets all cells to empty state
+- [x] Test resize preserves content within new dimensions
+- [x] Test cleanup deletes ETS tables preventing memory leaks
 
 ---
 
