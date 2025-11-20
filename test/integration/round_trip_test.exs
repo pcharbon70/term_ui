@@ -3,7 +3,20 @@ defmodule TermUI.Integration.RoundTripTest do
   Integration tests for input/output round-trip verification.
 
   Tests that output sequences produce expected results and input bytes
-  parse to expected events. These tests validate the complete I/O path.
+  parse to expected events.
+
+  ## Limitations
+
+  These tests validate sequence generation and parsing separately, not through
+  actual terminal I/O via pseudo-terminals (PTY). This means:
+
+  - ANSI sequence generation is tested for correctness
+  - Input byte parsing is tested against expected events
+  - The two are not connected through actual terminal round-trips
+
+  True PTY-based round-trip testing would require platform-specific code to
+  create pseudo-terminal pairs and verify that written sequences produce the
+  expected terminal state. This is left as a future enhancement.
   """
 
   use ExUnit.Case, async: false
