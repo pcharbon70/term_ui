@@ -219,6 +219,23 @@ defmodule TermUI.IntegrationHelpers do
 
   @doc """
   Sets environment variables for testing capabilities.
+
+  ## Important Notes
+
+  Environment variables are global to the Erlang VM, not per-process. This
+  function uses try/after to ensure cleanup, but be aware:
+
+  - Tests using this must run with `async: false` to prevent race conditions
+  - Original values are restored even if the function raises an exception
+  - In rare cases of catastrophic crashes (e.g., VM exit), env vars may not
+    be restored - this is acceptable for test environments
+
+  ## Example
+
+      with_env(%{"TERM" => "xterm-256color"}, fn ->
+        caps = Capabilities.detect()
+        assert caps.max_colors >= 256
+      end)
   """
   @spec with_env(map(), function()) :: term()
   def with_env(env_vars, fun) when is_map(env_vars) and is_function(fun, 0) do
