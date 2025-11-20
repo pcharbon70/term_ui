@@ -271,4 +271,21 @@ defmodule TermUI.Renderer.Style do
   def empty?(%__MODULE__{} = style) do
     is_nil(style.fg) and is_nil(style.bg) and MapSet.size(style.attrs) == 0
   end
+
+  @doc """
+  Checks if two styles are visually equal.
+
+  Compares foreground color, background color, and all attributes.
+
+  ## Examples
+
+      iex> s1 = Style.new(fg: :red, attrs: [:bold])
+      iex> s2 = Style.new(fg: :red, attrs: [:bold])
+      iex> Style.equal?(s1, s2)
+      true
+  """
+  @spec equal?(t(), t()) :: boolean()
+  def equal?(%__MODULE__{} = a, %__MODULE__{} = b) do
+    a.fg == b.fg and a.bg == b.bg and MapSet.equal?(a.attrs, b.attrs)
+  end
 end
