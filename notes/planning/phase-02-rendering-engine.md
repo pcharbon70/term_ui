@@ -423,53 +423,53 @@ Performance monitoring tracks rendering metrics for debugging and optimization. 
 
 ## 2.7 Integration Tests
 
-- [ ] **Section 2.7 Complete**
+- [x] **Section 2.7 Complete**
 
 Integration tests validate the complete rendering pipeline from buffer writes through terminal output. We test realistic rendering scenarios: full screen updates, partial updates, animations, and resize handling. Tests verify both correctness (right content rendered) and performance (meets FPS target). We use PTY-based testing to capture actual terminal output.
 
 ### 2.7.1 Render Pipeline Testing
 
-- [ ] **Task 2.7.1 Complete**
+- [x] **Task 2.7.1 Complete**
 
 We test the complete pipeline: write cells to buffer, trigger render, verify terminal output matches expected sequences. Tests cover all cell types (colors, styles, characters) and all rendering optimizations (diff, cursor optimization, batching). We verify output is correct and minimal.
 
-- [ ] 2.7.1.1 Test simple text rendering produces correct escape sequences and characters
-- [ ] 2.7.1.2 Test styled text rendering produces correct SGR sequences
-- [ ] 2.7.1.3 Test partial update only renders changed cells, not full screen
-- [ ] 2.7.1.4 Test cursor optimization produces shorter sequences than naive approach
+- [x] 2.7.1.1 Test simple text rendering produces correct escape sequences and characters
+- [x] 2.7.1.2 Test styled text rendering produces correct SGR sequences
+- [x] 2.7.1.3 Test partial update only renders changed cells, not full screen
+- [x] 2.7.1.4 Test cursor optimization produces shorter sequences than naive approach
 
 ### 2.7.2 Animation Testing
 
-- [ ] **Task 2.7.2 Complete**
+- [x] **Task 2.7.2 Complete**
 
 Animation testing verifies smooth rendering over time. We render multiple frames with incremental changes and verify consistent frame rate, proper dirty flag handling, and no visual artifacts. Tests simulate spinner animation, progress bar updates, and scrolling content.
 
-- [ ] 2.7.2.1 Test spinner animation renders at consistent FPS
-- [ ] 2.7.2.2 Test progress bar updates render only changed region
-- [ ] 2.7.2.3 Test scrolling content uses scroll optimization when available
-- [ ] 2.7.2.4 Test high-frequency updates coalesce to target FPS
+- [x] 2.7.2.1 Test spinner animation renders at consistent FPS
+- [x] 2.7.2.2 Test progress bar updates render only changed region
+- [x] 2.7.2.3 Test scrolling content uses scroll optimization when available
+- [x] 2.7.2.4 Test high-frequency updates coalesce to target FPS
 
 ### 2.7.3 Resize Handling Testing
 
-- [ ] **Task 2.7.3 Complete**
+- [x] **Task 2.7.3 Complete**
 
 Resize tests verify correct behavior when terminal dimensions change. The renderer must reallocate buffers, re-render content, and handle edge cases (content truncation, expanded space). We test resize during rendering, rapid resize sequences, and resize to very small dimensions.
 
-- [ ] 2.7.3.1 Test resize triggers buffer reallocation with correct new dimensions
-- [ ] 2.7.3.2 Test content is preserved within new dimensions after resize
-- [ ] 2.7.3.3 Test resize during render completes current frame before reallocating
-- [ ] 2.7.3.4 Test rapid resize sequence handles all resize events correctly
+- [x] 2.7.3.1 Test resize triggers buffer reallocation with correct new dimensions
+- [x] 2.7.3.2 Test content is preserved within new dimensions after resize
+- [x] 2.7.3.3 Test resize during render completes current frame before reallocating
+- [x] 2.7.3.4 Test rapid resize sequence handles all resize events correctly
 
 ### 2.7.4 Performance Benchmarking
 
-- [ ] **Task 2.7.4 Complete**
+- [x] **Task 2.7.4 Complete**
 
 Performance benchmarks measure rendering throughput and identify bottlenecks. We benchmark: cells per second, frames per second, bytes per frame, and optimization savings. Results validate performance targets and guide optimization efforts.
 
-- [ ] 2.7.4.1 Benchmark full screen render measuring time for complete screen update
-- [ ] 2.7.4.2 Benchmark incremental render measuring time for small changes
-- [ ] 2.7.4.3 Benchmark diff algorithm measuring cell comparisons per millisecond
-- [ ] 2.7.4.4 Benchmark cursor optimization measuring byte savings over naive approach
+- [x] 2.7.4.1 Benchmark full screen render measuring time for complete screen update
+- [x] 2.7.4.2 Benchmark incremental render measuring time for small changes
+- [x] 2.7.4.3 Benchmark diff algorithm measuring cell comparisons per millisecond
+- [x] 2.7.4.4 Benchmark cursor optimization measuring byte savings over naive approach
 
 ---
 
