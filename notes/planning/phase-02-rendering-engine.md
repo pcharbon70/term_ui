@@ -148,7 +148,7 @@ Buffer lifecycle includes creation, resize, and cleanup. ETS tables persist unti
 
 ## 2.3 Diff Algorithm
 
-- [ ] **Section 2.3 Complete**
+- [x] **Section 2.3 Complete**
 
 The diff algorithm compares current and previous buffers to identify changed cells, producing a minimal set of update operations. We iterate row-by-row comparing cells and tracking change spans—contiguous changed cells in a row that can be rendered with a single cursor move. The algorithm balances between finding optimal diffs and maintaining fast O(n) performance where n is total cells.
 
@@ -156,70 +156,70 @@ The diff output is a sequence of render operations: position cursor, emit styled
 
 ### 2.3.1 Cell Comparison
 
-- [ ] **Task 2.3.1 Complete**
+- [x] **Task 2.3.1 Complete**
 
 Cell comparison determines if two cells are visually identical. We compare character content, foreground color, background color, and all attributes. Comparison must be efficient since we compare thousands of cells per frame. We use structural comparison optimized for the common case (cells unchanged).
 
-- [ ] 2.3.1.1 Implement `Cell.equal?/2` comparing all cell properties for visual equality
-- [ ] 2.3.1.2 Optimize comparison for common case using early-exit on first difference
-- [ ] 2.3.1.3 Implement hash-based comparison option caching cell hashes for repeated comparisons
-- [ ] 2.3.1.4 Handle special cases: different color representations (named vs RGB) that appear identical
+- [x] 2.3.1.1 Implement `Cell.equal?/2` comparing all cell properties for visual equality
+- [x] 2.3.1.2 Optimize comparison for common case using early-exit on first difference
+- [x] 2.3.1.3 Implement hash-based comparison option caching cell hashes for repeated comparisons
+- [x] 2.3.1.4 Handle special cases: different color representations (named vs RGB) that appear identical
 
 ### 2.3.2 Row-Based Diffing
 
-- [ ] **Task 2.3.2 Complete**
+- [x] **Task 2.3.2 Complete**
 
 We diff row-by-row for efficient sequential output—cursor movement between rows is cheap, and terminals optimize for row-wise output. For each row, we find spans of changed cells and generate render operations. Unchanged rows are skipped entirely. We track whether the row is completely unchanged, partially changed, or completely new.
 
-- [ ] 2.3.2.1 Implement `diff_row/3` comparing corresponding rows from current and previous buffers
-- [ ] 2.3.2.2 Implement change span detection grouping contiguous changed cells within a row
-- [ ] 2.3.2.3 Implement row skip optimization for completely unchanged rows
-- [ ] 2.3.2.4 Implement row cache invalidation tracking which rows have been modified since last render
+- [x] 2.3.2.1 Implement `diff_row/3` comparing corresponding rows from current and previous buffers
+- [x] 2.3.2.2 Implement change span detection grouping contiguous changed cells within a row
+- [x] 2.3.2.3 Implement row skip optimization for completely unchanged rows
+- [x] 2.3.2.4 Implement row cache invalidation tracking which rows have been modified since last render
 
 ### 2.3.3 Change Span Optimization
 
-- [ ] **Task 2.3.3 Complete**
+- [x] **Task 2.3.3 Complete**
 
 Change spans represent contiguous changed cells that can be rendered together. We optimize span boundaries based on cursor movement cost—sometimes it's cheaper to render unchanged cells than to move cursor around them. We merge adjacent small spans when the gap is small, and split large spans when beneficial for style changes.
 
-- [ ] 2.3.3.1 Implement span boundary calculation minimizing total output bytes (cursor moves + content)
-- [ ] 2.3.3.2 Implement span merging combining adjacent spans when gap is smaller than cursor move cost
-- [ ] 2.3.3.3 Implement span splitting at style changes to optimize SGR sequence output
-- [ ] 2.3.3.4 Implement span generation producing cursor position and styled text for each span
+- [x] 2.3.3.1 Implement span boundary calculation minimizing total output bytes (cursor moves + content)
+- [x] 2.3.3.2 Implement span merging combining adjacent spans when gap is smaller than cursor move cost
+- [x] 2.3.3.3 Implement span splitting at style changes to optimize SGR sequence output
+- [x] 2.3.3.4 Implement span generation producing cursor position and styled text for each span
 
 ### 2.3.4 Wide Character Handling
 
-- [ ] **Task 2.3.4 Complete**
+- [x] **Task 2.3.4 Complete**
 
 Double-width characters require special handling during diffing. If either cell of a wide character changes, both must be redrawn to avoid display corruption. We detect wide characters and ensure their pairs are included in change spans. Partial overwrite of wide characters must clear both cells.
 
-- [ ] 2.3.4.1 Implement wide character detection checking for double-width characters in cells
-- [ ] 2.3.4.2 Implement pair inclusion ensuring both cells of wide character are in same change span
-- [ ] 2.3.4.3 Implement overwrite detection flagging when single-width overwrites half of wide character
-- [ ] 2.3.4.4 Implement wide character clearing emitting space pair to erase corrupted wide characters
+- [x] 2.3.4.1 Implement wide character detection checking for double-width characters in cells
+- [x] 2.3.4.2 Implement pair inclusion ensuring both cells of wide character are in same change span
+- [x] 2.3.4.3 Implement overwrite detection flagging when single-width overwrites half of wide character
+- [x] 2.3.4.4 Implement wide character clearing emitting space pair to erase corrupted wide characters
 
 ### 2.3.5 Diff Output Generation
 
-- [ ] **Task 2.3.5 Complete**
+- [x] **Task 2.3.5 Complete**
 
 The diff output is a list of render operations that the escape sequence generator converts to terminal output. Operations include: move cursor, set style, emit text, reset style. We optimize operation ordering to minimize style changes and cursor movements. The output is deterministic—same buffer diff always produces same operations.
 
-- [ ] 2.3.5.1 Define render operation types: `{:move, row, col}`, `{:style, style}`, `{:text, string}`, `{:reset}`
-- [ ] 2.3.5.2 Implement operation generation from change spans
-- [ ] 2.3.5.3 Implement operation merging combining adjacent same-style texts
-- [ ] 2.3.5.4 Implement operation sorting ensuring optimal cursor movement path
+- [x] 2.3.5.1 Define render operation types: `{:move, row, col}`, `{:style, style}`, `{:text, string}`, `{:reset}`
+- [x] 2.3.5.2 Implement operation generation from change spans
+- [x] 2.3.5.3 Implement operation merging combining adjacent same-style texts
+- [x] 2.3.5.4 Implement operation sorting ensuring optimal cursor movement path
 
 ### Unit Tests - Section 2.3
 
-- [ ] **Unit Tests 2.3 Complete**
-- [ ] Test cell comparison correctly identifies identical and different cells
-- [ ] Test row diffing finds all changed cells within a row
-- [ ] Test unchanged row detection skips rows with no changes
-- [ ] Test change span detection groups contiguous changes correctly
-- [ ] Test span merging combines small gaps to reduce cursor movements
-- [ ] Test wide character pairs are included together in change spans
-- [ ] Test diff output generates correct sequence of render operations
-- [ ] Test deterministic output produces same operations for same input
+- [x] **Unit Tests 2.3 Complete**
+- [x] Test cell comparison correctly identifies identical and different cells
+- [x] Test row diffing finds all changed cells within a row
+- [x] Test unchanged row detection skips rows with no changes
+- [x] Test change span detection groups contiguous changes correctly
+- [x] Test span merging combines small gaps to reduce cursor movements
+- [x] Test wide character pairs are included together in change spans
+- [x] Test diff output generates correct sequence of render operations
+- [x] Test deterministic output produces same operations for same input
 
 ---
 
