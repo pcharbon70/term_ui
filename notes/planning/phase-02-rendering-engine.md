@@ -12,7 +12,7 @@ The design leverages BEAM's strengths: ETS tables provide fast concurrent reads/
 
 ## 2.1 Cell and Buffer Data Structures
 
-- [ ] **Section 2.1 Complete**
+- [x] **Section 2.1 Complete**
 
 The fundamental data structures represent individual screen cells and the complete screen buffer. A cell contains a character (grapheme cluster), foreground and background colors, and style attributes (bold, italic, etc.). The buffer is a two-dimensional array of cells indexed by row and column. We optimize these structures for both memory efficiency and fast access patterns—cells are small fixed-size structures, and buffers use ETS ordered_set tables for O(log n) access.
 
@@ -20,62 +20,62 @@ The cell representation must handle Unicode correctly: a cell contains a graphem
 
 ### 2.1.1 Cell Structure
 
-- [ ] **Task 2.1.1 Complete**
+- [x] **Task 2.1.1 Complete**
 
 The cell structure holds all information needed to render a single character position. We balance between completeness (supporting all terminal features) and efficiency (small memory footprint, fast comparison). Cells are immutable—updates create new cells, enabling efficient diffing by reference comparison when unchanged.
 
-- [ ] 2.1.1.1 Define `%Cell{char: String.t(), fg: color(), bg: color(), attrs: MapSet.t()}` struct with compact representation
-- [ ] 2.1.1.2 Implement color type supporting `:default`, named colors (`:red`), 256-color integers (0-255), and RGB tuples (`{r, g, b}`)
-- [ ] 2.1.1.3 Implement attribute set for style modifiers: `:bold`, `:dim`, `:italic`, `:underline`, `:blink`, `:reverse`, `:hidden`, `:strikethrough`
-- [ ] 2.1.1.4 Implement cell comparison function for efficient diffing checking character, colors, and attributes
-- [ ] 2.1.1.5 Implement `Cell.empty/0` returning default empty cell (space, default colors, no attributes)
+- [x] 2.1.1.1 Define `%Cell{char: String.t(), fg: color(), bg: color(), attrs: MapSet.t()}` struct with compact representation
+- [x] 2.1.1.2 Implement color type supporting `:default`, named colors (`:red`), 256-color integers (0-255), and RGB tuples (`{r, g, b}`)
+- [x] 2.1.1.3 Implement attribute set for style modifiers: `:bold`, `:dim`, `:italic`, `:underline`, `:blink`, `:reverse`, `:hidden`, `:strikethrough`
+- [x] 2.1.1.4 Implement cell comparison function for efficient diffing checking character, colors, and attributes
+- [x] 2.1.1.5 Implement `Cell.empty/0` returning default empty cell (space, default colors, no attributes)
 
 ### 2.1.2 Display Width Handling
 
-- [ ] **Task 2.1.2 Complete**
+- [x] **Task 2.1.2 Complete**
 
 Display width determines how many columns a character occupies. Most characters are single-width, but East Asian characters (CJK) are double-width, and combining characters (accents) are zero-width. Correct width handling is essential for proper cursor positioning and layout. We use `wcwidth` algorithm to calculate display width and handle edge cases.
 
-- [ ] 2.1.2.1 Implement `display_width/1` function returning column count for a grapheme cluster using Unicode East Asian Width property
-- [ ] 2.1.2.2 Implement double-width character handling storing character in first cell, placeholder in second cell
-- [ ] 2.1.2.3 Implement combining character handling merging combining marks with base character in single cell
-- [ ] 2.1.2.4 Implement text width calculation summing display widths for string layout
+- [x] 2.1.2.1 Implement `display_width/1` function returning column count for a grapheme cluster using Unicode East Asian Width property
+- [x] 2.1.2.2 Implement double-width character handling storing character in first cell, placeholder in second cell
+- [x] 2.1.2.3 Implement combining character handling merging combining marks with base character in single cell
+- [x] 2.1.2.4 Implement text width calculation summing display widths for string layout
 
 ### 2.1.3 Style Structure
 
-- [ ] **Task 2.1.3 Complete**
+- [x] **Task 2.1.3 Complete**
 
 Styles encapsulate visual presentation: colors and text attributes. We provide a Style struct that can be built incrementally and merged with other styles. Style inheritance allows components to specify partial styles that inherit from parent. The style system integrates with Phase 1's capability detection to automatically downgrade colors on limited terminals.
 
-- [ ] 2.1.3.1 Define `%Style{fg: color(), bg: color(), attrs: MapSet.t()}` struct with defaults for unset properties
-- [ ] 2.1.3.2 Implement style builder functions: `Style.new() |> Style.fg(:red) |> Style.bold()` for fluent construction
-- [ ] 2.1.3.3 Implement `Style.merge/2` combining styles with later style overriding earlier for cascading
-- [ ] 2.1.3.4 Implement style to cell conversion applying style to create styled cells
+- [x] 2.1.3.1 Define `%Style{fg: color(), bg: color(), attrs: MapSet.t()}` struct with defaults for unset properties
+- [x] 2.1.3.2 Implement style builder functions: `Style.new() |> Style.fg(:red) |> Style.bold()` for fluent construction
+- [x] 2.1.3.3 Implement `Style.merge/2` combining styles with later style overriding earlier for cascading
+- [x] 2.1.3.4 Implement style to cell conversion applying style to create styled cells
 
 ### 2.1.4 Buffer Structure
 
-- [ ] **Task 2.1.4 Complete**
+- [x] **Task 2.1.4 Complete**
 
 The buffer holds all cells for the entire screen. We use ETS ordered_set tables keyed by `{row, col}` tuples for O(log n) access and efficient range operations. The buffer tracks dimensions and provides operations for cell access, region clearing, and content copying. Two buffers exist simultaneously for double-buffering: current (being built) and previous (last rendered).
 
-- [ ] 2.1.4.1 Implement `Buffer.new(rows, cols)` creating ETS table and initializing with empty cells
-- [ ] 2.1.4.2 Implement `Buffer.get_cell(buffer, row, col)` returning cell at position with bounds checking
-- [ ] 2.1.4.3 Implement `Buffer.set_cell(buffer, row, col, cell)` updating cell at position
-- [ ] 2.1.4.4 Implement `Buffer.clear_region(buffer, x, y, width, height)` filling rectangle with empty cells
-- [ ] 2.1.4.5 Implement `Buffer.resize(buffer, new_rows, new_cols)` handling terminal resize with content preservation
+- [x] 2.1.4.1 Implement `Buffer.new(rows, cols)` creating ETS table and initializing with empty cells
+- [x] 2.1.4.2 Implement `Buffer.get_cell(buffer, row, col)` returning cell at position with bounds checking
+- [x] 2.1.4.3 Implement `Buffer.set_cell(buffer, row, col, cell)` updating cell at position
+- [x] 2.1.4.4 Implement `Buffer.clear_region(buffer, x, y, width, height)` filling rectangle with empty cells
+- [x] 2.1.4.5 Implement `Buffer.resize(buffer, new_rows, new_cols)` handling terminal resize with content preservation
 
 ### Unit Tests - Section 2.1
 
-- [ ] **Unit Tests 2.1 Complete**
-- [ ] Test cell creation with various color and attribute combinations
-- [ ] Test cell comparison detects differences in char, colors, and attributes
-- [ ] Test display width calculation for ASCII, CJK, and combining characters
-- [ ] Test style builder produces correct style structs with all properties
-- [ ] Test style merging correctly overrides properties from base style
-- [ ] Test buffer creation initializes all cells to empty
-- [ ] Test buffer get/set operations maintain cell values correctly
-- [ ] Test buffer clear_region fills specified area with empty cells
-- [ ] Test buffer resize preserves existing content where possible
+- [x] **Unit Tests 2.1 Complete**
+- [x] Test cell creation with various color and attribute combinations
+- [x] Test cell comparison detects differences in char, colors, and attributes
+- [x] Test display width calculation for ASCII, CJK, and combining characters
+- [x] Test style builder produces correct style structs with all properties
+- [x] Test style merging correctly overrides properties from base style
+- [x] Test buffer creation initializes all cells to empty
+- [x] Test buffer get/set operations maintain cell values correctly
+- [x] Test buffer clear_region fills specified area with empty cells
+- [x] Test buffer resize preserves existing content where possible
 
 ---
 
