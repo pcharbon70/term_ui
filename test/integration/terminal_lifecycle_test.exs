@@ -193,11 +193,8 @@ defmodule TermUI.Integration.TerminalLifecycleTest do
       receive do
         {:EXIT, ^pid, :killed} -> :ok
       after
-        1000 -> :ok
+        1000 -> flunk("Timeout waiting for terminal process to die")
       end
-
-      # Give time for process to fully terminate
-      Process.sleep(10)
 
       # Restart the terminal
       case IntegrationHelpers.start_terminal() do

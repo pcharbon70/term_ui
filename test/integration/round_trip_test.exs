@@ -10,8 +10,9 @@ defmodule TermUI.Integration.RoundTripTest do
 
   alias TermUI.ANSI
   alias TermUI.IntegrationHelpers
-  alias TermUI.Parser
   alias TermUI.Parser.Events.{FocusEvent, KeyEvent, MouseEvent, PasteEvent}
+
+  import IntegrationHelpers, only: [parse: 1]
 
   # These tests validate I/O behavior
   @moduletag :integration
@@ -24,12 +25,6 @@ defmodule TermUI.Integration.RoundTripTest do
     end)
 
     :ok
-  end
-
-  # Helper to parse and extract events
-  defp parse(input) do
-    {events, remaining, _state} = Parser.parse(input, Parser.new())
-    {events, remaining}
   end
 
   describe "1.6.2.1 cursor positioning round-trip" do

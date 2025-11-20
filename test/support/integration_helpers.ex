@@ -6,6 +6,7 @@ defmodule TermUI.IntegrationHelpers do
   capturing output, and simulating input.
   """
 
+  alias TermUI.Parser
   alias TermUI.Terminal
 
   @doc """
@@ -99,15 +100,15 @@ defmodule TermUI.IntegrationHelpers do
   def assert_terminal_clean do
     state = Terminal.get_state()
 
-    unless state.raw_mode_active == false do
+    if state.raw_mode_active do
       raise "Terminal raw mode should be inactive, got: #{state.raw_mode_active}"
     end
 
-    unless state.alternate_screen_active == false do
+    if state.alternate_screen_active do
       raise "Terminal alternate screen should be inactive, got: #{state.alternate_screen_active}"
     end
 
-    unless state.cursor_visible == true do
+    unless state.cursor_visible do
       raise "Terminal cursor should be visible, got: #{state.cursor_visible}"
     end
 
@@ -292,5 +293,21 @@ defmodule TermUI.IntegrationHelpers do
       "WT_SESSION" => "true",
       "TERM_PROGRAM" => nil
     }
+  end
+
+  @doc """
+  Parses input bytes and returns events and remaining bytes.
+
+  Simplifies the Parser API for tests by discarding the parser state.
+
+  ## Example
+
+      {events, remaining} = parse("\\e[A")
+      assert [%KeyEvent{key: :up}] = events
+  """
+  @spec parse(binary()) :: {list(), binary()}
+  def parse(input) do
+    {events, remaining, _state} = Parser.parse(input, Parser.new())
+    {events, remaining}
   end
 end
