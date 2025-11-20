@@ -365,4 +365,81 @@ defmodule TermUI.Integration.RoundTripTest do
       assert ANSI.scroll_down(2) |> IO.iodata_to_binary() == "\e[2T"
     end
   end
+
+  describe "edge cases and boundary values" do
+    test "cursor position rejects zero values" do
+      # ANSI module guards require positive values
+      assert_raise FunctionClauseError, fn ->
+        ANSI.cursor_position(0, 0)
+      end
+
+      assert_raise FunctionClauseError, fn ->
+        ANSI.cursor_position(1, 0)
+      end
+
+      assert_raise FunctionClauseError, fn ->
+        ANSI.cursor_position(0, 1)
+      end
+    end
+
+    test "cursor position with minimum valid values" do
+      seq = ANSI.cursor_position(1, 1) |> IO.iodata_to_binary()
+      assert seq == "\e[1;1H"
+    end
+
+    test "cursor position with large values" do
+      # Test with values beyond typical terminal size
+      seq = ANSI.cursor_position(9999, 9999) |> IO.iodata_to_binary()
+      assert seq == "\e[9999;9999H"
+    end
+
+    test "cursor movement rejects zero" do
+      # ANSI module guards require positive values
+      assert_raise FunctionClauseError, fn -> ANSI.cursor_up(0) end
+      assert_raise FunctionClauseError, fn -> ANSI.cursor_down(0) end
+      assert_raise FunctionClauseError, fn -> ANSI.cursor_forward(0) end
+      assert_raise FunctionClauseError, fn -> ANSI.cursor_back(0) end
+    end
+
+    test "cursor movement with large values" do
+      assert ANSI.cursor_up(10000) |> IO.iodata_to_binary() == "\e[10000A"
+      assert ANSI.cursor_down(10000) |> IO.iodata_to_binary() == "\e[10000B"
+    end
+
+    test "256 color boundary values" do
+      # Minimum valid
+      assert ANSI.foreground_256(0) |> IO.iodata_to_binary() == "\e[38;5;0m"
+      # Maximum valid
+      assert ANSI.foreground_256(255) |> IO.iodata_to_binary() == "\e[38;5;255m"
+      # Background boundaries
+      assert ANSI.background_256(0) |> IO.iodata_to_binary() == "\e[48;5;0m"
+      assert ANSI.background_256(255) |> IO.iodata_to_binary() == "\e[48;5;255m"
+    end
+
+    test "RGB color boundary values" do
+      # All zeros (black)
+      assert ANSI.foreground_rgb(0, 0, 0) |> IO.iodata_to_binary() == "\e[38;2;0;0;0m"
+      # All max (white)
+      assert ANSI.foreground_rgb(255, 255, 255) |> IO.iodata_to_binary() == "\e[38;2;255;255;255m"
+      # Mixed boundaries
+      assert ANSI.background_rgb(0, 255, 0) |> IO.iodata_to_binary() == "\e[48;2;0;255;0m"
+    end
+
+    test "scroll region boundary values" do
+      # Minimum region
+      assert ANSI.set_scroll_region(1, 1) |> IO.iodata_to_binary() == "\e[1;1r"
+      # Large region
+      assert ANSI.set_scroll_region(1, 1000) |> IO.iodata_to_binary() == "\e[1;1000r"
+    end
+
+    test "scroll rejects zero values" do
+      assert_raise FunctionClauseError, fn -> ANSI.scroll_up(0) end
+      assert_raise FunctionClauseError, fn -> ANSI.scroll_down(0) end
+    end
+
+    test "scroll with large values" do
+      assert ANSI.scroll_up(1000) |> IO.iodata_to_binary() == "\e[1000S"
+      assert ANSI.scroll_down(1000) |> IO.iodata_to_binary() == "\e[1000T"
+    end
+  end
 end
