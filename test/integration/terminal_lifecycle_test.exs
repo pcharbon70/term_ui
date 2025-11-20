@@ -8,8 +8,8 @@ defmodule TermUI.Integration.TerminalLifecycleTest do
 
   use ExUnit.Case, async: false
 
-  alias TermUI.Terminal
   alias TermUI.IntegrationHelpers
+  alias TermUI.Terminal
 
   # These tests require actual terminal access
   @moduletag :integration
