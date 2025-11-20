@@ -59,4 +59,3 @@ defmodule TermUI do
     end
   end
 end
-

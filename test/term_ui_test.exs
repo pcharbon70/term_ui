@@ -6,10 +6,13 @@ defmodule TermUITest do
   setup do
     # Clean up any existing Terminal process
     case Process.whereis(Terminal) do
-      nil -> :ok
+      nil ->
+        :ok
+
       pid ->
         ref = Process.monitor(pid)
         Process.exit(pid, :shutdown)
+
         receive do
           {:DOWN, ^ref, :process, ^pid, _} -> :ok
         after
@@ -19,11 +22,14 @@ defmodule TermUITest do
 
     on_exit(fn ->
       case Process.whereis(Terminal) do
-        nil -> :ok
+        nil ->
+          :ok
+
         pid when is_pid(pid) ->
           if Process.alive?(pid) do
             ref = Process.monitor(pid)
             Process.exit(pid, :shutdown)
+
             receive do
               {:DOWN, ^ref, :process, ^pid, _} -> :ok
             after

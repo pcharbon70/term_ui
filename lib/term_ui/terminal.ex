@@ -150,13 +150,8 @@ defmodule TermUI.Terminal do
 
   @impl true
   def init(_opts) do
-    # Set up exit trap for cleanup
     Process.flag(:trap_exit, true)
-
-    # Check for unclean termination from previous run
     check_previous_crash()
-
-    # Create ETS table for crash detection
     create_ets_table()
 
     state = State.new()
@@ -170,7 +165,6 @@ defmodule TermUI.Terminal do
     else
       case do_enable_raw_mode() do
         {:ok, original_settings} ->
-          # Mark as active in ETS for crash detection
           :ets.insert(@ets_table, {:raw_mode_active, true})
 
           new_state = %{state | raw_mode_active: true, original_settings: original_settings}
@@ -274,13 +268,11 @@ defmodule TermUI.Terminal do
 
   @impl true
   def handle_info({:EXIT, _pid, :normal}, state) do
-    # Ignore normal exits from linked processes
     {:noreply, state}
   end
 
   @impl true
   def handle_info({:EXIT, _pid, :shutdown}, state) do
-    # Shutdown requested - perform cleanup and stop
     Logger.debug("Terminal GenServer received shutdown, performing cleanup")
     do_restore(state)
     {:stop, :shutdown, state}
@@ -288,7 +280,6 @@ defmodule TermUI.Terminal do
 
   @impl true
   def handle_info({:EXIT, _pid, reason}, state) do
-    # Abnormal exit - log, cleanup, and stop
     Logger.warning("Terminal GenServer received EXIT: #{inspect(reason)}, performing cleanup")
     do_restore(state)
     {:stop, reason, state}
@@ -300,7 +291,6 @@ defmodule TermUI.Terminal do
       {:ok, {rows, cols}} ->
         new_state = %{state | size: {rows, cols}}
 
-        # Notify all registered callbacks
         for pid <- new_state.resize_callbacks do
           send(pid, {:terminal_resize, {rows, cols}})
         end
@@ -355,33 +345,25 @@ defmodule TermUI.Terminal do
   end
 
   defp do_disable_raw_mode(_original_settings) do
-    try do
-      # Restore normal terminal mode
-      # OTP 28 should handle this, but we also write reset sequence
-      write_to_terminal(@reset_terminal)
-      :ok
-    rescue
-      _ -> :ok
-    catch
-      _, _ -> :ok
-    end
+    write_to_terminal(@reset_terminal)
+    :ok
+  rescue
+    _ -> :ok
+  catch
+    _, _ -> :ok
   end
 
   defp do_get_terminal_size do
-    cond do
-      # Try using :io.columns and :io.rows (available in OTP)
-      function_exported?(:io, :columns, 0) and function_exported?(:io, :rows, 0) ->
-        case {:io.columns(), :io.rows()} do
-          {{:ok, cols}, {:ok, rows}} ->
-            {:ok, {rows, cols}}
+    if function_exported?(:io, :columns, 0) and function_exported?(:io, :rows, 0) do
+      case {:io.columns(), :io.rows()} do
+        {{:ok, cols}, {:ok, rows}} ->
+          {:ok, {rows, cols}}
 
-          _ ->
-            # Fallback to environment variables
-            get_size_from_env()
-        end
-
-      true ->
-        get_size_from_env()
+        _ ->
+          get_size_from_env()
+      end
+    else
+      get_size_from_env()
     end
   end
 
@@ -399,7 +381,9 @@ defmodule TermUI.Terminal do
 
   defp get_env_int(var) do
     case System.get_env(var) do
-      nil -> {:error, :not_set}
+      nil ->
+        {:error, :not_set}
+
       value ->
         case Integer.parse(value) do
           {int, ""} when int > 0 -> {:ok, int}
@@ -432,7 +416,6 @@ defmodule TermUI.Terminal do
   end
 
   defp do_restore(state) do
-    # Restore in correct sequence
     if not state.cursor_visible do
       write_to_terminal(@show_cursor)
     end
@@ -445,7 +428,6 @@ defmodule TermUI.Terminal do
       do_disable_raw_mode(state.original_settings)
     end
 
-    # Clear ETS state
     if :ets.whereis(@ets_table) != :undefined do
       :ets.insert(@ets_table, {:raw_mode_active, false})
     end
@@ -460,14 +442,11 @@ defmodule TermUI.Terminal do
   end
 
   defp terminal? do
-    # Check if we're running in a terminal
     case :io.getopts(:standard_io) do
       {:ok, opts} ->
-        # Check for terminal-like options
         Keyword.has_key?(opts, :terminal)
 
       _ ->
-        # Fallback: check if stdout is a tty
         check_tty()
     end
   end
@@ -492,7 +471,6 @@ defmodule TermUI.Terminal do
       case :ets.lookup(@ets_table, :raw_mode_active) do
         [{:raw_mode_active, true}] ->
           Logger.warning("Detected unclean termination from previous run, resetting terminal")
-          # Reset terminal state
           write_to_terminal(@show_cursor)
           write_to_terminal(@leave_alternate_screen)
           write_to_terminal(@reset_terminal)

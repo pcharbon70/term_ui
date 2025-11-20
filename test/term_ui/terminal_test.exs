@@ -7,10 +7,13 @@ defmodule TermUI.TerminalTest do
   setup do
     # Start a fresh Terminal GenServer for each test
     case Process.whereis(Terminal) do
-      nil -> :ok
+      nil ->
+        :ok
+
       pid ->
         ref = Process.monitor(pid)
         Process.exit(pid, :shutdown)
+
         receive do
           {:DOWN, ^ref, :process, ^pid, _} -> :ok
         after
@@ -19,13 +22,17 @@ defmodule TermUI.TerminalTest do
     end
 
     {:ok, pid} = Terminal.start_link()
+
     on_exit(fn ->
       case Process.whereis(Terminal) do
-        nil -> :ok
+        nil ->
+          :ok
+
         pid when is_pid(pid) ->
           if Process.alive?(pid) do
             ref = Process.monitor(pid)
             Process.exit(pid, :shutdown)
+
             receive do
               {:DOWN, ^ref, :process, ^pid, _} -> :ok
             after
