@@ -8,12 +8,12 @@ defmodule TermUI.Integration.CrossPlatformTest do
 
   use ExUnit.Case, async: false
 
+  alias TermUI.IntegrationHelpers
+  alias TermUI.Parser
+  alias TermUI.Parser.Events.KeyEvent
   alias TermUI.Platform
   alias TermUI.Platform.Unix
   alias TermUI.Platform.Windows
-  alias TermUI.Parser
-  alias TermUI.Parser.Events.KeyEvent
-  alias TermUI.IntegrationHelpers
 
   # These tests validate platform behavior
   @moduletag :integration

@@ -9,9 +9,9 @@ defmodule TermUI.Integration.RoundTripTest do
   use ExUnit.Case, async: false
 
   alias TermUI.ANSI
-  alias TermUI.Parser
-  alias TermUI.Parser.Events.{KeyEvent, MouseEvent, PasteEvent, FocusEvent}
   alias TermUI.IntegrationHelpers
+  alias TermUI.Parser
+  alias TermUI.Parser.Events.{FocusEvent, KeyEvent, MouseEvent, PasteEvent}
 
   # These tests validate I/O behavior
   @moduletag :integration
