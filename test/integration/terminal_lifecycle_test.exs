@@ -47,37 +47,41 @@ defmodule TermUI.Integration.TerminalLifecycleTest do
       assert caps.color_mode in [:monochrome, :color_16, :color_256, :true_color]
     end
 
+  end
+
+  describe "1.6.1.1 tests requiring terminal" do
+    setup do
+      IntegrationHelpers.stop_terminal()
+      on_exit(fn -> IntegrationHelpers.cleanup_terminal() end)
+      :ok
+    end
+
     @tag :requires_terminal
     test "full initialization sequence with raw mode" do
-      # Skip if not in a terminal or OTP 28+ not available
-      if not IntegrationHelpers.terminal_available?() or not IntegrationHelpers.raw_mode_available?() do
-        IO.puts("Skipping: Requires terminal and OTP 28+")
-      else
-        {:ok, _pid} = IntegrationHelpers.start_terminal()
+      {:ok, _pid} = IntegrationHelpers.start_terminal()
 
-        # Step 1: Detect capabilities
-        caps = TermUI.Capabilities.detect()
-        assert is_struct(caps, TermUI.Capabilities)
+      # Step 1: Detect capabilities
+      caps = TermUI.Capabilities.detect()
+      assert is_struct(caps, TermUI.Capabilities)
 
-        # Step 2: Enable raw mode
-        result = Terminal.enable_raw_mode()
-        assert {:ok, state} = result
-        assert state.raw_mode_active == true
+      # Step 2: Enable raw mode
+      result = Terminal.enable_raw_mode()
+      assert {:ok, state} = result
+      assert state.raw_mode_active == true
 
-        # Step 3: Enter alternate screen
-        assert :ok = Terminal.enter_alternate_screen()
-        assert Terminal.get_state().alternate_screen_active == true
+      # Step 3: Enter alternate screen
+      assert :ok = Terminal.enter_alternate_screen()
+      assert Terminal.get_state().alternate_screen_active == true
 
-        # Step 4: Hide cursor
-        assert :ok = Terminal.hide_cursor()
-        assert Terminal.get_state().cursor_visible == false
+      # Step 4: Hide cursor
+      assert :ok = Terminal.hide_cursor()
+      assert Terminal.get_state().cursor_visible == false
 
-        # Verify full initialized state
-        state = Terminal.get_state()
-        assert state.raw_mode_active == true
-        assert state.alternate_screen_active == true
-        assert state.cursor_visible == false
-      end
+      # Verify full initialized state
+      state = Terminal.get_state()
+      assert state.raw_mode_active == true
+      assert state.alternate_screen_active == true
+      assert state.cursor_visible == false
     end
 
     test "initialization without terminal returns error" do
@@ -124,34 +128,39 @@ defmodule TermUI.Integration.TerminalLifecycleTest do
       IntegrationHelpers.assert_terminal_clean()
     end
 
+  end
+
+  describe "1.6.1.2 tests requiring terminal" do
+    setup do
+      IntegrationHelpers.stop_terminal()
+      on_exit(fn -> IntegrationHelpers.cleanup_terminal() end)
+      :ok
+    end
+
     @tag :requires_terminal
     test "full shutdown sequence reverses initialization" do
-      if not IntegrationHelpers.terminal_available?() or not IntegrationHelpers.raw_mode_available?() do
-        IO.puts("Skipping: Requires terminal and OTP 28+")
-      else
-        {:ok, _pid} = IntegrationHelpers.start_terminal()
+      {:ok, _pid} = IntegrationHelpers.start_terminal()
 
-        # Initialize fully
-        {:ok, _} = Terminal.enable_raw_mode()
-        :ok = Terminal.enter_alternate_screen()
-        :ok = Terminal.hide_cursor()
+      # Initialize fully
+      {:ok, _} = Terminal.enable_raw_mode()
+      :ok = Terminal.enter_alternate_screen()
+      :ok = Terminal.hide_cursor()
 
-        # Now shutdown in reverse order
-        # Step 1: Show cursor
-        assert :ok = Terminal.show_cursor()
-        assert Terminal.get_state().cursor_visible == true
+      # Now shutdown in reverse order
+      # Step 1: Show cursor
+      assert :ok = Terminal.show_cursor()
+      assert Terminal.get_state().cursor_visible == true
 
-        # Step 2: Leave alternate screen
-        assert :ok = Terminal.leave_alternate_screen()
-        assert Terminal.get_state().alternate_screen_active == false
+      # Step 2: Leave alternate screen
+      assert :ok = Terminal.leave_alternate_screen()
+      assert Terminal.get_state().alternate_screen_active == false
 
-        # Step 3: Disable raw mode
-        assert :ok = Terminal.disable_raw_mode()
-        assert Terminal.get_state().raw_mode_active == false
+      # Step 3: Disable raw mode
+      assert :ok = Terminal.disable_raw_mode()
+      assert Terminal.get_state().raw_mode_active == false
 
-        # Verify complete shutdown
-        IntegrationHelpers.assert_terminal_clean()
-      end
+      # Verify complete shutdown
+      IntegrationHelpers.assert_terminal_clean()
     end
   end
 
@@ -197,8 +206,7 @@ defmodule TermUI.Integration.TerminalLifecycleTest do
           IntegrationHelpers.assert_terminal_clean()
 
         {:error, reason} ->
-          # In some environments, this may fail
-          IO.puts("Note: crash recovery restart failed: #{inspect(reason)}")
+          flunk("Crash recovery restart failed: #{inspect(reason)}")
       end
     end
 

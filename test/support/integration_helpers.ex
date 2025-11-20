@@ -192,12 +192,13 @@ defmodule TermUI.IntegrationHelpers do
     pid = Process.whereis(TermUI.Terminal)
 
     if pid do
+      # Set up monitor before killing to avoid race condition
+      ref = Process.monitor(pid)
+
       # Kill the process
       Process.exit(pid, :kill)
 
       # Wait for it to die
-      ref = Process.monitor(pid)
-
       receive do
         {:DOWN, ^ref, :process, ^pid, _reason} -> :ok
       after
