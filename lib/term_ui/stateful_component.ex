@@ -179,6 +179,55 @@ defmodule TermUI.StatefulComponent do
   # Optional callbacks
 
   @doc """
+  Called when the component is mounted to the active tree.
+
+  Mount is the appropriate place for setup requiring the component
+  to be "live": registering event handlers, starting timers, fetching data.
+
+  ## Parameters
+
+  - `state` - Current component state after init
+
+  ## Returns
+
+  - `{:ok, new_state}` - Mount successful
+  - `{:ok, new_state, commands}` - Mount with commands
+  - `{:stop, reason}` - Mount failed
+  """
+  @callback mount(state()) :: {:ok, state()} | {:ok, state(), [command()]} | {:stop, term()}
+
+  @doc """
+  Called when the component's props change.
+
+  The parent passes new props, triggering this callback.
+  Update may modify state based on new props.
+
+  ## Parameters
+
+  - `new_props` - The new props from parent
+  - `state` - Current component state
+
+  ## Returns
+
+  - `{:ok, new_state}` - Update successful
+  - `{:ok, new_state, commands}` - Update with commands
+  """
+  @callback update(new_props :: props(), state()) ::
+              {:ok, state()} | {:ok, state(), [command()]}
+
+  @doc """
+  Called when the component is unmounted from the tree.
+
+  This is the appropriate place for cleanup: canceling timers,
+  closing files, unregistering handlers.
+
+  ## Parameters
+
+  - `state` - Current component state
+  """
+  @callback unmount(state()) :: :ok
+
+  @doc """
   Handles component termination.
 
   Called when the component is stopping. Use for cleanup.
@@ -230,7 +279,7 @@ defmodule TermUI.StatefulComponent do
               | {:noreply, state()}
               | {:noreply, state(), [command()]}
 
-  @optional_callbacks terminate: 2, handle_info: 2, handle_call: 3
+  @optional_callbacks mount: 1, update: 2, unmount: 1, terminate: 2, handle_info: 2, handle_call: 3
 
   @doc false
   defmacro __using__(_opts) do
@@ -245,6 +294,15 @@ defmodule TermUI.StatefulComponent do
       # Default implementations for optional callbacks
 
       @doc false
+      def mount(state), do: {:ok, state}
+
+      @doc false
+      def update(_new_props, state), do: {:ok, state}
+
+      @doc false
+      def unmount(_state), do: :ok
+
+      @doc false
       def terminate(_reason, _state), do: :ok
 
       @doc false
@@ -253,7 +311,7 @@ defmodule TermUI.StatefulComponent do
       @doc false
       def handle_call(_request, _from, state), do: {:reply, :ok, state}
 
-      defoverridable terminate: 2, handle_info: 2, handle_call: 3
+      defoverridable mount: 1, update: 2, unmount: 1, terminate: 2, handle_info: 2, handle_call: 3
     end
   end
 end
