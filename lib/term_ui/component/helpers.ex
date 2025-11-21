@@ -279,4 +279,43 @@ defmodule TermUI.Component.Helpers do
       String.slice(text, 0, max_width)
     end
   end
+
+  @doc """
+  Creates a positioned cell for use with RenderNode.cells/2.
+
+  ## Examples
+
+      cell = positioned_cell(0, 0, "A", Style.new() |> Style.fg(:red))
+      # %{x: 0, y: 0, cell: %Cell{char: "A", fg: :red}}
+  """
+  @spec positioned_cell(non_neg_integer(), non_neg_integer(), String.t(), Style.t() | nil) ::
+          RenderNode.positioned_cell()
+  def positioned_cell(x, y, char, style \\ nil) do
+    alias TermUI.Renderer.Cell
+
+    cell_opts =
+      if style do
+        # Only include non-default/non-nil values
+        opts = []
+        opts = if style.fg not in [nil, :default], do: [{:fg, style.fg} | opts], else: opts
+        opts = if style.bg not in [nil, :default], do: [{:bg, style.bg} | opts], else: opts
+        opts = if MapSet.size(style.attrs) > 0, do: [{:attrs, MapSet.to_list(style.attrs)} | opts], else: opts
+        opts
+      else
+        []
+      end
+
+    %{x: x, y: y, cell: Cell.new(char, cell_opts)}
+  end
+
+  @doc """
+  Delegates to RenderNode.cells/2 for creating cell-based render nodes.
+
+  ## Examples
+
+      cells = [positioned_cell(0, 0, "H"), positioned_cell(1, 0, "i")]
+      cells(cells)
+  """
+  @spec cells([RenderNode.positioned_cell()], keyword()) :: RenderNode.t()
+  defdelegate cells(cells, opts \\ []), to: RenderNode
 end

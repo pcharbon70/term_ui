@@ -35,8 +35,12 @@ defmodule TermUI.Component.RenderNode do
   """
 
   alias TermUI.Renderer.Style
+  alias TermUI.Renderer.Cell
 
-  @type node_type :: :text | :box | :stack | :empty
+  @type node_type :: :text | :box | :stack | :empty | :cells
+
+  @typedoc "A cell with position information for the :cells node type"
+  @type positioned_cell :: %{x: non_neg_integer(), y: non_neg_integer(), cell: Cell.t()}
   @type direction :: :vertical | :horizontal
 
   @type t :: %__MODULE__{
@@ -46,7 +50,8 @@ defmodule TermUI.Component.RenderNode do
           children: [t()],
           direction: direction() | nil,
           width: non_neg_integer() | :auto | nil,
-          height: non_neg_integer() | :auto | nil
+          height: non_neg_integer() | :auto | nil,
+          cells: [positioned_cell()] | nil
         }
 
   defstruct type: :empty,
@@ -55,7 +60,8 @@ defmodule TermUI.Component.RenderNode do
             children: [],
             direction: nil,
             width: nil,
-            height: nil
+            height: nil,
+            cells: nil
 
   @doc """
   Creates an empty render node.
@@ -139,6 +145,29 @@ defmodule TermUI.Component.RenderNode do
       direction: direction,
       children: children,
       style: Keyword.get(opts, :style),
+      width: Keyword.get(opts, :width),
+      height: Keyword.get(opts, :height)
+    }
+  end
+
+  @doc """
+  Creates a cells node with pre-rendered cells.
+
+  This is used by widgets that need fine-grained control over cell positioning.
+  The cells list should contain Cell structs with absolute positions.
+
+  ## Examples
+
+      iex> cells = [%{x: 0, y: 0, cell: Cell.new("H")}, %{x: 1, y: 0, cell: Cell.new("i")}]
+      iex> RenderNode.cells(cells)
+      %RenderNode{type: :cells, cells: [...]}
+  """
+  @spec cells([positioned_cell()], keyword()) :: t()
+  def cells(cells, opts \\ []) when is_list(cells) do
+    %__MODULE__{
+      type: :cells,
+      cells: cells,
+      children: Keyword.get(opts, :children, []),
       width: Keyword.get(opts, :width),
       height: Keyword.get(opts, :height)
     }
