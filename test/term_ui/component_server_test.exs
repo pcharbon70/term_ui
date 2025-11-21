@@ -133,6 +133,7 @@ defmodule TermUI.ComponentServerTest do
 
   setup do
     # Start required processes
+    start_supervised!(TermUI.Component.StatePersistence)
     start_supervised!(ComponentRegistry)
     start_supervised!(ComponentSupervisor)
     :ok

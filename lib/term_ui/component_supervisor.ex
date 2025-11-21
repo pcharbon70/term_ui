@@ -14,13 +14,34 @@ defmodule TermUI.ComponentSupervisor do
       # Stop a component
       :ok = ComponentSupervisor.stop_component(pid)
 
+      # Stop with cascade (stops all children)
+      :ok = ComponentSupervisor.stop_component(pid, cascade: true)
+
   ## Supervision Strategy
 
   Uses `:one_for_one` strategy - each component is independent.
   Default restart is `:transient` - restart only on crash, not normal exit.
+
+  ## Restart Strategies
+
+  - `:transient` (default) - Restart only on abnormal termination
+  - `:permanent` - Always restart on termination
+  - `:temporary` - Never restart
+
+  ## Shutdown Options
+
+  - `:shutdown` - Timeout in ms (default 5000) or `:brutal_kill`
+  - `:recovery` - Recovery mode: `:reset`, `:last_props`, `:last_state`
   """
 
   use DynamicSupervisor
+
+  require Logger
+
+  alias TermUI.ComponentRegistry
+  alias TermUI.Component.StatePersistence
+
+  @default_shutdown_timeout 5_000
 
   @doc """
   Starts the component supervisor.
@@ -34,8 +55,15 @@ defmodule TermUI.ComponentSupervisor do
   end
 
   @impl true
-  def init(_opts) do
-    DynamicSupervisor.init(strategy: :one_for_one)
+  def init(opts) do
+    max_restarts = Keyword.get(opts, :max_restarts, 3)
+    max_seconds = Keyword.get(opts, :max_seconds, 5)
+
+    DynamicSupervisor.init(
+      strategy: :one_for_one,
+      max_restarts: max_restarts,
+      max_seconds: max_seconds
+    )
   end
 
   @doc """
@@ -52,6 +80,9 @@ defmodule TermUI.ComponentSupervisor do
   - `:id` - Component identifier for registry lookup
   - `:name` - Process name registration
   - `:timeout` - Init timeout in milliseconds (default 5000)
+  - `:restart` - Restart strategy: `:transient`, `:permanent`, `:temporary` (default `:transient`)
+  - `:shutdown` - Shutdown timeout in ms or `:brutal_kill` (default 5000)
+  - `:recovery` - Recovery mode: `:reset`, `:last_props`, `:last_state` (default `:last_state`)
 
   ## Returns
 
@@ -70,10 +101,26 @@ defmodule TermUI.ComponentSupervisor do
   """
   @spec start_component(module(), map(), keyword()) :: DynamicSupervisor.on_start_child()
   def start_component(module, props, opts \\ []) do
+    component_id = Keyword.get(opts, :id, make_ref())
+    restart = Keyword.get(opts, :restart, :transient)
+    shutdown = Keyword.get(opts, :shutdown, @default_shutdown_timeout)
+    recovery = Keyword.get(opts, :recovery, :last_state)
+
+    # Store recovery mode for state persistence
+    full_opts = Keyword.put(opts, :recovery, recovery)
+
+    # Set restart limits for this component if specified
+    if Keyword.has_key?(opts, :max_restarts) do
+      max_restarts = Keyword.get(opts, :max_restarts, 3)
+      max_seconds = Keyword.get(opts, :max_seconds, 5)
+      StatePersistence.set_restart_limits(component_id, max_restarts, max_seconds)
+    end
+
     child_spec = %{
-      id: Keyword.get(opts, :id, make_ref()),
-      start: {TermUI.ComponentServer, :start_link, [module, props, opts]},
-      restart: Keyword.get(opts, :restart, :transient),
+      id: component_id,
+      start: {TermUI.ComponentServer, :start_link, [module, props, full_opts]},
+      restart: restart,
+      shutdown: shutdown,
       type: :worker
     }
 
@@ -87,19 +134,60 @@ defmodule TermUI.ComponentSupervisor do
 
   ## Parameters
 
-  - `pid` - The component process pid
+  - `pid_or_id` - The component process pid or id
+  - `opts` - Options
+    - `:cascade` - Also stop all child components (default: false)
 
   ## Returns
 
   - `:ok` - Component stopped successfully
   - `{:error, :not_found}` - Component not found
   """
-  @spec stop_component(pid()) :: :ok | {:error, :not_found}
-  def stop_component(pid) when is_pid(pid) do
+  @spec stop_component(pid() | term(), keyword()) :: :ok | {:error, :not_found}
+  def stop_component(pid_or_id, opts \\ [])
+
+  def stop_component(pid, opts) when is_pid(pid) do
+    cascade = Keyword.get(opts, :cascade, false)
+
+    # If cascade, find and stop children first
+    if cascade do
+      case ComponentRegistry.lookup_id(pid) do
+        {:ok, id} ->
+          stop_children(id)
+        _ ->
+          :ok
+      end
+    end
+
     case DynamicSupervisor.terminate_child(__MODULE__, pid) do
       :ok -> :ok
       {:error, :not_found} -> {:error, :not_found}
     end
+  end
+
+  def stop_component(id, opts) do
+    case ComponentRegistry.lookup(id) do
+      {:ok, pid} -> stop_component(pid, opts)
+      {:error, :not_found} -> {:error, :not_found}
+    end
+  end
+
+  defp stop_children(parent_id) do
+    children = ComponentRegistry.get_children(parent_id)
+
+    # Stop children in reverse order (depth-first)
+    Enum.each(children, fn child_id ->
+      # Recursively stop grandchildren first
+      stop_children(child_id)
+
+      # Then stop the child
+      case ComponentRegistry.lookup(child_id) do
+        {:ok, pid} ->
+          DynamicSupervisor.terminate_child(__MODULE__, pid)
+        _ ->
+          :ok
+      end
+    end)
   end
 
   @doc """
