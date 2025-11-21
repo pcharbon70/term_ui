@@ -420,11 +420,14 @@ Monitor the component tree:
 tree = ComponentSupervisor.get_tree()
 
 # Get component info
-info = ComponentSupervisor.get_component_info(:my_counter)
-# => %{pid: #PID<...>, restart_count: 0, uptime: 12345}
+{:ok, info} = ComponentSupervisor.get_component_info(:my_counter)
+# => %{pid: #PID<...>, restart_count: 0, uptime_ms: 12345, ...}
 
 # Count children
 count = ComponentSupervisor.count_children()
+
+# Format tree for display
+IO.puts(ComponentSupervisor.format_tree())
 ```
 
 ## Best Practices

@@ -209,4 +209,201 @@ defmodule TermUI.ComponentSupervisor do
     |> Enum.map(fn {_, pid, _, _} -> pid end)
     |> Enum.filter(&is_pid/1)
   end
+
+  @doc """
+  Returns the component tree structure.
+
+  Builds a hierarchical view of all components based on their
+  parent-child relationships in the registry.
+
+  ## Returns
+
+  A list of tree nodes, where each node contains:
+  - `:id` - Component identifier
+  - `:pid` - Process identifier
+  - `:module` - Component module
+  - `:children` - List of child nodes
+
+  ## Examples
+
+      tree = ComponentSupervisor.get_tree()
+      # [
+      #   %{id: :root, pid: #PID<0.123.0>, module: MyApp.Root, children: [
+      #     %{id: :child1, pid: #PID<0.124.0>, module: MyApp.Child, children: []}
+      #   ]}
+      # ]
+  """
+  @spec get_tree() :: [map()]
+  def get_tree do
+    # Get all components
+    all_components = ComponentRegistry.list_all()
+
+    # Find root components (no parent)
+    roots = Enum.filter(all_components, fn {id, _pid} ->
+      case ComponentRegistry.get_parent(id) do
+        {:ok, nil} -> true
+        {:error, :not_found} -> true
+        _ -> false
+      end
+    end)
+
+    # Build tree recursively from roots
+    Enum.map(roots, fn {id, pid} ->
+      build_tree_node(id, pid)
+    end)
+  end
+
+  defp build_tree_node(id, pid) do
+    # Get component module from server state
+    module = try do
+      state = TermUI.ComponentServer.get_state(pid)
+      Map.get(state, :__module__, :unknown)
+    catch
+      _, _ -> :unknown
+    end
+
+    # Get children
+    children = ComponentRegistry.get_children(id)
+
+    child_nodes = Enum.flat_map(children, fn child_id ->
+      case ComponentRegistry.lookup(child_id) do
+        {:ok, child_pid} -> [build_tree_node(child_id, child_pid)]
+        _ -> []
+      end
+    end)
+
+    %{
+      id: id,
+      pid: pid,
+      module: module,
+      children: child_nodes
+    }
+  end
+
+  @doc """
+  Returns detailed information about a component.
+
+  ## Parameters
+
+  - `id` - Component identifier
+
+  ## Returns
+
+  - `{:ok, info}` - Component information map
+  - `{:error, :not_found}` - Component not found
+
+  The info map contains:
+  - `:id` - Component identifier
+  - `:pid` - Process identifier
+  - `:module` - Component module
+  - `:lifecycle` - Current lifecycle stage
+  - `:restart_count` - Number of times restarted
+  - `:uptime_ms` - Milliseconds since process started
+  - `:state` - Current component state
+  - `:props` - Current props
+
+  ## Examples
+
+      {:ok, info} = ComponentSupervisor.get_component_info(:my_button)
+      info.uptime_ms
+      # => 12345
+  """
+  @spec get_component_info(term()) :: {:ok, map()} | {:error, :not_found}
+  def get_component_info(id) do
+    case ComponentRegistry.lookup(id) do
+      {:ok, pid} ->
+        info = build_component_info(id, pid)
+        {:ok, info}
+
+      {:error, :not_found} ->
+        {:error, :not_found}
+    end
+  end
+
+  defp build_component_info(id, pid) do
+    # Get basic info from ComponentServer
+    {state, props, lifecycle, module} = try do
+      server_state = :sys.get_state(pid)
+      {
+        Map.get(server_state, :component_state, %{}),
+        Map.get(server_state, :props, %{}),
+        Map.get(server_state, :lifecycle, :unknown),
+        Map.get(server_state, :module, :unknown)
+      }
+    catch
+      _, _ -> {%{}, %{}, :unknown, :unknown}
+    end
+
+    # Get restart count from persistence
+    restart_count = StatePersistence.get_restart_count(id)
+
+    # Calculate uptime from process info
+    uptime_ms = case Process.info(pid, :start_time) do
+      {:start_time, start_time} ->
+        # start_time is in native time units since VM start
+        current = :erlang.monotonic_time(:millisecond)
+        start_ms = :erlang.convert_time_unit(start_time, :native, :millisecond)
+        current - start_ms
+
+      nil ->
+        0
+    end
+
+    %{
+      id: id,
+      pid: pid,
+      module: module,
+      lifecycle: lifecycle,
+      restart_count: restart_count,
+      uptime_ms: uptime_ms,
+      state: state,
+      props: props
+    }
+  end
+
+  @doc """
+  Returns a text visualization of the component tree.
+
+  Useful for debugging and logging.
+
+  ## Examples
+
+      IO.puts(ComponentSupervisor.format_tree())
+      # └─ :root (MyApp.Root) #PID<0.123.0>
+      #    ├─ :sidebar (MyApp.Sidebar) #PID<0.124.0>
+      #    └─ :content (MyApp.Content) #PID<0.125.0>
+  """
+  @spec format_tree() :: String.t()
+  def format_tree do
+    tree = get_tree()
+
+    if Enum.empty?(tree) do
+      "(no components)"
+    else
+      tree
+      |> Enum.map(&format_tree_node(&1, "", true))
+      |> Enum.join("\n")
+    end
+  end
+
+  defp format_tree_node(node, prefix, is_last) do
+    connector = if is_last, do: "└─ ", else: "├─ "
+    line = "#{prefix}#{connector}#{inspect(node.id)} (#{inspect(node.module)}) #{inspect(node.pid)}"
+
+    if Enum.empty?(node.children) do
+      line
+    else
+      child_prefix = prefix <> if(is_last, do: "   ", else: "│  ")
+
+      child_lines = node.children
+      |> Enum.with_index()
+      |> Enum.map(fn {child, idx} ->
+        is_last_child = idx == length(node.children) - 1
+        format_tree_node(child, child_prefix, is_last_child)
+      end)
+      |> Enum.join("\n")
+
+      line <> "\n" <> child_lines
+    end
+  end
 end

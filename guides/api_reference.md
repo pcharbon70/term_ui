@@ -101,7 +101,8 @@ opts = [
 # Query
 count = ComponentSupervisor.count_children()
 tree = ComponentSupervisor.get_tree()
-info = ComponentSupervisor.get_component_info(:id)
+{:ok, info} = ComponentSupervisor.get_component_info(:id)
+tree_text = ComponentSupervisor.format_tree()
 ```
 
 ## ComponentRegistry
@@ -118,7 +119,7 @@ Tracks components and their relationships.
 children = ComponentRegistry.get_children(:id)
 
 # All components
-components = ComponentRegistry.all()
+components = ComponentRegistry.list_all()
 ```
 
 ## EventRouter
