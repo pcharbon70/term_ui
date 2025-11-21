@@ -29,6 +29,7 @@ defmodule TermUI.ComponentServer do
   require Logger
 
   alias TermUI.ComponentRegistry
+  alias TermUI.Component.StatePersistence
 
   @default_init_timeout 5_000
   @default_unmount_timeout 5_000
@@ -39,7 +40,8 @@ defmodule TermUI.ComponentServer do
           props: map(),
           lifecycle: :initialized | :mounted | :unmounted,
           id: term(),
-          hooks: %{atom() => [function()]}
+          hooks: %{atom() => [function()]},
+          recovery: :reset | :last_props | :last_state
         }
 
   # Client API
@@ -144,20 +146,32 @@ defmodule TermUI.ComponentServer do
   @impl true
   def init({module, props, id, opts}) do
     timeout = Keyword.get(opts, :timeout, @default_init_timeout)
+    recovery = Keyword.get(opts, :recovery, :last_state)
 
     # Validate that module implements required behaviour
     unless function_exported?(module, :init, 1) or function_exported?(module, :render, 2) do
       {:stop, {:error, :invalid_component_module}}
     else
+      # Try to recover state if this is a restart
+      recovered_state = try_recover_state(id, recovery, props)
+
       # Initialize component with timeout
       task =
         Task.async(fn ->
           try do
-            if function_exported?(module, :init, 1) do
-              module.init(props)
-            else
-              # Stateless component - no init needed
-              {:ok, props}
+            case recovered_state do
+              {:ok, recovered} ->
+                # State was recovered, use it directly
+                {:ok, recovered}
+
+              :not_found ->
+                # No recovered state, normal init
+                if function_exported?(module, :init, 1) do
+                  module.init(props)
+                else
+                  # Stateless component - no init needed
+                  {:ok, props}
+                end
             end
           rescue
             e -> {:error, {:init_error, e, __STACKTRACE__}}
@@ -176,7 +190,8 @@ defmodule TermUI.ComponentServer do
               after_mount: [],
               before_unmount: [],
               on_prop_change: []
-            }
+            },
+            recovery: recovery
           }
 
           {:ok, state}
@@ -192,7 +207,8 @@ defmodule TermUI.ComponentServer do
               after_mount: [],
               before_unmount: [],
               on_prop_change: []
-            }
+            },
+            recovery: recovery
           }
 
           # Execute init commands
@@ -208,6 +224,19 @@ defmodule TermUI.ComponentServer do
         nil ->
           {:stop, {:init_timeout, timeout}}
       end
+    end
+  end
+
+  defp try_recover_state(id, recovery, _props) do
+    case StatePersistence.recover(id, recovery) do
+      {:ok, state} ->
+        # Record this as a restart
+        StatePersistence.record_restart(id)
+        Logger.debug("Recovered state for component #{inspect(id)}")
+        {:ok, state}
+
+      :not_found ->
+        :not_found
     end
   end
 
@@ -375,6 +404,12 @@ defmodule TermUI.ComponentServer do
 
   @impl true
   def terminate(reason, state) do
+    # Persist state for potential recovery on crash
+    if reason != :normal and reason != :shutdown do
+      StatePersistence.persist(state.id, state.component_state, props: state.props)
+      Logger.debug("Persisted state for component #{inspect(state.id)} before crash")
+    end
+
     # Ensure cleanup happens even on crash
     if state.lifecycle == :mounted do
       execute_hooks(:before_unmount, state)
