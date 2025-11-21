@@ -28,6 +28,33 @@ defmodule TermUI.Renderer.BufferTest do
         Buffer.new(-1, 80)
       end
     end
+
+    test "rejects rows exceeding maximum" do
+      max_rows = Buffer.max_rows()
+      assert {:error, {:dimensions_too_large, msg}} = Buffer.new(max_rows + 1, 80)
+      assert msg =~ "rows #{max_rows + 1} exceeds maximum #{max_rows}"
+    end
+
+    test "rejects cols exceeding maximum" do
+      max_cols = Buffer.max_cols()
+      assert {:error, {:dimensions_too_large, msg}} = Buffer.new(24, max_cols + 1)
+      assert msg =~ "cols #{max_cols + 1} exceeds maximum #{max_cols}"
+    end
+
+    test "accepts dimensions under maximum" do
+      {:ok, buffer} = Buffer.new(100, 200)
+      assert buffer.rows == 100
+      assert buffer.cols == 200
+      Buffer.destroy(buffer)
+    end
+
+    test "max_rows returns configured maximum" do
+      assert Buffer.max_rows() == 500
+    end
+
+    test "max_cols returns configured maximum" do
+      assert Buffer.max_cols() == 1000
+    end
   end
 
   describe "destroy/1" do
@@ -139,6 +166,42 @@ defmodule TermUI.Renderer.BufferTest do
       Buffer.clear_region(buffer, 1, 1, 100, 100)
       Buffer.destroy(buffer)
     end
+
+    test "handles zero width gracefully" do
+      {:ok, buffer} = Buffer.new(5, 5)
+      Buffer.set_cell(buffer, 1, 1, Cell.new("X"))
+      # Should not clear anything
+      Buffer.clear_region(buffer, 1, 1, 0, 5)
+      assert Buffer.get_cell(buffer, 1, 1).char == "X"
+      Buffer.destroy(buffer)
+    end
+
+    test "handles zero height gracefully" do
+      {:ok, buffer} = Buffer.new(5, 5)
+      Buffer.set_cell(buffer, 1, 1, Cell.new("X"))
+      # Should not clear anything
+      Buffer.clear_region(buffer, 1, 1, 5, 0)
+      assert Buffer.get_cell(buffer, 1, 1).char == "X"
+      Buffer.destroy(buffer)
+    end
+
+    test "handles negative width gracefully" do
+      {:ok, buffer} = Buffer.new(5, 5)
+      Buffer.set_cell(buffer, 1, 1, Cell.new("X"))
+      # Should not clear anything
+      Buffer.clear_region(buffer, 1, 1, -1, 5)
+      assert Buffer.get_cell(buffer, 1, 1).char == "X"
+      Buffer.destroy(buffer)
+    end
+
+    test "handles negative height gracefully" do
+      {:ok, buffer} = Buffer.new(5, 5)
+      Buffer.set_cell(buffer, 1, 1, Cell.new("X"))
+      # Should not clear anything
+      Buffer.clear_region(buffer, 1, 1, 5, -1)
+      assert Buffer.get_cell(buffer, 1, 1).char == "X"
+      Buffer.destroy(buffer)
+    end
   end
 
   describe "clear/1" do
@@ -221,6 +284,22 @@ defmodule TermUI.Renderer.BufferTest do
       assert Cell.empty?(Buffer.get_cell(new_buffer, 6, 6))
       assert Cell.empty?(Buffer.get_cell(new_buffer, 10, 10))
       Buffer.destroy(new_buffer)
+    end
+
+    test "rejects rows exceeding maximum" do
+      {:ok, buffer} = Buffer.new(10, 10)
+      max_rows = Buffer.max_rows()
+      assert {:error, {:dimensions_too_large, msg}} = Buffer.resize(buffer, max_rows + 1, 80)
+      assert msg =~ "rows #{max_rows + 1} exceeds maximum #{max_rows}"
+      Buffer.destroy(buffer)
+    end
+
+    test "rejects cols exceeding maximum" do
+      {:ok, buffer} = Buffer.new(10, 10)
+      max_cols = Buffer.max_cols()
+      assert {:error, {:dimensions_too_large, msg}} = Buffer.resize(buffer, 24, max_cols + 1)
+      assert msg =~ "cols #{max_cols + 1} exceeds maximum #{max_cols}"
+      Buffer.destroy(buffer)
     end
   end
 
@@ -349,6 +428,89 @@ defmodule TermUI.Renderer.BufferTest do
         assert cell.char == "#{i}"
       end
 
+      Buffer.destroy(buffer)
+    end
+  end
+
+  describe "wide character handling" do
+    test "write_string returns display width for CJK" do
+      {:ok, buffer} = Buffer.new(10, 80)
+      # "日本" is 4 columns wide (2 chars × 2 width each)
+      written = Buffer.write_string(buffer, 1, 1, "日本")
+
+      assert written == 4
+      Buffer.destroy(buffer)
+    end
+
+    test "write_string sets placeholder for wide chars" do
+      {:ok, buffer} = Buffer.new(10, 80)
+      Buffer.write_string(buffer, 1, 1, "日")
+
+      # First cell has the character
+      cell1 = Buffer.get_cell(buffer, 1, 1)
+      assert cell1.char == "日"
+      assert Cell.wide?(cell1)
+
+      # Second cell is placeholder
+      cell2 = Buffer.get_cell(buffer, 1, 2)
+      assert Cell.wide_placeholder?(cell2)
+      assert cell2.char == ""
+      Buffer.destroy(buffer)
+    end
+
+    test "write_string advances by width for mixed content" do
+      {:ok, buffer} = Buffer.new(10, 80)
+      # "A日B" = 1 + 2 + 1 = 4 columns
+      written = Buffer.write_string(buffer, 1, 1, "A日B")
+
+      assert written == 4
+      assert Buffer.get_cell(buffer, 1, 1).char == "A"
+      assert Buffer.get_cell(buffer, 1, 2).char == "日"
+      assert Cell.wide_placeholder?(Buffer.get_cell(buffer, 1, 3))
+      assert Buffer.get_cell(buffer, 1, 4).char == "B"
+      Buffer.destroy(buffer)
+    end
+
+    test "write_string handles emoji" do
+      {:ok, buffer} = Buffer.new(10, 80)
+      written = Buffer.write_string(buffer, 1, 1, "😀")
+
+      assert written == 2
+      assert Buffer.get_cell(buffer, 1, 1).char == "😀"
+      assert Cell.wide_placeholder?(Buffer.get_cell(buffer, 1, 2))
+      Buffer.destroy(buffer)
+    end
+
+    test "write_string truncates wide char at edge" do
+      {:ok, buffer} = Buffer.new(1, 3)
+      # "日本" would need 4 columns, only 3 available
+      written = Buffer.write_string(buffer, 1, 1, "日本")
+
+      # Both chars written, but second doesn't get placeholder (col 4 out of bounds)
+      # Display width is 4, but only 3 columns rendered correctly
+      assert written == 4
+      assert Buffer.get_cell(buffer, 1, 1).char == "日"
+      assert Cell.wide_placeholder?(Buffer.get_cell(buffer, 1, 2))
+      assert Buffer.get_cell(buffer, 1, 3).char == "本"
+      Buffer.destroy(buffer)
+    end
+
+    test "placeholder inherits style from primary" do
+      {:ok, buffer} = Buffer.new(10, 80)
+      style = Style.new() |> Style.fg(:red)
+      Buffer.write_string(buffer, 1, 1, "日", style: style)
+
+      placeholder = Buffer.get_cell(buffer, 1, 2)
+      assert placeholder.fg == :red
+      Buffer.destroy(buffer)
+    end
+
+    test "wide char cell has correct width" do
+      {:ok, buffer} = Buffer.new(10, 80)
+      Buffer.write_string(buffer, 1, 1, "日")
+
+      cell = Buffer.get_cell(buffer, 1, 1)
+      assert Cell.width(cell) == 2
       Buffer.destroy(buffer)
     end
   end

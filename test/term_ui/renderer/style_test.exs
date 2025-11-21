@@ -235,4 +235,137 @@ defmodule TermUI.Renderer.StyleTest do
       refute Style.empty?(Style.new(attrs: [:bold]))
     end
   end
+
+  describe "input validation" do
+    test "new/1 raises on invalid foreground color" do
+      assert_raise ArgumentError, fn ->
+        Style.new(fg: :invalid_color)
+      end
+    end
+
+    test "new/1 raises on invalid background color" do
+      assert_raise ArgumentError, fn ->
+        Style.new(bg: :invalid_color)
+      end
+    end
+
+    test "new/1 raises on invalid attribute" do
+      assert_raise ArgumentError, fn ->
+        Style.new(attrs: [:invalid_attr])
+      end
+    end
+
+    test "fg/2 raises on invalid color" do
+      assert_raise ArgumentError, fn ->
+        Style.new() |> Style.fg(:invalid_color)
+      end
+    end
+
+    test "bg/2 raises on invalid color" do
+      assert_raise ArgumentError, fn ->
+        Style.new() |> Style.bg(:invalid_color)
+      end
+    end
+
+    test "add_attr/2 raises on invalid attribute" do
+      assert_raise ArgumentError, fn ->
+        Style.new() |> Style.add_attr(:invalid_attr)
+      end
+    end
+
+    test "new/1 raises on out-of-range 256-color" do
+      assert_raise ArgumentError, fn ->
+        Style.new(fg: 256)
+      end
+    end
+
+    test "new/1 raises on out-of-range RGB" do
+      assert_raise ArgumentError, fn ->
+        Style.new(fg: {256, 0, 0})
+      end
+    end
+
+    test "accepts 256-color values" do
+      style = Style.new(fg: 196, bg: 21)
+      assert style.fg == 196
+      assert style.bg == 21
+    end
+
+    test "accepts RGB color values" do
+      style = Style.new(fg: {255, 128, 0}, bg: {0, 0, 255})
+      assert style.fg == {255, 128, 0}
+      assert style.bg == {0, 0, 255}
+    end
+
+    test "accepts all named colors" do
+      style = Style.new(fg: :bright_red, bg: :bright_blue)
+      assert style.fg == :bright_red
+      assert style.bg == :bright_blue
+    end
+
+    test "accepts all valid attributes" do
+      style = Style.new(attrs: [:bold, :dim, :italic, :underline, :blink, :reverse, :hidden, :strikethrough])
+      assert MapSet.size(style.attrs) == 8
+    end
+  end
+
+  describe "equal?/2" do
+    test "returns true for identical styles" do
+      s1 = Style.new(fg: :red, bg: :blue, attrs: [:bold, :italic])
+      s2 = Style.new(fg: :red, bg: :blue, attrs: [:bold, :italic])
+      assert Style.equal?(s1, s2)
+    end
+
+    test "returns true for empty styles" do
+      assert Style.equal?(Style.new(), Style.new())
+    end
+
+    test "returns false for different foreground colors" do
+      s1 = Style.new(fg: :red)
+      s2 = Style.new(fg: :blue)
+      refute Style.equal?(s1, s2)
+    end
+
+    test "returns false for different background colors" do
+      s1 = Style.new(bg: :red)
+      s2 = Style.new(bg: :blue)
+      refute Style.equal?(s1, s2)
+    end
+
+    test "returns false for different attributes" do
+      s1 = Style.new(attrs: [:bold])
+      s2 = Style.new(attrs: [:italic])
+      refute Style.equal?(s1, s2)
+    end
+
+    test "returns false when one has attribute other doesn't" do
+      s1 = Style.new(attrs: [:bold])
+      s2 = Style.new()
+      refute Style.equal?(s1, s2)
+    end
+
+    test "attribute order doesn't matter" do
+      s1 = Style.new(attrs: [:bold, :italic])
+      s2 = Style.new(attrs: [:italic, :bold])
+      assert Style.equal?(s1, s2)
+    end
+
+    test "returns true for styles with 256-color" do
+      s1 = Style.new(fg: 196, bg: 21)
+      s2 = Style.new(fg: 196, bg: 21)
+      assert Style.equal?(s1, s2)
+    end
+
+    test "returns true for styles with RGB color" do
+      s1 = Style.new(fg: {255, 128, 0})
+      s2 = Style.new(fg: {255, 128, 0})
+      assert Style.equal?(s1, s2)
+    end
+
+    test "returns false for nil vs set color" do
+      s1 = Style.new(fg: :red)
+      s2 = Style.new()
+      refute Style.equal?(s1, s2)
+    end
+  end
 end

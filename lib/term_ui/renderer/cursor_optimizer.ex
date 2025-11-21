@@ -237,6 +237,15 @@ defmodule TermUI.Renderer.CursorOptimizer do
         options
       end
 
+    # Add newline-based options for moving down
+    options =
+      if row_diff > 0 and from_col == 1 and to_col == 1 do
+        # Just newlines when starting and ending at column 1
+        [{String.duplicate("\n", row_diff), row_diff} | options]
+      else
+        options
+      end
+
     options
   end
 
@@ -269,8 +278,20 @@ defmodule TermUI.Renderer.CursorOptimizer do
       [{"\r", cost_cr()}]
     else
       # CR + vertical movement
+      options = []
+
+      # Option 1: CR + newlines (for moving down to column 1)
+      options = if row_diff > 0 do
+        # \r\n\n\n... is 1 + row_diff bytes
+        lf_seq = ["\r", String.duplicate("\n", row_diff)]
+        [{lf_seq, cost_cr() + row_diff} | options]
+      else
+        options
+      end
+
+      # Option 2: CR + escape sequence (for up or large down)
       {v_seq, v_cost} = vertical_sequence(row_diff)
-      [{["\r", v_seq], cost_cr() + v_cost}]
+      [{["\r", v_seq], cost_cr() + v_cost} | options]
     end
   end
 

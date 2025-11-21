@@ -212,4 +212,212 @@ defmodule TermUI.Renderer.CellTest do
       assert :strikethrough in attrs
     end
   end
+
+  describe "character sanitization" do
+    test "preserves normal ASCII characters" do
+      cell = Cell.new("A")
+      assert cell.char == "A"
+    end
+
+    test "preserves space character" do
+      cell = Cell.new(" ")
+      assert cell.char == " "
+    end
+
+    test "preserves Unicode characters" do
+      cell = Cell.new("世")
+      assert cell.char == "世"
+    end
+
+    test "preserves emoji" do
+      cell = Cell.new("🎉")
+      assert cell.char == "🎉"
+    end
+
+    test "strips escape sequence (CSI)" do
+      # \e[2J is clear screen
+      cell = Cell.new("\e[2J")
+      assert cell.char == " "
+    end
+
+    test "strips escape sequence with text after" do
+      cell = Cell.new("\e[31mRed")
+      assert cell.char == "Red"
+    end
+
+    test "strips null character" do
+      cell = Cell.new("\x00")
+      assert cell.char == " "
+    end
+
+    test "strips bell character" do
+      cell = Cell.new("\x07")
+      assert cell.char == " "
+    end
+
+    test "strips backspace" do
+      cell = Cell.new("\x08")
+      assert cell.char == " "
+    end
+
+    test "strips tab character" do
+      cell = Cell.new("\t")
+      assert cell.char == " "
+    end
+
+    test "strips newline" do
+      cell = Cell.new("\n")
+      assert cell.char == " "
+    end
+
+    test "strips carriage return" do
+      cell = Cell.new("\r")
+      assert cell.char == " "
+    end
+
+    test "strips DEL character" do
+      cell = Cell.new("\x7F")
+      assert cell.char == " "
+    end
+
+    test "strips C1 control characters" do
+      # 0x9B is CSI in C1 range
+      cell = Cell.new(<<0x9B>>)
+      assert cell.char == " "
+    end
+
+    test "strips escape from mixed content" do
+      cell = Cell.new("A\e[0mB")
+      assert cell.char == "AB"
+    end
+
+    test "strips multiple control characters" do
+      cell = Cell.new("\x00\x01\x02X\x03\x04")
+      assert cell.char == "X"
+    end
+
+    test "put_char also sanitizes" do
+      cell = Cell.new("A")
+      new_cell = Cell.put_char(cell, "\e[2J")
+      assert new_cell.char == " "
+    end
+
+    test "OSC sequence is stripped" do
+      # OSC to set window title
+      cell = Cell.new("\e]2;malicious\x07")
+      assert cell.char == " "
+    end
+
+    test "preserves accented characters" do
+      cell = Cell.new("é")
+      assert cell.char == "é"
+    end
+
+    test "preserves combining characters" do
+      # e + combining acute accent
+      cell = Cell.new("e\u0301")
+      assert cell.char == "e\u0301"
+    end
+
+    test "preserves multiple combining marks" do
+      # a + combining acute + combining tilde
+      cell = Cell.new("a\u0301\u0303")
+      assert cell.char == "a\u0301\u0303"
+    end
+
+    test "preserves flag emoji (regional indicators)" do
+      # US flag (U+1F1FA U+1F1F8)
+      cell = Cell.new("🇺🇸")
+      assert cell.char == "🇺🇸"
+    end
+
+    test "preserves emoji with skin tone modifier" do
+      # Waving hand + medium skin tone
+      cell = Cell.new("👋🏽")
+      assert cell.char == "👋🏽"
+    end
+
+    test "preserves ZWJ emoji sequences" do
+      # Family emoji (man + ZWJ + woman + ZWJ + girl)
+      cell = Cell.new("👨‍👩‍👧")
+      assert cell.char == "👨‍👩‍👧"
+    end
+
+    test "preserves keycap sequences" do
+      # Keycap digit one (1 + combining enclosing keycap)
+      cell = Cell.new("1️⃣")
+      assert cell.char == "1️⃣"
+    end
+  end
+
+  describe "wide character support" do
+    test "ASCII characters have width 1" do
+      cell = Cell.new("A")
+      assert Cell.width(cell) == 1
+      refute Cell.wide?(cell)
+    end
+
+    test "CJK characters have width 2" do
+      cell = Cell.new("日")
+      assert Cell.width(cell) == 2
+      assert Cell.wide?(cell)
+    end
+
+    test "emoji have width 2" do
+      cell = Cell.new("😀")
+      assert Cell.width(cell) == 2
+      assert Cell.wide?(cell)
+    end
+
+    test "space has width 1" do
+      cell = Cell.new(" ")
+      assert Cell.width(cell) == 1
+      refute Cell.wide?(cell)
+    end
+
+    test "empty cell has width 1" do
+      cell = Cell.empty()
+      assert Cell.width(cell) == 1
+      refute Cell.wide?(cell)
+    end
+
+    test "wide_placeholder creates placeholder cell" do
+      primary = Cell.new("日", fg: :red)
+      placeholder = Cell.wide_placeholder(primary)
+
+      assert placeholder.char == ""
+      assert placeholder.fg == :red
+      assert placeholder.width == 0
+      assert Cell.wide_placeholder?(placeholder)
+      refute Cell.wide_placeholder?(primary)
+    end
+
+    test "equal? considers width" do
+      # Same char different width shouldn't be equal
+      cell1 = Cell.new("A")
+      cell2 = %{cell1 | width: 2}
+      refute Cell.equal?(cell1, cell2)
+    end
+
+    test "equal? considers wide_placeholder" do
+      cell1 = Cell.new("A")
+      cell2 = %{cell1 | wide_placeholder: true}
+      refute Cell.equal?(cell1, cell2)
+    end
+
+    test "Hangul has width 2" do
+      cell = Cell.new("한")
+      assert Cell.width(cell) == 2
+    end
+
+    test "Hiragana has width 2" do
+      cell = Cell.new("あ")
+      assert Cell.width(cell) == 2
+    end
+
+    test "fullwidth ASCII has width 2" do
+      cell = Cell.new("Ａ")
+      assert Cell.width(cell) == 2
+    end
+  end
 end

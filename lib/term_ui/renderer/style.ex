@@ -39,6 +39,27 @@ defmodule TermUI.Renderer.Style do
             bg: nil,
             attrs: MapSet.new()
 
+  @valid_attributes [:bold, :dim, :italic, :underline, :blink, :reverse, :hidden, :strikethrough]
+
+  @named_colors [
+    :black,
+    :red,
+    :green,
+    :yellow,
+    :blue,
+    :magenta,
+    :cyan,
+    :white,
+    :bright_black,
+    :bright_red,
+    :bright_green,
+    :bright_yellow,
+    :bright_blue,
+    :bright_magenta,
+    :bright_cyan,
+    :bright_white
+  ]
+
   @doc """
   Creates a new empty style.
 
@@ -67,9 +88,9 @@ defmodule TermUI.Renderer.Style do
     attrs = Keyword.get(opts, :attrs, [])
 
     %__MODULE__{
-      fg: fg,
-      bg: bg,
-      attrs: MapSet.new(attrs)
+      fg: validate_color!(fg),
+      bg: validate_color!(bg),
+      attrs: attrs |> Enum.map(&validate_attribute!/1) |> MapSet.new()
     }
   end
 
@@ -83,7 +104,7 @@ defmodule TermUI.Renderer.Style do
   """
   @spec fg(t(), color()) :: t()
   def fg(%__MODULE__{} = style, color) do
-    %{style | fg: color}
+    %{style | fg: validate_color!(color)}
   end
 
   @doc """
@@ -96,7 +117,7 @@ defmodule TermUI.Renderer.Style do
   """
   @spec bg(t(), color()) :: t()
   def bg(%__MODULE__{} = style, color) do
-    %{style | bg: color}
+    %{style | bg: validate_color!(color)}
   end
 
   @doc """
@@ -168,7 +189,7 @@ defmodule TermUI.Renderer.Style do
   """
   @spec add_attr(t(), attribute()) :: t()
   def add_attr(%__MODULE__{} = style, attr) do
-    %{style | attrs: MapSet.put(style.attrs, attr)}
+    %{style | attrs: MapSet.put(style.attrs, validate_attribute!(attr))}
   end
 
   @doc """
@@ -225,12 +246,11 @@ defmodule TermUI.Renderer.Style do
   """
   @spec to_cell(t(), String.t()) :: Cell.t()
   def to_cell(%__MODULE__{} = style, char) when is_binary(char) do
-    %Cell{
-      char: char,
+    Cell.new(char,
       fg: style.fg || :default,
       bg: style.bg || :default,
-      attrs: style.attrs
-    }
+      attrs: MapSet.to_list(style.attrs)
+    )
   end
 
   @doc """
@@ -287,5 +307,31 @@ defmodule TermUI.Renderer.Style do
   @spec equal?(t(), t()) :: boolean()
   def equal?(%__MODULE__{} = a, %__MODULE__{} = b) do
     a.fg == b.fg and a.bg == b.bg and MapSet.equal?(a.attrs, b.attrs)
+  end
+
+  # Private validation helpers
+
+  defp validate_color!(nil), do: nil
+
+  defp validate_color!(color) when color in @named_colors, do: color
+
+  defp validate_color!(color) when is_integer(color) and color >= 0 and color <= 255, do: color
+
+  defp validate_color!({r, g, b} = color)
+       when is_integer(r) and r >= 0 and r <= 255 and
+              is_integer(g) and g >= 0 and g <= 255 and
+              is_integer(b) and b >= 0 and b <= 255 do
+    color
+  end
+
+  defp validate_color!(invalid) do
+    raise ArgumentError, "Invalid color: #{inspect(invalid)}"
+  end
+
+  defp validate_attribute!(attr) when attr in @valid_attributes, do: attr
+
+  defp validate_attribute!(invalid) do
+    raise ArgumentError,
+          "Invalid attribute: #{inspect(invalid)}. Valid attributes: #{inspect(@valid_attributes)}"
   end
 end
