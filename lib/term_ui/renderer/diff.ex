@@ -79,10 +79,14 @@ defmodule TermUI.Renderer.Diff do
   Compares a single row and returns render operations for changed spans.
   """
   @spec diff_row(Buffer.t(), Buffer.t(), pos_integer(), pos_integer()) :: [operation()]
-  def diff_row(current, previous, row, cols) do
-    # Get all cells for the row
-    current_cells = for col <- 1..cols, do: {col, Buffer.get_cell(current, row, col)}
-    previous_cells = for col <- 1..cols, do: {col, Buffer.get_cell(previous, row, col)}
+  def diff_row(current, previous, row, _cols) do
+    # Get all cells for the row using optimized batch lookup
+    current_row = Buffer.get_row(current, row)
+    previous_row = Buffer.get_row(previous, row)
+
+    # Convert to indexed format for find_changed_spans
+    current_cells = current_row |> Enum.with_index(1) |> Enum.map(fn {cell, col} -> {col, cell} end)
+    previous_cells = previous_row |> Enum.with_index(1) |> Enum.map(fn {cell, col} -> {col, cell} end)
 
     # Find changed spans
     spans = find_changed_spans(current_cells, previous_cells, row)
@@ -131,7 +135,8 @@ defmodule TermUI.Renderer.Diff do
   end
 
   defp extend_or_start_span(spans, span, col, curr, _row) do
-    extended = %{span | end_col: col, cells: span.cells ++ [curr]}
+    # Prepend for O(1) instead of append O(n) - reversed in finalize_span
+    extended = %{span | end_col: col, cells: [curr | span.cells]}
     {spans, extended}
   end
 
@@ -199,8 +204,9 @@ defmodule TermUI.Renderer.Diff do
   # Private functions
 
   defp finalize_span(span) do
-    # Handle wide characters - ensure pairs stay together
-    cells = handle_wide_chars(span.cells)
+    # Reverse cells (they were prepended for O(1) performance)
+    # then handle wide characters - ensure pairs stay together
+    cells = span.cells |> Enum.reverse() |> handle_wide_chars()
     %{span | cells: cells}
   end
 
@@ -228,7 +234,8 @@ defmodule TermUI.Renderer.Diff do
     style = cell_to_style(cell)
 
     if Style.equal?(style, prev_style) do
-      [{prev_style, prev_cells ++ [cell]} | rest]
+      # Prepend for O(1) instead of append O(n) - reversed in style_groups_to_operations
+      [{prev_style, [cell | prev_cells]} | rest]
     else
       [{style, [cell]}, {prev_style, prev_cells} | rest]
     end
@@ -240,7 +247,8 @@ defmodule TermUI.Renderer.Diff do
 
   defp style_groups_to_operations(groups, _start_col) do
     Enum.flat_map(groups, fn {style, cells} ->
-      text = Enum.map_join(cells, "", & &1.char)
+      # Reverse cells (they were prepended for O(1) performance)
+      text = cells |> Enum.reverse() |> Enum.map_join("", & &1.char)
       [{:style, style}, {:text, text}]
     end)
   end

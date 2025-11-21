@@ -54,7 +54,8 @@ defmodule TermUI.Renderer.FramerateLimiter do
           fps: fps(),
           interval_ms: float(),
           render_callback: (-> any()),
-          dirty: :atomics.atomics_ref(),
+          dirty_check: (-> boolean()),
+          dirty_clear: (-> :ok),
           paused: boolean(),
           timer_ref: reference() | nil,
           last_tick: integer(),
@@ -68,7 +69,8 @@ defmodule TermUI.Renderer.FramerateLimiter do
   defstruct fps: 60,
             interval_ms: 16.67,
             render_callback: nil,
-            dirty: nil,
+            dirty_check: nil,
+            dirty_clear: nil,
             paused: false,
             timer_ref: nil,
             last_tick: 0,
@@ -87,13 +89,27 @@ defmodule TermUI.Renderer.FramerateLimiter do
 
     * `:fps` - Target FPS: 30, 60, or 120 (default: 60)
     * `:render_callback` - Function to call for rendering (required)
+    * `:dirty_check` - Function returning true if render needed (optional)
+    * `:dirty_clear` - Function to clear dirty flag after render (optional)
     * `:name` - GenServer name (default: `__MODULE__`)
+
+  If `:dirty_check` and `:dirty_clear` are not provided, an internal dirty flag
+  is created. For integration with BufferManager, pass its dirty functions:
 
   ## Examples
 
+      # Standalone with internal dirty flag
       {:ok, pid} = FramerateLimiter.start_link(
         fps: 60,
         render_callback: fn -> render_frame() end
+      )
+
+      # With BufferManager integration
+      {:ok, pid} = FramerateLimiter.start_link(
+        fps: 60,
+        render_callback: fn -> render_frame() end,
+        dirty_check: fn -> BufferManager.dirty?(manager) end,
+        dirty_clear: fn -> BufferManager.clear_dirty(manager) end
       )
   """
   @spec start_link(keyword()) :: GenServer.on_start()
@@ -103,9 +119,9 @@ defmodule TermUI.Renderer.FramerateLimiter do
   end
 
   @doc """
-  Marks the buffer as dirty, triggering render on next tick.
+  Marks the internal dirty flag (for standalone use without BufferManager).
 
-  This uses an atomic operation and can be called from any process.
+  When using BufferManager integration, call `BufferManager.mark_dirty/1` instead.
   """
   @spec mark_dirty(GenServer.server()) :: :ok
   def mark_dirty(server \\ __MODULE__) do
@@ -113,7 +129,10 @@ defmodule TermUI.Renderer.FramerateLimiter do
   end
 
   @doc """
-  Clears the dirty flag after rendering.
+  Clears the internal dirty flag (for standalone use without BufferManager).
+
+  When using BufferManager integration, this is called automatically via the
+  `dirty_clear` callback after each render.
   """
   @spec clear_dirty(GenServer.server()) :: :ok
   def clear_dirty(server \\ __MODULE__) do
@@ -121,7 +140,9 @@ defmodule TermUI.Renderer.FramerateLimiter do
   end
 
   @doc """
-  Returns whether the buffer is dirty and needs rendering.
+  Returns whether the internal dirty flag is set (for standalone use).
+
+  When using BufferManager integration, call `BufferManager.dirty?/1` instead.
   """
   @spec dirty?(GenServer.server()) :: boolean()
   def dirty?(server \\ __MODULE__) do
@@ -211,14 +232,33 @@ defmodule TermUI.Renderer.FramerateLimiter do
 
     interval_ms = fps_to_interval(fps)
 
-    # Create atomic for dirty flag
-    dirty = :atomics.new(1, signed: false)
+    # Set up dirty callbacks - use provided ones or create internal atomics
+    {dirty_check, dirty_clear} =
+      case {Keyword.get(opts, :dirty_check), Keyword.get(opts, :dirty_clear)} do
+        {check, clear} when is_function(check, 0) and is_function(clear, 0) ->
+          {check, clear}
+
+        _ ->
+          # Create internal atomic for standalone use
+          dirty = :atomics.new(1, signed: false)
+          check = fn -> :atomics.get(dirty, 1) == 1 end
+
+          clear = fn ->
+            :atomics.put(dirty, 1, 0)
+            :ok
+          end
+
+          # Store atomics ref for mark_dirty
+          Process.put(:internal_dirty, dirty)
+          {check, clear}
+      end
 
     state = %__MODULE__{
       fps: fps,
       interval_ms: interval_ms,
       render_callback: render_callback,
-      dirty: dirty,
+      dirty_check: dirty_check,
+      dirty_clear: dirty_clear,
       last_tick: System.monotonic_time(:microsecond)
     }
 
@@ -231,20 +271,36 @@ defmodule TermUI.Renderer.FramerateLimiter do
 
   @impl true
   def handle_call(:mark_dirty, _from, state) do
-    :atomics.put(state.dirty, 1, 1)
+    # Use internal dirty flag if available (standalone mode)
+    case Process.get(:internal_dirty) do
+      nil -> :ok
+      dirty -> :atomics.put(dirty, 1, 1)
+    end
+
     {:reply, :ok, state}
   end
 
   @impl true
   def handle_call(:clear_dirty, _from, state) do
-    :atomics.put(state.dirty, 1, 0)
+    # Use internal dirty flag if available (standalone mode)
+    case Process.get(:internal_dirty) do
+      nil -> :ok
+      dirty -> :atomics.put(dirty, 1, 0)
+    end
+
     {:reply, :ok, state}
   end
 
   @impl true
   def handle_call(:dirty?, _from, state) do
-    value = :atomics.get(state.dirty, 1)
-    {:reply, value == 1, state}
+    # Use internal dirty flag if available (standalone mode)
+    result =
+      case Process.get(:internal_dirty) do
+        nil -> false
+        dirty -> :atomics.get(dirty, 1) == 1
+      end
+
+    {:reply, result, state}
   end
 
   @impl true
@@ -320,8 +376,8 @@ defmodule TermUI.Renderer.FramerateLimiter do
   def handle_info(:tick, state) do
     now = System.monotonic_time(:microsecond)
 
-    # Check if dirty
-    is_dirty = :atomics.get(state.dirty, 1) == 1
+    # Check if dirty using callback
+    is_dirty = state.dirty_check.()
 
     state =
       if is_dirty do
@@ -362,8 +418,8 @@ defmodule TermUI.Renderer.FramerateLimiter do
     # Call render callback
     state.render_callback.()
 
-    # Clear dirty flag
-    :atomics.put(state.dirty, 1, 0)
+    # Clear dirty flag using callback
+    state.dirty_clear.()
 
     end_time = System.monotonic_time(:microsecond)
     render_time = end_time - start_time

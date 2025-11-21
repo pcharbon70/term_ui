@@ -36,6 +36,40 @@ defmodule TermUI.Renderer.BufferManager do
   Cell writes are atomic but unordered—last writer wins for overlapping cells.
   Components should write to non-overlapping regions for deterministic results.
 
+  **Important:** This module is designed for a single-writer pattern where one
+  process (typically the render loop) coordinates buffer access. If you hold a
+  buffer reference while another process calls `swap_buffers/1`, your writes
+  will go to the wrong buffer. To avoid this race condition:
+
+  1. Complete all writes before calling `swap_buffers/1`
+  2. Use a single coordinator process for the write → swap cycle
+  3. Don't cache buffer references across swap operations
+
+  ## Typical Render Loop
+
+      # Single process coordinates all buffer access
+      buffer = BufferManager.get_current_buffer()
+
+      # All writes happen here
+      Buffer.write_string(buffer, 1, 1, "Hello")
+      BufferManager.mark_dirty()
+
+      # Only swap after writes are complete
+      if BufferManager.dirty?() do
+        current = BufferManager.get_current_buffer()
+        previous = BufferManager.get_previous_buffer()
+        operations = Diff.diff(current, previous)
+        # ... render operations ...
+        BufferManager.swap_buffers()
+        BufferManager.clear_dirty()
+      end
+
+  ## Direct Access
+
+  Most operations bypass the GenServer for maximum throughput. Buffer references
+  and the dirty flag are stored in `:persistent_term` for lock-free access from
+  any process. Only `swap_buffers/1` and `resize/3` require GenServer coordination.
+
   ## Dirty Flag
 
   The dirty flag uses `:atomics` for lock-free concurrent access. Any process
@@ -48,12 +82,14 @@ defmodule TermUI.Renderer.BufferManager do
   alias TermUI.Renderer.Buffer
 
   @type t :: %__MODULE__{
+          name: atom(),
           current: Buffer.t(),
           previous: Buffer.t(),
           dirty: :atomics.atomics_ref()
         }
 
-  defstruct current: nil,
+  defstruct name: nil,
+            current: nil,
             previous: nil,
             dirty: nil
 
@@ -82,21 +118,29 @@ defmodule TermUI.Renderer.BufferManager do
   Returns the current buffer for writing.
 
   Components use this buffer for all cell modifications.
+  This is a direct access operation (no GenServer call).
   """
   @spec get_current_buffer(GenServer.server()) :: Buffer.t()
   def get_current_buffer(server \\ __MODULE__) do
-    GenServer.call(server, :get_current_buffer)
+    name = server_name(server)
+    :persistent_term.get({__MODULE__, name, :current})
   end
 
   @doc """
   Returns the previous buffer for diffing.
 
   The renderer compares current against previous to identify changes.
+  This is a direct access operation (no GenServer call).
   """
   @spec get_previous_buffer(GenServer.server()) :: Buffer.t()
   def get_previous_buffer(server \\ __MODULE__) do
-    GenServer.call(server, :get_previous_buffer)
+    name = server_name(server)
+    :persistent_term.get({__MODULE__, name, :previous})
   end
+
+  # Convert server reference to name for persistent_term keys
+  defp server_name(name) when is_atom(name), do: name
+  defp server_name(pid) when is_pid(pid), do: GenServer.call(pid, :get_name)
 
   @doc """
   Atomically swaps the current and previous buffers.
@@ -111,10 +155,13 @@ defmodule TermUI.Renderer.BufferManager do
 
   @doc """
   Returns the buffer dimensions as `{rows, cols}`.
+
+  This is a direct access operation (no GenServer call).
   """
   @spec dimensions(GenServer.server()) :: {pos_integer(), pos_integer()}
   def dimensions(server \\ __MODULE__) do
-    GenServer.call(server, :dimensions)
+    buffer = get_current_buffer(server)
+    Buffer.dimensions(buffer)
   end
 
   @doc """
@@ -129,53 +176,75 @@ defmodule TermUI.Renderer.BufferManager do
 
   @doc """
   Clears the entire current buffer.
+
+  This is a direct access operation (no GenServer call).
   """
   @spec clear_current(GenServer.server()) :: :ok
   def clear_current(server \\ __MODULE__) do
-    GenServer.call(server, :clear_current)
+    buffer = get_current_buffer(server)
+    Buffer.clear(buffer)
   end
 
   @doc """
   Clears a single row in the current buffer.
+
+  This is a direct access operation (no GenServer call).
   """
   @spec clear_row(GenServer.server(), pos_integer()) :: :ok
   def clear_row(server \\ __MODULE__, row) do
-    GenServer.call(server, {:clear_row, row})
+    buffer = get_current_buffer(server)
+    Buffer.clear_row(buffer, row)
   end
 
   @doc """
   Clears a rectangular region in the current buffer.
+
+  This is a direct access operation (no GenServer call).
   """
   @spec clear_region(GenServer.server(), pos_integer(), pos_integer(), pos_integer(), pos_integer()) ::
           :ok
   def clear_region(server \\ __MODULE__, start_row, start_col, width, height) do
-    GenServer.call(server, {:clear_region, start_row, start_col, width, height})
+    buffer = get_current_buffer(server)
+    Buffer.clear_region(buffer, start_row, start_col, width, height)
   end
 
   @doc """
   Marks the buffer as dirty, indicating it needs rendering.
 
   This uses an atomic operation and can be called from any process.
+  This is a direct access operation (no GenServer call).
   """
   @spec mark_dirty(GenServer.server()) :: :ok
   def mark_dirty(server \\ __MODULE__) do
-    GenServer.call(server, :mark_dirty)
+    name = server_name(server)
+    dirty = :persistent_term.get({__MODULE__, name, :dirty})
+    :atomics.put(dirty, 1, 1)
+    :ok
   end
 
   @doc """
   Clears the dirty flag after rendering.
+
+  This is a direct access operation (no GenServer call).
   """
   @spec clear_dirty(GenServer.server()) :: :ok
   def clear_dirty(server \\ __MODULE__) do
-    GenServer.call(server, :clear_dirty)
+    name = server_name(server)
+    dirty = :persistent_term.get({__MODULE__, name, :dirty})
+    :atomics.put(dirty, 1, 0)
+    :ok
   end
 
   @doc """
   Returns whether the buffer is dirty and needs rendering.
+
+  This is a direct access operation (no GenServer call).
   """
   @spec dirty?(GenServer.server()) :: boolean()
   def dirty?(server \\ __MODULE__) do
-    GenServer.call(server, :dirty?)
+    name = server_name(server)
+    dirty = :persistent_term.get({__MODULE__, name, :dirty})
+    :atomics.get(dirty, 1) == 1
   end
 
   @doc """
@@ -231,14 +300,21 @@ defmodule TermUI.Renderer.BufferManager do
   def init(opts) do
     rows = Keyword.fetch!(opts, :rows)
     cols = Keyword.fetch!(opts, :cols)
+    name = Keyword.get(opts, :name, __MODULE__)
 
     {:ok, current} = Buffer.new(rows, cols)
     {:ok, previous} = Buffer.new(rows, cols)
 
-    # Create atomic for dirty flag (1 element, signed 64-bit)
+    # Create atomic for dirty flag (1 element, unsigned 64-bit)
     dirty = :atomics.new(1, signed: false)
 
+    # Store references in persistent_term for direct access
+    :persistent_term.put({__MODULE__, name, :current}, current)
+    :persistent_term.put({__MODULE__, name, :previous}, previous)
+    :persistent_term.put({__MODULE__, name, :dirty}, dirty)
+
     state = %__MODULE__{
+      name: name,
       current: current,
       previous: previous,
       dirty: dirty
@@ -248,24 +324,19 @@ defmodule TermUI.Renderer.BufferManager do
   end
 
   @impl true
-  def handle_call(:get_current_buffer, _from, state) do
-    {:reply, state.current, state}
-  end
-
-  @impl true
-  def handle_call(:get_previous_buffer, _from, state) do
-    {:reply, state.previous, state}
+  def handle_call(:get_name, _from, state) do
+    {:reply, state.name, state}
   end
 
   @impl true
   def handle_call(:swap_buffers, _from, state) do
     new_state = %{state | current: state.previous, previous: state.current}
-    {:reply, :ok, new_state}
-  end
 
-  @impl true
-  def handle_call(:dimensions, _from, state) do
-    {:reply, Buffer.dimensions(state.current), state}
+    # Update persistent_term references
+    :persistent_term.put({__MODULE__, state.name, :current}, new_state.current)
+    :persistent_term.put({__MODULE__, state.name, :previous}, new_state.previous)
+
+    {:reply, :ok, new_state}
   end
 
   @impl true
@@ -274,47 +345,21 @@ defmodule TermUI.Renderer.BufferManager do
     {:ok, new_previous} = Buffer.resize(state.previous, rows, cols)
 
     new_state = %{state | current: new_current, previous: new_previous}
+
+    # Update persistent_term references
+    :persistent_term.put({__MODULE__, state.name, :current}, new_current)
+    :persistent_term.put({__MODULE__, state.name, :previous}, new_previous)
+
     {:reply, :ok, new_state}
   end
 
   @impl true
-  def handle_call(:clear_current, _from, state) do
-    Buffer.clear(state.current)
-    {:reply, :ok, state}
-  end
-
-  @impl true
-  def handle_call({:clear_row, row}, _from, state) do
-    Buffer.clear_row(state.current, row)
-    {:reply, :ok, state}
-  end
-
-  @impl true
-  def handle_call({:clear_region, start_row, start_col, width, height}, _from, state) do
-    Buffer.clear_region(state.current, start_row, start_col, width, height)
-    {:reply, :ok, state}
-  end
-
-  @impl true
-  def handle_call(:mark_dirty, _from, state) do
-    :atomics.put(state.dirty, 1, 1)
-    {:reply, :ok, state}
-  end
-
-  @impl true
-  def handle_call(:clear_dirty, _from, state) do
-    :atomics.put(state.dirty, 1, 0)
-    {:reply, :ok, state}
-  end
-
-  @impl true
-  def handle_call(:dirty?, _from, state) do
-    value = :atomics.get(state.dirty, 1)
-    {:reply, value == 1, state}
-  end
-
-  @impl true
   def terminate(_reason, state) do
+    # Clean up persistent_term entries
+    :persistent_term.erase({__MODULE__, state.name, :current})
+    :persistent_term.erase({__MODULE__, state.name, :previous})
+    :persistent_term.erase({__MODULE__, state.name, :dirty})
+
     # Clean up ETS tables
     Buffer.destroy(state.current)
     Buffer.destroy(state.previous)

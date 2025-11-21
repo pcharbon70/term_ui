@@ -329,6 +329,48 @@ defmodule TermUI.Renderer.SequenceBufferTest do
       end
     end
 
+    test "generates correct bright foreground color codes" do
+      buffer = SequenceBuffer.new()
+
+      for {color, code} <- [
+            {:bright_black, "90"},
+            {:bright_red, "91"},
+            {:bright_green, "92"},
+            {:bright_yellow, "93"},
+            {:bright_blue, "94"},
+            {:bright_magenta, "95"},
+            {:bright_cyan, "96"},
+            {:bright_white, "97"}
+          ] do
+        style = Style.new(fg: color)
+        buf = SequenceBuffer.append_style(buffer, style)
+        {data, _} = SequenceBuffer.flush(buf)
+        binary = IO.iodata_to_binary(data)
+        assert String.contains?(binary, code), "Expected #{code} for #{color}"
+      end
+    end
+
+    test "generates correct bright background color codes" do
+      buffer = SequenceBuffer.new()
+
+      for {color, code} <- [
+            {:bright_black, "100"},
+            {:bright_red, "101"},
+            {:bright_green, "102"},
+            {:bright_yellow, "103"},
+            {:bright_blue, "104"},
+            {:bright_magenta, "105"},
+            {:bright_cyan, "106"},
+            {:bright_white, "107"}
+          ] do
+        style = Style.new(bg: color)
+        buf = SequenceBuffer.append_style(buffer, style)
+        {data, _} = SequenceBuffer.flush(buf)
+        binary = IO.iodata_to_binary(data)
+        assert String.contains?(binary, code), "Expected #{code} for #{color}"
+      end
+    end
+
     test "generates 256-color codes" do
       buffer = SequenceBuffer.new()
       style = Style.new(fg: 196)
@@ -392,6 +434,144 @@ defmodule TermUI.Renderer.SequenceBufferTest do
       {bytes, count} = SequenceBuffer.stats(buffer)
       assert bytes == 14
       assert count == 2
+    end
+  end
+
+  describe "edge cases for coverage" do
+    test "style with only attributes emits attribute codes" do
+      buffer = SequenceBuffer.new()
+      # Style with only attributes, no colors
+      style = Style.new(attrs: [:bold])
+      buffer = SequenceBuffer.append_style(buffer, style)
+      {data, _buffer} = SequenceBuffer.flush(buffer)
+      binary = IO.iodata_to_binary(data)
+
+      # Should contain bold code but no color codes
+      assert String.contains?(binary, "1")
+      refute String.contains?(binary, "38;")
+      refute String.contains?(binary, "48;")
+    end
+
+    test "style with nil colors does not emit SGR codes" do
+      buffer = SequenceBuffer.new()
+      # Style with nil colors (default new())
+      style = Style.new()
+      buffer = SequenceBuffer.append_style(buffer, style)
+      {data, _buffer} = SequenceBuffer.flush(buffer)
+      binary = IO.iodata_to_binary(data)
+
+      # Empty style should produce no output
+      assert binary == ""
+    end
+
+    test "removing multiple attributes emits correct off codes" do
+      buffer = SequenceBuffer.new()
+
+      # First style with multiple attributes
+      style1 = Style.new(attrs: [:bold, :italic, :underline])
+      buffer = SequenceBuffer.append_style(buffer, style1)
+      {_data, buffer} = SequenceBuffer.flush(buffer)
+
+      # Second style removes all attributes
+      style2 = Style.new()
+      buffer = SequenceBuffer.append_style(buffer, style2)
+      {data, _buffer} = SequenceBuffer.flush(buffer)
+      binary = IO.iodata_to_binary(data)
+
+      # Should contain off codes for removed attributes
+      assert String.contains?(binary, "22") # bold off
+      assert String.contains?(binary, "23") # italic off
+      assert String.contains?(binary, "24") # underline off
+    end
+
+    test "removing blink attribute emits correct off code" do
+      buffer = SequenceBuffer.new()
+
+      style1 = Style.new(attrs: [:blink])
+      buffer = SequenceBuffer.append_style(buffer, style1)
+      {_data, buffer} = SequenceBuffer.flush(buffer)
+
+      style2 = Style.new()
+      buffer = SequenceBuffer.append_style(buffer, style2)
+      {data, _buffer} = SequenceBuffer.flush(buffer)
+      binary = IO.iodata_to_binary(data)
+
+      assert String.contains?(binary, "25") # blink off
+    end
+
+    test "removing reverse attribute emits correct off code" do
+      buffer = SequenceBuffer.new()
+
+      style1 = Style.new(attrs: [:reverse])
+      buffer = SequenceBuffer.append_style(buffer, style1)
+      {_data, buffer} = SequenceBuffer.flush(buffer)
+
+      style2 = Style.new()
+      buffer = SequenceBuffer.append_style(buffer, style2)
+      {data, _buffer} = SequenceBuffer.flush(buffer)
+      binary = IO.iodata_to_binary(data)
+
+      assert String.contains?(binary, "27") # reverse off
+    end
+
+    test "removing hidden attribute emits correct off code" do
+      buffer = SequenceBuffer.new()
+
+      style1 = Style.new(attrs: [:hidden])
+      buffer = SequenceBuffer.append_style(buffer, style1)
+      {_data, buffer} = SequenceBuffer.flush(buffer)
+
+      style2 = Style.new()
+      buffer = SequenceBuffer.append_style(buffer, style2)
+      {data, _buffer} = SequenceBuffer.flush(buffer)
+      binary = IO.iodata_to_binary(data)
+
+      assert String.contains?(binary, "28") # hidden off
+    end
+
+    test "removing strikethrough attribute emits correct off code" do
+      buffer = SequenceBuffer.new()
+
+      style1 = Style.new(attrs: [:strikethrough])
+      buffer = SequenceBuffer.append_style(buffer, style1)
+      {_data, buffer} = SequenceBuffer.flush(buffer)
+
+      style2 = Style.new()
+      buffer = SequenceBuffer.append_style(buffer, style2)
+      {data, _buffer} = SequenceBuffer.flush(buffer)
+      binary = IO.iodata_to_binary(data)
+
+      assert String.contains?(binary, "29") # strikethrough off
+    end
+
+    test "removing dim attribute uses same off code as bold" do
+      buffer = SequenceBuffer.new()
+
+      style1 = Style.new(attrs: [:dim])
+      buffer = SequenceBuffer.append_style(buffer, style1)
+      {_data, buffer} = SequenceBuffer.flush(buffer)
+
+      style2 = Style.new()
+      buffer = SequenceBuffer.append_style(buffer, style2)
+      {data, _buffer} = SequenceBuffer.flush(buffer)
+      binary = IO.iodata_to_binary(data)
+
+      assert String.contains?(binary, "22") # dim off (same as bold)
+    end
+
+    test "background color change emits new background code" do
+      buffer = SequenceBuffer.new()
+
+      style1 = Style.new(bg: :red)
+      buffer = SequenceBuffer.append_style(buffer, style1)
+      {_data, buffer} = SequenceBuffer.flush(buffer)
+
+      style2 = Style.new(bg: :blue)
+      buffer = SequenceBuffer.append_style(buffer, style2)
+      {data, _buffer} = SequenceBuffer.flush(buffer)
+      binary = IO.iodata_to_binary(data)
+
+      assert String.contains?(binary, "44") # blue background
     end
   end
 end

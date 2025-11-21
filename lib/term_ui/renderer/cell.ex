@@ -36,13 +36,17 @@ defmodule TermUI.Renderer.Cell do
           char: String.t(),
           fg: color(),
           bg: color(),
-          attrs: MapSet.t(attribute())
+          attrs: MapSet.t(attribute()),
+          width: 1 | 2,
+          wide_placeholder: boolean()
         }
 
   defstruct char: " ",
             fg: :default,
             bg: :default,
-            attrs: MapSet.new()
+            attrs: MapSet.new(),
+            width: 1,
+            wide_placeholder: false
 
   @valid_attributes [:bold, :dim, :italic, :underline, :blink, :reverse, :hidden, :strikethrough]
 
@@ -81,13 +85,64 @@ defmodule TermUI.Renderer.Cell do
     fg = Keyword.get(opts, :fg, :default)
     bg = Keyword.get(opts, :bg, :default)
     attrs = Keyword.get(opts, :attrs, [])
+    sanitized = sanitize_char(char)
 
     %__MODULE__{
-      char: char,
+      char: sanitized,
       fg: validate_color!(fg),
       bg: validate_color!(bg),
-      attrs: attrs |> Enum.map(&validate_attribute!/1) |> MapSet.new()
+      attrs: attrs |> Enum.map(&validate_attribute!/1) |> MapSet.new(),
+      width: calculate_width(sanitized),
+      wide_placeholder: false
     }
+  end
+
+  @doc """
+  Creates a placeholder cell for the second column of a wide character.
+
+  This cell inherits the styling from the primary cell but renders as empty.
+  """
+  @spec wide_placeholder(t()) :: t()
+  def wide_placeholder(%__MODULE__{} = primary) do
+    %__MODULE__{
+      char: "",
+      fg: primary.fg,
+      bg: primary.bg,
+      attrs: primary.attrs,
+      width: 0,
+      wide_placeholder: true
+    }
+  end
+
+  @doc """
+  Returns the display width of a cell (1 or 2).
+  """
+  @spec width(t()) :: non_neg_integer()
+  def width(%__MODULE__{width: w}), do: w
+
+  @doc """
+  Returns true if this cell is a wide character placeholder.
+  """
+  @spec wide_placeholder?(t()) :: boolean()
+  def wide_placeholder?(%__MODULE__{wide_placeholder: wp}), do: wp
+
+  @doc """
+  Returns true if this cell is a wide (double-width) character.
+  """
+  @spec wide?(t()) :: boolean()
+  def wide?(%__MODULE__{width: 2}), do: true
+  def wide?(%__MODULE__{}), do: false
+
+  # Calculate display width using DisplayWidth module
+  defp calculate_width(char) do
+    alias TermUI.Renderer.DisplayWidth
+    width = DisplayWidth.width(char)
+    # Clamp to 1 or 2 for cell width
+    cond do
+      width >= 2 -> 2
+      width <= 0 -> 1
+      true -> 1
+    end
   end
 
   @doc """
@@ -124,7 +179,9 @@ defmodule TermUI.Renderer.Cell do
     a.char == b.char and
       a.fg == b.fg and
       a.bg == b.bg and
-      MapSet.equal?(a.attrs, b.attrs)
+      MapSet.equal?(a.attrs, b.attrs) and
+      a.width == b.width and
+      a.wide_placeholder == b.wide_placeholder
   end
 
   @doc """
@@ -157,7 +214,7 @@ defmodule TermUI.Renderer.Cell do
   """
   @spec put_char(t(), String.t()) :: t()
   def put_char(%__MODULE__{} = cell, char) when is_binary(char) do
-    %{cell | char: char}
+    %{cell | char: sanitize_char(char)}
   end
 
   @doc """
@@ -237,4 +294,61 @@ defmodule TermUI.Renderer.Cell do
     raise ArgumentError,
           "Invalid attribute: #{inspect(invalid)}. Valid attributes: #{inspect(@valid_attributes)}"
   end
+
+  # Sanitize character to prevent escape sequence injection
+  # Removes control characters (0x00-0x1F except space, 0x7F) and escape sequences
+  defp sanitize_char(char) when is_binary(char) do
+    char
+    # Strip ANSI escape sequences first
+    |> strip_escape_sequences()
+    # Remove control characters while preserving valid Unicode
+    |> filter_control_chars()
+    |> case do
+      "" -> " "
+      sanitized -> sanitized
+    end
+  end
+
+  # Strip CSI sequences: ESC [ ... final_char (0x40-0x7E)
+  # Strip OSC sequences: ESC ] ... ST (0x07 or ESC \)
+  defp strip_escape_sequences(str) do
+    str
+    # CSI sequences: \e[ followed by any params and intermediate bytes, ending with final byte
+    |> String.replace(~r/\e\[[0-9;]*[A-Za-z]/, "")
+    # OSC sequences: \e] followed by anything until BEL or ST
+    |> String.replace(~r/\e\][^\x07\e]*(?:\x07|\e\\)?/, "")
+    # Any other escape sequences (ESC followed by single char)
+    |> String.replace(~r/\e./, "")
+  end
+
+  defp filter_control_chars(str) do
+    if String.valid?(str) do
+      str
+      |> String.graphemes()
+      |> Enum.map_join(&sanitize_grapheme/1)
+    else
+      # Handle invalid UTF-8 by filtering bytes
+      str
+      |> :binary.bin_to_list()
+      |> Enum.filter(&safe_byte?/1)
+      |> List.to_string()
+    end
+  end
+
+  defp sanitize_grapheme(grapheme) do
+    grapheme
+    |> String.to_charlist()
+    |> Enum.filter(&safe_codepoint?/1)
+    |> List.to_string()
+  end
+
+  # For byte-level filtering (invalid UTF-8)
+  defp safe_byte?(byte) when byte >= 0x20 and byte <= 0x7E, do: true
+  defp safe_byte?(_), do: false
+
+  # Allow printable ASCII (space through tilde), and Unicode above 0x9F
+  # Block: control chars (0x00-0x1F), DEL (0x7F), and C1 controls (0x80-0x9F)
+  defp safe_codepoint?(cp) when cp >= 0x20 and cp <= 0x7E, do: true
+  defp safe_codepoint?(cp) when cp >= 0xA0, do: true
+  defp safe_codepoint?(_), do: false
 end
