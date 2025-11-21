@@ -25,6 +25,7 @@ defmodule TermUI.ComponentRegistry do
 
   @table_name :term_ui_component_registry
   @pid_index :term_ui_component_pid_index
+  @parent_table :term_ui_component_parents
 
   # Client API
 
@@ -165,6 +166,51 @@ defmodule TermUI.ComponentRegistry do
     GenServer.call(__MODULE__, :clear)
   end
 
+  @doc """
+  Sets the parent of a component for propagation.
+
+  ## Parameters
+
+  - `id` - Component id
+  - `parent_id` - Parent component id (or nil for root)
+  """
+  @spec set_parent(term(), term() | nil) :: :ok
+  def set_parent(id, parent_id) do
+    :ets.insert(@parent_table, {id, parent_id})
+    :ok
+  end
+
+  @doc """
+  Gets the parent of a component.
+
+  ## Returns
+
+  - `{:ok, parent_id}` - Parent found (nil if root)
+  - `{:error, :not_found}` - Component not in parent table
+  """
+  @spec get_parent(term()) :: {:ok, term() | nil} | {:error, :not_found}
+  def get_parent(id) do
+    case :ets.lookup(@parent_table, id) do
+      [{^id, parent_id}] -> {:ok, parent_id}
+      [] -> {:error, :not_found}
+    end
+  end
+
+  @doc """
+  Gets all children of a component.
+
+  ## Returns
+
+  List of child component ids.
+  """
+  @spec get_children(term()) :: [term()]
+  def get_children(parent_id) do
+    @parent_table
+    |> :ets.tab2list()
+    |> Enum.filter(fn {_id, pid} -> pid == parent_id end)
+    |> Enum.map(fn {id, _pid} -> id end)
+  end
+
   # Server Callbacks
 
   @impl true
@@ -172,6 +218,7 @@ defmodule TermUI.ComponentRegistry do
     # Create ETS tables
     :ets.new(@table_name, [:set, :public, :named_table, read_concurrency: true])
     :ets.new(@pid_index, [:set, :public, :named_table, read_concurrency: true])
+    :ets.new(@parent_table, [:set, :public, :named_table, read_concurrency: true])
 
     {:ok, %{monitors: %{}}}
   end
@@ -223,6 +270,7 @@ defmodule TermUI.ComponentRegistry do
   def handle_call(:clear, _from, state) do
     :ets.delete_all_objects(@table_name)
     :ets.delete_all_objects(@pid_index)
+    :ets.delete_all_objects(@parent_table)
 
     # Demonitor all
     Enum.each(state.monitors, fn {ref, _id} ->
