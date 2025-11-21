@@ -184,6 +184,51 @@ defmodule TermUI.StyleIntegrationTest do
         assert is_atom(color) or is_tuple(color)
       end
     end
+
+    test "named to RGB to indexed conversion chain" do
+      named = :red
+
+      # Convert named to RGB tuple
+      {r, g, b} = Style.to_rgb(named)
+      assert is_integer(r) and r >= 0 and r <= 255
+      assert is_integer(g) and g >= 0 and g <= 255
+      assert is_integer(b) and b >= 0 and b <= 255
+
+      # Convert RGB to indexed (returns just the index number)
+      idx = Style.rgb_to_indexed({r, g, b})
+      assert is_integer(idx) and idx >= 0 and idx <= 255
+    end
+
+    test "edge RGB values convert correctly" do
+      # Pure black
+      black_rgb = {:rgb, 0, 0, 0}
+      black_named = Style.to_named(black_rgb)
+      assert black_named == :black
+
+      # Pure white
+      white_rgb = {:rgb, 255, 255, 255}
+      white_named = Style.to_named(white_rgb)
+      assert white_named == :bright_white
+
+      # Edge values for indexed (0 = black, 255 = white)
+      black_indexed = {:indexed, 0}
+      assert Style.to_named(black_indexed) == :black
+
+      white_indexed = {:indexed, 15}
+      assert Style.to_named(white_indexed) == :bright_white
+    end
+
+    test "round-trip conversion preserves color identity" do
+      # Named -> RGB -> Indexed -> Named
+      original = :blue
+      rgb_tuple = Style.to_rgb(original)
+      idx = Style.rgb_to_indexed(rgb_tuple)
+      # Wrap index as indexed tuple for to_named
+      back_to_named = Style.to_named({:indexed, idx})
+
+      # Should map back to same color or close equivalent
+      assert back_to_named == original or back_to_named == :bright_blue
+    end
   end
 
   describe "complex style scenarios" do
@@ -208,8 +253,8 @@ defmodule TermUI.StyleIntegrationTest do
       for state <- states do
         style = Style.get_variant(variants, state)
         assert %Style{} = style
-        # All states should have both fg and bg
-        assert style.fg != nil or state == :focused or state == :pressed
+        # All states should have fg (from base or override)
+        assert style.fg != nil, "State #{state} should have fg color"
       end
     end
 

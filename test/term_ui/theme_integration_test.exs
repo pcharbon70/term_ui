@@ -127,9 +127,11 @@ defmodule TermUI.ThemeIntegrationTest do
       assert button.fg == :yellow
       assert button.bg == :blue
 
-      # Other button variants preserved from base
+      # Other button variants preserved from base (dark theme defaults)
       focused = Theme.get_component_style(:button, :focused, server)
-      assert focused != nil
+      assert focused.fg == :white
+      assert focused.bg == :blue
+      assert Style.has_attr?(focused, :bold)
     end
 
     test "theme validation catches errors" do
@@ -166,8 +168,8 @@ defmodule TermUI.ThemeIntegrationTest do
       style = Theme.style_from_theme(:button, :normal, [fg: :magenta], server)
 
       assert style.fg == :magenta
-      # bg from theme
-      assert style.bg != nil
+      # bg from dark theme button normal
+      assert style.bg == :bright_black
     end
 
     test "style_from_theme falls back for unknown component", %{server: server} do
@@ -223,6 +225,11 @@ defmodule TermUI.ThemeIntegrationTest do
           end)
         end
 
+      # Guarantee cleanup even if test fails
+      on_exit(fn ->
+        for pid <- pids, Process.alive?(pid), do: Process.exit(pid, :kill)
+      end)
+
       # Wait for all subscriptions
       for i <- 1..3 do
         assert_receive {:subscribed, ^i}
@@ -235,9 +242,6 @@ defmodule TermUI.ThemeIntegrationTest do
       for i <- 1..3 do
         assert_receive {:received, ^i, :light}
       end
-
-      # Cleanup
-      for pid <- pids, Process.alive?(pid), do: Process.exit(pid, :kill)
     end
 
     test "dead subscriber cleaned up", %{server: server} do
@@ -250,6 +254,11 @@ defmodule TermUI.ThemeIntegrationTest do
             :done -> :ok
           end
         end)
+
+      # Guarantee cleanup even if test fails
+      on_exit(fn ->
+        if Process.alive?(pid), do: Process.exit(pid, :kill)
+      end)
 
       # Kill the subscriber
       Process.exit(pid, :kill)
