@@ -265,6 +265,15 @@ defmodule TermUI.Layout.IntegrationTest do
         {:error, {:already_started, _}} -> :ok
       end
 
+      # Ensure cleanup after test to prevent state leakage
+      on_exit(fn ->
+        try do
+          Cache.clear()
+        rescue
+          ArgumentError -> :ok
+        end
+      end)
+
       :ok
     end
 
@@ -312,6 +321,70 @@ defmodule TermUI.Layout.IntegrationTest do
       Cache.clear()
       stats_after = Cache.stats()
       assert stats_after.size == 0
+    end
+
+    test "evict_now triggers synchronous eviction" do
+      Cache.clear()
+
+      # Add some entries
+      for i <- 1..10 do
+        constraints = [Constraint.length(i)]
+        area = %{x: 0, y: 0, width: 100, height: 20}
+        Cache.solve(constraints, area)
+      end
+
+      stats_before = Cache.stats()
+      assert stats_before.size == 10
+
+      # Eviction only removes entries if over max_size
+      # With default max_size of 500, nothing will be evicted
+      # But we can verify the function runs without error
+      Cache.evict_now()
+
+      stats_after = Cache.stats()
+      # Size unchanged since we're under max_size
+      assert stats_after.size == 10
+    end
+
+    test "cache tracks access for LRU" do
+      Cache.clear()
+
+      constraints = [Constraint.fill()]
+      area = %{x: 0, y: 0, width: 100, height: 20}
+
+      # First access
+      Cache.solve(constraints, area)
+
+      # Wait a moment then access again
+      Process.sleep(1)
+      Cache.solve(constraints, area)
+
+      # Should have 1 hit (second access)
+      stats = Cache.stats()
+      assert stats.hits >= 1
+      assert stats.misses >= 1
+    end
+
+    test "warm preloads cache entries" do
+      Cache.clear()
+
+      entries = [
+        {[Constraint.length(10)], %{x: 0, y: 0, width: 100, height: 20}, []},
+        {[Constraint.fill()], %{x: 0, y: 0, width: 200, height: 30}, []}
+      ]
+
+      Cache.warm(entries)
+
+      stats = Cache.stats()
+      # Stats reset after warm, so size should be 2 but hits/misses reset
+      assert stats.size == 2
+
+      # Subsequent solves should hit cache
+      Cache.solve([Constraint.length(10)], %{x: 0, y: 0, width: 100, height: 20})
+      Cache.solve([Constraint.fill()], %{x: 0, y: 0, width: 200, height: 30})
+
+      stats_after = Cache.stats()
+      assert stats_after.hits == 2
     end
   end
 
@@ -390,6 +463,65 @@ defmodule TermUI.Layout.IntegrationTest do
 
       assert rect.width == 0
       assert rect.height == 0
+    end
+
+    test "empty constraints list produces empty rects" do
+      constraints = []
+      area = %{x: 0, y: 0, width: 100, height: 20}
+
+      rects = Solver.solve_to_rects(constraints, area, direction: :horizontal)
+
+      assert rects == []
+    end
+
+    test "constraints exceeding available space are reduced" do
+      # Total fixed: 150, available: 100
+      constraints = [
+        Constraint.length(50),
+        Constraint.length(50),
+        Constraint.length(50)
+      ]
+
+      area = %{x: 0, y: 0, width: 100, height: 10}
+      rects = Solver.solve_to_rects(constraints, area, direction: :horizontal)
+
+      # Should reduce proportionally, total should not exceed available
+      total_width = Enum.reduce(rects, 0, fn r, acc -> acc + r.width end)
+      assert total_width <= 100
+    end
+
+    test "all ratios with no remaining space get zero" do
+      # Fixed takes all space
+      constraints = [
+        Constraint.length(100),
+        Constraint.ratio(1),
+        Constraint.ratio(2)
+      ]
+
+      area = %{x: 0, y: 0, width: 100, height: 10}
+      rects = Solver.solve_to_rects(constraints, area, direction: :horizontal)
+
+      assert Enum.at(rects, 0).width == 100
+      assert Enum.at(rects, 1).width == 0
+      assert Enum.at(rects, 2).width == 0
+    end
+
+    test "percentage over 100 raises error" do
+      assert_raise ArgumentError, ~r/percentage must be between 0 and 100/, fn ->
+        Constraint.percentage(150)
+      end
+    end
+
+    test "min constraint is enforced even when exceeding available" do
+      constraints = [
+        Constraint.fill() |> Constraint.with_min(200)
+      ]
+
+      area = %{x: 0, y: 0, width: 100, height: 10}
+      rects = Solver.solve_to_rects(constraints, area, direction: :horizontal)
+
+      # Min is enforced - may exceed available (overflow scenario)
+      assert Enum.at(rects, 0).width == 200
     end
   end
 end
