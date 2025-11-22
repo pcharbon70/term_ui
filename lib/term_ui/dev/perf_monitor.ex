@@ -42,8 +42,10 @@ defmodule TermUI.Dev.PerfMonitor do
       type: :positioned,
       content: panel,
       x: 0,
-      y: 0,  # Will be adjusted by renderer
-      z: 195  # Below inspectors but above content
+      # Will be adjusted by renderer
+      y: 0,
+      # Below inspectors but above content
+      z: 195
     }
   end
 
@@ -53,7 +55,9 @@ defmodule TermUI.Dev.PerfMonitor do
     left = div(remaining, 2)
     right = remaining - left
 
-    text("┌" <> String.duplicate("─", left - 1) <> title <> String.duplicate("─", right - 1) <> "┐")
+    text(
+      "┌" <> String.duplicate("─", left - 1) <> title <> String.duplicate("─", right - 1) <> "┐"
+    )
   end
 
   defp render_footer do
@@ -99,13 +103,14 @@ defmodule TermUI.Dev.PerfMonitor do
 
     # Create graph rows (top to bottom)
     for row <- (@graph_height - 1)..0//-1 do
-      threshold = min_time + (row / @graph_height) * range
+      threshold = min_time + row / @graph_height * range
 
-      chars = times
-      |> Enum.map(fn time ->
-        if time >= threshold, do: "▄", else: " "
-      end)
-      |> Enum.join("")
+      chars =
+        times
+        |> Enum.map(fn time ->
+          if time >= threshold, do: "▄", else: " "
+        end)
+        |> Enum.join("")
 
       padded = String.pad_trailing(chars, graph_width)
       text("│ " <> padded <> " │")
@@ -182,7 +187,8 @@ defmodule TermUI.Dev.PerfMonitor do
         []
     end
   rescue
-    _ -> []
+    # The :scheduler module may not be available in all environments
+    UndefinedFunctionError -> []
   end
 
   @doc """
