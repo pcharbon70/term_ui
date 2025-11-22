@@ -12,7 +12,7 @@ This phase unifies the component system from Phase 3 with a formal event archite
 
 ## 5.1 Message-Driven Architecture
 
-- [ ] **Section 5.1 Complete**
+- [x] **Section 5.1 Complete**
 
 The message-driven architecture implements The Elm Architecture for OTP. Every state change results from handling a message. Components define their message types, and the runtime delivers messages and collects updates. This creates predictable, debuggable state flow—you can trace any state change back to the message that caused it.
 
@@ -20,71 +20,71 @@ The architecture distinguishes between events (input from outside—key presses,
 
 ### 5.1.1 Event Types
 
-- [ ] **Task 5.1.1 Complete**
+- [x] **Task 5.1.1 Complete**
 
 Event types represent all possible input from the terminal and system. We define typed structs for each event category using the parsing results from Phase 1. Events are the external interface—they arrive from outside the application and trigger component updates.
 
-- [ ] 5.1.1.1 Define `%TermUI.Event.Key{key: atom | char, modifiers: [atom]}` for keyboard input
-- [ ] 5.1.1.2 Define `%TermUI.Event.Mouse{action: atom, button: atom, x: integer, y: integer, modifiers: [atom]}` for mouse input
-- [ ] 5.1.1.3 Define `%TermUI.Event.Resize{width: integer, height: integer}` for terminal resize
-- [ ] 5.1.1.4 Define `%TermUI.Event.Focus{type: :gained | :lost}` for terminal focus changes
-- [ ] 5.1.1.5 Define `%TermUI.Event.Paste{content: String.t()}` for clipboard paste
-- [ ] 5.1.1.6 Define `%TermUI.Event.Tick{interval: integer}` for timer events
+- [x] 5.1.1.1 Define `%TermUI.Event.Key{key: atom | char, modifiers: [atom]}` for keyboard input
+- [x] 5.1.1.2 Define `%TermUI.Event.Mouse{action: atom, button: atom, x: integer, y: integer, modifiers: [atom]}` for mouse input
+- [x] 5.1.1.3 Define `%TermUI.Event.Resize{width: integer, height: integer}` for terminal resize
+- [x] 5.1.1.4 Define `%TermUI.Event.Focus{type: :gained | :lost}` for terminal focus changes
+- [x] 5.1.1.5 Define `%TermUI.Event.Paste{content: String.t()}` for clipboard paste
+- [x] 5.1.1.6 Define `%TermUI.Event.Tick{interval: integer}` for timer events
 
 ### 5.1.2 Message Types
 
-- [ ] **Task 5.1.2 Complete**
+- [x] **Task 5.1.2 Complete**
 
 Messages are component-specific types representing meaningful actions. Components define their own message types as structs or atoms. Messages carry semantic meaning—`{:select_item, 3}` is clearer than the raw key event that triggered it. The runtime routes messages to the component that should handle them.
 
-- [ ] 5.1.2.1 Define message type specification for component behaviours
-- [ ] 5.1.2.2 Implement message struct convention: `%MyComponent.Msg.SelectItem{index: 3}`
-- [ ] 5.1.2.3 Implement atom message support for simple messages: `:increment`, `:decrement`
-- [ ] 5.1.2.4 Implement message routing from events to messages via `event_to_msg/2` callback
+- [x] 5.1.2.1 Define message type specification for component behaviours
+- [x] 5.1.2.2 Implement message struct convention: `%MyComponent.Msg.SelectItem{index: 3}`
+- [x] 5.1.2.3 Implement atom message support for simple messages: `:increment`, `:decrement`
+- [x] 5.1.2.4 Implement message routing from events to messages via `event_to_msg/2` callback
 
 ### 5.1.3 Update Function
 
-- [ ] **Task 5.1.3 Complete**
+- [x] **Task 5.1.3 Complete**
 
 The update function is the core of component logic. It receives the current state and a message, and returns new state plus optional commands. Update functions must be pure—no side effects, no external calls. This makes components testable and predictable.
 
-- [ ] 5.1.3.1 Define `update(msg, state) :: {new_state, [command]}` callback signature
-- [ ] 5.1.3.2 Implement state-only return shorthand: `{new_state, []}`
-- [ ] 5.1.3.3 Implement unchanged state return: `:noreply` keeps state unchanged
-- [ ] 5.1.3.4 Implement update validation ensuring pure function (no side effects)
+- [x] 5.1.3.1 Define `update(msg, state) :: {new_state, [command]}` callback signature
+- [x] 5.1.3.2 Implement state-only return shorthand: `{new_state, []}`
+- [x] 5.1.3.3 Implement unchanged state return: `:noreply` keeps state unchanged
+- [x] 5.1.3.4 Implement update validation ensuring pure function (no side effects)
 
 ### 5.1.4 View Function
 
-- [ ] **Task 5.1.4 Complete**
+- [x] **Task 5.1.4 Complete**
 
 The view function renders current state to a render tree. Like update, it must be pure—given the same state, it always produces the same output. View functions should be fast since they run every frame. They use the render tree builders from Phase 3.
 
-- [ ] 5.1.4.1 Define `view(state) :: render_tree()` callback signature
-- [ ] 5.1.4.2 Implement render tree types: nodes, text, styled spans
-- [ ] 5.1.4.3 Implement view memoization caching result when state unchanged
-- [ ] 5.1.4.4 Implement view performance warning for slow view functions
+- [x] 5.1.4.1 Define `view(state) :: render_tree()` callback signature
+- [x] 5.1.4.2 Implement render tree types: nodes, text, styled spans
+- [x] 5.1.4.3 Implement view memoization caching result when state unchanged
+- [x] 5.1.4.4 Implement view performance warning for slow view functions
 
 ### 5.1.5 Message Batching
 
-- [ ] **Task 5.1.5 Complete**
+- [x] **Task 5.1.5 Complete**
 
 Multiple messages may arrive between renders. We batch messages, applying all updates before rendering once. This prevents redundant renders when multiple events arrive quickly. The batch preserves message order for deterministic updates.
 
-- [ ] 5.1.5.1 Implement message queue for incoming messages
-- [ ] 5.1.5.2 Implement batch processing applying all queued messages sequentially
-- [ ] 5.1.5.3 Implement single render after batch processing
-- [ ] 5.1.5.4 Implement batch size limits to prevent unbounded accumulation
+- [x] 5.1.5.1 Implement message queue for incoming messages
+- [x] 5.1.5.2 Implement batch processing applying all queued messages sequentially
+- [x] 5.1.5.3 Implement single render after batch processing
+- [x] 5.1.5.4 Implement batch size limits to prevent unbounded accumulation
 
 ### Unit Tests - Section 5.1
 
-- [ ] **Unit Tests 5.1 Complete**
-- [ ] Test event types contain correct fields
-- [ ] Test message routing delivers to correct component
-- [ ] Test update function produces new state from message
-- [ ] Test update commands are collected for execution
-- [ ] Test view function produces render tree from state
-- [ ] Test view memoization skips render for unchanged state
-- [ ] Test message batching applies all messages before render
+- [x] **Unit Tests 5.1 Complete**
+- [x] Test event types contain correct fields
+- [x] Test message routing delivers to correct component
+- [x] Test update function produces new state from message
+- [x] Test update commands are collected for execution
+- [x] Test view function produces render tree from state
+- [x] Test view memoization skips render for unchanged state
+- [x] Test message batching applies all messages before render
 
 ---
 

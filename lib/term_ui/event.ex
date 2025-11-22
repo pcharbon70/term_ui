@@ -167,6 +167,100 @@ defmodule TermUI.Event do
     end
   end
 
+  # Resize Event
+
+  defmodule Resize do
+    @moduledoc """
+    Terminal resize event.
+
+    Sent when the terminal window dimensions change.
+    """
+
+    @type t :: %__MODULE__{
+            width: pos_integer(),
+            height: pos_integer(),
+            timestamp: integer()
+          }
+
+    defstruct width: 80,
+              height: 24,
+              timestamp: 0
+
+    @doc """
+    Creates a new resize event.
+    """
+    def new(width, height, opts \\ []) when is_integer(width) and is_integer(height) do
+      %__MODULE__{
+        width: width,
+        height: height,
+        timestamp: Keyword.get(opts, :timestamp, System.monotonic_time(:millisecond))
+      }
+    end
+  end
+
+  # Paste Event
+
+  defmodule Paste do
+    @moduledoc """
+    Clipboard paste event.
+
+    Sent when content is pasted from the clipboard via bracketed paste mode.
+    """
+
+    @type t :: %__MODULE__{
+            content: String.t(),
+            timestamp: integer()
+          }
+
+    defstruct content: "",
+              timestamp: 0
+
+    @doc """
+    Creates a new paste event.
+    """
+    def new(content, opts \\ []) when is_binary(content) do
+      %__MODULE__{
+        content: content,
+        timestamp: Keyword.get(opts, :timestamp, System.monotonic_time(:millisecond))
+      }
+    end
+  end
+
+  # Tick Event
+
+  defmodule Tick do
+    @moduledoc """
+    Timer tick event.
+
+    Represents a periodic timer event for animations and time-based updates.
+    """
+
+    @type t :: %__MODULE__{
+            interval: pos_integer(),
+            timestamp: integer()
+          }
+
+    defstruct interval: 16,
+              timestamp: 0
+
+    @doc """
+    Creates a new tick event.
+    """
+    def new(interval, opts \\ []) when is_integer(interval) and interval > 0 do
+      %__MODULE__{
+        interval: interval,
+        timestamp: Keyword.get(opts, :timestamp, System.monotonic_time(:millisecond))
+      }
+    end
+
+    @doc """
+    Returns the tick rate in Hz (ticks per second).
+    """
+    def rate(%__MODULE__{interval: interval}) do
+      1000 / interval
+    end
+  end
+
   # Convenience constructors
 
   @doc """
@@ -221,6 +315,43 @@ defmodule TermUI.Event do
     Custom.new(name, payload, opts)
   end
 
+  @doc """
+  Creates a resize event.
+
+  ## Examples
+
+      Event.resize(120, 40)
+  """
+  @spec resize(pos_integer(), pos_integer(), keyword()) :: Resize.t()
+  def resize(width, height, opts \\ []) do
+    Resize.new(width, height, opts)
+  end
+
+  @doc """
+  Creates a paste event.
+
+  ## Examples
+
+      Event.paste("Hello, World!")
+  """
+  @spec paste(String.t(), keyword()) :: Paste.t()
+  def paste(content, opts \\ []) do
+    Paste.new(content, opts)
+  end
+
+  @doc """
+  Creates a tick event.
+
+  ## Examples
+
+      Event.tick(16)  # ~60 FPS
+      Event.tick(1000)  # 1 second
+  """
+  @spec tick(pos_integer(), keyword()) :: Tick.t()
+  def tick(interval, opts \\ []) do
+    Tick.new(interval, opts)
+  end
+
   # Type checks
 
   @doc "Returns true if event is a key event"
@@ -243,14 +374,33 @@ defmodule TermUI.Event do
   def custom?(%Custom{}), do: true
   def custom?(_), do: false
 
+  @doc "Returns true if event is a resize event"
+  @spec resize?(term()) :: boolean()
+  def resize?(%Resize{}), do: true
+  def resize?(_), do: false
+
+  @doc "Returns true if event is a paste event"
+  @spec paste?(term()) :: boolean()
+  def paste?(%Paste{}), do: true
+  def paste?(_), do: false
+
+  @doc "Returns true if event is a tick event"
+  @spec tick?(term()) :: boolean()
+  def tick?(%Tick{}), do: true
+  def tick?(_), do: false
+
   @doc """
   Returns the event type as an atom.
   """
-  @spec type(Key.t() | Mouse.t() | Focus.t() | Custom.t()) :: :key | :mouse | :focus | :custom
+  @spec type(Key.t() | Mouse.t() | Focus.t() | Custom.t() | Resize.t() | Paste.t() | Tick.t()) ::
+    :key | :mouse | :focus | :custom | :resize | :paste | :tick
   def type(%Key{}), do: :key
   def type(%Mouse{}), do: :mouse
   def type(%Focus{}), do: :focus
   def type(%Custom{}), do: :custom
+  def type(%Resize{}), do: :resize
+  def type(%Paste{}), do: :paste
+  def type(%Tick{}), do: :tick
 
   @doc """
   Checks if a modifier is present in the event.
