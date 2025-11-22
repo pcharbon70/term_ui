@@ -12,7 +12,7 @@ These additions transform TermUI from a foundation into a complete framework rea
 
 ## 6.1 Table Widget
 
-- [ ] **Section 6.1 Complete**
+- [x] **Section 6.1 Complete**
 
 Table displays tabular data with columns, headers, sorting, and scrolling. Tables are complex widgets handling large datasets efficiently, supporting user interaction (selection, sorting, editing), and providing flexible column configuration. This is one of the most commonly needed widgets for data-driven applications.
 
@@ -20,68 +20,68 @@ We implement virtual scrolling for performance with large datasets—only visibl
 
 ### 6.1.1 Table Structure
 
-- [ ] **Task 6.1.1 Complete**
+- [x] **Task 6.1.1 Complete**
 
 Table structure defines columns, data, and configuration. Columns specify header text, width constraints, data accessor, and optional renderer. Data is a list of rows, each row a map or struct. Configuration includes selection mode, sorting, and visual options.
 
-- [ ] 6.1.1.1 Define column spec: `%Column{header: String.t(), key: atom, width: constraint, render: fun}`
-- [ ] 6.1.1.2 Implement data binding accepting list of row maps
-- [ ] 6.1.1.3 Implement configuration props: `:single_select`, `:multi_select`, `:sortable`
-- [ ] 6.1.1.4 Implement style props for header, rows, selected rows, alternating backgrounds
+- [x] 6.1.1.1 Define column spec: `%Column{header: String.t(), key: atom, width: constraint, render: fun}`
+- [x] 6.1.1.2 Implement data binding accepting list of row maps
+- [x] 6.1.1.3 Implement configuration props: `:single_select`, `:multi_select`, `:sortable`
+- [x] 6.1.1.4 Implement style props for header, rows, selected rows, alternating backgrounds
 
 ### 6.1.2 Column Layout
 
-- [ ] **Task 6.1.2 Complete**
+- [x] **Task 6.1.2 Complete**
 
 Column layout distributes available width among columns. Columns may have fixed widths, percentages, or flexible sizing. The table integrates with the constraint solver from Phase 4 for width calculation. Column widths update on table resize.
 
-- [ ] 6.1.2.1 Implement column width calculation using constraint solver
-- [ ] 6.1.2.2 Support fixed width: `Constraint.length(20)`
-- [ ] 6.1.2.3 Support proportional width: `Constraint.ratio(2)`
-- [ ] 6.1.2.4 Implement column resize handles (drag to adjust width)
+- [x] 6.1.2.1 Implement column width calculation using constraint solver
+- [x] 6.1.2.2 Support fixed width: `Constraint.length(20)`
+- [x] 6.1.2.3 Support proportional width: `Constraint.ratio(2)`
+- [x] 6.1.2.4 Implement column resize handles (drag to adjust width)
 
 ### 6.1.3 Virtual Scrolling
 
-- [ ] **Task 6.1.3 Complete**
+- [x] **Task 6.1.3 Complete**
 
 Virtual scrolling renders only visible rows, enabling tables with thousands of rows without performance degradation. We calculate visible range from scroll position and table height, render only those rows, and update on scroll.
 
-- [ ] 6.1.3.1 Implement scroll state tracking scroll offset
-- [ ] 6.1.3.2 Implement visible range calculation from offset and height
-- [ ] 6.1.3.3 Implement row recycling rendering only visible rows
-- [ ] 6.1.3.4 Implement smooth scrolling with keyboard and mouse wheel
+- [x] 6.1.3.1 Implement scroll state tracking scroll offset
+- [x] 6.1.3.2 Implement visible range calculation from offset and height
+- [x] 6.1.3.3 Implement row recycling rendering only visible rows
+- [x] 6.1.3.4 Implement smooth scrolling with keyboard and mouse wheel
 
 ### 6.1.4 Selection and Navigation
 
-- [ ] **Task 6.1.4 Complete**
+- [x] **Task 6.1.4 Complete**
 
 Selection supports single row, multiple rows, and range selection. Navigation uses arrow keys for row movement and Tab for cell navigation. Selection state notifies parent through callbacks.
 
-- [ ] 6.1.4.1 Implement single selection with arrow keys and click
-- [ ] 6.1.4.2 Implement multi-selection with Ctrl+click and Shift+click
-- [ ] 6.1.4.3 Implement keyboard navigation: arrows, PageUp/Down, Home/End
-- [ ] 6.1.4.4 Implement `on_select` callback for selection changes
+- [x] 6.1.4.1 Implement single selection with arrow keys and click
+- [x] 6.1.4.2 Implement multi-selection with Ctrl+click and Shift+click
+- [x] 6.1.4.3 Implement keyboard navigation: arrows, PageUp/Down, Home/End
+- [x] 6.1.4.4 Implement `on_select` callback for selection changes
 
 ### 6.1.5 Sorting
 
-- [ ] **Task 6.1.5 Complete**
+- [x] **Task 6.1.5 Complete**
 
 Sorting reorders rows by column values. Clicking column header toggles sort direction (ascending, descending, none). We support multiple sort criteria for secondary sorting. Sort state displays indicator in header.
 
-- [ ] 6.1.5.1 Implement sort state tracking sort column and direction
-- [ ] 6.1.5.2 Implement header click handling toggling sort
-- [ ] 6.1.5.3 Implement row sorting by column values
-- [ ] 6.1.5.4 Implement sort indicator (▲/▼) in header
+- [x] 6.1.5.1 Implement sort state tracking sort column and direction
+- [x] 6.1.5.2 Implement header click handling toggling sort
+- [x] 6.1.5.3 Implement row sorting by column values
+- [x] 6.1.5.4 Implement sort indicator (▲/▼) in header
 
 ### Unit Tests - Section 6.1
 
-- [ ] **Unit Tests 6.1 Complete**
-- [ ] Test table renders correct columns and headers
-- [ ] Test column width calculation distributes space correctly
-- [ ] Test virtual scrolling renders only visible rows
-- [ ] Test selection state updates on row click
-- [ ] Test keyboard navigation moves between rows
-- [ ] Test sorting reorders rows by column
+- [x] **Unit Tests 6.1 Complete**
+- [x] Test table renders correct columns and headers
+- [x] Test column width calculation distributes space correctly
+- [x] Test virtual scrolling renders only visible rows
+- [x] Test selection state updates on row click
+- [x] Test keyboard navigation moves between rows
+- [x] Test sorting reorders rows by column
 
 ---
 
