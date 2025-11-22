@@ -57,7 +57,6 @@ defmodule TermUI.StatefulComponent do
   """
 
   alias TermUI.Component.RenderNode
-  alias TermUI.Renderer.Style
 
   # Type definitions
 
