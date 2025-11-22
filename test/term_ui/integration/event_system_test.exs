@@ -9,6 +9,13 @@ defmodule TermUI.Integration.EventSystemTest do
 
   use ExUnit.Case, async: false
 
+  # Timeout constants for assertions
+  @short_timeout 50
+  @default_timeout 100
+  @medium_timeout 150
+  @long_timeout 200
+  @extended_timeout 250
+
   alias TermUI.Event
   alias TermUI.Shortcut
   alias TermUI.Mouse.Tracker, as: MouseTracker
@@ -18,53 +25,101 @@ defmodule TermUI.Integration.EventSystemTest do
   alias TermUI.Focus
   alias TermUI.Command
   alias TermUI.Command.Executor
+  alias TermUI.Event.Propagation
+  alias TermUI.Event.Transformation
+  alias TermUI.ComponentRegistry
 
   describe "command execution workflows" do
-    test "timer command executes and delivers result to component" do
-      {:ok, executor} = Executor.start_link()
-      test_pid = self()
-
-      cmd = Command.timer(10, {:timer_done, :test})
-      Executor.execute(executor, cmd, test_pid, :test_component)
-
-      assert_receive {:command_result, :test_component, _ref, {:timer_done, :test}}, 100
-
-      GenServer.stop(executor)
+    setup do
+      executor = start_supervised!(Executor)
+      %{executor: executor}
     end
 
-    test "multiple commands execute concurrently and deliver results" do
-      {:ok, executor} = Executor.start_link()
-      test_pid = self()
+    test "timer command executes and delivers result to component", %{executor: executor} do
+      cmd = Command.timer(10, {:timer_done, :test})
+      Executor.execute(executor, cmd, self(), :test_component)
 
+      assert_receive {:command_result, :test_component, _ref, {:timer_done, :test}}, @default_timeout
+    end
+
+    test "multiple commands execute concurrently and deliver results", %{executor: executor} do
       cmd1 = Command.timer(10, :first)
       cmd2 = Command.timer(10, :second)
 
-      Executor.execute(executor, cmd1, test_pid, :comp1)
-      Executor.execute(executor, cmd2, test_pid, :comp2)
+      Executor.execute(executor, cmd1, self(), :comp1)
+      Executor.execute(executor, cmd2, self(), :comp2)
 
       results = receive_results_with_ref(2, 200)
       assert length(results) == 2
-
-      GenServer.stop(executor)
     end
 
-    test "command cancellation prevents result delivery" do
-      {:ok, executor} = Executor.start_link()
-      test_pid = self()
-
+    test "command cancellation prevents result delivery", %{executor: executor} do
       cmd = Command.timer(100, :should_not_receive)
-      {:ok, ref} = Executor.execute(executor, cmd, test_pid, :test)
+      {:ok, ref} = Executor.execute(executor, cmd, self(), :test)
 
       Executor.cancel(executor, ref)
 
-      refute_receive {:command_result, _, _, _}, 150
+      refute_receive {:command_result, _, _, _}, @medium_timeout
+    end
 
-      GenServer.stop(executor)
+    test "cancel_all_for_component cancels multiple pending commands", %{executor: executor} do
+      # Start multiple commands for same component
+      cmd1 = Command.timer(100, :first)
+      cmd2 = Command.timer(100, :second)
+      cmd3 = Command.timer(100, :third)
+
+      Executor.execute(executor, cmd1, self(), :my_component)
+      Executor.execute(executor, cmd2, self(), :my_component)
+      Executor.execute(executor, cmd3, self(), :other_component)
+
+      # Cancel all for my_component
+      :ok = Executor.cancel_all_for_component(executor, :my_component)
+
+      # Should only receive result from other_component
+      assert_receive {:command_result, :other_component, _, :third}, @long_timeout
+      refute_receive {:command_result, :my_component, _, _}, @short_timeout
+    end
+
+    test "max_concurrent limit returns error when exceeded" do
+      # Start executor with low limit (use unique id to avoid conflict with setup executor)
+      executor = start_supervised!({Executor, max_concurrent: 2}, id: :limited_executor)
+
+      cmd1 = Command.timer(100, :first)
+      cmd2 = Command.timer(100, :second)
+      cmd3 = Command.timer(100, :third)
+
+      {:ok, _} = Executor.execute(executor, cmd1, self(), :comp1)
+      {:ok, _} = Executor.execute(executor, cmd2, self(), :comp2)
+
+      # Third should fail
+      assert {:error, :max_concurrent_reached} = Executor.execute(executor, cmd3, self(), :comp3)
+
+      # After one completes, should be able to execute another
+      assert_receive {:command_result, _, _, _}, @long_timeout
+
+      cmd4 = Command.timer(10, :fourth)
+      assert {:ok, _} = Executor.execute(executor, cmd4, self(), :comp4)
+    end
+
+    test "command timeout delivers error result", %{executor: executor} do
+      # Create a command that would take longer than timeout
+      cmd = %Command{
+        type: :timer,
+        payload: 200,
+        on_result: :should_timeout,
+        timeout: 50
+      }
+
+      Executor.execute(executor, cmd, self(), :test)
+
+      # Should receive timeout error, not the result
+      assert_receive {:command_result, :test, _, {:error, :timeout}}, @default_timeout
+      refute_receive {:command_result, :test, _, :should_timeout}, @extended_timeout
     end
   end
 
   describe "mouse drag with routing and tracking" do
-    test "complete drag sequence with coordinate transformation" do
+    test "tracks complete drag sequence with coordinate transformation" do
       components = %{
         panel: %{bounds: %{x: 100, y: 50, width: 200, height: 100}, z_index: 0}
       }
@@ -98,7 +153,7 @@ defmodule TermUI.Integration.EventSystemTest do
       assert [{:drag_end, :left, 180, 100}] = events
     end
 
-    test "hover tracking with component routing" do
+    test "tracks hover state with component routing" do
       components = %{
         button1: %{bounds: %{x: 0, y: 0, width: 50, height: 30}, z_index: 0},
         button2: %{bounds: %{x: 60, y: 0, width: 50, height: 30}, z_index: 0}
@@ -123,7 +178,7 @@ defmodule TermUI.Integration.EventSystemTest do
       assert events == [{:hover_leave, :button1}, {:hover_enter, :button2}]
     end
 
-    test "z-order routing with overlapping components" do
+    test "routes to highest z-order with overlapping components" do
       components = %{
         background: %{bounds: %{x: 0, y: 0, width: 100, height: 100}, z_index: 0},
         dialog: %{bounds: %{x: 20, y: 20, width: 60, height: 60}, z_index: 10}
@@ -140,9 +195,12 @@ defmodule TermUI.Integration.EventSystemTest do
   end
 
   describe "shortcut system workflows" do
-    test "global shortcut triggers from any context" do
-      {:ok, registry} = Shortcut.start_link()
+    setup do
+      registry = start_supervised!(Shortcut)
+      %{registry: registry}
+    end
 
+    test "global shortcut triggers from any context", %{registry: registry} do
       Shortcut.register(registry, %Shortcut{
         key: :q,
         modifiers: [:ctrl],
@@ -156,13 +214,9 @@ defmodule TermUI.Integration.EventSystemTest do
       assert {:ok, _} = Shortcut.match(registry, event, %{mode: :normal})
       assert {:ok, _} = Shortcut.match(registry, event, %{mode: :edit})
       assert {:ok, _} = Shortcut.match(registry, event, %{focused_component: :editor})
-
-      GenServer.stop(registry)
     end
 
-    test "mode-scoped shortcut respects application mode" do
-      {:ok, registry} = Shortcut.start_link()
-
+    test "mode-scoped shortcut respects application mode", %{registry: registry} do
       Shortcut.register(registry, %Shortcut{
         key: :i,
         modifiers: [],
@@ -175,13 +229,9 @@ defmodule TermUI.Integration.EventSystemTest do
       # Only matches in normal mode
       assert :no_match = Shortcut.match(registry, event, %{mode: :edit})
       assert {:ok, _} = Shortcut.match(registry, event, %{mode: :normal})
-
-      GenServer.stop(registry)
     end
 
-    test "component-scoped shortcut respects focus" do
-      {:ok, registry} = Shortcut.start_link()
-
+    test "component-scoped shortcut respects focus", %{registry: registry} do
       Shortcut.register(registry, %Shortcut{
         key: :enter,
         modifiers: [],
@@ -194,13 +244,9 @@ defmodule TermUI.Integration.EventSystemTest do
       # Only matches when form is focused
       assert :no_match = Shortcut.match(registry, event, %{focused_component: :list})
       assert {:ok, _} = Shortcut.match(registry, event, %{focused_component: :form})
-
-      GenServer.stop(registry)
     end
 
-    test "key sequence completes across multiple key events" do
-      {:ok, registry} = Shortcut.start_link()
-
+    test "key sequence completes across multiple key events", %{registry: registry} do
       Shortcut.register(registry, %Shortcut{
         key: :g,
         modifiers: [],
@@ -217,13 +263,9 @@ defmodule TermUI.Integration.EventSystemTest do
       assert {:ok, shortcut} = Shortcut.match(registry, event)
       assert shortcut.sequence == [:g, :g]
       assert Shortcut.execute(shortcut) == :go_top
-
-      GenServer.stop(registry)
     end
 
-    test "priority resolves conflicting shortcuts" do
-      {:ok, registry} = Shortcut.start_link()
-
+    test "priority resolves conflicting shortcuts", %{registry: registry} do
       Shortcut.register(registry, %Shortcut{
         key: :s,
         modifiers: [:ctrl],
@@ -242,13 +284,9 @@ defmodule TermUI.Integration.EventSystemTest do
       {:ok, shortcut} = Shortcut.match(registry, event)
 
       assert Shortcut.execute(shortcut) == :high_priority
-
-      GenServer.stop(registry)
     end
 
-    test "shortcut triggers clipboard copy operation" do
-      {:ok, registry} = Shortcut.start_link()
-
+    test "shortcut triggers clipboard copy operation", %{registry: registry} do
       # Register Ctrl+C shortcut that performs copy
       Shortcut.register(registry, %Shortcut{
         key: :c,
@@ -269,8 +307,6 @@ defmodule TermUI.Integration.EventSystemTest do
 
       assert content == "content"
       assert String.contains?(sequence, Base.encode64("content"))
-
-      GenServer.stop(registry)
     end
   end
 
@@ -336,7 +372,7 @@ defmodule TermUI.Integration.EventSystemTest do
 
   describe "focus event workflows" do
     test "focus lost triggers registered actions" do
-      {:ok, tracker} = Focus.Tracker.start_link(initial_focus: true)
+      tracker = start_supervised!({Focus.Tracker, initial_focus: true})
       test_pid = self()
 
       # Register multiple focus lost actions
@@ -352,14 +388,12 @@ defmodule TermUI.Integration.EventSystemTest do
       Focus.Tracker.set_focus(tracker, false)
 
       # Both actions should execute
-      assert_receive :autosave_triggered, 100
-      assert_receive :cleanup_triggered, 100
-
-      GenServer.stop(tracker)
+      assert_receive :autosave_triggered, @default_timeout
+      assert_receive :cleanup_triggered, @default_timeout
     end
 
     test "focus gained triggers refresh actions" do
-      {:ok, tracker} = Focus.Tracker.start_link(initial_focus: false)
+      tracker = start_supervised!({Focus.Tracker, initial_focus: false})
       test_pid = self()
 
       Focus.Tracker.on_focus_gained(tracker, fn ->
@@ -369,13 +403,11 @@ defmodule TermUI.Integration.EventSystemTest do
       # Gain focus
       Focus.Tracker.set_focus(tracker, true)
 
-      assert_receive :refresh_triggered, 100
-
-      GenServer.stop(tracker)
+      assert_receive :refresh_triggered, @default_timeout
     end
 
     test "auto-pause pauses on focus lost and resumes on focus gained" do
-      {:ok, tracker} = Focus.Tracker.start_link(initial_focus: true)
+      tracker = start_supervised!({Focus.Tracker, initial_focus: true})
 
       Focus.Tracker.enable_auto_pause(tracker)
 
@@ -389,12 +421,10 @@ defmodule TermUI.Integration.EventSystemTest do
       # Gain focus - should resume
       Focus.Tracker.set_focus(tracker, true)
       refute Focus.Tracker.paused?(tracker)
-
-      GenServer.stop(tracker)
     end
 
     test "focus lost triggers autosave then pauses animations" do
-      {:ok, tracker} = Focus.Tracker.start_link(initial_focus: true)
+      tracker = start_supervised!({Focus.Tracker, initial_focus: true})
       test_pid = self()
 
       # Register autosave action
@@ -409,18 +439,15 @@ defmodule TermUI.Integration.EventSystemTest do
       Focus.Tracker.set_focus(tracker, false)
 
       # Both should happen
-      assert_receive :autosave, 100
+      assert_receive :autosave, @default_timeout
       assert Focus.Tracker.paused?(tracker)
-
-      GenServer.stop(tracker)
     end
   end
 
   describe "cross-system integration" do
-    test "shortcut with command execution workflow" do
-      {:ok, registry} = Shortcut.start_link()
-      {:ok, executor} = Executor.start_link()
-      test_pid = self()
+    test "executes shortcut with command execution workflow" do
+      registry = start_supervised!(Shortcut)
+      executor = start_supervised!(Executor)
 
       # Register shortcut that returns a command
       Shortcut.register(registry, %Shortcut{
@@ -438,13 +465,10 @@ defmodule TermUI.Integration.EventSystemTest do
       {:execute_command, cmd} = Shortcut.execute(shortcut)
 
       # Execute command
-      Executor.execute(executor, cmd, test_pid, :app)
+      Executor.execute(executor, cmd, self(), :app)
 
       # Receive command result
-      assert_receive {:command_result, :app, _ref, :refreshed}, 100
-
-      GenServer.stop(registry)
-      GenServer.stop(executor)
+      assert_receive {:command_result, :app, _ref, :refreshed}, @default_timeout
     end
 
     test "mouse click triggers shortcut-like action via routing" do
@@ -464,8 +488,8 @@ defmodule TermUI.Integration.EventSystemTest do
     end
 
     test "focus change affects shortcut scope matching" do
-      {:ok, registry} = Shortcut.start_link()
-      {:ok, tracker} = Focus.Tracker.start_link(initial_focus: true)
+      registry = start_supervised!(Shortcut)
+      _tracker = start_supervised!({Focus.Tracker, initial_focus: true})
 
       # Register component-scoped shortcut
       Shortcut.register(registry, %Shortcut{
@@ -484,9 +508,129 @@ defmodule TermUI.Integration.EventSystemTest do
       # When something else is focused, shortcut doesn't match
       context = %{focused_component: :list}
       assert :no_match = Shortcut.match(registry, event, context)
+    end
+  end
 
-      GenServer.stop(registry)
-      GenServer.stop(tracker)
+  describe "event propagation and transformation" do
+    # Test component that handles events
+    defmodule HandlingComponent do
+      use GenServer
+
+      def start_link(opts) do
+        test_pid = Keyword.fetch!(opts, :test_pid)
+        id = Keyword.fetch!(opts, :id)
+        GenServer.start_link(__MODULE__, %{test_pid: test_pid, id: id})
+      end
+
+      @impl true
+      def init(state), do: {:ok, state}
+
+      @impl true
+      def handle_call({:event, event}, _from, state) do
+        send(state.test_pid, {:handled_by, state.id, event})
+        {:reply, :handled, state}
+      end
+    end
+
+    # Test component that bubbles events
+    defmodule BubblingComponent do
+      use GenServer
+
+      def start_link(opts) do
+        test_pid = Keyword.fetch!(opts, :test_pid)
+        id = Keyword.fetch!(opts, :id)
+        GenServer.start_link(__MODULE__, %{test_pid: test_pid, id: id})
+      end
+
+      @impl true
+      def init(state), do: {:ok, state}
+
+      @impl true
+      def handle_call({:event, event}, _from, state) do
+        send(state.test_pid, {:bubbled_through, state.id, event})
+        {:reply, :unhandled, state}
+      end
+    end
+
+    setup do
+      start_supervised!(ComponentRegistry)
+      :ok
+    end
+
+    test "event bubbles through component hierarchy until handled" do
+      {:ok, button_pid} = BubblingComponent.start_link(test_pid: self(), id: :button)
+      {:ok, panel_pid} = BubblingComponent.start_link(test_pid: self(), id: :panel)
+      {:ok, root_pid} = HandlingComponent.start_link(test_pid: self(), id: :root)
+
+      :ok = ComponentRegistry.register(:button, button_pid, BubblingComponent)
+      :ok = ComponentRegistry.register(:panel, panel_pid, BubblingComponent)
+      :ok = ComponentRegistry.register(:root, root_pid, HandlingComponent)
+
+      :ok = Propagation.set_parent(:button, :panel)
+      :ok = Propagation.set_parent(:panel, :root)
+      :ok = Propagation.set_parent(:root, nil)
+
+      event = Event.key(:enter)
+      assert :handled = Propagation.bubble(event, :button)
+
+      # Event should bubble through all components in order
+      assert_receive {:bubbled_through, :button, ^event}
+      assert_receive {:bubbled_through, :panel, ^event}
+      assert_receive {:handled_by, :root, ^event}
+    end
+
+    test "mouse event transforms coordinates through routing and propagation" do
+      components = %{
+        button: %{bounds: %{x: 50, y: 30, width: 100, height: 40}, z_index: 0}
+      }
+
+      # Global mouse click
+      event = Event.mouse(:click, :left, 75, 45)
+
+      # Route to component
+      {component_id, local_event} = MouseRouter.route(components, event)
+
+      assert component_id == :button
+      assert local_event.x == 25
+      assert local_event.y == 15
+
+      # Transform with metadata for routing
+      envelope = Transformation.envelope(local_event, source: :terminal, target: :button)
+
+      assert Transformation.get_metadata(envelope, :source) == :terminal
+      assert Transformation.get_metadata(envelope, :target) == :button
+    end
+
+    test "event filtering finds matching events from batch" do
+      events = [
+        Event.key(:a),
+        Event.key(:c, modifiers: [:ctrl]),
+        Event.mouse(:click, :left, 10, 20),
+        Event.key(:v, modifiers: [:ctrl])
+      ]
+
+      # Filter for Ctrl+key combinations
+      ctrl_keys = Transformation.filter(events, type: :key, modifiers_all: [:ctrl])
+
+      assert length(ctrl_keys) == 2
+      assert Enum.all?(ctrl_keys, fn e -> :ctrl in e.modifiers end)
+    end
+
+    test "coordinate transformation roundtrip preserves position" do
+      bounds = %{x: 100, y: 50, width: 200, height: 100}
+
+      # Create event at screen coordinates
+      original = Event.mouse(:click, :left, 150, 80)
+
+      # Transform to local coordinates
+      local = Transformation.to_local(original, bounds)
+      assert local.x == 50
+      assert local.y == 30
+
+      # Transform back to screen
+      screen = Transformation.to_screen(local, bounds)
+      assert screen.x == original.x
+      assert screen.y == original.y
     end
   end
 
