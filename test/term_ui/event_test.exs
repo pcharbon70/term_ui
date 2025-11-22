@@ -2,7 +2,7 @@ defmodule TermUI.EventTest do
   use ExUnit.Case, async: true
 
   alias TermUI.Event
-  alias TermUI.Event.{Key, Mouse, Focus, Custom}
+  alias TermUI.Event.{Key, Mouse, Focus, Custom, Resize, Paste, Tick}
 
   describe "Key event" do
     test "creates key event with defaults" do
@@ -151,6 +151,77 @@ defmodule TermUI.EventTest do
     end
   end
 
+  describe "Resize event" do
+    test "creates resize event with dimensions" do
+      event = Event.resize(120, 40)
+
+      assert %Resize{} = event
+      assert event.width == 120
+      assert event.height == 40
+      assert is_integer(event.timestamp)
+    end
+
+    test "resize? returns true for resize events" do
+      event = Event.resize(80, 24)
+      assert Event.resize?(event)
+    end
+
+    test "resize? returns false for non-resize events" do
+      refute Event.resize?(%Key{})
+      refute Event.resize?(%Mouse{})
+    end
+  end
+
+  describe "Paste event" do
+    test "creates paste event with content" do
+      event = Event.paste("Hello, World!")
+
+      assert %Paste{} = event
+      assert event.content == "Hello, World!"
+      assert is_integer(event.timestamp)
+    end
+
+    test "creates paste event with empty string" do
+      event = Event.paste("")
+      assert event.content == ""
+    end
+
+    test "paste? returns true for paste events" do
+      event = Event.paste("test")
+      assert Event.paste?(event)
+    end
+
+    test "paste? returns false for non-paste events" do
+      refute Event.paste?(%Key{})
+      refute Event.paste?(%Mouse{})
+    end
+  end
+
+  describe "Tick event" do
+    test "creates tick event with interval" do
+      event = Event.tick(16)
+
+      assert %Tick{} = event
+      assert event.interval == 16
+      assert is_integer(event.timestamp)
+    end
+
+    test "tick rate calculation" do
+      event = Event.tick(16)
+      assert_in_delta Tick.rate(event), 62.5, 0.1
+    end
+
+    test "tick? returns true for tick events" do
+      event = Event.tick(1000)
+      assert Event.tick?(event)
+    end
+
+    test "tick? returns false for non-tick events" do
+      refute Event.tick?(%Key{})
+      refute Event.tick?(%Mouse{})
+    end
+  end
+
   describe "type/1" do
     test "returns :key for key events" do
       assert Event.type(%Key{}) == :key
@@ -166,6 +237,18 @@ defmodule TermUI.EventTest do
 
     test "returns :custom for custom events" do
       assert Event.type(%Custom{}) == :custom
+    end
+
+    test "returns :resize for resize events" do
+      assert Event.type(%Resize{}) == :resize
+    end
+
+    test "returns :paste for paste events" do
+      assert Event.type(%Paste{}) == :paste
+    end
+
+    test "returns :tick for tick events" do
+      assert Event.type(%Tick{}) == :tick
     end
   end
 
