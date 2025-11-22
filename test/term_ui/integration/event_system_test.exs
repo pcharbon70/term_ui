@@ -2,12 +2,12 @@ defmodule TermUI.Integration.EventSystemTest do
   @moduledoc """
   Integration tests for the Phase 5 Event System.
 
-  Tests the complete event flow from terminal input through to
-  component updates and rendering, covering mouse interactions,
-  keyboard shortcuts, clipboard operations, and focus events.
+  Tests realistic workflows that involve multiple subsystems working together,
+  such as shortcuts triggering clipboard operations, mouse events with
+  coordinate transformation, and focus changes affecting application state.
   """
 
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias TermUI.Event
   alias TermUI.Shortcut
@@ -15,46 +15,12 @@ defmodule TermUI.Integration.EventSystemTest do
   alias TermUI.Mouse.Router, as: MouseRouter
   alias TermUI.Clipboard
   alias TermUI.Clipboard.Selection
-  alias TermUI.Clipboard.PasteAccumulator
   alias TermUI.Focus
   alias TermUI.Command
   alias TermUI.Command.Executor
 
-  # ===========================================================================
-  # 5.8.1 Event Flow Testing
-  # ===========================================================================
-
-  describe "event flow - keyboard events" do
-    test "keyboard event creates correct event structure" do
-      event = Event.key(:a, modifiers: [:ctrl])
-
-      assert event.key == :a
-      assert event.modifiers == [:ctrl]
-      assert %Event.Key{} = event
-    end
-
-    test "keyboard event with multiple modifiers" do
-      event = Event.key(:s, modifiers: [:ctrl, :shift, :alt])
-
-      assert :ctrl in event.modifiers
-      assert :shift in event.modifiers
-      assert :alt in event.modifiers
-    end
-
-    test "special key events" do
-      event = Event.key(:enter)
-      assert event.key == :enter
-
-      event = Event.key(:escape)
-      assert event.key == :escape
-
-      event = Event.key(:tab)
-      assert event.key == :tab
-    end
-  end
-
-  describe "event flow - command execution" do
-    test "timer command executes and returns result" do
+  describe "command execution workflows" do
+    test "timer command executes and delivers result to component" do
       {:ok, executor} = Executor.start_link()
       test_pid = self()
 
@@ -62,9 +28,11 @@ defmodule TermUI.Integration.EventSystemTest do
       Executor.execute(executor, cmd, test_pid, :test_component)
 
       assert_receive {:command_result, :test_component, _ref, {:timer_done, :test}}, 100
+
+      GenServer.stop(executor)
     end
 
-    test "multiple commands execute concurrently" do
+    test "multiple commands execute concurrently and deliver results" do
       {:ok, executor} = Executor.start_link()
       test_pid = self()
 
@@ -76,9 +44,11 @@ defmodule TermUI.Integration.EventSystemTest do
 
       results = receive_results_with_ref(2, 200)
       assert length(results) == 2
+
+      GenServer.stop(executor)
     end
 
-    test "command cancellation prevents result" do
+    test "command cancellation prevents result delivery" do
       {:ok, executor} = Executor.start_link()
       test_pid = self()
 
@@ -87,150 +57,90 @@ defmodule TermUI.Integration.EventSystemTest do
 
       Executor.cancel(executor, ref)
 
-      refute_receive {:command_result, _, _}, 150
+      refute_receive {:command_result, _, _, _}, 150
+
+      GenServer.stop(executor)
     end
   end
 
-  describe "event flow - event to message transformation" do
-    test "event contains all necessary fields for routing" do
-      key_event = Event.key(:j, modifiers: [])
-      assert Map.has_key?(key_event, :key)
-      assert Map.has_key?(key_event, :modifiers)
-
-      mouse_event = Event.mouse(:click, :left, 10, 20)
-      assert Map.has_key?(mouse_event, :x)
-      assert Map.has_key?(mouse_event, :y)
-      assert Map.has_key?(mouse_event, :button)
-      assert Map.has_key?(mouse_event, :action)
-    end
-  end
-
-  # ===========================================================================
-  # 5.8.2 Mouse Interaction Testing
-  # ===========================================================================
-
-  describe "mouse interaction - click events" do
-    test "click event contains position and button" do
-      event = Event.mouse(:click, :left, 15, 25)
-
-      assert event.action == :click
-      assert event.button == :left
-      assert event.x == 15
-      assert event.y == 25
-    end
-
-    test "right click event" do
-      event = Event.mouse(:click, :right, 10, 10)
-      assert event.button == :right
-    end
-
-    test "mouse router routes to component at position" do
+  describe "mouse drag with routing and tracking" do
+    test "complete drag sequence with coordinate transformation" do
       components = %{
-        button: %{bounds: %{x: 10, y: 10, width: 20, height: 10}, z_index: 0}
+        panel: %{bounds: %{x: 100, y: 50, width: 200, height: 100}, z_index: 0}
       }
 
-      event = Event.mouse(:click, :left, 15, 15)
-      {id, transformed} = MouseRouter.route(components, event)
+      tracker = MouseTracker.new(drag_threshold: 1)
 
-      assert id == :button
-      assert transformed.x == 5
-      assert transformed.y == 5
-    end
+      # Press at global coordinates - route to component
+      press = Event.mouse(:press, :left, 120, 70)
+      {component_id, local_event} = MouseRouter.route(components, press)
 
-    test "mouse router returns nil for empty space" do
-      components = %{
-        button: %{bounds: %{x: 10, y: 10, width: 20, height: 10}, z_index: 0}
-      }
+      assert component_id == :panel
+      assert local_event.x == 20
+      assert local_event.y == 20
 
-      event = Event.mouse(:click, :left, 0, 0)
-      assert nil == MouseRouter.route(components, event)
-    end
-  end
-
-  describe "mouse interaction - drag operations" do
-    test "drag sequence press-move-release" do
-      tracker = MouseTracker.new(drag_threshold: 3)
-
-      # Press
-      press = Event.mouse(:press, :left, 10, 10)
-      {tracker, events} = MouseTracker.process(tracker, press)
-      assert events == []
+      # Track drag state
+      {tracker, _events} = MouseTracker.process(tracker, press)
       assert MouseTracker.button_down(tracker) == :left
 
-      # Move beyond threshold
-      move = Event.mouse(:move, nil, 20, 20)
+      # Move beyond threshold - drag starts
+      move = Event.mouse(:move, nil, 150, 90)
       {tracker, events} = MouseTracker.process(tracker, move)
+
       assert MouseTracker.dragging?(tracker)
-      assert [{:drag_start, :left, 10, 10}, {:drag_move, :left, 20, 20, 10, 10}] = events
+      assert [{:drag_start, :left, 120, 70}, {:drag_move, :left, 150, 90, 30, 20}] = events
 
-      # Release
-      release = Event.mouse(:release, :left, 25, 25)
+      # Release - drag ends
+      release = Event.mouse(:release, :left, 180, 100)
       {tracker, events} = MouseTracker.process(tracker, release)
-      refute MouseTracker.dragging?(tracker)
-      assert [{:drag_end, :left, 25, 25}] = events
-    end
-
-    test "small movements don't start drag" do
-      tracker = MouseTracker.new(drag_threshold: 10)
-
-      press = Event.mouse(:press, :left, 10, 10)
-      {tracker, _} = MouseTracker.process(tracker, press)
-
-      move = Event.mouse(:move, nil, 12, 11)
-      {tracker, events} = MouseTracker.process(tracker, move)
 
       refute MouseTracker.dragging?(tracker)
-      assert events == []
-    end
-  end
-
-  describe "mouse interaction - scroll wheel" do
-    test "scroll up event" do
-      event = Event.mouse(:scroll_up, nil, 10, 10)
-      assert event.action == :scroll_up
+      assert [{:drag_end, :left, 180, 100}] = events
     end
 
-    test "scroll down event" do
-      event = Event.mouse(:scroll_down, nil, 10, 10)
-      assert event.action == :scroll_down
-    end
+    test "hover tracking with component routing" do
+      components = %{
+        button1: %{bounds: %{x: 0, y: 0, width: 50, height: 30}, z_index: 0},
+        button2: %{bounds: %{x: 60, y: 0, width: 50, height: 30}, z_index: 0}
+      }
 
-    test "scroll action detection" do
-      assert TermUI.Mouse.scroll_action?(:scroll_up)
-      assert TermUI.Mouse.scroll_action?(:scroll_down)
-      refute TermUI.Mouse.scroll_action?(:click)
-    end
-  end
-
-  describe "mouse interaction - hover" do
-    test "hover enter and leave events" do
       tracker = MouseTracker.new()
 
-      # Enter component
-      {tracker, events} = MouseTracker.update_hover(tracker, :button1)
+      # Move over button1
+      move1 = Event.mouse(:move, nil, 25, 15)
+      {id1, _} = MouseRouter.route(components, move1)
+      {tracker, events} = MouseTracker.update_hover(tracker, id1)
+
+      assert id1 == :button1
       assert events == [{:hover_enter, :button1}]
 
-      # Leave component
-      {tracker, events} = MouseTracker.update_hover(tracker, nil)
-      assert events == [{:hover_leave, :button1}]
+      # Move to button2 - leave button1, enter button2
+      move2 = Event.mouse(:move, nil, 85, 15)
+      {id2, _} = MouseRouter.route(components, move2)
+      {_tracker, events} = MouseTracker.update_hover(tracker, id2)
+
+      assert id2 == :button2
+      assert events == [{:hover_leave, :button1}, {:hover_enter, :button2}]
     end
 
-    test "hover between components" do
-      tracker = MouseTracker.new()
+    test "z-order routing with overlapping components" do
+      components = %{
+        background: %{bounds: %{x: 0, y: 0, width: 100, height: 100}, z_index: 0},
+        dialog: %{bounds: %{x: 20, y: 20, width: 60, height: 60}, z_index: 10}
+      }
 
-      {tracker, _} = MouseTracker.update_hover(tracker, :button1)
-      {_tracker, events} = MouseTracker.update_hover(tracker, :button2)
+      # Click in overlap area routes to higher z-index
+      event = Event.mouse(:click, :left, 50, 50)
+      {id, local_event} = MouseRouter.route(components, event)
 
-      assert events == [{:hover_leave, :button1}, {:hover_enter, :button2}]
+      assert id == :dialog
+      assert local_event.x == 30
+      assert local_event.y == 30
     end
   end
 
-  # ===========================================================================
-  # 5.8.3 Shortcut Testing
-  # ===========================================================================
-
-  describe "shortcut - global shortcuts" do
-    test "global shortcut matches from any context" do
+  describe "shortcut system workflows" do
+    test "global shortcut triggers from any context" do
       {:ok, registry} = Shortcut.start_link()
 
       Shortcut.register(registry, %Shortcut{
@@ -242,15 +152,15 @@ defmodule TermUI.Integration.EventSystemTest do
 
       event = Event.key(:q, modifiers: [:ctrl])
 
-      # Should match with any context
+      # Matches in any mode or focused component
       assert {:ok, _} = Shortcut.match(registry, event, %{mode: :normal})
       assert {:ok, _} = Shortcut.match(registry, event, %{mode: :edit})
       assert {:ok, _} = Shortcut.match(registry, event, %{focused_component: :editor})
-    end
-  end
 
-  describe "shortcut - scoped shortcuts" do
-    test "mode-scoped shortcut only matches in that mode" do
+      GenServer.stop(registry)
+    end
+
+    test "mode-scoped shortcut respects application mode" do
       {:ok, registry} = Shortcut.start_link()
 
       Shortcut.register(registry, %Shortcut{
@@ -262,14 +172,14 @@ defmodule TermUI.Integration.EventSystemTest do
 
       event = Event.key(:i)
 
-      # Should not match in edit mode
+      # Only matches in normal mode
       assert :no_match = Shortcut.match(registry, event, %{mode: :edit})
-
-      # Should match in normal mode
       assert {:ok, _} = Shortcut.match(registry, event, %{mode: :normal})
+
+      GenServer.stop(registry)
     end
 
-    test "component-scoped shortcut only matches when focused" do
+    test "component-scoped shortcut respects focus" do
       {:ok, registry} = Shortcut.start_link()
 
       Shortcut.register(registry, %Shortcut{
@@ -281,16 +191,14 @@ defmodule TermUI.Integration.EventSystemTest do
 
       event = Event.key(:enter)
 
-      # Should not match when different component focused
+      # Only matches when form is focused
       assert :no_match = Shortcut.match(registry, event, %{focused_component: :list})
-
-      # Should match when form focused
       assert {:ok, _} = Shortcut.match(registry, event, %{focused_component: :form})
-    end
-  end
 
-  describe "shortcut - key sequences" do
-    test "key sequence matches on completion" do
+      GenServer.stop(registry)
+    end
+
+    test "key sequence completes across multiple key events" do
       {:ok, registry} = Shortcut.start_link()
 
       Shortcut.register(registry, %Shortcut{
@@ -302,327 +210,194 @@ defmodule TermUI.Integration.EventSystemTest do
 
       event = Event.key(:g)
 
-      # First key - no match
+      # First key starts sequence
       assert :no_match = Shortcut.match(registry, event)
 
-      # Second key - matches
+      # Second key completes sequence
       assert {:ok, shortcut} = Shortcut.match(registry, event)
       assert shortcut.sequence == [:g, :g]
+      assert Shortcut.execute(shortcut) == :go_top
+
+      GenServer.stop(registry)
     end
 
-    test "sequence resets on clear" do
-      {:ok, registry} = Shortcut.start_link()
-
-      Shortcut.register(registry, %Shortcut{
-        key: :g,
-        modifiers: [],
-        action: {:function, fn -> :go_top end},
-        sequence: [:g, :g]
-      })
-
-      event = Event.key(:g)
-
-      # Start sequence
-      Shortcut.match(registry, event)
-
-      # Clear sequence
-      Shortcut.clear_sequence(registry)
-
-      # Next key starts fresh
-      assert :no_match = Shortcut.match(registry, event)
-    end
-  end
-
-  describe "shortcut - priority resolution" do
-    test "higher priority shortcut wins" do
+    test "priority resolves conflicting shortcuts" do
       {:ok, registry} = Shortcut.start_link()
 
       Shortcut.register(registry, %Shortcut{
         key: :s,
         modifiers: [:ctrl],
-        action: {:function, fn -> :low end},
+        action: {:function, fn -> :low_priority end},
         priority: 0
       })
 
       Shortcut.register(registry, %Shortcut{
         key: :s,
         modifiers: [:ctrl],
-        action: {:function, fn -> :high end},
+        action: {:function, fn -> :high_priority end},
         priority: 10
       })
 
       event = Event.key(:s, modifiers: [:ctrl])
       {:ok, shortcut} = Shortcut.match(registry, event)
 
-      assert Shortcut.execute(shortcut) == :high
-    end
-  end
+      assert Shortcut.execute(shortcut) == :high_priority
 
-  describe "shortcut - action execution" do
-    test "function action executes and returns result" do
-      shortcut = %Shortcut{
-        key: :x,
-        modifiers: [:ctrl],
-        action: {:function, fn -> {:cut, "content"} end}
-      }
-
-      assert {:cut, "content"} = Shortcut.execute(shortcut)
+      GenServer.stop(registry)
     end
 
-    test "message action returns send_message tuple" do
-      shortcut = %Shortcut{
-        key: :s,
-        modifiers: [:ctrl],
-        action: {:message, :editor, :save}
-      }
-
-      assert {:send_message, :editor, :save} = Shortcut.execute(shortcut)
-    end
-
-    test "command action returns execute_command tuple" do
-      command = {:file_write, "/path", "content"}
-
-      shortcut = %Shortcut{
-        key: :s,
-        modifiers: [:ctrl],
-        action: {:command, command}
-      }
-
-      assert {:execute_command, ^command} = Shortcut.execute(shortcut)
-    end
-  end
-
-  # ===========================================================================
-  # 5.8.4 Clipboard Testing
-  # ===========================================================================
-
-  describe "clipboard - paste accumulation" do
-    test "accumulates content between markers" do
-      acc = PasteAccumulator.new()
-      acc = PasteAccumulator.start(acc)
-      acc = PasteAccumulator.add(acc, "Hello ")
-      acc = PasteAccumulator.add(acc, "World")
-      {content, _} = PasteAccumulator.complete(acc)
-
-      assert content == "Hello World"
-    end
-
-    test "paste event creation" do
-      event = Event.paste("pasted content")
-
-      assert %Event.Paste{} = event
-      assert event.content == "pasted content"
-    end
-  end
-
-  describe "clipboard - selection management" do
-    test "selection tracks start and end" do
-      selection = Selection.new()
-      selection = Selection.start(selection, 5)
-      selection = Selection.extend(selection, 15)
-
-      assert Selection.range(selection) == {5, 15}
-      assert Selection.length(selection) == 10
-    end
-
-    test "selection extracts content" do
-      text = "Hello World Example"
-      selection = Selection.new()
-      selection = Selection.start(selection, 6)
-      selection = Selection.extend(selection, 11)
-
-      assert Selection.extract(selection, text) == "World"
-    end
-
-    test "selection expands with shift+arrow simulation" do
-      text = "Hello World"
-      selection = Selection.new()
-
-      # Simulate Shift+Right to select "Hello"
-      selection = Selection.expand(selection, :right, text, 0)
-      selection = Selection.expand(selection, :right, text, 1)
-      selection = Selection.expand(selection, :right, text, 2)
-      selection = Selection.expand(selection, :right, text, 3)
-      selection = Selection.expand(selection, :right, text, 4)
-
-      assert Selection.extract(selection, text) == "Hello"
-    end
-
-    test "selection clears on navigation" do
-      selection = Selection.new()
-      selection = Selection.start(selection, 0)
-      selection = Selection.extend(selection, 10)
-
-      assert Selection.active?(selection)
-
-      selection = Selection.clear(selection)
-      refute Selection.active?(selection)
-    end
-  end
-
-  describe "clipboard - OSC 52 operations" do
-    test "generates correct write sequence" do
-      sequence = Clipboard.write_sequence("test")
-      encoded = Base.encode64("test")
-
-      assert sequence == "\e]52;c;#{encoded}\e\\"
-    end
-
-    test "handles unicode content" do
-      sequence = Clipboard.write_sequence("日本語")
-      encoded = Base.encode64("日本語")
-
-      assert sequence == "\e]52;c;#{encoded}\e\\"
-    end
-
-    test "targets primary selection" do
-      sequence = Clipboard.write_sequence("test", target: :primary)
-
-      assert String.contains?(sequence, ";p;")
-    end
-  end
-
-  describe "clipboard - cut/copy/paste workflow" do
-    test "copy workflow: select and write to clipboard" do
-      text = "The quick brown fox"
-
-      # Select "quick"
-      selection = Selection.new()
-      selection = Selection.start(selection, 4)
-      selection = Selection.extend(selection, 9)
-
-      # Extract and generate clipboard sequence
-      content = Selection.extract(selection, text)
-      sequence = Clipboard.write_sequence(content)
-
-      assert content == "quick"
-      assert String.contains?(sequence, Base.encode64("quick"))
-    end
-
-    test "cut workflow: select, copy, then delete" do
-      text = "Hello World"
-
-      # Select "World"
-      selection = Selection.new()
-      selection = Selection.start(selection, 6)
-      selection = Selection.extend(selection, 11)
-
-      # Get selected content
-      content = Selection.extract(selection, text)
-      assert content == "World"
-
-      # Simulate deletion (would be done by component)
-      {start, finish} = Selection.range(selection)
-      new_text = String.slice(text, 0, start) <> String.slice(text, finish, String.length(text))
-
-      assert new_text == "Hello "
-    end
-  end
-
-  # ===========================================================================
-  # Focus Event Testing
-  # ===========================================================================
-
-  describe "focus - state tracking" do
-    test "focus state updates correctly" do
-      {:ok, tracker} = Focus.Tracker.start_link()
-
-      assert Focus.Tracker.has_focus?(tracker)
-
-      Focus.Tracker.set_focus(tracker, false)
-      refute Focus.Tracker.has_focus?(tracker)
-
-      Focus.Tracker.set_focus(tracker, true)
-      assert Focus.Tracker.has_focus?(tracker)
-    end
-
-    test "focus actions execute on state change" do
-      {:ok, tracker} = Focus.Tracker.start_link(initial_focus: true)
-      test_pid = self()
-
-      Focus.Tracker.on_focus_lost(tracker, fn ->
-        send(test_pid, :autosave_triggered)
-      end)
-
-      Focus.Tracker.set_focus(tracker, false)
-
-      assert_receive :autosave_triggered, 100
-    end
-  end
-
-  describe "focus - optimization hooks" do
-    test "auto-pause on focus lost" do
-      {:ok, tracker} = Focus.Tracker.start_link(initial_focus: true)
-
-      Focus.Tracker.enable_auto_pause(tracker)
-
-      refute Focus.Tracker.paused?(tracker)
-
-      Focus.Tracker.set_focus(tracker, false)
-      assert Focus.Tracker.paused?(tracker)
-
-      Focus.Tracker.set_focus(tracker, true)
-      refute Focus.Tracker.paused?(tracker)
-    end
-  end
-
-  # ===========================================================================
-  # Complex Integration Scenarios
-  # ===========================================================================
-
-  describe "integration - complex workflows" do
-    test "shortcut triggers clipboard operation" do
+    test "shortcut triggers clipboard copy operation" do
       {:ok, registry} = Shortcut.start_link()
 
-      # Register Ctrl+C shortcut
+      # Register Ctrl+C shortcut that performs copy
       Shortcut.register(registry, %Shortcut{
         key: :c,
         modifiers: [:ctrl],
         action: {:function, fn ->
-          # Simulate copy operation
-          {:copy, "selected text"}
+          text = "Document content here"
+          selection = Selection.new() |> Selection.start(9) |> Selection.extend(16)
+          content = Selection.extract(selection, text)
+          sequence = Clipboard.write_sequence(content)
+          {:copied, content, sequence}
         end},
-        description: "Copy"
+        description: "Copy selection to clipboard"
       })
 
       event = Event.key(:c, modifiers: [:ctrl])
       {:ok, shortcut} = Shortcut.match(registry, event)
-      result = Shortcut.execute(shortcut)
+      {:copied, content, sequence} = Shortcut.execute(shortcut)
 
-      assert result == {:copy, "selected text"}
+      assert content == "content"
+      assert String.contains?(sequence, Base.encode64("content"))
+
+      GenServer.stop(registry)
+    end
+  end
+
+  describe "clipboard workflow integration" do
+    test "complete copy workflow: select, extract, write to clipboard" do
+      text = "The quick brown fox jumps over the lazy dog"
+
+      # Select "quick brown"
+      selection =
+        Selection.new()
+        |> Selection.start(4)
+        |> Selection.extend(15)
+
+      # Extract selected content
+      content = Selection.extract(selection, text)
+      assert content == "quick brown"
+
+      # Generate clipboard write sequence
+      sequence = Clipboard.write_sequence(content)
+      assert String.contains?(sequence, Base.encode64("quick brown"))
     end
 
-    test "mouse drag with coordinate transformation" do
-      components = %{
-        panel: %{bounds: %{x: 100, y: 50, width: 200, height: 100}, z_index: 0}
-      }
+    test "complete cut workflow: select, copy, delete" do
+      text = "Hello World"
 
-      tracker = MouseTracker.new(drag_threshold: 1)
+      # Select "World"
+      selection =
+        Selection.new()
+        |> Selection.start(6)
+        |> Selection.extend(11)
 
-      # Press at global coordinates
-      press = Event.mouse(:press, :left, 120, 70)
-      {component_id, local_event} = MouseRouter.route(components, press)
+      # Extract for clipboard
+      content = Selection.extract(selection, text)
+      assert content == "World"
 
-      assert component_id == :panel
-      assert local_event.x == 20
-      assert local_event.y == 20
+      # Generate clipboard sequence
+      _sequence = Clipboard.write_sequence(content)
 
-      # Track drag
-      {tracker, _} = MouseTracker.process(tracker, press)
+      # Delete selected content
+      {start_pos, end_pos} = Selection.range(selection)
+      remaining = String.slice(text, 0, start_pos) <> String.slice(text, end_pos..-1//1)
 
-      # Move
-      move = Event.mouse(:move, nil, 150, 90)
-      {_tracker, events} = MouseTracker.process(tracker, move)
+      assert remaining == "Hello "
+    end
 
-      # Should have started dragging
-      assert [{:drag_start, _, _, _}, {:drag_move, _, _, _, _, _}] = events
+    test "selection expansion simulates shift+arrow navigation" do
+      text = "Hello World Example"
+
+      # Start with cursor at position 6 (beginning of "World")
+      # Simulate Shift+Right five times to select "World"
+      selection =
+        Selection.new()
+        |> Selection.start(6)
+        |> Selection.extend(7)
+        |> Selection.extend(8)
+        |> Selection.extend(9)
+        |> Selection.extend(10)
+        |> Selection.extend(11)
+
+      assert Selection.extract(selection, text) == "World"
+    end
+  end
+
+  describe "focus event workflows" do
+    test "focus lost triggers registered actions" do
+      {:ok, tracker} = Focus.Tracker.start_link(initial_focus: true)
+      test_pid = self()
+
+      # Register multiple focus lost actions
+      Focus.Tracker.on_focus_lost(tracker, fn ->
+        send(test_pid, :autosave_triggered)
+      end)
+
+      Focus.Tracker.on_focus_lost(tracker, fn ->
+        send(test_pid, :cleanup_triggered)
+      end)
+
+      # Lose focus
+      Focus.Tracker.set_focus(tracker, false)
+
+      # Both actions should execute
+      assert_receive :autosave_triggered, 100
+      assert_receive :cleanup_triggered, 100
+
+      GenServer.stop(tracker)
+    end
+
+    test "focus gained triggers refresh actions" do
+      {:ok, tracker} = Focus.Tracker.start_link(initial_focus: false)
+      test_pid = self()
+
+      Focus.Tracker.on_focus_gained(tracker, fn ->
+        send(test_pid, :refresh_triggered)
+      end)
+
+      # Gain focus
+      Focus.Tracker.set_focus(tracker, true)
+
+      assert_receive :refresh_triggered, 100
+
+      GenServer.stop(tracker)
+    end
+
+    test "auto-pause pauses on focus lost and resumes on focus gained" do
+      {:ok, tracker} = Focus.Tracker.start_link(initial_focus: true)
+
+      Focus.Tracker.enable_auto_pause(tracker)
+
+      # Initially not paused
+      refute Focus.Tracker.paused?(tracker)
+
+      # Lose focus - should pause
+      Focus.Tracker.set_focus(tracker, false)
+      assert Focus.Tracker.paused?(tracker)
+
+      # Gain focus - should resume
+      Focus.Tracker.set_focus(tracker, true)
+      refute Focus.Tracker.paused?(tracker)
+
+      GenServer.stop(tracker)
     end
 
     test "focus lost triggers autosave then pauses animations" do
       {:ok, tracker} = Focus.Tracker.start_link(initial_focus: true)
       test_pid = self()
 
-      # Register autosave
+      # Register autosave action
       Focus.Tracker.on_focus_lost(tracker, fn ->
         send(test_pid, :autosave)
       end)
@@ -636,12 +411,86 @@ defmodule TermUI.Integration.EventSystemTest do
       # Both should happen
       assert_receive :autosave, 100
       assert Focus.Tracker.paused?(tracker)
+
+      GenServer.stop(tracker)
     end
   end
 
-  # ===========================================================================
+  describe "cross-system integration" do
+    test "shortcut with command execution workflow" do
+      {:ok, registry} = Shortcut.start_link()
+      {:ok, executor} = Executor.start_link()
+      test_pid = self()
+
+      # Register shortcut that returns a command
+      Shortcut.register(registry, %Shortcut{
+        key: :r,
+        modifiers: [:ctrl],
+        action: {:command, Command.timer(10, :refreshed)},
+        description: "Refresh"
+      })
+
+      # Match shortcut
+      event = Event.key(:r, modifiers: [:ctrl])
+      {:ok, shortcut} = Shortcut.match(registry, event)
+
+      # Execute shortcut returns command
+      {:execute_command, cmd} = Shortcut.execute(shortcut)
+
+      # Execute command
+      Executor.execute(executor, cmd, test_pid, :app)
+
+      # Receive command result
+      assert_receive {:command_result, :app, _ref, :refreshed}, 100
+
+      GenServer.stop(registry)
+      GenServer.stop(executor)
+    end
+
+    test "mouse click triggers shortcut-like action via routing" do
+      components = %{
+        save_button: %{bounds: %{x: 10, y: 10, width: 80, height: 30}, z_index: 0}
+      }
+
+      # Click on button
+      event = Event.mouse(:click, :left, 50, 25)
+      {component_id, local_event} = MouseRouter.route(components, event)
+
+      assert component_id == :save_button
+      assert local_event.action == :click
+
+      # Component could register a shortcut or handle the click directly
+      # This demonstrates routing working with events
+    end
+
+    test "focus change affects shortcut scope matching" do
+      {:ok, registry} = Shortcut.start_link()
+      {:ok, tracker} = Focus.Tracker.start_link(initial_focus: true)
+
+      # Register component-scoped shortcut
+      Shortcut.register(registry, %Shortcut{
+        key: :enter,
+        modifiers: [],
+        action: {:function, fn -> :submit end},
+        scope: {:component, :form}
+      })
+
+      event = Event.key(:enter)
+
+      # When form is focused, shortcut matches
+      context = %{focused_component: :form}
+      assert {:ok, _} = Shortcut.match(registry, event, context)
+
+      # When something else is focused, shortcut doesn't match
+      context = %{focused_component: :list}
+      assert :no_match = Shortcut.match(registry, event, context)
+
+      GenServer.stop(registry)
+      GenServer.stop(tracker)
+    end
+  end
+
   # Helper Functions
-  # ===========================================================================
 
   defp receive_results_with_ref(count, timeout) do
     receive_results_with_ref(count, timeout, [])
