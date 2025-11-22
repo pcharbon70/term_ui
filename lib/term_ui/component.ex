@@ -48,7 +48,6 @@ defmodule TermUI.Component do
   """
 
   alias TermUI.Component.RenderNode
-  alias TermUI.Renderer.Style
 
   # Type definitions
 

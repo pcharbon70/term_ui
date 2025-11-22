@@ -173,7 +173,8 @@ defmodule TermUI.Dev.PerfMonitor do
   """
   @spec get_scheduler_utilization() :: [float()]
   def get_scheduler_utilization do
-    case :scheduler.utilization(1) do
+    # Use apply to avoid compile-time warning about undefined module
+    case apply(:scheduler, :utilization, [1]) do
       [{:total, _, total} | _schedulers] ->
         [total]
 
