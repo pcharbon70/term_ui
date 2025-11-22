@@ -1,10 +1,17 @@
 defmodule TermUI.Integration.TestingFrameworkTest do
+  # async: true because test utilities are stateless and create isolated resources
   use ExUnit.Case, async: true
   use TermUI.Test.Assertions
 
   alias TermUI.Event
   alias TermUI.Renderer.Cell
   alias TermUI.Test.{ComponentHarness, EventSimulator, TestRenderer}
+  alias TermUI.Test.Components.{Counter, Label, TextInput}
+
+  # Ensure modules are loaded for function_exported? checks in ComponentHarness
+  Code.ensure_loaded!(Counter)
+  Code.ensure_loaded!(TextInput)
+  Code.ensure_loaded!(Label)
 
   describe "test renderer accuracy" do
     test "captures text content correctly" do
@@ -235,31 +242,6 @@ defmodule TermUI.Integration.TestingFrameworkTest do
   end
 
   describe "component harness isolates components" do
-    # Test component
-    defmodule Counter do
-      import TermUI.Component.Helpers
-
-      def init(props) do
-        %{count: Keyword.get(props, :initial, 0)}
-      end
-
-      def render(state) do
-        text("Count: #{state.count}")
-      end
-
-      def handle_event(%Event.Key{key: :up}, state) do
-        {:noreply, %{state | count: state.count + 1}}
-      end
-
-      def handle_event(%Event.Key{key: :down}, state) do
-        {:noreply, %{state | count: max(0, state.count - 1)}}
-      end
-
-      def handle_event(_event, state) do
-        {:noreply, state}
-      end
-    end
-
     test "mounts component with initial state" do
       {:ok, harness} = ComponentHarness.mount_test(Counter, initial: 5)
 
@@ -348,20 +330,6 @@ defmodule TermUI.Integration.TestingFrameworkTest do
 
   describe "integration between test utilities" do
     test "event simulator works with component harness" do
-      defmodule TextInput do
-        import TermUI.Component.Helpers
-
-        def init(_props), do: %{text: ""}
-
-        def render(state), do: text(state.text)
-
-        def handle_event(%Event.Key{char: char}, state) when char != nil do
-          {:noreply, %{state | text: state.text <> char}}
-        end
-
-        def handle_event(_event, state), do: {:noreply, state}
-      end
-
       {:ok, harness} = ComponentHarness.mount_test(TextInput)
 
       # Use event simulator to type text
@@ -374,13 +342,6 @@ defmodule TermUI.Integration.TestingFrameworkTest do
     end
 
     test "assertions work with harness renderer" do
-      defmodule Label do
-        import TermUI.Component.Helpers
-
-        def init(props), do: %{text: Keyword.get(props, :text, "")}
-        def render(state), do: text(state.text)
-      end
-
       {:ok, harness} = ComponentHarness.mount_test(Label, text: "Important")
       harness = ComponentHarness.render(harness)
 

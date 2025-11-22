@@ -8,18 +8,38 @@ defmodule TermUI.Integration.DevWorkflowTest do
   alias TermUI.Dev.StateInspector
   alias TermUI.Dev.UIInspector
 
-  describe "inspector toggle" do
-    test "shows/hides component boundaries with shortcut" do
-      {:ok, _pid} = DevMode.start_link()
+  @default_area %{width: 80, height: 24}
 
-      on_exit(fn ->
+  # Frame timing constants (microseconds)
+  # 60 FPS = 16,666 microseconds per frame
+  @frame_time_60fps 16_666
+  # Slightly faster than 60 FPS for testing
+  @frame_time_fast 16_000
+
+  # Helper to start DevMode and ensure cleanup
+  defp start_dev_mode do
+    {:ok, _pid} = DevMode.start_link()
+
+    on_exit(fn ->
+      # Only stop if the process still exists (may have been stopped by test)
+      # Use try/catch as a safety net for race conditions
+      if Process.whereis(DevMode) do
         try do
           GenServer.stop(DevMode)
         catch
           :exit, _ -> :ok
         end
-      end)
+      end
+    end)
+  end
 
+  describe "inspector toggle" do
+    setup do
+      start_dev_mode()
+      :ok
+    end
+
+    test "shows/hides component boundaries with shortcut" do
       DevMode.enable()
 
       # Initially disabled
@@ -36,16 +56,6 @@ defmodule TermUI.Integration.DevWorkflowTest do
     end
 
     test "renders component boundaries when enabled" do
-      {:ok, _pid} = DevMode.start_link()
-
-      on_exit(fn ->
-        try do
-          GenServer.stop(DevMode)
-        catch
-          :exit, _ -> :ok
-        end
-      end)
-
       DevMode.enable()
       DevMode.toggle_ui_inspector()
 
@@ -59,24 +69,12 @@ defmodule TermUI.Integration.DevWorkflowTest do
 
       # Get state and render overlay
       state = DevMode.get_state()
-      area = %{width: 80, height: 24}
-
-      overlay = UIInspector.render(state.components, nil, area)
+      overlay = UIInspector.render(state.components, nil, @default_area)
       assert overlay.type == :overlay
       assert overlay.z == 200
     end
 
     test "selects component for detailed inspection" do
-      {:ok, _pid} = DevMode.start_link()
-
-      on_exit(fn ->
-        try do
-          GenServer.stop(DevMode)
-        catch
-          :exit, _ -> :ok
-        end
-      end)
-
       DevMode.enable()
       DevMode.toggle_ui_inspector()
       DevMode.toggle_state_inspector()
@@ -124,8 +122,7 @@ defmodule TermUI.Integration.DevWorkflowTest do
         bounds: %{x: 0, y: 0, width: 40, height: 20}
       }
 
-      area = %{width: 80, height: 24}
-      panel = StateInspector.render(component_info, area)
+      panel = StateInspector.render(component_info, @default_area)
 
       assert panel.type == :positioned
       # Panel should be positioned on the right side
@@ -158,22 +155,17 @@ defmodule TermUI.Integration.DevWorkflowTest do
   end
 
   describe "performance monitor" do
+    setup do
+      start_dev_mode()
+      :ok
+    end
+
     test "calculates FPS from frame times" do
-      {:ok, _pid} = DevMode.start_link()
-
-      on_exit(fn ->
-        try do
-          GenServer.stop(DevMode)
-        catch
-          :exit, _ -> :ok
-        end
-      end)
-
       DevMode.enable()
 
-      # Record several frames at ~60 FPS (16.6ms each)
+      # Record several frames at ~60 FPS
       for _ <- 1..60 do
-        DevMode.record_frame(16_666)
+        DevMode.record_frame(@frame_time_60fps)
       end
 
       metrics = DevMode.get_metrics()
@@ -182,18 +174,8 @@ defmodule TermUI.Integration.DevWorkflowTest do
     end
 
     test "tracks memory usage" do
-      {:ok, _pid} = DevMode.start_link()
-
-      on_exit(fn ->
-        try do
-          GenServer.stop(DevMode)
-        catch
-          :exit, _ -> :ok
-        end
-      end)
-
       DevMode.enable()
-      DevMode.record_frame(16_000)
+      DevMode.record_frame(@frame_time_fast)
 
       metrics = DevMode.get_metrics()
       assert metrics.memory > 0
@@ -208,8 +190,7 @@ defmodule TermUI.Integration.DevWorkflowTest do
         process_count: 100
       }
 
-      area = %{width: 80, height: 24}
-      panel = PerfMonitor.render(metrics, area)
+      panel = PerfMonitor.render(metrics, @default_area)
 
       assert panel.type == :positioned
     end
@@ -246,16 +227,7 @@ defmodule TermUI.Integration.DevWorkflowTest do
 
   describe "integrated development workflow" do
     setup do
-      {:ok, _pid} = DevMode.start_link()
-
-      on_exit(fn ->
-        try do
-          GenServer.stop(DevMode)
-        catch
-          :exit, _ -> :ok
-        end
-      end)
-
+      start_dev_mode()
       :ok
     end
 
@@ -283,15 +255,14 @@ defmodule TermUI.Integration.DevWorkflowTest do
 
       # Record some frames
       for _ <- 1..10 do
-        DevMode.record_frame(16_000)
+        DevMode.record_frame(@frame_time_fast)
       end
 
       # Get state for rendering
       state = DevMode.get_state()
-      area = %{width: 80, height: 24}
 
       # Render all overlays
-      overlays = DevMode.render_overlays(state, area)
+      overlays = DevMode.render_overlays(state, @default_area)
       assert length(overlays) == 3
 
       # Update component state
