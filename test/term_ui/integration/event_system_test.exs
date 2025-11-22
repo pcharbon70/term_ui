@@ -39,7 +39,8 @@ defmodule TermUI.Integration.EventSystemTest do
       cmd = Command.timer(10, {:timer_done, :test})
       Executor.execute(executor, cmd, self(), :test_component)
 
-      assert_receive {:command_result, :test_component, _ref, {:timer_done, :test}}, @default_timeout
+      assert_receive {:command_result, :test_component, _ref, {:timer_done, :test}},
+                     @default_timeout
     end
 
     test "multiple commands execute concurrently and deliver results", %{executor: executor} do
@@ -291,13 +292,15 @@ defmodule TermUI.Integration.EventSystemTest do
       Shortcut.register(registry, %Shortcut{
         key: :c,
         modifiers: [:ctrl],
-        action: {:function, fn ->
-          text = "Document content here"
-          selection = Selection.new() |> Selection.start(9) |> Selection.extend(16)
-          content = Selection.extract(selection, text)
-          sequence = Clipboard.write_sequence(content)
-          {:copied, content, sequence}
-        end},
+        action:
+          {:function,
+           fn ->
+             text = "Document content here"
+             selection = Selection.new() |> Selection.start(9) |> Selection.extend(16)
+             content = Selection.extract(selection, text)
+             sequence = Clipboard.write_sequence(content)
+             {:copied, content, sequence}
+           end},
         description: "Copy selection to clipboard"
       })
 

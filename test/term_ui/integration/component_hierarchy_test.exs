@@ -23,12 +23,13 @@ defmodule TermUI.Integration.ComponentHierarchyTest do
       id = props[:id]
       if tracker, do: send(tracker, {:lifecycle, id, :init})
 
-      {:ok, %{
-        id: id,
-        tracker: tracker,
-        children_ids: props[:children_ids] || [],
-        mounted: false
-      }}
+      {:ok,
+       %{
+         id: id,
+         tracker: tracker,
+         children_ids: props[:children_ids] || [],
+         mounted: false
+       }}
     end
 
     @impl true
@@ -60,11 +61,12 @@ defmodule TermUI.Integration.ComponentHierarchyTest do
 
     @impl true
     def init(props) do
-      {:ok, %{
-        id: props[:id],
-        tracker: props[:tracker],
-        child_specs: props[:child_specs] || []
-      }}
+      {:ok,
+       %{
+         id: props[:id],
+         tracker: props[:tracker],
+         child_specs: props[:child_specs] || []
+       }}
     end
 
     def mount(state) do
@@ -111,25 +113,28 @@ defmodule TermUI.Integration.ComponentHierarchyTest do
       tracker = self()
 
       # Start grandparent
-      {:ok, grandparent} = ComponentSupervisor.start_component(
-        LifecycleTracker,
-        %{id: :grandparent, tracker: tracker},
-        id: :grandparent
-      )
+      {:ok, grandparent} =
+        ComponentSupervisor.start_component(
+          LifecycleTracker,
+          %{id: :grandparent, tracker: tracker},
+          id: :grandparent
+        )
 
       # Start parent
-      {:ok, parent} = ComponentSupervisor.start_component(
-        LifecycleTracker,
-        %{id: :parent, tracker: tracker},
-        id: :parent
-      )
+      {:ok, parent} =
+        ComponentSupervisor.start_component(
+          LifecycleTracker,
+          %{id: :parent, tracker: tracker},
+          id: :parent
+        )
 
       # Start child
-      {:ok, child} = ComponentSupervisor.start_component(
-        LifecycleTracker,
-        %{id: :child, tracker: tracker},
-        id: :child
-      )
+      {:ok, child} =
+        ComponentSupervisor.start_component(
+          LifecycleTracker,
+          %{id: :child, tracker: tracker},
+          id: :child
+        )
 
       # Set up hierarchy
       ComponentRegistry.set_parent(:parent, :grandparent)
@@ -158,29 +163,33 @@ defmodule TermUI.Integration.ComponentHierarchyTest do
     end
 
     test "hierarchy maintains correct parent-child relationships" do
-      {:ok, _root} = ComponentSupervisor.start_component(
-        LifecycleTracker,
-        %{id: :root},
-        id: :root
-      )
+      {:ok, _root} =
+        ComponentSupervisor.start_component(
+          LifecycleTracker,
+          %{id: :root},
+          id: :root
+        )
 
-      {:ok, _branch1} = ComponentSupervisor.start_component(
-        LifecycleTracker,
-        %{id: :branch1},
-        id: :branch1
-      )
+      {:ok, _branch1} =
+        ComponentSupervisor.start_component(
+          LifecycleTracker,
+          %{id: :branch1},
+          id: :branch1
+        )
 
-      {:ok, _branch2} = ComponentSupervisor.start_component(
-        LifecycleTracker,
-        %{id: :branch2},
-        id: :branch2
-      )
+      {:ok, _branch2} =
+        ComponentSupervisor.start_component(
+          LifecycleTracker,
+          %{id: :branch2},
+          id: :branch2
+        )
 
-      {:ok, _leaf} = ComponentSupervisor.start_component(
-        LifecycleTracker,
-        %{id: :leaf},
-        id: :leaf
-      )
+      {:ok, _leaf} =
+        ComponentSupervisor.start_component(
+          LifecycleTracker,
+          %{id: :leaf},
+          id: :leaf
+        )
 
       ComponentRegistry.set_parent(:branch1, :root)
       ComponentRegistry.set_parent(:branch2, :root)
@@ -200,17 +209,19 @@ defmodule TermUI.Integration.ComponentHierarchyTest do
 
   describe "child components render within parent bounds" do
     test "children exist within parent hierarchy" do
-      {:ok, parent_pid} = ComponentSupervisor.start_component(
-        LifecycleTracker,
-        %{id: :parent},
-        id: :parent
-      )
+      {:ok, parent_pid} =
+        ComponentSupervisor.start_component(
+          LifecycleTracker,
+          %{id: :parent},
+          id: :parent
+        )
 
-      {:ok, child_pid} = ComponentSupervisor.start_component(
-        LifecycleTracker,
-        %{id: :child},
-        id: :child
-      )
+      {:ok, child_pid} =
+        ComponentSupervisor.start_component(
+          LifecycleTracker,
+          %{id: :child},
+          id: :child
+        )
 
       ComponentServer.mount(parent_pid)
       ComponentServer.mount(child_pid)
@@ -230,23 +241,26 @@ defmodule TermUI.Integration.ComponentHierarchyTest do
     test "cascade shutdown terminates children" do
       tracker = self()
 
-      {:ok, parent} = ComponentSupervisor.start_component(
-        LifecycleTracker,
-        %{id: :parent, tracker: tracker},
-        id: :parent
-      )
+      {:ok, parent} =
+        ComponentSupervisor.start_component(
+          LifecycleTracker,
+          %{id: :parent, tracker: tracker},
+          id: :parent
+        )
 
-      {:ok, child} = ComponentSupervisor.start_component(
-        LifecycleTracker,
-        %{id: :child, tracker: tracker},
-        id: :child
-      )
+      {:ok, child} =
+        ComponentSupervisor.start_component(
+          LifecycleTracker,
+          %{id: :child, tracker: tracker},
+          id: :child
+        )
 
-      {:ok, grandchild} = ComponentSupervisor.start_component(
-        LifecycleTracker,
-        %{id: :grandchild, tracker: tracker},
-        id: :grandchild
-      )
+      {:ok, grandchild} =
+        ComponentSupervisor.start_component(
+          LifecycleTracker,
+          %{id: :grandchild, tracker: tracker},
+          id: :grandchild
+        )
 
       ComponentServer.mount(parent)
       ComponentServer.mount(child)
@@ -268,29 +282,33 @@ defmodule TermUI.Integration.ComponentHierarchyTest do
     end
 
     test "sibling branches unaffected by other branch termination" do
-      {:ok, root} = ComponentSupervisor.start_component(
-        LifecycleTracker,
-        %{id: :root},
-        id: :root
-      )
+      {:ok, root} =
+        ComponentSupervisor.start_component(
+          LifecycleTracker,
+          %{id: :root},
+          id: :root
+        )
 
-      {:ok, branch1} = ComponentSupervisor.start_component(
-        LifecycleTracker,
-        %{id: :branch1},
-        id: :branch1
-      )
+      {:ok, branch1} =
+        ComponentSupervisor.start_component(
+          LifecycleTracker,
+          %{id: :branch1},
+          id: :branch1
+        )
 
-      {:ok, branch2} = ComponentSupervisor.start_component(
-        LifecycleTracker,
-        %{id: :branch2},
-        id: :branch2
-      )
+      {:ok, branch2} =
+        ComponentSupervisor.start_component(
+          LifecycleTracker,
+          %{id: :branch2},
+          id: :branch2
+        )
 
-      {:ok, leaf1} = ComponentSupervisor.start_component(
-        LifecycleTracker,
-        %{id: :leaf1},
-        id: :leaf1
-      )
+      {:ok, leaf1} =
+        ComponentSupervisor.start_component(
+          LifecycleTracker,
+          %{id: :leaf1},
+          id: :leaf1
+        )
 
       ComponentServer.mount(root)
       ComponentServer.mount(branch1)
@@ -316,11 +334,12 @@ defmodule TermUI.Integration.ComponentHierarchyTest do
 
   describe "dynamic child addition and removal" do
     test "children can be added at runtime" do
-      {:ok, parent} = ComponentSupervisor.start_component(
-        LifecycleTracker,
-        %{id: :parent},
-        id: :parent
-      )
+      {:ok, parent} =
+        ComponentSupervisor.start_component(
+          LifecycleTracker,
+          %{id: :parent},
+          id: :parent
+        )
 
       ComponentServer.mount(parent)
 
@@ -328,11 +347,12 @@ defmodule TermUI.Integration.ComponentHierarchyTest do
       assert ComponentRegistry.get_children(:parent) == []
 
       # Add child dynamically
-      {:ok, child} = ComponentSupervisor.start_component(
-        LifecycleTracker,
-        %{id: :child1},
-        id: :child1
-      )
+      {:ok, child} =
+        ComponentSupervisor.start_component(
+          LifecycleTracker,
+          %{id: :child1},
+          id: :child1
+        )
 
       ComponentServer.mount(child)
       ComponentRegistry.set_parent(:child1, :parent)
@@ -342,11 +362,12 @@ defmodule TermUI.Integration.ComponentHierarchyTest do
       assert children == [:child1]
 
       # Add another child
-      {:ok, child2} = ComponentSupervisor.start_component(
-        LifecycleTracker,
-        %{id: :child2},
-        id: :child2
-      )
+      {:ok, child2} =
+        ComponentSupervisor.start_component(
+          LifecycleTracker,
+          %{id: :child2},
+          id: :child2
+        )
 
       ComponentServer.mount(child2)
       ComponentRegistry.set_parent(:child2, :parent)
@@ -357,23 +378,26 @@ defmodule TermUI.Integration.ComponentHierarchyTest do
     end
 
     test "children can be removed at runtime" do
-      {:ok, parent} = ComponentSupervisor.start_component(
-        LifecycleTracker,
-        %{id: :parent},
-        id: :parent
-      )
+      {:ok, parent} =
+        ComponentSupervisor.start_component(
+          LifecycleTracker,
+          %{id: :parent},
+          id: :parent
+        )
 
-      {:ok, child1} = ComponentSupervisor.start_component(
-        LifecycleTracker,
-        %{id: :child1},
-        id: :child1
-      )
+      {:ok, child1} =
+        ComponentSupervisor.start_component(
+          LifecycleTracker,
+          %{id: :child1},
+          id: :child1
+        )
 
-      {:ok, child2} = ComponentSupervisor.start_component(
-        LifecycleTracker,
-        %{id: :child2},
-        id: :child2
-      )
+      {:ok, child2} =
+        ComponentSupervisor.start_component(
+          LifecycleTracker,
+          %{id: :child2},
+          id: :child2
+        )
 
       ComponentServer.mount(parent)
       ComponentServer.mount(child1)
@@ -395,12 +419,14 @@ defmodule TermUI.Integration.ComponentHierarchyTest do
       children = ComponentRegistry.get_children(:parent)
       # Note: The parent table entry may still exist, but the component is gone
       # Filter to only existing components
-      existing = Enum.filter(children, fn id ->
-        case ComponentRegistry.lookup(id) do
-          {:ok, _} -> true
-          _ -> false
-        end
-      end)
+      existing =
+        Enum.filter(children, fn id ->
+          case ComponentRegistry.lookup(id) do
+            {:ok, _} -> true
+            _ -> false
+          end
+        end)
+
       assert existing == [:child2]
     end
   end

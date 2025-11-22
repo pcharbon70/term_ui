@@ -19,11 +19,12 @@ defmodule TermUI.Integration.FaultToleranceTest do
 
     @impl true
     def init(props) do
-      {:ok, %{
-        id: props[:id],
-        tracker: props[:tracker],
-        counter: props[:counter] || 0
-      }}
+      {:ok,
+       %{
+         id: props[:id],
+         tracker: props[:tracker],
+         counter: props[:counter] || 0
+       }}
     end
 
     @impl true
@@ -55,11 +56,12 @@ defmodule TermUI.Integration.FaultToleranceTest do
         send(props[:tracker], {:lifecycle, props[:id], :init})
       end
 
-      {:ok, %{
-        id: props[:id],
-        tracker: props[:tracker],
-        value: props[:value] || 0
-      }}
+      {:ok,
+       %{
+         id: props[:id],
+         tracker: props[:tracker],
+         value: props[:value] || 0
+       }}
     end
 
     @impl true
@@ -67,6 +69,7 @@ defmodule TermUI.Integration.FaultToleranceTest do
       if state.tracker do
         send(state.tracker, {:lifecycle, state.id, :mount})
       end
+
       {:ok, state}
     end
 
@@ -98,18 +101,20 @@ defmodule TermUI.Integration.FaultToleranceTest do
 
   describe "crashed child component restarts without affecting parent" do
     test "parent remains alive when child crashes" do
-      {:ok, parent} = ComponentSupervisor.start_component(
-        MonitoredComponent,
-        %{id: :parent, value: 100},
-        id: :parent
-      )
+      {:ok, parent} =
+        ComponentSupervisor.start_component(
+          MonitoredComponent,
+          %{id: :parent, value: 100},
+          id: :parent
+        )
 
-      {:ok, child} = ComponentSupervisor.start_component(
-        CrashableComponent,
-        %{id: :child, counter: 50},
-        id: :child,
-        restart: :transient
-      )
+      {:ok, child} =
+        ComponentSupervisor.start_component(
+          CrashableComponent,
+          %{id: :child, counter: 50},
+          id: :child,
+          restart: :transient
+        )
 
       ComponentServer.mount(parent)
       ComponentServer.mount(child)
@@ -137,18 +142,20 @@ defmodule TermUI.Integration.FaultToleranceTest do
     end
 
     test "parent can still receive events after child crash" do
-      {:ok, parent} = ComponentSupervisor.start_component(
-        CrashableComponent,
-        %{id: :parent, counter: 0},
-        id: :parent
-      )
+      {:ok, parent} =
+        ComponentSupervisor.start_component(
+          CrashableComponent,
+          %{id: :parent, counter: 0},
+          id: :parent
+        )
 
-      {:ok, child} = ComponentSupervisor.start_component(
-        CrashableComponent,
-        %{id: :child, counter: 0},
-        id: :child,
-        restart: :transient
-      )
+      {:ok, child} =
+        ComponentSupervisor.start_component(
+          CrashableComponent,
+          %{id: :child, counter: 0},
+          id: :child,
+          restart: :transient
+        )
 
       ComponentServer.mount(parent)
       ComponentServer.mount(child)
@@ -171,13 +178,14 @@ defmodule TermUI.Integration.FaultToleranceTest do
   describe "crashed component state recovers from persistence" do
     test "state is persisted and recovered on restart" do
       # Start component with recovery enabled
-      {:ok, pid} = ComponentSupervisor.start_component(
-        CrashableComponent,
-        %{id: :recoverable, counter: 0},
-        id: :recoverable,
-        restart: :transient,
-        recovery: :last_state
-      )
+      {:ok, pid} =
+        ComponentSupervisor.start_component(
+          CrashableComponent,
+          %{id: :recoverable, counter: 0},
+          id: :recoverable,
+          restart: :transient,
+          recovery: :last_state
+        )
 
       ComponentServer.mount(pid)
 
@@ -206,12 +214,13 @@ defmodule TermUI.Integration.FaultToleranceTest do
     end
 
     test "restart count is tracked" do
-      {:ok, pid} = ComponentSupervisor.start_component(
-        CrashableComponent,
-        %{id: :counted},
-        id: :counted,
-        restart: :transient
-      )
+      {:ok, pid} =
+        ComponentSupervisor.start_component(
+          CrashableComponent,
+          %{id: :counted},
+          id: :counted,
+          restart: :transient
+        )
 
       ComponentServer.mount(pid)
 
@@ -228,30 +237,34 @@ defmodule TermUI.Integration.FaultToleranceTest do
       # Restart count should be incremented
       # (counted when recovered state is used)
       count = StatePersistence.get_restart_count(:counted)
-      assert count >= 0  # May or may not have recovery depending on timing
+      # May or may not have recovery depending on timing
+      assert count >= 0
     end
   end
 
   describe "sibling components continue functioning during restart" do
     test "siblings unaffected by peer crash" do
-      {:ok, sibling1} = ComponentSupervisor.start_component(
-        CrashableComponent,
-        %{id: :sibling1, counter: 10},
-        id: :sibling1
-      )
+      {:ok, sibling1} =
+        ComponentSupervisor.start_component(
+          CrashableComponent,
+          %{id: :sibling1, counter: 10},
+          id: :sibling1
+        )
 
-      {:ok, sibling2} = ComponentSupervisor.start_component(
-        CrashableComponent,
-        %{id: :sibling2, counter: 20},
-        id: :sibling2,
-        restart: :transient
-      )
+      {:ok, sibling2} =
+        ComponentSupervisor.start_component(
+          CrashableComponent,
+          %{id: :sibling2, counter: 20},
+          id: :sibling2,
+          restart: :transient
+        )
 
-      {:ok, sibling3} = ComponentSupervisor.start_component(
-        CrashableComponent,
-        %{id: :sibling3, counter: 30},
-        id: :sibling3
-      )
+      {:ok, sibling3} =
+        ComponentSupervisor.start_component(
+          CrashableComponent,
+          %{id: :sibling3, counter: 30},
+          id: :sibling3
+        )
 
       ComponentServer.mount(sibling1)
       ComponentServer.mount(sibling2)
@@ -276,30 +289,34 @@ defmodule TermUI.Integration.FaultToleranceTest do
     end
 
     test "hierarchy isolation - cousin crashes don't affect other branches" do
-      {:ok, parent1} = ComponentSupervisor.start_component(
-        CrashableComponent,
-        %{id: :parent1, counter: 100},
-        id: :parent1
-      )
+      {:ok, parent1} =
+        ComponentSupervisor.start_component(
+          CrashableComponent,
+          %{id: :parent1, counter: 100},
+          id: :parent1
+        )
 
-      {:ok, child1} = ComponentSupervisor.start_component(
-        CrashableComponent,
-        %{id: :child1, counter: 10},
-        id: :child1,
-        restart: :transient
-      )
+      {:ok, child1} =
+        ComponentSupervisor.start_component(
+          CrashableComponent,
+          %{id: :child1, counter: 10},
+          id: :child1,
+          restart: :transient
+        )
 
-      {:ok, parent2} = ComponentSupervisor.start_component(
-        CrashableComponent,
-        %{id: :parent2, counter: 200},
-        id: :parent2
-      )
+      {:ok, parent2} =
+        ComponentSupervisor.start_component(
+          CrashableComponent,
+          %{id: :parent2, counter: 200},
+          id: :parent2
+        )
 
-      {:ok, child2} = ComponentSupervisor.start_component(
-        CrashableComponent,
-        %{id: :child2, counter: 20},
-        id: :child2
-      )
+      {:ok, child2} =
+        ComponentSupervisor.start_component(
+          CrashableComponent,
+          %{id: :child2, counter: 20},
+          id: :child2
+        )
 
       ComponentServer.mount(parent1)
       ComponentServer.mount(child1)
@@ -327,14 +344,15 @@ defmodule TermUI.Integration.FaultToleranceTest do
   describe "restart storm triggers supervisor shutdown" do
     test "rapid restarts trigger intensity limit" do
       # Create component with tight restart limits
-      {:ok, pid} = ComponentSupervisor.start_component(
-        CrashableComponent,
-        %{id: :storm},
-        id: :storm,
-        restart: :permanent,
-        max_restarts: 2,
-        max_seconds: 5
-      )
+      {:ok, pid} =
+        ComponentSupervisor.start_component(
+          CrashableComponent,
+          %{id: :storm},
+          id: :storm,
+          restart: :permanent,
+          max_restarts: 2,
+          max_seconds: 5
+        )
 
       ComponentServer.mount(pid)
 
@@ -350,6 +368,7 @@ defmodule TermUI.Integration.FaultToleranceTest do
             catch_exit do
               ComponentServer.send_event(current_pid, :crash)
             end
+
             Process.sleep(10)
 
           {:error, :not_found} ->
@@ -366,13 +385,14 @@ defmodule TermUI.Integration.FaultToleranceTest do
 
   describe "recovery modes" do
     test "reset recovery mode starts fresh" do
-      {:ok, pid} = ComponentSupervisor.start_component(
-        CrashableComponent,
-        %{id: :reset_test, counter: 0},
-        id: :reset_test,
-        restart: :transient,
-        recovery: :reset
-      )
+      {:ok, pid} =
+        ComponentSupervisor.start_component(
+          CrashableComponent,
+          %{id: :reset_test, counter: 0},
+          id: :reset_test,
+          restart: :transient,
+          recovery: :reset
+        )
 
       ComponentServer.mount(pid)
 
@@ -388,12 +408,13 @@ defmodule TermUI.Integration.FaultToleranceTest do
     end
 
     test "temporary restart never restarts" do
-      {:ok, pid} = ComponentSupervisor.start_component(
-        CrashableComponent,
-        %{id: :temporary},
-        id: :temporary,
-        restart: :temporary
-      )
+      {:ok, pid} =
+        ComponentSupervisor.start_component(
+          CrashableComponent,
+          %{id: :temporary},
+          id: :temporary,
+          restart: :temporary
+        )
 
       ComponentServer.mount(pid)
 

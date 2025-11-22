@@ -23,11 +23,12 @@ defmodule TermUI.Integration.FocusIntegrationTest do
 
     @impl true
     def init(props) do
-      {:ok, %{
-        id: props[:id],
-        tracker: props[:tracker],
-        focusable: Map.get(props, :focusable, true)
-      }}
+      {:ok,
+       %{
+         id: props[:id],
+         tracker: props[:tracker],
+         focusable: Map.get(props, :focusable, true)
+       }}
     end
 
     @impl true
@@ -35,6 +36,7 @@ defmodule TermUI.Integration.FocusIntegrationTest do
       if state.tracker do
         send(state.tracker, {:event, state.id, event})
       end
+
       {:ok, state}
     end
 
@@ -59,23 +61,26 @@ defmodule TermUI.Integration.FocusIntegrationTest do
       tracker = self()
 
       # Create form with 3 inputs
-      {:ok, input1} = ComponentSupervisor.start_component(
-        FocusableInput,
-        %{id: :input1, tracker: tracker},
-        id: :input1
-      )
+      {:ok, input1} =
+        ComponentSupervisor.start_component(
+          FocusableInput,
+          %{id: :input1, tracker: tracker},
+          id: :input1
+        )
 
-      {:ok, input2} = ComponentSupervisor.start_component(
-        FocusableInput,
-        %{id: :input2, tracker: tracker},
-        id: :input2
-      )
+      {:ok, input2} =
+        ComponentSupervisor.start_component(
+          FocusableInput,
+          %{id: :input2, tracker: tracker},
+          id: :input2
+        )
 
-      {:ok, input3} = ComponentSupervisor.start_component(
-        FocusableInput,
-        %{id: :input3, tracker: tracker},
-        id: :input3
-      )
+      {:ok, input3} =
+        ComponentSupervisor.start_component(
+          FocusableInput,
+          %{id: :input3, tracker: tracker},
+          id: :input3
+        )
 
       ComponentServer.mount(input1)
       ComponentServer.mount(input2)
@@ -100,23 +105,26 @@ defmodule TermUI.Integration.FocusIntegrationTest do
     end
 
     test "Shift+Tab moves focus to previous component" do
-      {:ok, input1} = ComponentSupervisor.start_component(
-        FocusableInput,
-        %{id: :input1},
-        id: :input1
-      )
+      {:ok, input1} =
+        ComponentSupervisor.start_component(
+          FocusableInput,
+          %{id: :input1},
+          id: :input1
+        )
 
-      {:ok, input2} = ComponentSupervisor.start_component(
-        FocusableInput,
-        %{id: :input2},
-        id: :input2
-      )
+      {:ok, input2} =
+        ComponentSupervisor.start_component(
+          FocusableInput,
+          %{id: :input2},
+          id: :input2
+        )
 
-      {:ok, input3} = ComponentSupervisor.start_component(
-        FocusableInput,
-        %{id: :input3},
-        id: :input3
-      )
+      {:ok, input3} =
+        ComponentSupervisor.start_component(
+          FocusableInput,
+          %{id: :input3},
+          id: :input3
+        )
 
       ComponentServer.mount(input1)
       ComponentServer.mount(input2)
@@ -140,17 +148,19 @@ defmodule TermUI.Integration.FocusIntegrationTest do
     end
 
     test "Tab wraps from last to first" do
-      {:ok, input1} = ComponentSupervisor.start_component(
-        FocusableInput,
-        %{id: :input1},
-        id: :input1
-      )
+      {:ok, input1} =
+        ComponentSupervisor.start_component(
+          FocusableInput,
+          %{id: :input1},
+          id: :input1
+        )
 
-      {:ok, input2} = ComponentSupervisor.start_component(
-        FocusableInput,
-        %{id: :input2},
-        id: :input2
-      )
+      {:ok, input2} =
+        ComponentSupervisor.start_component(
+          FocusableInput,
+          %{id: :input2},
+          id: :input2
+        )
 
       ComponentServer.mount(input1)
       ComponentServer.mount(input2)
@@ -170,17 +180,19 @@ defmodule TermUI.Integration.FocusIntegrationTest do
   describe "focus trap in modal" do
     test "trap_focus restricts traversal to group" do
       # Create modal components
-      {:ok, modal_input1} = ComponentSupervisor.start_component(
-        FocusableInput,
-        %{id: :modal_input1},
-        id: :modal_input1
-      )
+      {:ok, modal_input1} =
+        ComponentSupervisor.start_component(
+          FocusableInput,
+          %{id: :modal_input1},
+          id: :modal_input1
+        )
 
-      {:ok, modal_input2} = ComponentSupervisor.start_component(
-        FocusableInput,
-        %{id: :modal_input2},
-        id: :modal_input2
-      )
+      {:ok, modal_input2} =
+        ComponentSupervisor.start_component(
+          FocusableInput,
+          %{id: :modal_input2},
+          id: :modal_input2
+        )
 
       ComponentServer.mount(modal_input1)
       ComponentServer.mount(modal_input2)
@@ -203,17 +215,19 @@ defmodule TermUI.Integration.FocusIntegrationTest do
     end
 
     test "release_focus restores normal traversal" do
-      {:ok, bg_input} = ComponentSupervisor.start_component(
-        FocusableInput,
-        %{id: :bg_input},
-        id: :bg_input
-      )
+      {:ok, bg_input} =
+        ComponentSupervisor.start_component(
+          FocusableInput,
+          %{id: :bg_input},
+          id: :bg_input
+        )
 
-      {:ok, modal_input} = ComponentSupervisor.start_component(
-        FocusableInput,
-        %{id: :modal_input},
-        id: :modal_input
-      )
+      {:ok, modal_input} =
+        ComponentSupervisor.start_component(
+          FocusableInput,
+          %{id: :modal_input},
+          id: :modal_input
+        )
 
       ComponentServer.mount(bg_input)
       ComponentServer.mount(modal_input)
@@ -238,17 +252,19 @@ defmodule TermUI.Integration.FocusIntegrationTest do
 
   describe "focus returns to previous component after modal closes" do
     test "focus restores to previous component" do
-      {:ok, input} = ComponentSupervisor.start_component(
-        FocusableInput,
-        %{id: :input},
-        id: :input
-      )
+      {:ok, input} =
+        ComponentSupervisor.start_component(
+          FocusableInput,
+          %{id: :input},
+          id: :input
+        )
 
-      {:ok, modal_btn} = ComponentSupervisor.start_component(
-        FocusableInput,
-        %{id: :modal_btn},
-        id: :modal_btn
-      )
+      {:ok, modal_btn} =
+        ComponentSupervisor.start_component(
+          FocusableInput,
+          %{id: :modal_btn},
+          id: :modal_btn
+        )
 
       ComponentServer.mount(input)
       ComponentServer.mount(modal_btn)
@@ -270,23 +286,26 @@ defmodule TermUI.Integration.FocusIntegrationTest do
     end
 
     test "nested modals restore correctly" do
-      {:ok, main_input} = ComponentSupervisor.start_component(
-        FocusableInput,
-        %{id: :main_input},
-        id: :main_input
-      )
+      {:ok, main_input} =
+        ComponentSupervisor.start_component(
+          FocusableInput,
+          %{id: :main_input},
+          id: :main_input
+        )
 
-      {:ok, modal1_btn} = ComponentSupervisor.start_component(
-        FocusableInput,
-        %{id: :modal1_btn},
-        id: :modal1_btn
-      )
+      {:ok, modal1_btn} =
+        ComponentSupervisor.start_component(
+          FocusableInput,
+          %{id: :modal1_btn},
+          id: :modal1_btn
+        )
 
-      {:ok, modal2_btn} = ComponentSupervisor.start_component(
-        FocusableInput,
-        %{id: :modal2_btn},
-        id: :modal2_btn
-      )
+      {:ok, modal2_btn} =
+        ComponentSupervisor.start_component(
+          FocusableInput,
+          %{id: :modal2_btn},
+          id: :modal2_btn
+        )
 
       ComponentServer.mount(main_input)
       ComponentServer.mount(modal1_btn)
@@ -320,17 +339,19 @@ defmodule TermUI.Integration.FocusIntegrationTest do
     test "component can change focus when handling event" do
       tracker = self()
 
-      {:ok, button} = ComponentSupervisor.start_component(
-        FocusableInput,
-        %{id: :button, tracker: tracker},
-        id: :button
-      )
+      {:ok, button} =
+        ComponentSupervisor.start_component(
+          FocusableInput,
+          %{id: :button, tracker: tracker},
+          id: :button
+        )
 
-      {:ok, input} = ComponentSupervisor.start_component(
-        FocusableInput,
-        %{id: :input, tracker: tracker},
-        id: :input
-      )
+      {:ok, input} =
+        ComponentSupervisor.start_component(
+          FocusableInput,
+          %{id: :input, tracker: tracker},
+          id: :input
+        )
 
       ComponentServer.mount(button)
       ComponentServer.mount(input)
@@ -355,17 +376,19 @@ defmodule TermUI.Integration.FocusIntegrationTest do
     test "focus change updates correctly" do
       tracker = self()
 
-      {:ok, comp1} = ComponentSupervisor.start_component(
-        FocusableInput,
-        %{id: :comp1, tracker: tracker},
-        id: :comp1
-      )
+      {:ok, comp1} =
+        ComponentSupervisor.start_component(
+          FocusableInput,
+          %{id: :comp1, tracker: tracker},
+          id: :comp1
+        )
 
-      {:ok, comp2} = ComponentSupervisor.start_component(
-        FocusableInput,
-        %{id: :comp2, tracker: tracker},
-        id: :comp2
-      )
+      {:ok, comp2} =
+        ComponentSupervisor.start_component(
+          FocusableInput,
+          %{id: :comp2, tracker: tracker},
+          id: :comp2
+        )
 
       ComponentServer.mount(comp1)
       ComponentServer.mount(comp2)
