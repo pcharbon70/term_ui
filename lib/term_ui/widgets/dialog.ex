@@ -154,9 +154,7 @@ defmodule TermUI.Widgets.Dialog do
 
   @impl true
   def render(state, area) do
-    if not state.visible do
-      empty()
-    else
+    if state.visible do
       # Calculate dialog position (centered)
       dialog_width = state.width
       dialog_height = calculate_height(state)
@@ -182,6 +180,8 @@ defmodule TermUI.Widgets.Dialog do
         dialog_width: dialog_width,
         dialog_height: dialog_height
       }
+    else
+      empty()
     end
   end
 

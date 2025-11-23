@@ -138,9 +138,9 @@ defmodule TermUI.Dev.DevModeTest do
     end
 
     test "record_frame updates metrics" do
-      DevMode.record_frame(16000)
-      DevMode.record_frame(17000)
-      DevMode.record_frame(15000)
+      DevMode.record_frame(16_000)
+      DevMode.record_frame(17_000)
+      DevMode.record_frame(15_000)
 
       metrics = DevMode.get_metrics()
       assert length(metrics.frame_times) == 3
@@ -152,7 +152,7 @@ defmodule TermUI.Dev.DevModeTest do
     test "FPS calculation from frame times" do
       # Record 60 frames at 16.67ms each (60 FPS)
       for _ <- 1..60 do
-        DevMode.record_frame(16667)
+        DevMode.record_frame(16_667)
       end
 
       metrics = DevMode.get_metrics()

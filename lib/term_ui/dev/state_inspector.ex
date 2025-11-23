@@ -84,31 +84,42 @@ defmodule TermUI.Dev.StateInspector do
   """
   @spec render_state_tree(term(), integer()) :: [String.t()]
   def render_state_tree(value, depth) do
-    indent = String.duplicate("  ", depth)
+    render_value_by_type(value, depth, String.duplicate("  ", depth))
+  end
 
-    cond do
-      is_map(value) and map_size(value) == 0 ->
-        [indent <> "%{}"]
+  defp render_value_by_type(value, depth, indent) when is_map(value) do
+    render_map_value(value, depth, indent)
+  end
 
-      is_map(value) ->
-        render_map_tree(value, depth)
+  defp render_value_by_type(value, depth, indent) when is_list(value) do
+    render_list_value(value, depth, indent)
+  end
 
-      is_list(value) and length(value) == 0 ->
-        [indent <> "[]"]
+  defp render_value_by_type(value, depth, indent) when is_tuple(value) do
+    render_tuple_tree(value, depth)
+    |> ensure_indent_applied(indent)
+  end
 
-      is_list(value) ->
-        render_list_tree(value, depth)
-
-      is_tuple(value) ->
-        render_tuple_tree(value, depth)
-
-      struct_value?(value) ->
-        render_struct_tree(value, depth)
-
-      true ->
-        [indent <> format_value(value)]
+  defp render_value_by_type(value, depth, indent) do
+    if struct_value?(value) do
+      render_struct_tree(value, depth)
+    else
+      [indent <> format_value(value)]
     end
   end
+
+  defp render_map_value(value, _depth, indent) when map_size(value) == 0 do
+    [indent <> "%{}"]
+  end
+
+  defp render_map_value(value, depth, _indent) do
+    render_map_tree(value, depth)
+  end
+
+  defp render_list_value([], _depth, indent), do: [indent <> "[]"]
+  defp render_list_value(value, depth, _indent), do: render_list_tree(value, depth)
+
+  defp ensure_indent_applied(lines, _indent), do: lines
 
   defp render_map_tree(map, depth) do
     indent = String.duplicate("  ", depth)
@@ -120,7 +131,7 @@ defmodule TermUI.Dev.StateInspector do
       |> Enum.flat_map(fn {key, value} ->
         key_str = format_key(key)
 
-        if is_simple_value(value) do
+        if simple_value?(value) do
           [indent <> "  #{key_str}: #{format_value(value)}"]
         else
           [indent <> "  #{key_str}:" | render_state_tree(value, depth + 2)]
@@ -142,11 +153,7 @@ defmodule TermUI.Dev.StateInspector do
         |> Enum.take(5)
         |> Enum.with_index()
         |> Enum.flat_map(fn {item, idx} ->
-          if is_simple_value(item) do
-            [indent <> "  [#{idx}]: #{format_value(item)}"]
-          else
-            [indent <> "  [#{idx}]:" | render_state_tree(item, depth + 2)]
-          end
+          render_indexed_item(item, idx, indent, depth, "[")
         end)
 
       [indent <> "["] ++
@@ -156,11 +163,7 @@ defmodule TermUI.Dev.StateInspector do
         list
         |> Enum.with_index()
         |> Enum.flat_map(fn {item, idx} ->
-          if is_simple_value(item) do
-            [indent <> "  [#{idx}]: #{format_value(item)}"]
-          else
-            [indent <> "  [#{idx}]:" | render_state_tree(item, depth + 2)]
-          end
+          render_indexed_item(item, idx, indent, depth, "[")
         end)
 
       [indent <> "["] ++ entries ++ [indent <> "]"]
@@ -171,7 +174,7 @@ defmodule TermUI.Dev.StateInspector do
     indent = String.duplicate("  ", depth)
     elements = Tuple.to_list(tuple)
 
-    if tuple_size(tuple) <= 3 and Enum.all?(elements, &is_simple_value/1) do
+    if tuple_size(tuple) <= 3 and Enum.all?(elements, &simple_value?/1) do
       # Inline small tuples
       values = Enum.map_join(elements, ", ", &format_value/1)
       [indent <> "{#{values}}"]
@@ -180,11 +183,7 @@ defmodule TermUI.Dev.StateInspector do
         elements
         |> Enum.with_index()
         |> Enum.flat_map(fn {item, idx} ->
-          if is_simple_value(item) do
-            [indent <> "  .#{idx}: #{format_value(item)}"]
-          else
-            [indent <> "  .#{idx}:" | render_state_tree(item, depth + 2)]
-          end
+          render_indexed_item(item, idx, indent, depth, ".")
         end)
 
       [indent <> "{"] ++ entries ++ [indent <> "}"]
@@ -203,23 +202,33 @@ defmodule TermUI.Dev.StateInspector do
       entries =
         map
         |> Enum.flat_map(fn {key, value} ->
-          key_str = to_string(key)
-
-          if is_simple_value(value) do
-            [indent <> "  #{key_str}: #{format_value(value)}"]
-          else
-            [indent <> "  #{key_str}:" | render_state_tree(value, depth + 2)]
-          end
+          render_keyed_item(value, to_string(key), indent, depth)
         end)
 
       [indent <> "%#{struct_name}{"] ++ entries ++ [indent <> "}"]
     end
   end
 
+  defp render_indexed_item(item, idx, indent, depth, prefix) do
+    if simple_value?(item) do
+      [indent <> "  #{prefix}#{idx}]: #{format_value(item)}"]
+    else
+      [indent <> "  #{prefix}#{idx}]:" | render_state_tree(item, depth + 2)]
+    end
+  end
+
+  defp render_keyed_item(value, key_str, indent, depth) do
+    if simple_value?(value) do
+      [indent <> "  #{key_str}: #{format_value(value)}"]
+    else
+      [indent <> "  #{key_str}:" | render_state_tree(value, depth + 2)]
+    end
+  end
+
   defp struct_value?(%{__struct__: _}), do: true
   defp struct_value?(_), do: false
 
-  defp is_simple_value(value) do
+  defp simple_value?(value) do
     is_atom(value) or is_number(value) or is_binary(value) or
       is_boolean(value) or is_nil(value) or is_pid(value) or is_reference(value)
   end

@@ -1,8 +1,8 @@
 defmodule TermUI.Widget.ProgressTest do
   use ExUnit.Case, async: true
 
-  alias TermUI.Widget.Progress
   alias TermUI.Component.RenderNode
+  alias TermUI.Widget.Progress
 
   @area %{x: 0, y: 0, width: 20, height: 1}
 
@@ -124,7 +124,8 @@ defmodule TermUI.Widget.ProgressTest do
       result = Progress.render(state, @area)
 
       assert %RenderNode{type: :cells, cells: cells} = result
-      text = Enum.map(cells, fn %{cell: cell} -> cell.char end) |> Enum.join()
+      chars = Enum.map(cells, fn %{cell: cell} -> cell.char end)
+      text = Enum.join(chars)
       assert String.contains?(text, "50%")
     end
 

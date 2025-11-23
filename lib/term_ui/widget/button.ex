@@ -24,9 +24,9 @@ defmodule TermUI.Widget.Button do
 
   use TermUI.StatefulComponent
 
+  alias TermUI.Component.RenderNode
   alias TermUI.Event
   alias TermUI.Renderer.Style
-  alias TermUI.Component.RenderNode
 
   @doc """
   Initializes the button state.
@@ -143,12 +143,10 @@ defmodule TermUI.Widget.Button do
   # Private Functions
 
   defp get_style(props, state) do
-    cond do
-      state.pressed ->
-        build_style(Map.get(props, :pressed_style, %{fg: :black, bg: :white}))
-
-      true ->
-        build_style(Map.get(props, :style, %{}))
+    if state.pressed do
+      build_style(Map.get(props, :pressed_style, %{fg: :black, bg: :white}))
+    else
+      build_style(Map.get(props, :style, %{}))
     end
   end
 

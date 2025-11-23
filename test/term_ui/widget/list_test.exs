@@ -1,9 +1,9 @@
 defmodule TermUI.Widget.ListTest do
   use ExUnit.Case, async: true
 
-  alias TermUI.Widget.List, as: ListWidget
   alias TermUI.Component.RenderNode
   alias TermUI.Event
+  alias TermUI.Widget.List, as: ListWidget
 
   @area %{x: 0, y: 0, width: 20, height: 5}
   @items ["Apple", "Banana", "Cherry", "Date", "Elderberry", "Fig", "Grape"]
@@ -174,7 +174,8 @@ defmodule TermUI.Widget.ListTest do
 
       # Check first row contains "Apple"
       row0 = Enum.filter(cells, fn c -> c.y == 0 end)
-      text = Enum.map(row0, fn c -> c.cell.char end) |> Enum.join() |> String.trim()
+      chars = Enum.map(row0, & &1.cell.char)
+      text = chars |> Enum.join() |> String.trim()
       assert String.starts_with?(text, "Apple")
     end
 
@@ -215,12 +216,14 @@ defmodule TermUI.Widget.ListTest do
 
       # Row 0 should have "[ ] "
       row0 = Enum.filter(cells, fn c -> c.y == 0 end)
-      row0_text = Enum.map(row0, fn c -> c.cell.char end) |> Enum.join()
+      row0_chars = Enum.map(row0, & &1.cell.char)
+      row0_text = Enum.join(row0_chars)
       assert String.starts_with?(row0_text, "[ ]")
 
       # Row 1 should have "[x] "
       row1 = Enum.filter(cells, fn c -> c.y == 1 end)
-      row1_text = Enum.map(row1, fn c -> c.cell.char end) |> Enum.join()
+      row1_chars = Enum.map(row1, & &1.cell.char)
+      row1_text = Enum.join(row1_chars)
       assert String.starts_with?(row1_text, "[x]")
     end
 
@@ -246,7 +249,8 @@ defmodule TermUI.Widget.ListTest do
 
       # Should have scrolled to show Grape
       row4 = Enum.filter(cells, fn c -> c.y == 4 end)
-      text = Enum.map(row4, fn c -> c.cell.char end) |> Enum.join() |> String.trim()
+      chars = Enum.map(row4, & &1.cell.char)
+      text = chars |> Enum.join() |> String.trim()
       assert String.starts_with?(text, "Grape")
     end
 

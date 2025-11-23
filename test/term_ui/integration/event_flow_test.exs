@@ -8,14 +8,14 @@ defmodule TermUI.Integration.EventFlowTest do
 
   use ExUnit.Case, async: false
 
-  alias TermUI.ComponentSupervisor
+  alias TermUI.Component.StatePersistence
   alias TermUI.ComponentRegistry
   alias TermUI.ComponentServer
-  alias TermUI.Component.StatePersistence
+  alias TermUI.ComponentSupervisor
   alias TermUI.Event
   alias TermUI.EventRouter
-  alias TermUI.SpatialIndex
   alias TermUI.FocusManager
+  alias TermUI.SpatialIndex
 
   # Component that tracks received events
   defmodule EventTracker do

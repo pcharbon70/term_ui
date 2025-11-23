@@ -108,9 +108,7 @@ defmodule TermUI.Widgets.Toast do
 
   @impl true
   def render(state, area) do
-    if not state.visible do
-      empty()
-    else
+    if state.visible do
       # Calculate position
       {pos_x, pos_y} = calculate_position(state, area)
 
@@ -126,6 +124,8 @@ defmodule TermUI.Widgets.Toast do
         # Higher z-order than dialogs
         z: 150
       }
+    else
+      empty()
     end
   end
 

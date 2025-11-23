@@ -1,9 +1,9 @@
 defmodule TermUI.Test.ComponentHarnessTest do
   use ExUnit.Case, async: true
 
+  alias TermUI.Event
   alias TermUI.Test.ComponentHarness
   alias TermUI.Test.TestRenderer
-  alias TermUI.Event
 
   # Test component for harness testing
   defmodule Counter do

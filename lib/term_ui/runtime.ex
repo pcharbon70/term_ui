@@ -25,8 +25,8 @@ defmodule TermUI.Runtime do
 
   use GenServer
 
-  alias TermUI.Event
   alias TermUI.Elm
+  alias TermUI.Event
   alias TermUI.MessageQueue
   alias TermUI.Runtime.State
 

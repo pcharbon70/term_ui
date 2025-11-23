@@ -1,8 +1,8 @@
 defmodule TermUI.Widget.BlockTest do
   use ExUnit.Case, async: true
 
-  alias TermUI.Widget.Block
   alias TermUI.Component.RenderNode
+  alias TermUI.Widget.Block
 
   @area %{x: 0, y: 0, width: 20, height: 10}
 

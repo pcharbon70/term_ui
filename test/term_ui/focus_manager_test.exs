@@ -1,11 +1,11 @@
 defmodule TermUI.FocusManagerTest do
   use ExUnit.Case
 
-  alias TermUI.FocusManager
-  alias TermUI.EventRouter
-  alias TermUI.SpatialIndex
   alias TermUI.ComponentRegistry
   alias TermUI.Event
+  alias TermUI.EventRouter
+  alias TermUI.FocusManager
+  alias TermUI.SpatialIndex
 
   # Test component that tracks received events
   defmodule TestComponent do
@@ -303,21 +303,21 @@ defmodule TermUI.FocusManagerTest do
     end
   end
 
-  describe "is_focused?/1" do
+  describe "focused?/1" do
     test "returns true when component is focused" do
       {:ok, pid} = TestComponent.start_link(test_pid: self())
       :ok = ComponentRegistry.register(:input, pid, TestComponent)
 
       :ok = FocusManager.set_focused(:input)
 
-      assert FocusManager.is_focused?(:input)
+      assert FocusManager.focused?(:input)
     end
 
     test "returns false when component is not focused" do
       {:ok, pid} = TestComponent.start_link(test_pid: self())
       :ok = ComponentRegistry.register(:input, pid, TestComponent)
 
-      refute FocusManager.is_focused?(:input)
+      refute FocusManager.focused?(:input)
     end
 
     test "returns false when different component is focused" do
@@ -329,7 +329,7 @@ defmodule TermUI.FocusManagerTest do
 
       :ok = FocusManager.set_focused(:input1)
 
-      refute FocusManager.is_focused?(:input2)
+      refute FocusManager.focused?(:input2)
     end
   end
 

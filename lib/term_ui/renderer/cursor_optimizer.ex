@@ -212,42 +212,41 @@ defmodule TermUI.Renderer.CursorOptimizer do
     row_diff = to_row - from_row
     col_diff = to_col - from_col
 
-    options = [
-      # Always include absolute positioning as fallback
-      absolute_option(to_row, to_col)
-    ]
-
-    # Add relative movement options
-    options = options ++ relative_options(row_diff, col_diff)
-
-    # Add CR-based options for column 1
-    options = if to_col == 1, do: options ++ cr_options(row_diff), else: options
-
-    # Add CR + relative column options
-    options = options ++ cr_col_options(row_diff, to_col, from_col)
-
-    # Add home option for (1, 1)
-    options = if to_row == 1 and to_col == 1, do: [home_option() | options], else: options
-
-    # Add space option for small rightward moves on same row
-    options =
-      if row_diff == 0 and col_diff > 0 and col_diff <= @space_threshold do
-        [space_option(col_diff) | options]
-      else
-        options
-      end
-
-    # Add newline-based options for moving down
-    options =
-      if row_diff > 0 and from_col == 1 and to_col == 1 do
-        # Just newlines when starting and ending at column 1
-        [{String.duplicate("\n", row_diff), row_diff} | options]
-      else
-        options
-      end
-
-    options
+    [absolute_option(to_row, to_col)]
+    |> add_relative_options(row_diff, col_diff)
+    |> add_cr_options(to_col, row_diff)
+    |> add_cr_col_options(row_diff, to_col, from_col)
+    |> add_home_option(to_row, to_col)
+    |> add_space_option(row_diff, col_diff)
+    |> add_newline_options(row_diff, from_col, to_col)
   end
+
+  defp add_relative_options(options, row_diff, col_diff) do
+    options ++ relative_options(row_diff, col_diff)
+  end
+
+  defp add_cr_options(options, 1, row_diff), do: options ++ cr_options(row_diff)
+  defp add_cr_options(options, _to_col, _row_diff), do: options
+
+  defp add_cr_col_options(options, row_diff, to_col, from_col) do
+    options ++ cr_col_options(row_diff, to_col, from_col)
+  end
+
+  defp add_home_option(options, 1, 1), do: [home_option() | options]
+  defp add_home_option(options, _to_row, _to_col), do: options
+
+  defp add_space_option(options, 0, col_diff)
+       when col_diff > 0 and col_diff <= @space_threshold do
+    [space_option(col_diff) | options]
+  end
+
+  defp add_space_option(options, _row_diff, _col_diff), do: options
+
+  defp add_newline_options(options, row_diff, 1, 1) when row_diff > 0 do
+    [{String.duplicate("\n", row_diff), row_diff} | options]
+  end
+
+  defp add_newline_options(options, _row_diff, _from_col, _to_col), do: options
 
   defp absolute_option(row, col) do
     seq = ["\e[", Integer.to_string(row), ";", Integer.to_string(col), "H"]

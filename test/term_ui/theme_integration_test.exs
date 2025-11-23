@@ -1,8 +1,8 @@
 defmodule TermUI.ThemeIntegrationTest do
   use ExUnit.Case, async: true
 
-  alias TermUI.Theme
   alias TermUI.Style
+  alias TermUI.Theme
 
   setup do
     name = :"theme_integration_#{:erlang.unique_integer([:positive])}"

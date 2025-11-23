@@ -149,9 +149,7 @@ defmodule TermUI.Test.Assertions do
 
       actual = TestRenderer.get_text_at(renderer, row, col, width)
 
-      if not String.contains?(actual, text) do
-        true
-      else
+      if String.contains?(actual, text) do
         raise ExUnit.AssertionError,
           message: """
           Text contains refutation failed at (#{row}, #{col}) with width #{width}
@@ -159,6 +157,8 @@ defmodule TermUI.Test.Assertions do
           Did not expect to contain: #{inspect(text)}
           Actual content:            #{inspect(actual)}
           """
+      else
+        true
       end
     end
   end
@@ -204,7 +204,7 @@ defmodule TermUI.Test.Assertions do
 
       positions = TestRenderer.find_text(renderer, text)
 
-      if length(positions) == 0 do
+      if positions == [] do
         true
       else
         raise ExUnit.AssertionError,
@@ -327,9 +327,7 @@ defmodule TermUI.Test.Assertions do
 
       style = TestRenderer.get_style_at(renderer, row, col)
 
-      if not MapSet.member?(style.attrs, attr) do
-        true
-      else
+      if MapSet.member?(style.attrs, attr) do
         raise ExUnit.AssertionError,
           message: """
           Attribute refutation failed at (#{row}, #{col})
@@ -337,6 +335,8 @@ defmodule TermUI.Test.Assertions do
           Did not expect attribute: #{inspect(attr)}
           But found in attributes:  #{inspect(MapSet.to_list(style.attrs))}
           """
+      else
+        true
       end
     end
   end
@@ -439,13 +439,9 @@ defmodule TermUI.Test.Assertions do
         diffs = TestRenderer.diff_snapshot(renderer, snapshot)
         diff_count = length(diffs)
 
-        sample_diffs =
-          diffs
-          |> Enum.take(5)
-          |> Enum.map(fn {row, col, expected, actual} ->
-            "  (#{row}, #{col}): expected #{inspect(expected.char)}, got #{inspect(actual.char)}"
-          end)
-          |> Enum.join("\n")
+        sample_list = Enum.take(diffs, 5)
+        formatted = Enum.map(sample_list, &unquote(__MODULE__).format_diff/1)
+        sample_diffs = Enum.join(formatted, "\n")
 
         raise ExUnit.AssertionError,
           message: """
@@ -499,6 +495,11 @@ defmodule TermUI.Test.Assertions do
       cell.fg == :default and
       cell.bg == :default and
       MapSet.size(cell.attrs) == 0
+  end
+
+  @doc false
+  def format_diff({row, col, expected, actual}) do
+    "  (#{row}, #{col}): expected #{inspect(expected.char)}, got #{inspect(actual.char)}"
   end
 
   @doc """

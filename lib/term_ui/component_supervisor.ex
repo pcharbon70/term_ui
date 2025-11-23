@@ -38,8 +38,8 @@ defmodule TermUI.ComponentSupervisor do
 
   require Logger
 
-  alias TermUI.ComponentRegistry
   alias TermUI.Component.StatePersistence
+  alias TermUI.ComponentRegistry
 
   @default_shutdown_timeout 5_000
 
@@ -384,14 +384,14 @@ defmodule TermUI.ComponentSupervisor do
   @spec format_tree() :: String.t()
   def format_tree do
     tree = get_tree()
+    do_format_tree(tree)
+  end
 
-    if Enum.empty?(tree) do
-      "(no components)"
-    else
-      tree
-      |> Enum.map(&format_tree_node(&1, "", true))
-      |> Enum.join("\n")
-    end
+  defp do_format_tree([]), do: "(no components)"
+
+  defp do_format_tree(tree) do
+    formatted = Enum.map(tree, fn node -> format_tree_node(node, "", true) end)
+    Enum.join(formatted, "\n")
   end
 
   defp format_tree_node(node, prefix, is_last) do
@@ -408,11 +408,10 @@ defmodule TermUI.ComponentSupervisor do
       child_lines =
         node.children
         |> Enum.with_index()
-        |> Enum.map(fn {child, idx} ->
+        |> Enum.map_join("\n", fn {child, idx} ->
           is_last_child = idx == length(node.children) - 1
           format_tree_node(child, child_prefix, is_last_child)
         end)
-        |> Enum.join("\n")
 
       line <> "\n" <> child_lines
     end

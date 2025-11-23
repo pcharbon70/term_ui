@@ -1,10 +1,10 @@
 defmodule TermUI.EventRouterTest do
   use ExUnit.Case
 
+  alias TermUI.ComponentRegistry
   alias TermUI.Event
   alias TermUI.EventRouter
   alias TermUI.SpatialIndex
-  alias TermUI.ComponentRegistry
 
   # Test component that tracks received events
   defmodule TestComponent do

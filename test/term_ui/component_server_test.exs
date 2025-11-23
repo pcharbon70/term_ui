@@ -1,8 +1,8 @@
 defmodule TermUI.ComponentServerTest do
   use ExUnit.Case, async: false
 
-  alias TermUI.ComponentServer
   alias TermUI.ComponentRegistry
+  alias TermUI.ComponentServer
   alias TermUI.ComponentSupervisor
 
   # Test component with full lifecycle

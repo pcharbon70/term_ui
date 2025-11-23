@@ -23,9 +23,9 @@ defmodule TermUI.Widget.List do
 
   use TermUI.StatefulComponent
 
+  alias TermUI.Component.RenderNode
   alias TermUI.Event
   alias TermUI.Renderer.Style
-  alias TermUI.Component.RenderNode
 
   @doc """
   Initializes the list state.
@@ -165,21 +165,8 @@ defmodule TermUI.Widget.List do
         is_selected = item_index == state.selected_index
         is_multi_selected = MapSet.member?(state.selected_indices, item_index)
 
-        item_style =
-          if is_selected || is_multi_selected do
-            highlight_style
-          else
-            style
-          end
-
-        # Add multi-select indicator
-        text =
-          if multi_select do
-            indicator = if is_multi_selected, do: "[x] ", else: "[ ] "
-            indicator <> to_string(item)
-          else
-            to_string(item)
-          end
+        item_style = get_item_style(is_selected, is_multi_selected, highlight_style, style)
+        text = format_item_text(item, multi_select, is_multi_selected)
 
         render_item(text, display_y, area.width, item_style)
       end)
@@ -188,6 +175,14 @@ defmodule TermUI.Widget.List do
   end
 
   # Private Functions
+
+  defp get_item_style(true, _is_multi_selected, highlight_style, _style), do: highlight_style
+  defp get_item_style(_is_selected, true, highlight_style, _style), do: highlight_style
+  defp get_item_style(_is_selected, _is_multi_selected, _highlight_style, style), do: style
+
+  defp format_item_text(item, true, true), do: "[x] " <> to_string(item)
+  defp format_item_text(item, true, false), do: "[ ] " <> to_string(item)
+  defp format_item_text(item, false, _is_multi_selected), do: to_string(item)
 
   defp render_item(text, y, width, style) do
     display_text =

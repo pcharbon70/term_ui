@@ -8,10 +8,10 @@ defmodule TermUI.Integration.ComponentHierarchyTest do
 
   use ExUnit.Case, async: false
 
-  alias TermUI.ComponentSupervisor
+  alias TermUI.Component.StatePersistence
   alias TermUI.ComponentRegistry
   alias TermUI.ComponentServer
-  alias TermUI.Component.StatePersistence
+  alias TermUI.ComponentSupervisor
 
   # Test components that track lifecycle events
   defmodule LifecycleTracker do

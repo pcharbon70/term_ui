@@ -77,22 +77,27 @@ defmodule TermUI.Focus do
     term = System.get_env("TERM", "")
     term_program = System.get_env("TERM_PROGRAM", "")
 
-    cond do
-      # Known good terminals
-      String.contains?(term_program, "iTerm") -> true
-      String.contains?(term_program, "Alacritty") -> true
-      String.contains?(term_program, "WezTerm") -> true
-      System.get_env("KITTY_WINDOW_ID") != nil -> true
-      System.get_env("WT_SESSION") != nil -> true
-      # xterm and derivatives
-      String.starts_with?(term, "xterm") -> true
-      # foot terminal
-      term == "foot" or term == "foot-extra" -> true
-      # VTE-based terminals (GNOME Terminal, etc.)
-      System.get_env("VTE_VERSION") != nil -> true
-      # Conservative default
-      true -> false
-    end
+    known_terminal_program?(term_program) or
+      known_terminal_env?() or
+      known_terminal_type?(term)
+  end
+
+  defp known_terminal_program?(term_program) do
+    String.contains?(term_program, "iTerm") or
+      String.contains?(term_program, "Alacritty") or
+      String.contains?(term_program, "WezTerm")
+  end
+
+  defp known_terminal_env? do
+    System.get_env("KITTY_WINDOW_ID") != nil or
+      System.get_env("WT_SESSION") != nil or
+      System.get_env("VTE_VERSION") != nil
+  end
+
+  defp known_terminal_type?(term) do
+    String.starts_with?(term, "xterm") or
+      term == "foot" or
+      term == "foot-extra"
   end
 
   @doc """

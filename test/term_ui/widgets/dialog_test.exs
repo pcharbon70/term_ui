@@ -1,8 +1,8 @@
 defmodule TermUI.Widgets.DialogTest do
   use ExUnit.Case, async: true
 
-  alias TermUI.Widgets.Dialog
   alias TermUI.Event
+  alias TermUI.Widgets.Dialog
 
   describe "new/1" do
     test "creates dialog props with required fields" do

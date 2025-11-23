@@ -3,9 +3,9 @@ defmodule TermUI.Component.IntrospectionTest do
 
   alias TermUI.Component.Introspection
   alias TermUI.Component.StatePersistence
-  alias TermUI.ComponentSupervisor
   alias TermUI.ComponentRegistry
   alias TermUI.ComponentServer
+  alias TermUI.ComponentSupervisor
 
   # Simple test component
   defmodule TestComponent do

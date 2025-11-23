@@ -24,8 +24,8 @@ defmodule TermUI.Widget.Block do
 
   use TermUI.Container
 
-  alias TermUI.Renderer.Style
   alias TermUI.Component.RenderNode
+  alias TermUI.Renderer.Style
 
   # Border character sets
   @borders %{

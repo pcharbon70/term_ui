@@ -186,22 +186,23 @@ defmodule TermUI.Event.Propagation do
 
   defp send_to_component(component_id, event) do
     case ComponentRegistry.lookup(component_id) do
-      {:ok, pid} ->
-        try do
-          case GenServer.call(pid, {:event, event}, 5000) do
-            :handled -> :handled
-            :stop -> :stopped
-            :stopped -> :stopped
-            :unhandled -> :unhandled
-            {:ok, _} -> :handled
-            _ -> :unhandled
-          end
-        catch
-          :exit, _ -> {:error, :component_unavailable}
-        end
-
-      {:error, :not_found} ->
-        {:error, :not_found}
+      {:ok, pid} -> call_component(pid, event)
+      {:error, :not_found} -> {:error, :not_found}
     end
   end
+
+  defp call_component(pid, event) do
+    pid
+    |> GenServer.call({:event, event}, 5000)
+    |> normalize_event_result()
+  catch
+    :exit, _ -> {:error, :component_unavailable}
+  end
+
+  defp normalize_event_result(:handled), do: :handled
+  defp normalize_event_result(:stop), do: :stopped
+  defp normalize_event_result(:stopped), do: :stopped
+  defp normalize_event_result(:unhandled), do: :unhandled
+  defp normalize_event_result({:ok, _}), do: :handled
+  defp normalize_event_result(_), do: :unhandled
 end

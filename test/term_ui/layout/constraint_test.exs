@@ -2,7 +2,12 @@ defmodule TermUI.Layout.ConstraintTest do
   use ExUnit.Case, async: true
 
   alias TermUI.Layout.Constraint
-  alias TermUI.Layout.Constraint.{Length, Percentage, Ratio, Min, Max, Fill}
+  alias TermUI.Layout.Constraint.Fill
+  alias TermUI.Layout.Constraint.Length
+  alias TermUI.Layout.Constraint.Max
+  alias TermUI.Layout.Constraint.Min
+  alias TermUI.Layout.Constraint.Percentage
+  alias TermUI.Layout.Constraint.Ratio
 
   describe "length/1" do
     test "creates length constraint with exact size" do

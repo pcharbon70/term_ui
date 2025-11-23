@@ -1,9 +1,13 @@
 defmodule TermUI.Test.EventSimulatorTest do
   use ExUnit.Case, async: true
 
-  alias TermUI.Test.EventSimulator
   alias TermUI.Event
-  alias TermUI.Event.{Key, Mouse, Focus, Resize, Paste}
+  alias TermUI.Event.Focus
+  alias TermUI.Event.Key
+  alias TermUI.Event.Mouse
+  alias TermUI.Event.Paste
+  alias TermUI.Event.Resize
+  alias TermUI.Test.EventSimulator
 
   describe "simulate_key/2" do
     test "creates key event" do

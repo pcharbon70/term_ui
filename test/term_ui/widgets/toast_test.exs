@@ -1,9 +1,9 @@
 defmodule TermUI.Widgets.ToastTest do
   use ExUnit.Case, async: true
 
+  alias TermUI.Event
   alias TermUI.Widgets.Toast
   alias TermUI.Widgets.ToastManager
-  alias TermUI.Event
 
   describe "Toast.new/1" do
     test "creates toast with required fields" do
@@ -137,7 +137,7 @@ defmodule TermUI.Widgets.ToastTest do
     end
 
     test "should_dismiss? returns false before duration", %{state: state} do
-      state = %{state | duration: 10000}
+      state = %{state | duration: 10_000}
 
       assert not Toast.should_dismiss?(state)
     end

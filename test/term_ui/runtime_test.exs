@@ -1,8 +1,8 @@
 defmodule TermUI.RuntimeTest do
   use ExUnit.Case, async: true
 
-  alias TermUI.Runtime
   alias TermUI.Event
+  alias TermUI.Runtime
 
   # Test component that implements Elm behaviour
   defmodule Counter do
@@ -189,7 +189,7 @@ defmodule TermUI.RuntimeTest do
     end
 
     test "force_render bypasses framerate limiter" do
-      {:ok, runtime} = Runtime.start_link(root: Counter, render_interval: 10000)
+      {:ok, runtime} = Runtime.start_link(root: Counter, render_interval: 10_000)
 
       # Initial dirty
       state = Runtime.get_state(runtime)

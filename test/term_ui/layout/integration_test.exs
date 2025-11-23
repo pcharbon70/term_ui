@@ -1,7 +1,10 @@
 defmodule TermUI.Layout.IntegrationTest do
   use ExUnit.Case, async: true
 
-  alias TermUI.Layout.{Constraint, Solver, Cache, Alignment}
+  alias TermUI.Layout.Alignment
+  alias TermUI.Layout.Cache
+  alias TermUI.Layout.Constraint
+  alias TermUI.Layout.Solver
 
   describe "three-pane layout" do
     test "sidebar, main, and detail with ratio constraints" do

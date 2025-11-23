@@ -1,8 +1,8 @@
 defmodule TermUI.Widgets.TabsTest do
   use ExUnit.Case, async: true
 
-  alias TermUI.Widgets.Tabs
   alias TermUI.Event
+  alias TermUI.Widgets.Tabs
 
   @test_tabs [
     %{id: :home, label: "Home", content: {:text, "Home content"}},

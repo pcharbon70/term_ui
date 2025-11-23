@@ -44,9 +44,9 @@ defmodule TermUI.Widgets.Table do
 
   use TermUI.StatefulComponent
 
-  alias TermUI.Widgets.Table.Column
-  alias TermUI.Layout.Constraint
   alias TermUI.Event
+  alias TermUI.Layout.Constraint
+  alias TermUI.Widgets.Table.Column
 
   @type selection_mode :: :none | :single | :multi
   @type sort_direction :: :asc | :desc | nil
@@ -344,20 +344,7 @@ defmodule TermUI.Widgets.Table do
       state.columns
       |> Enum.zip(column_widths)
       |> Enum.map(fn {column, width} ->
-        header_text = column.header
-
-        # Add sort indicator
-        header_text =
-          if state.sort_column == column.key do
-            case state.sort_direction do
-              :asc -> header_text <> " ▲"
-              :desc -> header_text <> " ▼"
-              _ -> header_text
-            end
-          else
-            header_text
-          end
-
+        header_text = format_header_text(column.header, column.key, state)
         Column.align_text(header_text, width, column.align)
       end)
 
@@ -368,6 +355,18 @@ defmodule TermUI.Widgets.Table do
     else
       text(header_text)
     end
+  end
+
+  defp format_header_text(header, column_key, %{sort_column: column_key, sort_direction: :asc}) do
+    header <> " ▲"
+  end
+
+  defp format_header_text(header, column_key, %{sort_column: column_key, sort_direction: :desc}) do
+    header <> " ▼"
+  end
+
+  defp format_header_text(header, _column_key, _state) do
+    header
   end
 
   defp render_rows(state, visible_rows, column_widths) do

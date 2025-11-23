@@ -1,7 +1,9 @@
 defmodule TermUI.PerformanceTest do
   use ExUnit.Case, async: true
 
-  alias TermUI.Layout.{Constraint, Solver, Cache}
+  alias TermUI.Layout.Cache
+  alias TermUI.Layout.Constraint
+  alias TermUI.Layout.Solver
   alias TermUI.Style
   alias TermUI.Theme
 
