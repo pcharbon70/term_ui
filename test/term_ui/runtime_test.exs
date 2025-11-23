@@ -1,8 +1,13 @@
 defmodule TermUI.RuntimeTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias TermUI.Event
   alias TermUI.Runtime
+
+  # Helper to start runtime without terminal (for test isolation)
+  defp start_test_runtime(opts) do
+    Runtime.start_link([skip_terminal: true] ++ opts)
+  end
 
   # Test component that implements Elm behaviour
   defmodule Counter do
@@ -36,7 +41,7 @@ defmodule TermUI.RuntimeTest do
 
   describe "start_link/1" do
     test "starts runtime with root component" do
-      {:ok, runtime} = Runtime.start_link(root: Counter)
+      {:ok, runtime} = start_test_runtime(root: Counter)
 
       state = Runtime.get_state(runtime)
       assert state.root_module == Counter
@@ -45,7 +50,7 @@ defmodule TermUI.RuntimeTest do
     end
 
     test "starts runtime with registered name" do
-      {:ok, _runtime} = Runtime.start_link(root: Counter, name: :test_runtime)
+      {:ok, _runtime} = start_test_runtime(root: Counter, name: :test_runtime)
 
       state = Runtime.get_state(:test_runtime)
       assert state.root_module == Counter
@@ -54,21 +59,21 @@ defmodule TermUI.RuntimeTest do
     end
 
     test "passes options to component init" do
-      {:ok, runtime} = Runtime.start_link(root: Counter, initial: 10)
+      {:ok, runtime} = start_test_runtime(root: Counter, initial: 10)
 
       state = Runtime.get_state(runtime)
       assert state.root_state.count == 10
     end
 
     test "handles component without init function" do
-      {:ok, runtime} = Runtime.start_link(root: NoInit)
+      {:ok, runtime} = start_test_runtime(root: NoInit)
 
       state = Runtime.get_state(runtime)
       assert state.root_state == %{}
     end
 
     test "sets custom render interval" do
-      {:ok, runtime} = Runtime.start_link(root: Counter, render_interval: 100)
+      {:ok, runtime} = start_test_runtime(root: Counter, render_interval: 100)
 
       state = Runtime.get_state(runtime)
       assert state.render_interval == 100
@@ -77,7 +82,7 @@ defmodule TermUI.RuntimeTest do
 
   describe "send_event/2" do
     test "dispatches keyboard event to focused component" do
-      {:ok, runtime} = Runtime.start_link(root: Counter)
+      {:ok, runtime} = start_test_runtime(root: Counter)
 
       Runtime.send_event(runtime, Event.key(:up))
       # Wait for message processing
@@ -88,7 +93,7 @@ defmodule TermUI.RuntimeTest do
     end
 
     test "processes multiple events in sequence" do
-      {:ok, runtime} = Runtime.start_link(root: Counter)
+      {:ok, runtime} = start_test_runtime(root: Counter)
 
       Runtime.send_event(runtime, Event.key(:up))
       Runtime.send_event(runtime, Event.key(:up))
@@ -100,7 +105,7 @@ defmodule TermUI.RuntimeTest do
     end
 
     test "ignores events during shutdown" do
-      {:ok, runtime} = Runtime.start_link(root: Counter)
+      {:ok, runtime} = start_test_runtime(root: Counter)
 
       Runtime.shutdown(runtime)
       Runtime.send_event(runtime, Event.key(:up))
@@ -111,7 +116,7 @@ defmodule TermUI.RuntimeTest do
     end
 
     test "broadcasts resize events" do
-      {:ok, runtime} = Runtime.start_link(root: Counter)
+      {:ok, runtime} = start_test_runtime(root: Counter)
 
       Runtime.send_event(runtime, Event.resize(120, 40))
       Process.sleep(50)
@@ -122,7 +127,7 @@ defmodule TermUI.RuntimeTest do
     end
 
     test "dispatches paste events to focused component" do
-      {:ok, runtime} = Runtime.start_link(root: Counter)
+      {:ok, runtime} = start_test_runtime(root: Counter)
 
       # Paste events go to focused component but Counter ignores them
       Runtime.send_event(runtime, Event.paste("hello"))
@@ -136,7 +141,7 @@ defmodule TermUI.RuntimeTest do
 
   describe "send_message/3" do
     test "sends message directly to component" do
-      {:ok, runtime} = Runtime.start_link(root: Counter)
+      {:ok, runtime} = start_test_runtime(root: Counter)
 
       Runtime.send_message(runtime, :root, :increment)
       Process.sleep(50)
@@ -146,7 +151,7 @@ defmodule TermUI.RuntimeTest do
     end
 
     test "ignores messages to non-existent component" do
-      {:ok, runtime} = Runtime.start_link(root: Counter)
+      {:ok, runtime} = start_test_runtime(root: Counter)
 
       Runtime.send_message(runtime, :nonexistent, :increment)
       Process.sleep(50)
@@ -156,7 +161,7 @@ defmodule TermUI.RuntimeTest do
     end
 
     test "ignores messages during shutdown" do
-      {:ok, runtime} = Runtime.start_link(root: Counter)
+      {:ok, runtime} = start_test_runtime(root: Counter)
 
       Runtime.shutdown(runtime)
       Runtime.send_message(runtime, :root, :increment)
@@ -169,7 +174,7 @@ defmodule TermUI.RuntimeTest do
 
   describe "dirty flag and rendering" do
     test "marks dirty when state changes" do
-      {:ok, runtime} = Runtime.start_link(root: Counter, render_interval: 10)
+      {:ok, runtime} = start_test_runtime(root: Counter, render_interval: 10)
 
       # Initial state should be dirty for first render
       state = Runtime.get_state(runtime)
@@ -189,7 +194,7 @@ defmodule TermUI.RuntimeTest do
     end
 
     test "force_render bypasses framerate limiter" do
-      {:ok, runtime} = Runtime.start_link(root: Counter, render_interval: 10_000)
+      {:ok, runtime} = start_test_runtime(root: Counter, render_interval: 10_000)
 
       # Initial dirty
       state = Runtime.get_state(runtime)
@@ -206,7 +211,7 @@ defmodule TermUI.RuntimeTest do
 
   describe "command collection" do
     test "collects commands from update results" do
-      {:ok, runtime} = Runtime.start_link(root: Counter)
+      {:ok, runtime} = start_test_runtime(root: Counter)
 
       # Send event that produces a command
       Runtime.send_event(runtime, Event.key(:q))
@@ -220,7 +225,7 @@ defmodule TermUI.RuntimeTest do
 
   describe "command_result/4" do
     test "sends command result as message to component" do
-      {:ok, runtime} = Runtime.start_link(root: Counter)
+      {:ok, runtime} = start_test_runtime(root: Counter)
 
       # Simulate a command completion
       Runtime.command_result(runtime, :root, make_ref(), :some_result)
@@ -234,7 +239,7 @@ defmodule TermUI.RuntimeTest do
 
   describe "shutdown/1" do
     test "initiates graceful shutdown" do
-      {:ok, runtime} = Runtime.start_link(root: Counter)
+      {:ok, runtime} = start_test_runtime(root: Counter)
 
       Runtime.shutdown(runtime)
       Process.sleep(10)
@@ -244,7 +249,7 @@ defmodule TermUI.RuntimeTest do
     end
 
     test "clears pending commands on shutdown" do
-      {:ok, runtime} = Runtime.start_link(root: Counter)
+      {:ok, runtime} = start_test_runtime(root: Counter)
 
       Runtime.shutdown(runtime)
       Process.sleep(10)
@@ -254,7 +259,7 @@ defmodule TermUI.RuntimeTest do
     end
 
     test "clears components on shutdown" do
-      {:ok, runtime} = Runtime.start_link(root: Counter)
+      {:ok, runtime} = start_test_runtime(root: Counter)
 
       Runtime.shutdown(runtime)
       Process.sleep(10)
@@ -266,7 +271,7 @@ defmodule TermUI.RuntimeTest do
 
   describe "event dispatch routing" do
     test "keyboard events go to focused component" do
-      {:ok, runtime} = Runtime.start_link(root: Counter)
+      {:ok, runtime} = start_test_runtime(root: Counter)
 
       # Default focus is :root
       state = Runtime.get_state(runtime)
@@ -280,7 +285,7 @@ defmodule TermUI.RuntimeTest do
     end
 
     test "mouse events go to root (spatial index not implemented)" do
-      {:ok, runtime} = Runtime.start_link(root: Counter)
+      {:ok, runtime} = start_test_runtime(root: Counter)
 
       # Mouse events currently just go to root
       Runtime.send_event(runtime, Event.mouse(:click, :left, 10, 10))
@@ -292,7 +297,7 @@ defmodule TermUI.RuntimeTest do
     end
 
     test "focus events broadcast to all components" do
-      {:ok, runtime} = Runtime.start_link(root: Counter)
+      {:ok, runtime} = start_test_runtime(root: Counter)
 
       Runtime.send_event(runtime, Event.focus(:gained))
       Process.sleep(50)
@@ -303,7 +308,7 @@ defmodule TermUI.RuntimeTest do
     end
 
     test "tick events broadcast to all components" do
-      {:ok, runtime} = Runtime.start_link(root: Counter)
+      {:ok, runtime} = start_test_runtime(root: Counter)
 
       Runtime.send_event(runtime, Event.tick(16))
       Process.sleep(50)
@@ -316,7 +321,7 @@ defmodule TermUI.RuntimeTest do
 
   describe "component initialization" do
     test "initializes component registry with root" do
-      {:ok, runtime} = Runtime.start_link(root: Counter, initial: 5)
+      {:ok, runtime} = start_test_runtime(root: Counter, initial: 5)
 
       state = Runtime.get_state(runtime)
 
@@ -328,14 +333,14 @@ defmodule TermUI.RuntimeTest do
 
   describe "render timing" do
     test "uses default render interval" do
-      {:ok, runtime} = Runtime.start_link(root: Counter)
+      {:ok, runtime} = start_test_runtime(root: Counter)
 
       state = Runtime.get_state(runtime)
       assert state.render_interval == 16
     end
 
     test "schedules render ticks" do
-      {:ok, runtime} = Runtime.start_link(root: Counter, render_interval: 10)
+      {:ok, runtime} = start_test_runtime(root: Counter, render_interval: 10)
 
       # Initial should be dirty
       state = Runtime.get_state(runtime)
@@ -351,7 +356,7 @@ defmodule TermUI.RuntimeTest do
 
   describe "message batching" do
     test "processes multiple messages before render" do
-      {:ok, runtime} = Runtime.start_link(root: Counter, render_interval: 100)
+      {:ok, runtime} = start_test_runtime(root: Counter, render_interval: 100)
 
       # Send multiple events quickly
       for _ <- 1..5 do
@@ -368,7 +373,7 @@ defmodule TermUI.RuntimeTest do
 
   describe "full cycle integration" do
     test "event -> message -> update -> view cycle" do
-      {:ok, runtime} = Runtime.start_link(root: Counter)
+      {:ok, runtime} = start_test_runtime(root: Counter)
 
       # Initial state
       state = Runtime.get_state(runtime)
@@ -389,7 +394,7 @@ defmodule TermUI.RuntimeTest do
     end
 
     test "handles decrement correctly" do
-      {:ok, runtime} = Runtime.start_link(root: Counter, initial: 5)
+      {:ok, runtime} = start_test_runtime(root: Counter, initial: 5)
 
       Runtime.send_event(runtime, Event.key(:down))
       Process.sleep(50)
@@ -399,7 +404,7 @@ defmodule TermUI.RuntimeTest do
     end
 
     test "state changes trigger dirty flag" do
-      {:ok, runtime} = Runtime.start_link(root: Counter, render_interval: 10)
+      {:ok, runtime} = start_test_runtime(root: Counter, render_interval: 10)
 
       # Wait for initial render
       Process.sleep(50)

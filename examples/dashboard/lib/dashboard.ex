@@ -25,6 +25,6 @@ defmodule Dashboard do
   """
 
   def start do
-    TermUI.Runtime.start_link(Dashboard.App)
+    TermUI.Runtime.start_link(root: Dashboard.App)
   end
 end

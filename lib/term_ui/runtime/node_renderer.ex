@@ -1,0 +1,203 @@
+defmodule TermUI.Runtime.NodeRenderer do
+  @moduledoc """
+  Converts render trees to buffer cells for terminal output.
+
+  This module bridges the gap between the component's render tree output
+  and the low-level buffer cell representation needed for terminal rendering.
+
+  Supports both tuple-based render nodes (from TermUI.Elm.Helpers) and
+  struct-based RenderNodes (from TermUI.Component.RenderNode).
+  """
+
+  alias TermUI.Component.RenderNode
+  alias TermUI.Renderer.Buffer
+  alias TermUI.Renderer.BufferManager
+  alias TermUI.Renderer.Cell
+  alias TermUI.Renderer.Style
+
+  @doc """
+  Renders a node tree to the buffer starting at the given position.
+
+  Returns the bounds of the rendered content as {width, height}.
+  """
+  @spec render_to_buffer(term(), BufferManager.t() | pid(), pos_integer(), pos_integer()) ::
+          {non_neg_integer(), non_neg_integer()}
+  def render_to_buffer(node, buffer_manager, start_row \\ 1, start_col \\ 1) do
+    buffer = BufferManager.get_current_buffer(buffer_manager)
+    render_node(node, buffer, start_row, start_col, nil)
+  end
+
+  # Handle RenderNode structs
+  defp render_node(%RenderNode{type: :empty}, _buffer, _row, _col, _style), do: {0, 0}
+
+  defp render_node(%RenderNode{type: :text, content: content, style: style}, buffer, row, col, parent_style) do
+    effective_style = merge_styles(parent_style, style)
+    render_text(content, buffer, row, col, effective_style)
+  end
+
+  defp render_node(%RenderNode{type: :box, children: children, style: style}, buffer, row, col, parent_style) do
+    effective_style = merge_styles(parent_style, style)
+    render_children_vertical(children, buffer, row, col, effective_style)
+  end
+
+  defp render_node(%RenderNode{type: :stack, direction: :vertical, children: children, style: style}, buffer, row, col, parent_style) do
+    effective_style = merge_styles(parent_style, style)
+    render_children_vertical(children, buffer, row, col, effective_style)
+  end
+
+  defp render_node(%RenderNode{type: :stack, direction: :horizontal, children: children, style: style}, buffer, row, col, parent_style) do
+    effective_style = merge_styles(parent_style, style)
+    render_children_horizontal(children, buffer, row, col, effective_style)
+  end
+
+  defp render_node(%RenderNode{type: :cells, cells: cells}, buffer, row, col, parent_style) do
+    render_positioned_cells(cells, buffer, row, col, parent_style)
+  end
+
+  # Handle tuple-based render nodes from Elm.Helpers
+  defp render_node({:text, content}, buffer, row, col, style) do
+    render_text(content, buffer, row, col, style)
+  end
+
+  defp render_node({:styled, content, style}, buffer, row, col, parent_style) do
+    effective_style = merge_styles(parent_style, style)
+    render_node(content, buffer, row, col, effective_style)
+  end
+
+  defp render_node({:box, _opts, children}, buffer, row, col, style) do
+    render_node(children, buffer, row, col, style)
+  end
+
+  defp render_node({:row, _opts, children}, buffer, row, col, style) do
+    render_children_horizontal(children, buffer, row, col, style)
+  end
+
+  defp render_node({:column, _opts, children}, buffer, row, col, style) do
+    render_children_vertical(children, buffer, row, col, style)
+  end
+
+  defp render_node({:fragment, children}, buffer, row, col, style) do
+    render_children_vertical(children, buffer, row, col, style)
+  end
+
+  # Handle lists of children (from stack(:vertical, [...]))
+  defp render_node(children, buffer, row, col, style) when is_list(children) do
+    render_children_vertical(children, buffer, row, col, style)
+  end
+
+  # Fallback for unknown node types
+  defp render_node(_node, _buffer, _row, _col, _style), do: {0, 0}
+
+  # Text rendering
+  defp render_text(nil, _buffer, _row, _col, _style), do: {0, 0}
+  defp render_text("", _buffer, _row, _col, _style), do: {0, 0}
+
+  defp render_text(text, buffer, row, col, style) when is_binary(text) do
+    lines = String.split(text, "\n")
+    max_width = 0
+    height = length(lines)
+
+    {max_width, _final_row} =
+      Enum.reduce(lines, {max_width, row}, fn line, {max_w, current_row} ->
+        width = render_line(line, buffer, current_row, col, style)
+        {max(max_w, width), current_row + 1}
+      end)
+
+    {max_width, height}
+  end
+
+  defp render_text(content, buffer, row, col, style) do
+    render_text(to_string(content), buffer, row, col, style)
+  end
+
+  defp render_line(line, buffer, row, col, style) do
+    graphemes = String.graphemes(line)
+    width = length(graphemes)
+
+    graphemes
+    |> Enum.with_index()
+    |> Enum.each(fn {char, idx} ->
+      cell = create_cell(char, style)
+      Buffer.set_cell(buffer, row, col + idx, cell)
+    end)
+
+    width
+  end
+
+  # Children rendering
+  defp render_children_vertical(children, buffer, row, col, style) when is_list(children) do
+    {max_width, final_row} =
+      Enum.reduce(children, {0, row}, fn child, {max_w, current_row} ->
+        {width, height} = render_node(child, buffer, current_row, col, style)
+        {max(max_w, width), current_row + height}
+      end)
+
+    {max_width, final_row - row}
+  end
+
+  defp render_children_horizontal(children, buffer, row, col, style) when is_list(children) do
+    {max_height, final_col} =
+      Enum.reduce(children, {0, col}, fn child, {max_h, current_col} ->
+        {width, height} = render_node(child, buffer, row, current_col, style)
+        {max(max_h, height), current_col + width}
+      end)
+
+    {final_col - col, max_height}
+  end
+
+  # Positioned cells rendering (for widgets like Gauge that pre-render cells)
+  defp render_positioned_cells(cells, buffer, offset_row, offset_col, parent_style) do
+    max_x = 0
+    max_y = 0
+
+    {max_x, max_y} =
+      Enum.reduce(cells, {max_x, max_y}, fn %{x: x, y: y, cell: cell}, {mx, my} ->
+        # Apply parent style if cell doesn't have its own
+        cell = apply_parent_style_to_cell(cell, parent_style)
+        Buffer.set_cell(buffer, offset_row + y, offset_col + x, cell)
+        {max(mx, x + 1), max(my, y + 1)}
+      end)
+
+    {max_x, max_y}
+  end
+
+  # Cell creation
+  defp create_cell(char, nil) do
+    Cell.new(char)
+  end
+
+  defp create_cell(char, %Style{fg: fg, bg: bg, attrs: attrs}) do
+    opts = []
+    opts = if fg && fg != :default, do: [{:fg, fg} | opts], else: opts
+    opts = if bg && bg != :default, do: [{:bg, bg} | opts], else: opts
+    opts = if MapSet.size(attrs) > 0, do: [{:attrs, MapSet.to_list(attrs)} | opts], else: opts
+    Cell.new(char, opts)
+  end
+
+  defp apply_parent_style_to_cell(%Cell{fg: nil, bg: nil, attrs: []} = cell, %Style{} = style) do
+    opts = []
+    opts = if style.fg && style.fg != :default, do: [{:fg, style.fg} | opts], else: opts
+    opts = if style.bg && style.bg != :default, do: [{:bg, style.bg} | opts], else: opts
+    opts = if MapSet.size(style.attrs) > 0, do: [{:attrs, MapSet.to_list(style.attrs)} | opts], else: opts
+
+    if opts == [] do
+      cell
+    else
+      %{cell | fg: style.fg, bg: style.bg, attrs: MapSet.to_list(style.attrs)}
+    end
+  end
+
+  defp apply_parent_style_to_cell(cell, _style), do: cell
+
+  # Style merging
+  defp merge_styles(nil, nil), do: nil
+  defp merge_styles(nil, style), do: style
+  defp merge_styles(style, nil), do: style
+
+  defp merge_styles(%Style{} = parent, %Style{} = child) do
+    Style.merge(parent, child)
+  end
+
+  # Handle non-Style types (in case of raw maps or tuples)
+  defp merge_styles(_parent, child), do: child
+end

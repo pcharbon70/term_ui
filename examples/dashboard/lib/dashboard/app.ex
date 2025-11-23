@@ -6,87 +6,68 @@ defmodule Dashboard.App do
   in a terminal-based dashboard layout.
   """
 
-  use TermUI.StatefulComponent
+  use TermUI.Elm
 
   alias Dashboard.Data.Metrics
-  alias TermUI.Event.Key
+  alias TermUI.Event
   alias TermUI.Renderer.Style
   alias TermUI.Widgets.{Gauge, Sparkline}
 
-  @refresh_interval 1000
+  # Elm callbacks
 
-  @impl true
-  def init(_props) do
-    state = %{
-      metrics: nil,
+  def init(_opts) do
+    %{
       theme: :dark,
       selected_process: 0
     }
-
-    # Start refresh timer
-    commands = [{:timer, @refresh_interval, :refresh}]
-
-    {:ok, state, commands}
   end
 
-  @impl true
-  def handle_event(%Key{key: "q"}, state) do
-    {:stop, :normal, state}
+  def event_to_msg(%Event.Key{key: "q"}, _state), do: {:msg, :quit}
+  def event_to_msg(%Event.Key{key: "r"}, _state), do: {:msg, :refresh}
+  def event_to_msg(%Event.Key{key: "t"}, _state), do: {:msg, :toggle_theme}
+  def event_to_msg(%Event.Key{key: :down}, _state), do: {:msg, :select_next}
+  def event_to_msg(%Event.Key{key: :up}, _state), do: {:msg, :select_prev}
+  def event_to_msg(_, _state), do: :ignore
+
+  def update(:quit, state) do
+    # For now just return state - proper quit handling needs Runtime support
+    {state, []}
   end
 
-  def handle_event(%Key{key: "r"}, state) do
-    new_state = %{state | metrics: Metrics.get_metrics()}
-    {:ok, new_state}
+  def update(:refresh, state) do
+    # Manual refresh just triggers a re-render
+    {state, []}
   end
 
-  def handle_event(%Key{key: "t"}, state) do
+  def update(:toggle_theme, state) do
     new_theme = if state.theme == :dark, do: :light, else: :dark
-    {:ok, %{state | theme: new_theme}}
+    {%{state | theme: new_theme}, []}
   end
 
-  def handle_event(%Key{key: :down}, state) do
-    process_count = if state.metrics, do: length(state.metrics.processes), else: 0
-    new_selected = min(state.selected_process + 1, process_count - 1)
-    {:ok, %{state | selected_process: new_selected}}
+  def update(:select_next, state) do
+    metrics = Metrics.get_metrics()
+    process_count = length(metrics.processes)
+    new_selected = min(state.selected_process + 1, max(0, process_count - 1))
+    {%{state | selected_process: new_selected}, []}
   end
 
-  def handle_event(%Key{key: :up}, state) do
+  def update(:select_prev, state) do
     new_selected = max(state.selected_process - 1, 0)
-    {:ok, %{state | selected_process: new_selected}}
+    {%{state | selected_process: new_selected}, []}
   end
 
-  def handle_event(_event, state) do
-    {:ok, state}
-  end
+  def update(_msg, state), do: {state, []}
 
-  @impl true
-  def handle_info(:refresh, state) do
-    new_state = %{state | metrics: Metrics.get_metrics()}
-    commands = [{:timer, @refresh_interval, :refresh}]
-    {:ok, new_state, commands}
-  end
-
-  def handle_info(_msg, state) do
-    {:ok, state}
-  end
-
-  @impl true
-  def render(state, area) do
+  def view(state) do
     theme = get_theme(state.theme)
-
-    if state.metrics == nil do
-      render_loading(theme)
-    else
-      render_dashboard(state, area, theme)
-    end
+    # Fetch fresh metrics on each render
+    metrics = Metrics.get_metrics()
+    render_dashboard(state, metrics, theme)
   end
 
-  defp render_loading(theme) do
-    text("Loading dashboard...", theme.text)
-  end
+  # Render helpers
 
-  defp render_dashboard(state, area, theme) do
-    metrics = state.metrics
+  defp render_dashboard(state, metrics, theme) do
 
     # Build dashboard as vertical stack
     stack(:vertical, [
@@ -104,7 +85,7 @@ defmodule Dashboard.App do
       render_network(metrics, theme),
 
       # Process table
-      render_processes(metrics.processes, state.selected_process, area, theme),
+      render_processes(metrics.processes, state.selected_process, theme),
 
       # Help bar
       render_help(theme)
@@ -183,7 +164,7 @@ defmodule Dashboard.App do
     ])
   end
 
-  defp render_processes(processes, selected, _area, theme) do
+  defp render_processes(processes, selected, theme) do
     header = "  PID      Name                  CPU%      Memory"
     separator = "  ───────  ────────────────────  ────────  ────────────"
 
@@ -262,8 +243,8 @@ defmodule Dashboard.App do
       header: Style.new(fg: :cyan, attrs: [:bold]),
       border: Style.new(fg: :cyan),
       text: Style.new(fg: :white),
-      label: Style.new(fg: :gray),
-      help: Style.new(fg: :dark_gray),
+      label: Style.new(fg: :bright_black),
+      help: Style.new(fg: :bright_black),
       sparkline_rx: Style.new(fg: :green),
       sparkline_tx: Style.new(fg: :blue),
       table_header: Style.new(fg: :cyan, attrs: [:bold]),
@@ -277,8 +258,8 @@ defmodule Dashboard.App do
       header: Style.new(fg: :blue, attrs: [:bold]),
       border: Style.new(fg: :blue),
       text: Style.new(fg: :black),
-      label: Style.new(fg: :dark_gray),
-      help: Style.new(fg: :gray),
+      label: Style.new(fg: :bright_black),
+      help: Style.new(fg: :bright_black),
       sparkline_rx: Style.new(fg: :green),
       sparkline_tx: Style.new(fg: :blue),
       table_header: Style.new(fg: :blue, attrs: [:bold]),
