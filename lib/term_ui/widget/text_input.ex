@@ -26,9 +26,9 @@ defmodule TermUI.Widget.TextInput do
 
   use TermUI.StatefulComponent
 
+  alias TermUI.Component.RenderNode
   alias TermUI.Event
   alias TermUI.Renderer.Style
-  alias TermUI.Component.RenderNode
 
   @doc """
   Initializes the text input state.
@@ -189,25 +189,14 @@ defmodule TermUI.Widget.TextInput do
       |> String.pad_trailing(area.width)
 
     # Render cells
+    cursor_pos = state.cursor - scroll_offset
+
     cells =
       visible_text
       |> String.graphemes()
       |> Enum.with_index()
       |> Enum.map(fn {char, x} ->
-        cursor_pos = state.cursor - scroll_offset
-
-        cell_style =
-          if show_cursor && x == cursor_pos do
-            cursor_style
-          else
-            if state.value == "" do
-              # Placeholder style (dimmed)
-              Style.new(fg: :bright_black)
-            else
-              style
-            end
-          end
-
+        cell_style = get_cell_style(x, cursor_pos, show_cursor, cursor_style, state.value, style)
         positioned_cell(x, 0, char, cell_style)
       end)
 
@@ -215,6 +204,19 @@ defmodule TermUI.Widget.TextInput do
   end
 
   # Private Functions
+
+  defp get_cell_style(x, cursor_pos, true, cursor_style, _value, _style) when x == cursor_pos do
+    cursor_style
+  end
+
+  defp get_cell_style(_x, _cursor_pos, _show_cursor, _cursor_style, "", _style) do
+    # Placeholder style (dimmed)
+    Style.new(fg: :bright_black)
+  end
+
+  defp get_cell_style(_x, _cursor_pos, _show_cursor, _cursor_style, _value, style) do
+    style
+  end
 
   defp calculate_scroll(cursor, current_scroll, visible_width) do
     cond do

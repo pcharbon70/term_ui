@@ -31,9 +31,9 @@ defmodule TermUI.EventRouter do
 
   use GenServer
 
+  alias TermUI.ComponentRegistry
   alias TermUI.Event
   alias TermUI.SpatialIndex
-  alias TermUI.ComponentRegistry
 
   @type route_result :: :handled | :unhandled | {:error, term()}
 
@@ -282,16 +282,14 @@ defmodule TermUI.EventRouter do
   end
 
   defp send_event(pid, event) do
-    try do
-      case GenServer.call(pid, {:event, event}, 5000) do
-        :handled -> :handled
-        :unhandled -> :unhandled
-        {:ok, _} -> :handled
-        _ -> :unhandled
-      end
-    catch
-      :exit, _ -> {:error, :component_unavailable}
+    case GenServer.call(pid, {:event, event}, 5000) do
+      :handled -> :handled
+      :unhandled -> :unhandled
+      {:ok, _} -> :handled
+      _ -> :unhandled
     end
+  catch
+    :exit, _ -> {:error, :component_unavailable}
   end
 
   defp send_focus_event(component_id, action) do

@@ -1,9 +1,9 @@
 defmodule TermUI.Widget.ButtonTest do
   use ExUnit.Case, async: true
 
-  alias TermUI.Widget.Button
   alias TermUI.Component.RenderNode
   alias TermUI.Event
+  alias TermUI.Widget.Button
 
   @area %{x: 0, y: 0, width: 20, height: 1}
 
@@ -194,7 +194,8 @@ defmodule TermUI.Widget.ButtonTest do
       result = Button.render(state, @area)
 
       assert %RenderNode{type: :cells, cells: cells} = result
-      text = Enum.map(cells, fn c -> c.cell.char end) |> Enum.join() |> String.trim()
+      chars = Enum.map(cells, & &1.cell.char)
+      text = chars |> Enum.join() |> String.trim()
       assert text == "Button"
     end
   end

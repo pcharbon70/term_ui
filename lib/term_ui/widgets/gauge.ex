@@ -63,36 +63,37 @@ defmodule TermUI.Widgets.Gauge do
 
     case style_type do
       :bar ->
-        render_bar(
-          value,
-          min,
-          max,
-          width,
-          show_value,
-          show_range,
-          zones,
-          label,
-          bar_char,
-          empty_char
-        )
+        bar_opts = %{
+          value: value,
+          min: min,
+          max: max,
+          width: width,
+          show_value: show_value,
+          show_range: show_range,
+          zones: zones,
+          label: label,
+          bar_char: bar_char,
+          empty_char: empty_char
+        }
+
+        render_bar(bar_opts)
 
       :arc ->
         render_arc(value, min, max, width, show_value, zones, label)
     end
   end
 
-  defp render_bar(
-         value,
-         min,
-         max,
-         width,
-         show_value,
-         show_range,
-         zones,
-         label,
-         bar_char,
-         empty_char
-       ) do
+  defp render_bar(opts) do
+    value = opts.value
+    min = opts.min
+    max = opts.max
+    width = opts.width
+    show_value = opts.show_value
+    show_range = opts.show_range
+    zones = opts.zones
+    label = opts.label
+    bar_char = opts.bar_char
+    empty_char = opts.empty_char
     # Calculate fill
     normalized = normalize_value(value, min, max)
     filled_width = round(normalized * width)

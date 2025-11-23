@@ -34,8 +34,8 @@ defmodule TermUI.Component.RenderNode do
       ])
   """
 
-  alias TermUI.Renderer.Style
   alias TermUI.Renderer.Cell
+  alias TermUI.Renderer.Style
 
   @type node_type :: :text | :box | :stack | :empty | :cells
 

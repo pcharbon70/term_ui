@@ -90,8 +90,8 @@ end
 defmodule TermUI.Mouse.TrackerTest do
   use ExUnit.Case, async: true
 
-  alias TermUI.Mouse.Tracker
   alias TermUI.Event
+  alias TermUI.Mouse.Tracker
 
   describe "new/1" do
     test "creates new tracker with defaults" do
@@ -259,8 +259,8 @@ end
 defmodule TermUI.Mouse.RouterTest do
   use ExUnit.Case, async: true
 
-  alias TermUI.Mouse.Router
   alias TermUI.Event
+  alias TermUI.Mouse.Router
 
   describe "hit_test/3" do
     test "finds component at position" do

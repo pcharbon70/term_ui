@@ -251,11 +251,7 @@ defmodule TermUI.ComponentRegistry do
         :ets.delete(@pid_index, pid)
 
         # Find and remove monitor
-        {ref, monitors} =
-          state.monitors
-          |> Enum.find_value(fn {ref, monitored_id} ->
-            if monitored_id == id, do: {ref, Map.delete(state.monitors, ref)}
-          end) || {nil, state.monitors}
+        {ref, monitors} = find_and_remove_monitor(state.monitors, id)
 
         if ref, do: Process.demonitor(ref, [:flush])
 
@@ -299,5 +295,12 @@ defmodule TermUI.ComponentRegistry do
 
         {:noreply, %{state | monitors: monitors}}
     end
+  end
+
+  defp find_and_remove_monitor(monitors, id) do
+    monitors
+    |> Enum.find_value(fn {ref, monitored_id} ->
+      if monitored_id == id, do: {ref, Map.delete(monitors, ref)}
+    end) || {nil, monitors}
   end
 end

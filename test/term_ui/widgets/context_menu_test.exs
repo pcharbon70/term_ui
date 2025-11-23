@@ -1,8 +1,8 @@
 defmodule TermUI.Widgets.ContextMenuTest do
   use ExUnit.Case, async: true
 
-  alias TermUI.Widgets.ContextMenu
   alias TermUI.Event
+  alias TermUI.Widgets.ContextMenu
 
   defp test_items do
     [

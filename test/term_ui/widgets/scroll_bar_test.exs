@@ -1,8 +1,8 @@
 defmodule TermUI.Widgets.ScrollBarTest do
   use ExUnit.Case, async: true
 
-  alias TermUI.Widgets.ScrollBar
   alias TermUI.Event
+  alias TermUI.Widgets.ScrollBar
 
   describe "init/1" do
     test "initializes with default values" do

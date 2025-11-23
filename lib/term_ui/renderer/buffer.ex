@@ -387,23 +387,27 @@ defmodule TermUI.Renderer.Buffer do
     string
     |> String.graphemes()
     |> Enum.reduce(col, fn grapheme, current_col ->
-      if in_bounds?(buffer, row, current_col) do
-        cell = build_cell(grapheme, style)
-        set_cell(buffer, row, current_col, cell)
-
-        # For wide characters, set placeholder in next column
-        if Cell.wide?(cell) and in_bounds?(buffer, row, current_col + 1) do
-          placeholder = Cell.wide_placeholder(cell)
-          :ets.insert(buffer.table, {{row, current_col + 1}, placeholder})
-        end
-
-        # Advance by display width
-        current_col + Cell.width(cell)
-      else
-        current_col
-      end
+      write_grapheme(buffer, row, current_col, grapheme, style)
     end)
     |> then(&(&1 - col))
+  end
+
+  defp write_grapheme(buffer, row, current_col, grapheme, style) do
+    if in_bounds?(buffer, row, current_col) do
+      cell = build_cell(grapheme, style)
+      set_cell(buffer, row, current_col, cell)
+      write_wide_placeholder(buffer, row, current_col, cell)
+      current_col + Cell.width(cell)
+    else
+      current_col
+    end
+  end
+
+  defp write_wide_placeholder(buffer, row, current_col, cell) do
+    if Cell.wide?(cell) and in_bounds?(buffer, row, current_col + 1) do
+      placeholder = Cell.wide_placeholder(cell)
+      :ets.insert(buffer.table, {{row, current_col + 1}, placeholder})
+    end
   end
 
   defp build_cell(grapheme, nil), do: Cell.new(grapheme)

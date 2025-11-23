@@ -2,7 +2,13 @@ defmodule TermUI.EventTest do
   use ExUnit.Case, async: true
 
   alias TermUI.Event
-  alias TermUI.Event.{Key, Mouse, Focus, Custom, Resize, Paste, Tick}
+  alias TermUI.Event.Custom
+  alias TermUI.Event.Focus
+  alias TermUI.Event.Key
+  alias TermUI.Event.Mouse
+  alias TermUI.Event.Paste
+  alias TermUI.Event.Resize
+  alias TermUI.Event.Tick
 
   describe "Key event" do
     test "creates key event with defaults" do
@@ -36,9 +42,9 @@ defmodule TermUI.EventTest do
     end
 
     test "creates key event with custom timestamp" do
-      event = Event.key(:enter, timestamp: 12345)
+      event = Event.key(:enter, timestamp: 12_345)
 
-      assert event.timestamp == 12345
+      assert event.timestamp == 12_345
     end
 
     test "key? returns true for key events" do

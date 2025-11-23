@@ -1,9 +1,9 @@
 defmodule TermUI.Event.PropagationTest do
   use ExUnit.Case
 
+  alias TermUI.ComponentRegistry
   alias TermUI.Event
   alias TermUI.Event.Propagation
-  alias TermUI.ComponentRegistry
 
   # Test component that handles events
   defmodule HandlingComponent do

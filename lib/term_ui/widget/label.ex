@@ -26,8 +26,8 @@ defmodule TermUI.Widget.Label do
 
   use TermUI.Component
 
-  alias TermUI.Renderer.Style
   alias TermUI.Component.RenderNode
+  alias TermUI.Renderer.Style
 
   @doc """
   Renders the label text within the given area.

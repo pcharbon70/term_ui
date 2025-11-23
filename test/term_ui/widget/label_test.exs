@@ -1,8 +1,8 @@
 defmodule TermUI.Widget.LabelTest do
   use ExUnit.Case, async: true
 
-  alias TermUI.Widget.Label
   alias TermUI.Component.RenderNode
+  alias TermUI.Widget.Label
 
   @area %{x: 0, y: 0, width: 20, height: 1}
 

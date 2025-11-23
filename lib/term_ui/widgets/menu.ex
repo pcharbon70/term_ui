@@ -276,10 +276,10 @@ defmodule TermUI.Widgets.Menu do
         expand_at_cursor(state)
 
       %{type: :checkbox} = item ->
-        if not Map.get(item, :disabled, false) do
-          toggle_checkbox(state, item.id)
-        else
+        if Map.get(item, :disabled, false) do
           state
+        else
+          toggle_checkbox(state, item.id)
         end
 
       _ ->
@@ -333,18 +333,20 @@ defmodule TermUI.Widgets.Menu do
 
   defp get_visible_items(items, expanded, depth) do
     Enum.flat_map(items, fn item ->
-      case item.type do
-        :submenu ->
-          if MapSet.member?(expanded, item.id) do
-            [{item, depth} | get_visible_items(item.children, expanded, depth + 1)]
-          else
-            [{item, depth}]
-          end
-
-        _ ->
-          [{item, depth}]
-      end
+      get_item_visibility(item, expanded, depth)
     end)
+  end
+
+  defp get_item_visibility(%{type: :submenu} = item, expanded, depth) do
+    if MapSet.member?(expanded, item.id) do
+      [{item, depth} | get_visible_items(item.children, expanded, depth + 1)]
+    else
+      [{item, depth}]
+    end
+  end
+
+  defp get_item_visibility(item, _expanded, depth) do
+    [{item, depth}]
   end
 
   defp calculate_width(visible) do
@@ -377,19 +379,7 @@ defmodule TermUI.Widgets.Menu do
 
   defp render_selectable_item(state, item, depth, width) do
     indent = String.duplicate("  ", depth)
-
-    # Prefix: checkbox state or submenu arrow
-    prefix =
-      case item.type do
-        :checkbox ->
-          if item.checked, do: "[×] ", else: "[ ] "
-
-        :submenu ->
-          if MapSet.member?(state.expanded, item.id), do: "▼ ", else: "▶ "
-
-        _ ->
-          "  "
-      end
+    prefix = get_item_prefix(item, state)
 
     # Main label
     label = indent <> prefix <> item.label
@@ -402,22 +392,34 @@ defmodule TermUI.Widgets.Menu do
     full_text = label <> String.duplicate(" ", padding) <> shortcut
 
     # Determine style
-    style =
-      cond do
-        Map.get(item, :disabled, false) ->
-          state.disabled_style
-
-        item.id == state.cursor ->
-          state.selected_style
-
-        true ->
-          state.item_style
-      end
+    style = get_item_style(item, state)
 
     if style do
       styled(text(full_text), style)
     else
       text(full_text)
+    end
+  end
+
+  defp get_item_prefix(%{type: :checkbox, checked: true}, _state), do: "[×] "
+  defp get_item_prefix(%{type: :checkbox}, _state), do: "[ ] "
+
+  defp get_item_prefix(%{type: :submenu, id: id}, state) do
+    if MapSet.member?(state.expanded, id), do: "▼ ", else: "▶ "
+  end
+
+  defp get_item_prefix(_item, _state), do: "  "
+
+  defp get_item_style(item, state) do
+    cond do
+      Map.get(item, :disabled, false) ->
+        state.disabled_style
+
+      item.id == state.cursor ->
+        state.selected_style
+
+      true ->
+        state.item_style
     end
   end
 

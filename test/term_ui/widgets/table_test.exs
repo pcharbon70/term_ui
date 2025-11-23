@@ -1,10 +1,10 @@
 defmodule TermUI.Widgets.TableTest do
   use ExUnit.Case, async: true
 
+  alias TermUI.Event
+  alias TermUI.Layout.Constraint
   alias TermUI.Widgets.Table
   alias TermUI.Widgets.Table.Column
-  alias TermUI.Layout.Constraint
-  alias TermUI.Event
 
   # Test data
   @test_data [

@@ -29,8 +29,8 @@ defmodule TermUI.Widget.Progress do
 
   use TermUI.StatefulComponent
 
-  alias TermUI.Renderer.Style
   alias TermUI.Component.RenderNode
+  alias TermUI.Renderer.Style
 
   @spinner_frames ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
 

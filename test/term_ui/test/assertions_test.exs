@@ -2,8 +2,8 @@ defmodule TermUI.Test.AssertionsTest do
   use ExUnit.Case, async: true
   use TermUI.Test.Assertions
 
-  alias TermUI.Test.TestRenderer
   alias TermUI.Renderer.Cell
+  alias TermUI.Test.TestRenderer
 
   describe "assert_text/4" do
     test "passes when text matches" do

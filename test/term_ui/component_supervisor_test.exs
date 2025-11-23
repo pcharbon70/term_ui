@@ -1,10 +1,10 @@
 defmodule TermUI.ComponentSupervisorTest do
   use ExUnit.Case, async: false
 
-  alias TermUI.ComponentSupervisor
-  alias TermUI.ComponentRegistry
   alias TermUI.Component.StatePersistence
+  alias TermUI.ComponentRegistry
   alias TermUI.ComponentServer
+  alias TermUI.ComponentSupervisor
 
   # Simple test component
   defmodule SimpleComponent do

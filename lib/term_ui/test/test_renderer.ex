@@ -23,8 +23,8 @@ defmodule TermUI.Test.TestRenderer do
   Rows and columns are 1-indexed to match terminal conventions.
   """
 
-  alias TermUI.Renderer.Cell
   alias TermUI.Renderer.Buffer
+  alias TermUI.Renderer.Cell
 
   @type t :: %__MODULE__{
           buffer: Buffer.t(),
@@ -118,13 +118,11 @@ defmodule TermUI.Test.TestRenderer do
   @spec get_text_at(t(), pos_integer(), pos_integer(), pos_integer()) :: String.t()
   def get_text_at(%__MODULE__{buffer: buffer}, row, col, width)
       when is_integer(width) and width > 0 do
-    col..(col + width - 1)
-    |> Enum.map(fn c ->
+    Enum.map_join(col..(col + width - 1), "", fn c ->
       cell = Buffer.get_cell(buffer, row, c)
       # Skip wide character placeholders
       if cell.wide_placeholder, do: "", else: cell.char
     end)
-    |> Enum.join()
   end
 
   @doc """

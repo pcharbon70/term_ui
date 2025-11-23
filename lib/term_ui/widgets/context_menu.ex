@@ -154,9 +154,7 @@ defmodule TermUI.Widgets.ContextMenu do
 
   @impl true
   def render(state, _area) do
-    if not state.visible do
-      empty()
-    else
+    if state.visible do
       {pos_x, pos_y} = state.position
       width = calculate_width(state.items)
 
@@ -176,6 +174,8 @@ defmodule TermUI.Widgets.ContextMenu do
         y: pos_y,
         z: 100
       }
+    else
+      empty()
     end
   end
 

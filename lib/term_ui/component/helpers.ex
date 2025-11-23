@@ -112,23 +112,27 @@ defmodule TermUI.Component.Helpers do
       required = Keyword.get(opts, :required, false)
       default = Keyword.get(opts, :default)
 
-      value =
-        case Map.fetch(props, name) do
-          {:ok, val} ->
-            validate_prop_type!(name, val, type)
-            val
-
-          :error ->
-            if required do
-              raise ArgumentError, "Required prop #{inspect(name)} is missing"
-            else
-              default
-            end
-        end
-
+      value = extract_prop_value(props, name, type, required, default)
       Map.put(acc, name, value)
     end)
   end
+
+  defp extract_prop_value(props, name, type, required, default) do
+    case Map.fetch(props, name) do
+      {:ok, val} ->
+        validate_prop_type!(name, val, type)
+        val
+
+      :error ->
+        handle_missing_prop(name, required, default)
+    end
+  end
+
+  defp handle_missing_prop(name, true, _default) do
+    raise ArgumentError, "Required prop #{inspect(name)} is missing"
+  end
+
+  defp handle_missing_prop(_name, false, default), do: default
 
   defp validate_prop_type!(_name, nil, _type), do: :ok
 
@@ -299,8 +303,8 @@ defmodule TermUI.Component.Helpers do
       if style do
         # Only include non-default/non-nil values
         opts = []
-        opts = if style.fg not in [nil, :default], do: [{:fg, style.fg} | opts], else: opts
-        opts = if style.bg not in [nil, :default], do: [{:bg, style.bg} | opts], else: opts
+        opts = if style.fg in [nil, :default], do: opts, else: [{:fg, style.fg} | opts]
+        opts = if style.bg in [nil, :default], do: opts, else: [{:bg, style.bg} | opts]
 
         opts =
           if MapSet.size(style.attrs) > 0,

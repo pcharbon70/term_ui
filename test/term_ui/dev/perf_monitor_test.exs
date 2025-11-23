@@ -7,7 +7,7 @@ defmodule TermUI.Dev.PerfMonitorTest do
     test "renders performance panel" do
       metrics = %{
         fps: 60.0,
-        frame_times: [16000, 17000, 15000],
+        frame_times: [16_000, 17_000, 15_000],
         memory: 100_000_000,
         process_count: 200
       }

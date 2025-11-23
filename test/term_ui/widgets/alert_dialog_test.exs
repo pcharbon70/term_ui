@@ -1,8 +1,8 @@
 defmodule TermUI.Widgets.AlertDialogTest do
   use ExUnit.Case, async: true
 
-  alias TermUI.Widgets.AlertDialog
   alias TermUI.Event
+  alias TermUI.Widgets.AlertDialog
 
   describe "new/1" do
     test "creates alert with required fields" do

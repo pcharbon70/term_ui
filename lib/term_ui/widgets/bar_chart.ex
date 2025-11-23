@@ -169,32 +169,11 @@ defmodule TermUI.Widgets.BarChart do
           |> Enum.with_index()
           |> Enum.map(fn {_item, index} ->
             bar_height = Enum.at(bar_heights, index)
-
-            if row < bar_height do
-              color = Enum.at(colors, rem(index, max(1, length(colors))))
-              char = bar_char
-
-              if color do
-                {char, color}
-              else
-                {char, nil}
-              end
-            else
-              {@empty_char, nil}
-            end
+            build_bar_char(row, bar_height, index, bar_char, colors)
           end)
 
         # Join chars with spacing
-        line_parts =
-          Enum.map(chars, fn {char, color} ->
-            padded = " " <> char <> " "
-
-            if color do
-              styled(text(padded), color)
-            else
-              text(padded)
-            end
-          end)
+        line_parts = Enum.map(chars, &style_bar_char/1)
 
         stack(:horizontal, line_parts)
       end
@@ -246,6 +225,25 @@ defmodule TermUI.Widgets.BarChart do
   end
 
   defp format_value(value), do: inspect(value)
+
+  defp build_bar_char(row, bar_height, index, bar_char, colors) when row < bar_height do
+    color = Enum.at(colors, rem(index, max(1, length(colors))))
+    {bar_char, color}
+  end
+
+  defp build_bar_char(_row, _bar_height, _index, _bar_char, _colors) do
+    {@empty_char, nil}
+  end
+
+  defp style_bar_char({char, color}) do
+    padded = " " <> char <> " "
+
+    if color do
+      styled(text(padded), color)
+    else
+      text(padded)
+    end
+  end
 
   @doc """
   Creates a simple horizontal bar for a single value.

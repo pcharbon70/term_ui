@@ -1,9 +1,9 @@
 defmodule TermUI.Widget.TextInputTest do
   use ExUnit.Case, async: true
 
-  alias TermUI.Widget.TextInput
   alias TermUI.Component.RenderNode
   alias TermUI.Event
+  alias TermUI.Widget.TextInput
 
   @area %{x: 0, y: 0, width: 20, height: 1}
 
@@ -189,7 +189,8 @@ defmodule TermUI.Widget.TextInputTest do
       result = TextInput.render(state, @area)
 
       assert %RenderNode{type: :cells, cells: cells} = result
-      chars = Enum.map(cells, fn c -> c.cell.char end) |> Enum.join() |> String.trim()
+      char_list = Enum.map(cells, & &1.cell.char)
+      chars = char_list |> Enum.join() |> String.trim()
       assert String.starts_with?(chars, "Enter name...")
 
       # Placeholder should be gray
@@ -238,7 +239,8 @@ defmodule TermUI.Widget.TextInputTest do
 
       assert %RenderNode{type: :cells, cells: cells} = result
       # Should show end of string
-      chars = Enum.map(cells, fn c -> c.cell.char end) |> Enum.join() |> String.trim()
+      char_list = Enum.map(cells, & &1.cell.char)
+      chars = char_list |> Enum.join() |> String.trim()
       assert String.ends_with?(chars, "value")
     end
 
@@ -250,7 +252,8 @@ defmodule TermUI.Widget.TextInputTest do
 
       assert %RenderNode{type: :cells, cells: cells} = result
       # Should show beginning
-      chars = Enum.map(cells, fn c -> c.cell.char end) |> Enum.join() |> String.trim()
+      char_list = Enum.map(cells, & &1.cell.char)
+      chars = char_list |> Enum.join() |> String.trim()
       assert String.starts_with?(chars, "Long")
     end
 

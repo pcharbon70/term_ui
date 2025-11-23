@@ -1,8 +1,8 @@
 defmodule TermUI.Test.TestRendererTest do
   use ExUnit.Case, async: true
 
-  alias TermUI.Test.TestRenderer
   alias TermUI.Renderer.Cell
+  alias TermUI.Test.TestRenderer
 
   describe "new/2 and destroy/1" do
     test "creates renderer with correct dimensions" do

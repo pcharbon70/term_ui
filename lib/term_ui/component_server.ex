@@ -28,8 +28,8 @@ defmodule TermUI.ComponentServer do
 
   require Logger
 
-  alias TermUI.ComponentRegistry
   alias TermUI.Component.StatePersistence
+  alias TermUI.ComponentRegistry
 
   @default_init_timeout 5_000
   @default_unmount_timeout 5_000
@@ -145,86 +145,83 @@ defmodule TermUI.ComponentServer do
 
   @impl true
   def init({module, props, id, opts}) do
+    if valid_component_module?(module) do
+      do_init(module, props, id, opts)
+    else
+      {:stop, {:error, :invalid_component_module}}
+    end
+  end
+
+  defp valid_component_module?(module) do
+    function_exported?(module, :init, 1) or function_exported?(module, :render, 2)
+  end
+
+  defp do_init(module, props, id, opts) do
     timeout = Keyword.get(opts, :timeout, @default_init_timeout)
     recovery = Keyword.get(opts, :recovery, :last_state)
+    recovered_state = try_recover_state(id, recovery, props)
 
-    # Validate that module implements required behaviour
-    unless function_exported?(module, :init, 1) or function_exported?(module, :render, 2) do
-      {:stop, {:error, :invalid_component_module}}
-    else
-      # Try to recover state if this is a restart
-      recovered_state = try_recover_state(id, recovery, props)
+    task = Task.async(fn -> init_component(module, props, recovered_state) end)
 
-      # Initialize component with timeout
-      task =
-        Task.async(fn ->
-          try do
-            case recovered_state do
-              {:ok, recovered} ->
-                # State was recovered, use it directly
-                {:ok, recovered}
-
-              :not_found ->
-                # No recovered state, normal init
-                if function_exported?(module, :init, 1) do
-                  module.init(props)
-                else
-                  # Stateless component - no init needed
-                  {:ok, props}
-                end
-            end
-          rescue
-            e -> {:error, {:init_error, e, __STACKTRACE__}}
-          end
-        end)
-
-      case Task.yield(task, timeout) || Task.shutdown(task) do
-        {:ok, {:ok, component_state}} ->
-          state = %{
-            module: module,
-            component_state: component_state,
-            props: props,
-            lifecycle: :initialized,
-            id: id,
-            hooks: %{
-              after_mount: [],
-              before_unmount: [],
-              on_prop_change: []
-            },
-            recovery: recovery
-          }
-
-          {:ok, state}
-
-        {:ok, {:ok, component_state, commands}} ->
-          state = %{
-            module: module,
-            component_state: component_state,
-            props: props,
-            lifecycle: :initialized,
-            id: id,
-            hooks: %{
-              after_mount: [],
-              before_unmount: [],
-              on_prop_change: []
-            },
-            recovery: recovery
-          }
-
-          # Execute init commands
-          execute_commands(commands, state)
-          {:ok, state}
-
-        {:ok, {:stop, reason}} ->
-          {:stop, reason}
-
-        {:ok, {:error, reason}} ->
-          {:stop, reason}
-
-        nil ->
-          {:stop, {:init_timeout, timeout}}
-      end
+    case Task.yield(task, timeout) || Task.shutdown(task) do
+      {:ok, result} -> handle_init_result(result, module, props, id, recovery)
+      nil -> {:stop, {:init_timeout, timeout}}
     end
+  end
+
+  defp init_component(module, props, recovered_state) do
+    case recovered_state do
+      {:ok, recovered} ->
+        {:ok, recovered}
+
+      :not_found ->
+        call_module_init(module, props)
+    end
+  rescue
+    e -> {:error, {:init_error, e, __STACKTRACE__}}
+  end
+
+  defp call_module_init(module, props) do
+    if function_exported?(module, :init, 1) do
+      module.init(props)
+    else
+      {:ok, props}
+    end
+  end
+
+  defp handle_init_result({:ok, component_state}, module, props, id, recovery) do
+    state = build_initial_state(module, component_state, props, id, recovery)
+    {:ok, state}
+  end
+
+  defp handle_init_result({:ok, component_state, commands}, module, props, id, recovery) do
+    state = build_initial_state(module, component_state, props, id, recovery)
+    execute_commands(commands, state)
+    {:ok, state}
+  end
+
+  defp handle_init_result({:stop, reason}, _module, _props, _id, _recovery) do
+    {:stop, reason}
+  end
+
+  defp handle_init_result({:error, reason}, _module, _props, _id, _recovery) do
+    {:stop, reason}
+  end
+
+  defp build_initial_state(module, component_state, props, id, recovery) do
+    %{
+      module: module,
+      component_state: component_state,
+      props: props,
+      lifecycle: :initialized,
+      id: id,
+      hooks: %{
+        after_mount: [],
+        before_unmount: [],
+        on_prop_change: []
+      },
+      recovery: recovery
+    }
   end
 
   defp try_recover_state(id, recovery, _props) do

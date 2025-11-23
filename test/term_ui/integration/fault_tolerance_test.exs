@@ -8,10 +8,10 @@ defmodule TermUI.Integration.FaultToleranceTest do
 
   use ExUnit.Case, async: false
 
-  alias TermUI.ComponentSupervisor
+  alias TermUI.Component.StatePersistence
   alias TermUI.ComponentRegistry
   alias TermUI.ComponentServer
-  alias TermUI.Component.StatePersistence
+  alias TermUI.ComponentSupervisor
 
   # Component that can crash on demand
   defmodule CrashableComponent do

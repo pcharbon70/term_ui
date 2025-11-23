@@ -36,7 +36,10 @@ defmodule TermUI.Layout.Solver do
   require Logger
 
   alias TermUI.Layout.Constraint
-  alias TermUI.Layout.Constraint.{Length, Percentage, Ratio, Fill}
+  alias TermUI.Layout.Constraint.Fill
+  alias TermUI.Layout.Constraint.Length
+  alias TermUI.Layout.Constraint.Percentage
+  alias TermUI.Layout.Constraint.Ratio
 
   @type rect :: %{x: integer(), y: integer(), width: integer(), height: integer()}
   @type direction :: :horizontal | :vertical
@@ -268,7 +271,7 @@ defmodule TermUI.Layout.Solver do
   defp allocate_fixed(indexed, available) do
     fixed =
       indexed
-      |> Enum.filter(fn {c, _idx} -> is_length?(c) end)
+      |> Enum.filter(fn {c, _idx} -> length?(c) end)
       |> Enum.map(fn {c, idx} -> {idx, resolve_length(c)} end)
       |> Map.new()
 
@@ -279,7 +282,7 @@ defmodule TermUI.Layout.Solver do
   defp allocate_percentages(indexed, total_available, remaining) do
     percentages =
       indexed
-      |> Enum.filter(fn {c, _idx} -> is_percentage?(c) end)
+      |> Enum.filter(fn {c, _idx} -> percentage?(c) end)
       |> Enum.map(fn {c, idx} ->
         inner = Constraint.unwrap(c)
         size = round(total_available * inner.value / 100)
@@ -294,7 +297,7 @@ defmodule TermUI.Layout.Solver do
   defp allocate_flexible(indexed, remaining) do
     flex_constraints =
       indexed
-      |> Enum.filter(fn {c, _idx} -> is_flexible?(c) end)
+      |> Enum.filter(fn {c, _idx} -> flexible?(c) end)
 
     if flex_constraints == [] do
       {%{}, remaining}
@@ -308,7 +311,7 @@ defmodule TermUI.Layout.Solver do
         flex_constraints
         |> Enum.map(fn {c, idx} ->
           ratio = get_ratio_value(c)
-          size = if total_ratio > 0, do: round(remaining * ratio / total_ratio), else: 0
+          size = calculate_flex_size(ratio, remaining, total_ratio)
           {idx, size}
         end)
         |> Map.new()
@@ -357,44 +360,47 @@ defmodule TermUI.Layout.Solver do
         size > min_val
       end)
 
-    if reducible == [] do
-      # Nothing can be reduced, return as is with warning
-      Logger.warning(
-        "Cannot satisfy min constraints: total #{total} exceeds available #{available}"
-      )
+    do_reduce_to_fit(sizes, constraints, excess, total, available, reducible)
+  end
 
-      sizes
-    else
-      # Calculate how much each can be reduced
-      reducible_total =
-        reducible
-        |> Enum.map(fn {{size, constraint}, _idx} ->
-          min_val = Constraint.get_min(constraint) || 0
-          size - min_val
-        end)
-        |> Enum.sum()
+  defp do_reduce_to_fit(sizes, _constraints, _excess, total, available, []) do
+    # Nothing can be reduced, return as is with warning
+    Logger.warning(
+      "Cannot satisfy min constraints: total #{total} exceeds available #{available}"
+    )
 
-      if reducible_total <= 0 do
-        Logger.warning("Cannot reduce: all at minimum")
-        sizes
-      else
-        # Reduce proportionally
-        sizes
-        |> Enum.with_index()
-        |> Enum.map(fn {size, idx} ->
-          constraint = Enum.at(constraints, idx)
-          min_val = Constraint.get_min(constraint) || 0
-          reducible_amount = size - min_val
+    sizes
+  end
 
-          if reducible_amount > 0 do
-            reduction = round(excess * reducible_amount / reducible_total)
-            max(min_val, size - reduction)
-          else
-            size
-          end
-        end)
-      end
-    end
+  defp do_reduce_to_fit(sizes, constraints, excess, _total, _available, reducible) do
+    # Calculate how much each can be reduced
+    reducible_total = calculate_reducible_total(reducible)
+
+    apply_reductions(sizes, constraints, excess, reducible_total)
+  end
+
+  defp calculate_reducible_total(reducible) do
+    reducible
+    |> Enum.map(fn {{size, constraint}, _idx} ->
+      min_val = Constraint.get_min(constraint) || 0
+      size - min_val
+    end)
+    |> Enum.sum()
+  end
+
+  defp apply_reductions(sizes, _constraints, _excess, reducible_total)
+       when reducible_total <= 0 do
+    Logger.warning("Cannot reduce: all at minimum")
+    sizes
+  end
+
+  defp apply_reductions(sizes, constraints, excess, reducible_total) do
+    sizes
+    |> Enum.with_index()
+    |> Enum.map(fn {size, idx} ->
+      constraint = Enum.at(constraints, idx)
+      reduce_size(size, constraint, excess, reducible_total)
+    end)
   end
 
   defp handle_overflow(sizes, available) do
@@ -420,23 +426,41 @@ defmodule TermUI.Layout.Solver do
     end
   end
 
+  defp calculate_flex_size(_ratio, _remaining, 0), do: 0
+
+  defp calculate_flex_size(ratio, remaining, total_ratio) do
+    round(remaining * ratio / total_ratio)
+  end
+
+  defp reduce_size(size, constraint, excess, reducible_total) do
+    min_val = Constraint.get_min(constraint) || 0
+    reducible_amount = size - min_val
+
+    if reducible_amount > 0 do
+      reduction = round(excess * reducible_amount / reducible_total)
+      max(min_val, size - reduction)
+    else
+      size
+    end
+  end
+
   # Helper functions
 
-  defp is_length?(constraint) do
+  defp length?(constraint) do
     case Constraint.unwrap(constraint) do
       %Length{} -> true
       _ -> false
     end
   end
 
-  defp is_percentage?(constraint) do
+  defp percentage?(constraint) do
     case Constraint.unwrap(constraint) do
       %Percentage{} -> true
       _ -> false
     end
   end
 
-  defp is_flexible?(constraint) do
+  defp flexible?(constraint) do
     case Constraint.unwrap(constraint) do
       %Ratio{} -> true
       %Fill{} -> true

@@ -31,10 +31,10 @@ defmodule TermUI.Dev.DevMode do
 
   use GenServer
 
-  alias TermUI.Dev.UIInspector
-  alias TermUI.Dev.StateInspector
   alias TermUI.Dev.HotReload
   alias TermUI.Dev.PerfMonitor
+  alias TermUI.Dev.StateInspector
+  alias TermUI.Dev.UIInspector
 
   @type state :: %{
           enabled: boolean(),
@@ -407,7 +407,7 @@ defmodule TermUI.Dev.DevMode do
         Enum.sum(frame_times) / length(frame_times)
       else
         # Default to ~60 FPS
-        16666
+        16_666
       end
 
     fps = if avg_time > 0, do: 1_000_000 / avg_time, else: 0.0

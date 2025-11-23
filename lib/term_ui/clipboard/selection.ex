@@ -246,13 +246,13 @@ defmodule TermUI.Clipboard.Selection do
     |> String.graphemes()
     |> Enum.reduce_while({0, :skip_space}, fn char, {count, state} ->
       cond do
-        state == :skip_space and is_whitespace?(char) ->
+        state == :skip_space and whitespace?(char) ->
           {:cont, {count + 1, :skip_space}}
 
-        state == :skip_space and is_word_char?(char) ->
+        state == :skip_space and word_char?(char) ->
           {:cont, {count + 1, :in_word}}
 
-        state == :in_word and is_word_char?(char) ->
+        state == :in_word and word_char?(char) ->
           {:cont, {count + 1, :in_word}}
 
         true ->
@@ -267,13 +267,13 @@ defmodule TermUI.Clipboard.Selection do
     |> String.graphemes()
     |> Enum.reduce_while({0, :skip_space}, fn char, {count, state} ->
       cond do
-        state == :skip_space and is_whitespace?(char) ->
+        state == :skip_space and whitespace?(char) ->
           {:cont, {count + 1, :skip_space}}
 
-        state == :skip_space and is_word_char?(char) ->
+        state == :skip_space and word_char?(char) ->
           {:cont, {count + 1, :in_word}}
 
-        state == :in_word and is_word_char?(char) ->
+        state == :in_word and word_char?(char) ->
           {:cont, {count + 1, :in_word}}
 
         true ->
@@ -293,7 +293,7 @@ defmodule TermUI.Clipboard.Selection do
         len =
           prefix
           |> String.graphemes()
-          |> Enum.take_while(&is_word_char?/1)
+          |> Enum.take_while(&word_char?/1)
           |> Kernel.length()
 
         position - len
@@ -307,7 +307,7 @@ defmodule TermUI.Clipboard.Selection do
         len =
           suffix
           |> String.graphemes()
-          |> Enum.take_while(&is_word_char?/1)
+          |> Enum.take_while(&word_char?/1)
           |> Kernel.length()
 
         position + len
@@ -316,11 +316,11 @@ defmodule TermUI.Clipboard.Selection do
     {word_start, word_end}
   end
 
-  defp is_word_char?(char) do
+  defp word_char?(char) do
     String.match?(char, ~r/\w/)
   end
 
-  defp is_whitespace?(char) do
+  defp whitespace?(char) do
     String.match?(char, ~r/\s/)
   end
 end

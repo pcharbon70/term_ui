@@ -20,9 +20,9 @@ defmodule TermUI.Component.Introspection do
       metrics = Introspection.get_metrics(:my_component)
   """
 
+  alias TermUI.Component.StatePersistence
   alias TermUI.ComponentRegistry
   alias TermUI.ComponentServer
-  alias TermUI.Component.StatePersistence
 
   @doc """
   Returns the component tree structure.
@@ -226,26 +226,35 @@ defmodule TermUI.Component.Introspection do
 
     Enum.with_index(children, fn child, index ->
       is_last = index == child_count - 1
-
-      child_prefix = if is_last, do: "#{prefix}└── ", else: "#{prefix}├── "
-      cont_prefix = if is_last, do: "#{prefix}    ", else: "#{prefix}│   "
-
-      # Print child with its prefix
-      pid_str = inspect(child.pid)
-      module_str = inspect(child.module) |> String.replace("Elixir.", "")
-      IO.puts(io, "#{child_prefix}#{child.id} (#{pid_str}) - #{module_str}")
-
-      # Recursively print grandchildren
-      grand_children = child.children
-      grand_count = length(grand_children)
-
-      Enum.with_index(grand_children, fn grandchild, gindex ->
-        is_last_grand = gindex == grand_count - 1
-        grand_prefix = if is_last_grand, do: "#{cont_prefix}└── ", else: "#{cont_prefix}├── "
-        print_node(io, grandchild, grand_prefix)
-      end)
+      print_child_node(io, child, prefix, is_last)
     end)
   end
+
+  defp print_child_node(io, child, prefix, is_last) do
+    child_prefix = get_child_prefix(prefix, is_last)
+    cont_prefix = get_continuation_prefix(prefix, is_last)
+
+    # Print child with its prefix
+    pid_str = inspect(child.pid)
+    module_str = inspect(child.module) |> String.replace("Elixir.", "")
+    IO.puts(io, "#{child_prefix}#{child.id} (#{pid_str}) - #{module_str}")
+
+    # Recursively print grandchildren
+    grand_children = child.children
+    grand_count = length(grand_children)
+
+    Enum.with_index(grand_children, fn grandchild, gindex ->
+      is_last_grand = gindex == grand_count - 1
+      grand_prefix = get_child_prefix(cont_prefix, is_last_grand)
+      print_node(io, grandchild, grand_prefix)
+    end)
+  end
+
+  defp get_child_prefix(prefix, true), do: "#{prefix}└── "
+  defp get_child_prefix(prefix, false), do: "#{prefix}├── "
+
+  defp get_continuation_prefix(prefix, true), do: "#{prefix}    "
+  defp get_continuation_prefix(prefix, false), do: "#{prefix}│   "
 
   @doc """
   Returns the tree as a formatted string.

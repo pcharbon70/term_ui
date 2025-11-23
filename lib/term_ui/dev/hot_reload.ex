@@ -241,17 +241,7 @@ defmodule TermUI.Dev.HotReload do
 
     case recompile_file(path) do
       {:ok, modules} ->
-        Enum.reduce(modules, state, fn module, acc ->
-          case do_reload_module(module) do
-            :ok ->
-              notify_reload(state.on_reload, module)
-              add_recent_reload(acc, module)
-
-            {:error, reason} ->
-              Logger.error("Failed to reload #{module}: #{inspect(reason)}")
-              acc
-          end
-        end)
+        reload_modules(modules, state)
 
       {:error, reason} ->
         Logger.error("Failed to recompile #{path}: #{inspect(reason)}")
@@ -259,24 +249,40 @@ defmodule TermUI.Dev.HotReload do
     end
   end
 
-  defp recompile_file(path) do
-    try do
-      # Get modules defined in the file before recompilation
-      _old_modules = get_modules_in_file(path)
+  defp reload_modules(modules, state) do
+    Enum.reduce(modules, state, fn module, acc ->
+      reload_single_module(module, acc, state.on_reload)
+    end)
+  end
 
-      # Recompile using Code module
-      case Code.compile_file(path) do
-        modules when is_list(modules) ->
-          module_names = Enum.map(modules, fn {name, _binary} -> name end)
-          {:ok, module_names}
+  defp reload_single_module(module, state, on_reload) do
+    case do_reload_module(module) do
+      :ok ->
+        notify_reload(on_reload, module)
+        add_recent_reload(state, module)
 
-        _ ->
-          {:error, :compilation_failed}
-      end
-    rescue
-      e ->
-        {:error, e}
+      {:error, reason} ->
+        Logger.error("Failed to reload #{module}: #{inspect(reason)}")
+        state
     end
+  end
+
+  defp recompile_file(path) do
+    # Get modules defined in the file before recompilation
+    _old_modules = get_modules_in_file(path)
+
+    # Recompile using Code module
+    case Code.compile_file(path) do
+      modules when is_list(modules) ->
+        module_names = Enum.map(modules, fn {name, _binary} -> name end)
+        {:ok, module_names}
+
+      _ ->
+        {:error, :compilation_failed}
+    end
+  rescue
+    e ->
+      {:error, e}
   end
 
   defp get_modules_in_file(path) do
@@ -294,33 +300,29 @@ defmodule TermUI.Dev.HotReload do
   end
 
   defp do_reload_module(module) do
-    try do
-      # Purge old code
-      :code.purge(module)
+    # Purge old code
+    :code.purge(module)
 
-      # Delete old code if still loaded
-      :code.delete(module)
+    # Delete old code if still loaded
+    :code.delete(module)
 
-      # The module should already be loaded from compilation
-      # Just ensure it's available
-      case Code.ensure_loaded(module) do
-        {:module, ^module} -> :ok
-        {:error, reason} -> {:error, reason}
-      end
-    rescue
-      e -> {:error, e}
+    # The module should already be loaded from compilation
+    # Just ensure it's available
+    case Code.ensure_loaded(module) do
+      {:module, ^module} -> :ok
+      {:error, reason} -> {:error, reason}
     end
+  rescue
+    e -> {:error, e}
   end
 
   defp notify_reload(nil, _module), do: :ok
 
   defp notify_reload(callback, module) when is_function(callback, 1) do
-    try do
-      callback.(module)
-    rescue
-      e ->
-        Logger.error("Hot reload callback failed: #{inspect(e)}")
-    end
+    callback.(module)
+  rescue
+    e ->
+      Logger.error("Hot reload callback failed: #{inspect(e)}")
   end
 
   defp add_recent_reload(state, module) do
@@ -351,13 +353,11 @@ defmodule TermUI.Dev.HotReload do
   """
   @spec can_reload?(module()) :: boolean()
   def can_reload?(module) do
-    try do
-      # Check if module exists and is loaded
-      # Check if it has source info (not a native module)
-      Code.ensure_loaded?(module) and
-        is_list(module.__info__(:compile)[:source])
-    rescue
-      _ -> false
-    end
+    # Check if module exists and is loaded
+    # Check if it has source info (not a native module)
+    Code.ensure_loaded?(module) and
+      is_list(module.__info__(:compile)[:source])
+  rescue
+    _ -> false
   end
 end

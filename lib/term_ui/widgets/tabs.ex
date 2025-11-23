@@ -217,52 +217,45 @@ defmodule TermUI.Widgets.Tabs do
   end
 
   defp render_tab_bar(state) do
-    tabs =
-      Enum.map(state.tabs, fn tab ->
-        label = " #{tab.label} "
-
-        # Add close button if closeable
-        label =
-          if Map.get(tab, :closeable, false) do
-            label <> "×"
-          else
-            label
-          end
-
-        # Determine style
-        style =
-          cond do
-            Map.get(tab, :disabled, false) ->
-              state.disabled_style
-
-            tab.id == state.selected ->
-              state.selected_style
-
-            tab.id == state.focused ->
-              # Could add focused style
-              state.tab_style
-
-            true ->
-              state.tab_style
-          end
-
-        # Add visual indicator for selected/focused
-        label =
-          cond do
-            tab.id == state.selected -> "[#{label}]"
-            tab.id == state.focused -> "(#{label})"
-            true -> " #{label} "
-          end
-
-        if style do
-          styled(text(label), style)
-        else
-          text(label)
-        end
-      end)
-
+    tabs = Enum.map(state.tabs, fn tab -> render_single_tab(tab, state) end)
     stack(:horizontal, tabs)
   end
+
+  defp render_single_tab(tab, state) do
+    label = build_tab_label(tab)
+    style = determine_tab_style(tab, state)
+    decorated_label = decorate_tab_label(label, tab.id, state)
+    apply_tab_style(decorated_label, style)
+  end
+
+  defp build_tab_label(tab) do
+    base_label = " #{tab.label} "
+
+    if Map.get(tab, :closeable, false) do
+      base_label <> "×"
+    else
+      base_label
+    end
+  end
+
+  defp determine_tab_style(tab, state) do
+    cond do
+      Map.get(tab, :disabled, false) -> state.disabled_style
+      tab.id == state.selected -> state.selected_style
+      true -> state.tab_style
+    end
+  end
+
+  defp decorate_tab_label(label, tab_id, state) do
+    cond do
+      tab_id == state.selected -> "[#{label}]"
+      tab_id == state.focused -> "(#{label})"
+      true -> " #{label} "
+    end
+  end
+
+  defp apply_tab_style(label, nil), do: text(label)
+  defp apply_tab_style(label, style), do: styled(text(label), style)
 
   defp render_content(state, _area) do
     case Enum.find(state.tabs, &(&1.id == state.selected)) do

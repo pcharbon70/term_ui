@@ -31,9 +31,9 @@ defmodule TermUI.FocusManager do
 
   use GenServer
 
+  alias TermUI.ComponentRegistry
   alias TermUI.Event
   alias TermUI.EventRouter
-  alias TermUI.ComponentRegistry
   alias TermUI.SpatialIndex
 
   # Client API
@@ -190,8 +190,8 @@ defmodule TermUI.FocusManager do
   @doc """
   Checks if a component is currently focused.
   """
-  @spec is_focused?(term()) :: boolean()
-  def is_focused?(component_id) do
+  @spec focused?(term()) :: boolean()
+  def focused?(component_id) do
     case get_focused() do
       {:ok, ^component_id} -> true
       _ -> false
@@ -393,26 +393,23 @@ defmodule TermUI.FocusManager do
 
   defp do_set_focused(component_id, state) do
     # Check if component exists and is focusable
-    case ComponentRegistry.lookup(component_id) do
-      {:ok, _pid} ->
-        # Check focusable property
-        if is_focusable?(component_id) do
-          old_focus = state.current
-
-          # Only update if focus is actually changing
-          if component_id != old_focus do
-            # Update EventRouter - this sends focus events
-            EventRouter.set_focus(component_id)
-          end
-
-          {:ok, %{state | current: component_id}}
-        else
-          {:error, :not_focusable}
-        end
-
-      {:error, :not_found} ->
-        {:error, :not_found}
+    with {:ok, _pid} <- ComponentRegistry.lookup(component_id),
+         true <- focusable?(component_id) do
+      update_focus(component_id, state)
+    else
+      {:error, :not_found} -> {:error, :not_found}
+      false -> {:error, :not_focusable}
     end
+  end
+
+  defp update_focus(component_id, %{current: old_focus} = state) when component_id != old_focus do
+    # Update EventRouter - this sends focus events
+    EventRouter.set_focus(component_id)
+    {:ok, %{state | current: component_id}}
+  end
+
+  defp update_focus(component_id, state) do
+    {:ok, %{state | current: component_id}}
   end
 
   defp do_focus_next(state) do
@@ -454,7 +451,7 @@ defmodule TermUI.FocusManager do
 
     # Filter to focusable and sort by tab order
     components
-    |> Enum.filter(&is_focusable?/1)
+    |> Enum.filter(&focusable?/1)
     |> sort_by_tab_order()
   end
 
@@ -486,7 +483,7 @@ defmodule TermUI.FocusManager do
   end
 
   defp get_component_tab_index(_component_id) do
-    # TODO: Get tab_index from component props
+    # FIXME: Get tab_index from component props
     # For now, return nil to use position-based ordering
     nil
   end
@@ -529,10 +526,10 @@ defmodule TermUI.FocusManager do
     end
   end
 
-  defp is_focusable?(component_id) do
+  defp focusable?(component_id) do
     # Check if component is focusable
     # Components are focusable by default unless explicitly disabled
-    # TODO: Check component props for focusable and disabled
+    # FIXME: Check component props for focusable and disabled
     component_exists?(component_id)
   end
 

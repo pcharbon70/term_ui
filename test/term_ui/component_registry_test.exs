@@ -10,13 +10,13 @@ defmodule TermUI.ComponentRegistryTest do
 
   describe "register/3" do
     test "registers component successfully" do
-      pid = spawn(fn -> Process.sleep(10000) end)
+      pid = spawn(fn -> Process.sleep(10_000) end)
       assert :ok = ComponentRegistry.register(:test_id, pid, TestModule)
     end
 
     test "fails if id already registered" do
-      pid1 = spawn(fn -> Process.sleep(10000) end)
-      pid2 = spawn(fn -> Process.sleep(10000) end)
+      pid1 = spawn(fn -> Process.sleep(10_000) end)
+      pid2 = spawn(fn -> Process.sleep(10_000) end)
 
       :ok = ComponentRegistry.register(:same_id, pid1, TestModule)
 
@@ -25,7 +25,7 @@ defmodule TermUI.ComponentRegistryTest do
     end
 
     test "can register with reference as id" do
-      pid = spawn(fn -> Process.sleep(10000) end)
+      pid = spawn(fn -> Process.sleep(10_000) end)
       ref = make_ref()
       assert :ok = ComponentRegistry.register(ref, pid, TestModule)
       assert {:ok, ^pid} = ComponentRegistry.lookup(ref)
@@ -34,7 +34,7 @@ defmodule TermUI.ComponentRegistryTest do
 
   describe "unregister/1" do
     test "unregisters component" do
-      pid = spawn(fn -> Process.sleep(10000) end)
+      pid = spawn(fn -> Process.sleep(10_000) end)
       :ok = ComponentRegistry.register(:to_remove, pid, TestModule)
       assert ComponentRegistry.registered?(:to_remove)
 
@@ -49,7 +49,7 @@ defmodule TermUI.ComponentRegistryTest do
 
   describe "lookup/1" do
     test "returns pid for registered component" do
-      pid = spawn(fn -> Process.sleep(10000) end)
+      pid = spawn(fn -> Process.sleep(10_000) end)
       :ok = ComponentRegistry.register(:lookup_test, pid, TestModule)
 
       assert {:ok, ^pid} = ComponentRegistry.lookup(:lookup_test)
@@ -62,21 +62,21 @@ defmodule TermUI.ComponentRegistryTest do
 
   describe "lookup_id/1" do
     test "returns id for registered pid" do
-      pid = spawn(fn -> Process.sleep(10000) end)
+      pid = spawn(fn -> Process.sleep(10_000) end)
       :ok = ComponentRegistry.register(:reverse_lookup, pid, TestModule)
 
       assert {:ok, :reverse_lookup} = ComponentRegistry.lookup_id(pid)
     end
 
     test "returns error for non-registered pid" do
-      pid = spawn(fn -> Process.sleep(10000) end)
+      pid = spawn(fn -> Process.sleep(10_000) end)
       assert {:error, :not_found} = ComponentRegistry.lookup_id(pid)
     end
   end
 
   describe "get_info/1" do
     test "returns full component info" do
-      pid = spawn(fn -> Process.sleep(10000) end)
+      pid = spawn(fn -> Process.sleep(10_000) end)
       :ok = ComponentRegistry.register(:info_test, pid, MyModule)
 
       {:ok, info} = ComponentRegistry.get_info(:info_test)
@@ -92,8 +92,8 @@ defmodule TermUI.ComponentRegistryTest do
 
   describe "list_all/0" do
     test "returns all registered components" do
-      pid1 = spawn(fn -> Process.sleep(10000) end)
-      pid2 = spawn(fn -> Process.sleep(10000) end)
+      pid1 = spawn(fn -> Process.sleep(10_000) end)
+      pid2 = spawn(fn -> Process.sleep(10_000) end)
 
       :ok = ComponentRegistry.register(:comp1, pid1, Mod1)
       :ok = ComponentRegistry.register(:comp2, pid2, Mod2)
@@ -113,8 +113,8 @@ defmodule TermUI.ComponentRegistryTest do
 
   describe "count/0" do
     test "returns correct count" do
-      pid1 = spawn(fn -> Process.sleep(10000) end)
-      pid2 = spawn(fn -> Process.sleep(10000) end)
+      pid1 = spawn(fn -> Process.sleep(10_000) end)
+      pid2 = spawn(fn -> Process.sleep(10_000) end)
 
       assert ComponentRegistry.count() == 0
 
@@ -128,7 +128,7 @@ defmodule TermUI.ComponentRegistryTest do
 
   describe "registered?/1" do
     test "returns true for registered id" do
-      pid = spawn(fn -> Process.sleep(10000) end)
+      pid = spawn(fn -> Process.sleep(10_000) end)
       :ok = ComponentRegistry.register(:exists, pid, TestModule)
 
       assert ComponentRegistry.registered?(:exists)
@@ -141,8 +141,8 @@ defmodule TermUI.ComponentRegistryTest do
 
   describe "clear/0" do
     test "removes all registrations" do
-      pid1 = spawn(fn -> Process.sleep(10000) end)
-      pid2 = spawn(fn -> Process.sleep(10000) end)
+      pid1 = spawn(fn -> Process.sleep(10_000) end)
+      pid2 = spawn(fn -> Process.sleep(10_000) end)
 
       :ok = ComponentRegistry.register(:clear1, pid1, Mod1)
       :ok = ComponentRegistry.register(:clear2, pid2, Mod2)
@@ -171,7 +171,7 @@ defmodule TermUI.ComponentRegistryTest do
     end
 
     test "unregisters when process is killed" do
-      pid = spawn(fn -> Process.sleep(10000) end)
+      pid = spawn(fn -> Process.sleep(10_000) end)
       :ok = ComponentRegistry.register(:kill_test, pid, TestModule)
 
       Process.exit(pid, :kill)

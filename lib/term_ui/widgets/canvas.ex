@@ -131,26 +131,29 @@ defmodule TermUI.Widgets.Canvas do
       state.braille_buffer
       |> Enum.group_by(fn {{x, y, _dx, _dy}, _set} -> {div(x, 2), div(y, 4)} end)
       |> Enum.map(fn {{cx, cy}, dots} ->
-        # Calculate braille character
-        pattern =
-          Enum.reduce(dots, 0, fn {{x, y, _dx, _dy}, set}, acc ->
-            if set do
-              # Use actual position within cell
-              actual_x = rem(x, 2)
-              actual_y = rem(y, 4)
-              bit = Map.get(@dot_bits, {actual_x, actual_y}, 0)
-              Bitwise.bor(acc, bit)
-            else
-              acc
-            end
-          end)
-
+        pattern = calculate_braille_pattern(dots)
         char = <<@braille_base + pattern::utf8>>
         {{cx, cy}, char}
       end)
       |> Map.new()
 
     Map.merge(state.buffer, braille_chars)
+  end
+
+  defp calculate_braille_pattern(dots) do
+    Enum.reduce(dots, 0, fn {{x, y, _dx, _dy}, set}, acc ->
+      accumulate_dot_bit(acc, x, y, set)
+    end)
+  end
+
+  defp accumulate_dot_bit(acc, _x, _y, false), do: acc
+
+  defp accumulate_dot_bit(acc, x, y, true) do
+    # Use actual position within cell
+    actual_x = rem(x, 2)
+    actual_y = rem(y, 4)
+    bit = Map.get(@dot_bits, {actual_x, actual_y}, 0)
+    Bitwise.bor(acc, bit)
   end
 
   # Drawing primitives
@@ -238,64 +241,71 @@ defmodule TermUI.Widgets.Canvas do
     sx = if x1 < x2, do: 1, else: -1
     sy = if y1 < y2, do: 1, else: -1
 
-    draw_line_impl(state, x1, y1, x2, y2, dx, dy, sx, sy, dx - dy, char)
+    line_state = %{
+      x: x1,
+      y: y1,
+      target_x: x2,
+      target_y: y2,
+      dx: dx,
+      dy: dy,
+      sx: sx,
+      sy: sy,
+      err: dx - dy,
+      char: char
+    }
+
+    draw_line_impl(state, line_state)
   end
 
-  defp draw_line_impl(state, x, y, x2, y2, dx, dy, sx, sy, err, char) do
-    state = set_char(state, x, y, char)
+  defp draw_line_impl(state, line_state) do
+    state = set_char(state, line_state.x, line_state.y, line_state.char)
 
-    if x == x2 and y == y2 do
+    if line_state.x == line_state.target_x and line_state.y == line_state.target_y do
       state
     else
-      e2 = 2 * err
+      e2 = 2 * line_state.err
 
       {new_x, new_err} =
-        if e2 > -dy do
-          {x + sx, err - dy}
+        if e2 > -line_state.dy do
+          {line_state.x + line_state.sx, line_state.err - line_state.dy}
         else
-          {x, err}
+          {line_state.x, line_state.err}
         end
 
       {new_y, new_err} =
-        if e2 < dx do
-          {y + sy, new_err + dx}
+        if e2 < line_state.dx do
+          {line_state.y + line_state.sy, new_err + line_state.dx}
         else
-          {y, new_err}
+          {line_state.y, new_err}
         end
 
-      draw_line_impl(state, new_x, new_y, x2, y2, dx, dy, sx, sy, new_err, char)
+      new_line_state = %{line_state | x: new_x, y: new_y, err: new_err}
+      draw_line_impl(state, new_line_state)
     end
   end
 
   @doc """
   Draws a rectangle outline.
+
+  ## Border Options
+
+  The `border` map can contain:
+  - `:h` - Horizontal character (default: "─")
+  - `:v` - Vertical character (default: "│")
+  - `:tl` - Top-left corner (default: "┌")
+  - `:tr` - Top-right corner (default: "┐")
+  - `:bl` - Bottom-left corner (default: "└")
+  - `:br` - Bottom-right corner (default: "┘")
   """
-  @spec draw_rect(
-          map(),
-          integer(),
-          integer(),
-          integer(),
-          integer(),
-          String.t(),
-          String.t(),
-          String.t(),
-          String.t(),
-          String.t(),
-          String.t()
-        ) :: map()
-  def draw_rect(
-        state,
-        x,
-        y,
-        width,
-        height,
-        h \\ "─",
-        v \\ "│",
-        tl \\ "┌",
-        tr \\ "┐",
-        bl \\ "└",
-        br \\ "┘"
-      ) do
+  @spec draw_rect(map(), integer(), integer(), integer(), integer(), map()) :: map()
+  def draw_rect(state, x, y, width, height, border \\ %{}) do
+    h = Map.get(border, :h, "─")
+    v = Map.get(border, :v, "│")
+    tl = Map.get(border, :tl, "┌")
+    tr = Map.get(border, :tr, "┐")
+    bl = Map.get(border, :bl, "└")
+    br = Map.get(border, :br, "┘")
+
     # Top edge
     state = set_char(state, x, y, tl)
     state = draw_hline(state, x + 1, y, width - 2, h)
@@ -359,34 +369,46 @@ defmodule TermUI.Widgets.Canvas do
     sx = if x1 < x2, do: 1, else: -1
     sy = if y1 < y2, do: 1, else: -1
 
-    draw_braille_line_impl(state, x1, y1, x2, y2, dx, dy, sx, sy, dx - dy)
+    line_state = %{
+      x: x1,
+      y: y1,
+      target_x: x2,
+      target_y: y2,
+      dx: dx,
+      dy: dy,
+      sx: sx,
+      sy: sy,
+      err: dx - dy
+    }
+
+    draw_braille_line_impl(state, line_state)
   end
 
-  defp draw_braille_line_impl(state, x, y, x2, y2, dx, dy, sx, sy, err) do
-    state = set_dot(state, x, y)
-
-    if x == x2 and y == y2 do
-      state
-    else
-      e2 = 2 * err
-
-      {new_x, new_err} =
-        if e2 > -dy do
-          {x + sx, err - dy}
-        else
-          {x, err}
-        end
-
-      {new_y, new_err} =
-        if e2 < dx do
-          {y + sy, new_err + dx}
-        else
-          {y, new_err}
-        end
-
-      draw_braille_line_impl(state, new_x, new_y, x2, y2, dx, dy, sx, sy, new_err)
-    end
+  defp draw_braille_line_impl(state, line_state) do
+    new_state = set_dot(state, line_state.x, line_state.y)
+    braille_line_step(new_state, line_state)
   end
+
+  defp braille_line_step(state, %{x: x, y: y, target_x: x, target_y: y}), do: state
+
+  defp braille_line_step(state, line_state) do
+    e2 = 2 * line_state.err
+
+    {new_x, new_err} =
+      update_x_position(e2, line_state.x, line_state.sx, line_state.err, line_state.dy)
+
+    {new_y, final_err} =
+      update_y_position(e2, line_state.y, line_state.sy, new_err, line_state.dx)
+
+    new_line_state = %{line_state | x: new_x, y: new_y, err: final_err}
+    draw_braille_line_impl(state, new_line_state)
+  end
+
+  defp update_x_position(e2, x, sx, err, dy) when e2 > -dy, do: {x + sx, err - dy}
+  defp update_x_position(_e2, x, _sx, err, _dy), do: {x, err}
+
+  defp update_y_position(e2, y, sy, err, dx) when e2 < dx, do: {y + sy, err + dx}
+  defp update_y_position(_e2, y, _sy, err, _dx), do: {y, err}
 
   @doc """
   Converts dots to a Braille character.

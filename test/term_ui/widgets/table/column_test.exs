@@ -1,8 +1,8 @@
 defmodule TermUI.Widgets.Table.ColumnTest do
   use ExUnit.Case, async: true
 
-  alias TermUI.Widgets.Table.Column
   alias TermUI.Layout.Constraint
+  alias TermUI.Widgets.Table.Column
 
   describe "new/3" do
     test "creates column with default values" do

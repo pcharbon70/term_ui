@@ -1,8 +1,8 @@
 defmodule TermUI.ShortcutTest do
   use ExUnit.Case, async: true
 
-  alias TermUI.Shortcut
   alias TermUI.Event
+  alias TermUI.Shortcut
 
   describe "start_link/1" do
     test "starts registry" do
@@ -63,7 +63,7 @@ defmodule TermUI.ShortcutTest do
       assert length(Shortcut.list(registry)) == 1
 
       Shortcut.unregister(registry, :q, [:ctrl])
-      assert length(Shortcut.list(registry)) == 0
+      assert Shortcut.list(registry) == []
     end
   end
 

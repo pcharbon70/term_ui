@@ -156,29 +156,27 @@ defmodule TermUI.Widgets.AlertDialog do
   end
 
   @impl true
+  def render(%{visible: false}, _area), do: empty()
+
   def render(state, area) do
-    if not state.visible do
-      empty()
-    else
-      # Calculate dialog position (centered)
-      dialog_width = state.width
-      dialog_height = calculate_height(state)
+    # Calculate dialog position (centered)
+    dialog_width = state.width
+    dialog_height = calculate_height(state)
 
-      pos_x = max(0, div(area.width - dialog_width, 2))
-      pos_y = max(0, div(area.height - dialog_height, 2))
+    pos_x = max(0, div(area.width - dialog_width, 2))
+    pos_y = max(0, div(area.height - dialog_height, 2))
 
-      # Render dialog content
-      dialog = render_dialog(state, dialog_width)
+    # Render dialog content
+    dialog = render_dialog(state, dialog_width)
 
-      # Return as overlay
-      %{
-        type: :overlay,
-        content: dialog,
-        x: pos_x,
-        y: pos_y,
-        z: 100
-      }
-    end
+    # Return as overlay
+    %{
+      type: :overlay,
+      content: dialog,
+      x: pos_x,
+      y: pos_y,
+      z: 100
+    }
   end
 
   # Private functions

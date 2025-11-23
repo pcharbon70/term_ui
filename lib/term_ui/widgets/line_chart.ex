@@ -187,32 +187,45 @@ defmodule TermUI.Widgets.LineChart do
     sy = if y1 < y2, do: 1, else: -1
     err = dx - dy
 
-    draw_line_loop(canvas, x1, y1, x2, y2, dx, dy, sx, sy, err)
+    line_state = %{
+      x: x1,
+      y: y1,
+      target_x: x2,
+      target_y: y2,
+      dx: dx,
+      dy: dy,
+      sx: sx,
+      sy: sy,
+      err: err
+    }
+
+    draw_line_loop(canvas, line_state)
   end
 
-  defp draw_line_loop(canvas, x, y, x2, y2, dx, dy, sx, sy, err) do
-    set_dot(canvas, x, y)
+  defp draw_line_loop(canvas, line_state) do
+    set_dot(canvas, line_state.x, line_state.y)
 
-    if x == x2 and y == y2 do
+    if line_state.x == line_state.target_x and line_state.y == line_state.target_y do
       :ok
     else
-      e2 = 2 * err
+      e2 = 2 * line_state.err
 
       {new_x, new_err} =
-        if e2 > -dy do
-          {x + sx, err - dy}
+        if e2 > -line_state.dy do
+          {line_state.x + line_state.sx, line_state.err - line_state.dy}
         else
-          {x, err}
+          {line_state.x, line_state.err}
         end
 
       {new_y, new_err} =
-        if e2 < dx do
-          {y + sy, new_err + dx}
+        if e2 < line_state.dx do
+          {line_state.y + line_state.sy, new_err + line_state.dx}
         else
-          {y, new_err}
+          {line_state.y, new_err}
         end
 
-      draw_line_loop(canvas, new_x, new_y, x2, y2, dx, dy, sx, sy, new_err)
+      new_line_state = %{line_state | x: new_x, y: new_y, err: new_err}
+      draw_line_loop(canvas, new_line_state)
     end
   end
 

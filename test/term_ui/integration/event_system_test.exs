@@ -16,18 +16,18 @@ defmodule TermUI.Integration.EventSystemTest do
   @long_timeout 200
   @extended_timeout 250
 
-  alias TermUI.Event
-  alias TermUI.Shortcut
-  alias TermUI.Mouse.Tracker, as: MouseTracker
-  alias TermUI.Mouse.Router, as: MouseRouter
   alias TermUI.Clipboard
   alias TermUI.Clipboard.Selection
-  alias TermUI.Focus
   alias TermUI.Command
   alias TermUI.Command.Executor
+  alias TermUI.ComponentRegistry
+  alias TermUI.Event
   alias TermUI.Event.Propagation
   alias TermUI.Event.Transformation
-  alias TermUI.ComponentRegistry
+  alias TermUI.Focus
+  alias TermUI.Mouse.Router, as: MouseRouter
+  alias TermUI.Mouse.Tracker, as: MouseTracker
+  alias TermUI.Shortcut
 
   describe "command execution workflows" do
     setup do

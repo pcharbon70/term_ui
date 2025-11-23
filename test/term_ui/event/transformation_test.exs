@@ -230,9 +230,9 @@ defmodule TermUI.Event.TransformationTest do
 
     test "allows custom timestamp" do
       event = Event.key(:enter)
-      result = Transformation.envelope(event, timestamp: 12345)
+      result = Transformation.envelope(event, timestamp: 12_345)
 
-      assert Transformation.get_metadata(result, :routed_at) == 12345
+      assert Transformation.get_metadata(result, :routed_at) == 12_345
     end
   end
 end

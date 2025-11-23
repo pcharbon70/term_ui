@@ -310,12 +310,10 @@ defmodule TermUI.Layout.Cache do
   end
 
   defp get_config do
-    try do
-      GenServer.call(__MODULE__, :get_config, 100)
-    catch
-      :exit, _ ->
-        %{max_size: @default_max_size, eviction_count: @default_eviction_count}
-    end
+    GenServer.call(__MODULE__, :get_config, 100)
+  catch
+    :exit, _ ->
+      %{max_size: @default_max_size, eviction_count: @default_eviction_count}
   end
 
   defp do_eviction(max_size, eviction_count) do

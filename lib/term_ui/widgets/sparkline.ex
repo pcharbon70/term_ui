@@ -59,38 +59,40 @@ defmodule TermUI.Widgets.Sparkline do
         {value_to_bar(value, min, max), value}
       end)
 
-    if Enum.empty?(color_ranges) do
-      # Simple rendering without colors
-      line = chars |> Enum.map(&elem(&1, 0)) |> Enum.join()
-      result = text(line)
-
-      if style do
-        styled(result, style)
+    result =
+      if Enum.empty?(color_ranges) do
+        render_simple(chars)
       else
-        result
+        render_colored(chars, color_ranges)
       end
-    else
-      # Color-coded rendering
-      parts =
-        Enum.map(chars, fn {char, value} ->
-          color = find_color_for_value(value, color_ranges)
 
-          if color do
-            styled(text(char), color)
-          else
-            text(char)
-          end
-        end)
+    apply_style(result, style)
+  end
 
-      result = stack(:horizontal, parts)
+  defp render_simple(chars) do
+    char_list = Enum.map(chars, &elem(&1, 0))
+    line = Enum.join(char_list)
+    text(line)
+  end
 
-      if style do
-        styled(result, style)
-      else
-        result
-      end
+  defp render_colored(chars, color_ranges) do
+    parts =
+      Enum.map(chars, fn {char, value} ->
+        style_char_with_color(char, value, color_ranges)
+      end)
+
+    stack(:horizontal, parts)
+  end
+
+  defp style_char_with_color(char, value, color_ranges) do
+    case find_color_for_value(value, color_ranges) do
+      nil -> text(char)
+      color -> styled(text(char), color)
     end
   end
+
+  defp apply_style(result, nil), do: result
+  defp apply_style(result, style), do: styled(result, style)
 
   @doc """
   Converts a single value to its sparkline bar character.
@@ -147,9 +149,7 @@ defmodule TermUI.Widgets.Sparkline do
     min = Keyword.get(opts, :min, Enum.min(values))
     max = Keyword.get(opts, :max, Enum.max(values))
 
-    values
-    |> Enum.map(&value_to_bar(&1, min, max))
-    |> Enum.join()
+    Enum.map_join(values, "", &value_to_bar(&1, min, max))
   end
 
   defp find_color_for_value(value, color_ranges) do
