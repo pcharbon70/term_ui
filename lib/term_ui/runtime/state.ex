@@ -22,7 +22,10 @@ defmodule TermUI.Runtime.State do
           focused_component: atom(),
           components: %{atom() => component_entry()},
           pending_commands: %{reference() => command_entry()},
-          shutting_down: boolean()
+          shutting_down: boolean(),
+          terminal_started: boolean(),
+          buffer_manager: pid() | nil,
+          dimensions: {pos_integer(), pos_integer()} | nil
         }
 
   @type component_entry :: %{
@@ -44,6 +47,9 @@ defmodule TermUI.Runtime.State do
     :focused_component,
     :components,
     :pending_commands,
-    :shutting_down
+    :shutting_down,
+    :terminal_started,
+    :buffer_manager,
+    :dimensions
   ]
 end

@@ -28,7 +28,12 @@ defmodule TermUI.Runtime do
   alias TermUI.Elm
   alias TermUI.Event
   alias TermUI.MessageQueue
+  alias TermUI.Renderer.BufferManager
+  alias TermUI.Renderer.Diff
+  alias TermUI.Renderer.SequenceBuffer
+  alias TermUI.Runtime.NodeRenderer
   alias TermUI.Runtime.State
+  alias TermUI.Terminal
 
   @type option ::
           {:root, module()}
@@ -114,6 +119,15 @@ defmodule TermUI.Runtime do
   def init(opts) do
     root_module = Keyword.fetch!(opts, :root)
     render_interval = Keyword.get(opts, :render_interval, @default_render_interval)
+    skip_terminal = Keyword.get(opts, :skip_terminal, false)
+
+    # Initialize terminal and buffer manager (unless skipped for tests)
+    {terminal_started, buffer_manager, dimensions} =
+      if skip_terminal do
+        {false, nil, nil}
+      else
+        initialize_terminal()
+      end
 
     # Initialize root component state
     root_state =
@@ -133,13 +147,54 @@ defmodule TermUI.Runtime do
       focused_component: :root,
       components: %{root: %{module: root_module, state: root_state}},
       pending_commands: %{},
-      shutting_down: false
+      shutting_down: false,
+      terminal_started: terminal_started,
+      buffer_manager: buffer_manager,
+      dimensions: dimensions
     }
 
     # Schedule first render
     schedule_render(render_interval)
 
     {:ok, state}
+  end
+
+  defp initialize_terminal do
+    # Start Terminal GenServer
+    case Terminal.start_link() do
+      {:ok, _pid} ->
+        setup_terminal_and_buffers()
+
+      {:error, {:already_started, _pid}} ->
+        setup_terminal_and_buffers()
+
+      {:error, _reason} ->
+        # Terminal not available (e.g., not a TTY)
+        {false, nil, nil}
+    end
+  end
+
+  defp setup_terminal_and_buffers do
+    # Enable raw mode and alternate screen
+    Terminal.enable_raw_mode()
+    Terminal.enter_alternate_screen()
+    Terminal.hide_cursor()
+
+    # Get terminal dimensions
+    {rows, cols} =
+      case Terminal.get_terminal_size() do
+        {:ok, {rows, cols}} -> {rows, cols}
+        {:error, _reason} -> {24, 80}
+      end
+
+    # Start BufferManager with terminal dimensions
+    buffer_pid =
+      case BufferManager.start_link(rows: rows, cols: cols) do
+        {:ok, pid} -> pid
+        {:error, {:already_started, pid}} -> pid
+      end
+
+    {true, buffer_pid, {cols, rows}}
   end
 
   @impl true
@@ -202,6 +257,11 @@ defmodule TermUI.Runtime do
     # Ensure clean shutdown
     if not state.shutting_down do
       do_shutdown(state)
+    end
+
+    # Restore terminal
+    if state.terminal_started do
+      Terminal.restore()
     end
 
     :ok
@@ -381,14 +441,68 @@ defmodule TermUI.Runtime do
   end
 
   defp do_render(state) do
-    # Call view on root component
-    %{module: module, state: component_state} = Map.get(state.components, :root)
+    # Skip rendering if terminal not available
+    if not state.terminal_started do
+      %{state | dirty: false}
+    else
+      # Call view on root component
+      %{module: module, state: component_state} = Map.get(state.components, :root)
+      render_tree = module.view(component_state)
 
-    _render_tree = module.view(component_state)
+      # Clear current buffer
+      BufferManager.clear_current(state.buffer_manager)
 
-    # For now, just mark as clean
-    # Actual rendering to buffer will integrate with Phase 2
-    %{state | dirty: false}
+      # Render tree to buffer
+      NodeRenderer.render_to_buffer(render_tree, state.buffer_manager)
+
+      # Get buffers for diffing
+      current = BufferManager.get_current_buffer(state.buffer_manager)
+      previous = BufferManager.get_previous_buffer(state.buffer_manager)
+
+      # Compute diff operations
+      operations = Diff.diff(current, previous)
+
+      # Render operations to terminal
+      render_operations(operations)
+
+      # Swap buffers
+      BufferManager.swap_buffers(state.buffer_manager)
+
+      %{state | dirty: false}
+    end
+  end
+
+  defp render_operations([]), do: :ok
+
+  defp render_operations(operations) do
+    seq_buffer = SequenceBuffer.new()
+
+    seq_buffer =
+      Enum.reduce(operations, seq_buffer, fn op, buf ->
+        apply_operation(op, buf)
+      end)
+
+    # Flush to terminal
+    {output, _buf} = SequenceBuffer.flush(seq_buffer)
+    IO.write(output)
+  end
+
+  defp apply_operation({:move, row, col}, buffer) do
+    # ANSI cursor position: ESC[row;colH
+    seq = "\e[#{row};#{col}H"
+    SequenceBuffer.append!(buffer, seq)
+  end
+
+  defp apply_operation({:style, style}, buffer) do
+    SequenceBuffer.append_style(buffer, style)
+  end
+
+  defp apply_operation({:text, text}, buffer) do
+    SequenceBuffer.append!(buffer, text)
+  end
+
+  defp apply_operation(:reset, buffer) do
+    SequenceBuffer.append!(buffer, "\e[0m")
   end
 
   # --- Shutdown ---
