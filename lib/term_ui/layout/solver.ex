@@ -191,12 +191,13 @@ defmodule TermUI.Layout.Solver do
   end
 
   defp single_fill?(constraints) do
-    fills = Enum.count(constraints, fn c ->
-      case Constraint.unwrap(c) do
-        %Fill{} -> true
-        _ -> false
-      end
-    end)
+    fills =
+      Enum.count(constraints, fn c ->
+        case Constraint.unwrap(c) do
+          %Fill{} -> true
+          _ -> false
+        end
+      end)
 
     fills == 1 and
       Enum.all?(constraints, fn c ->
@@ -358,7 +359,10 @@ defmodule TermUI.Layout.Solver do
 
     if reducible == [] do
       # Nothing can be reduced, return as is with warning
-      Logger.warning("Cannot satisfy min constraints: total #{total} exceeds available #{available}")
+      Logger.warning(
+        "Cannot satisfy min constraints: total #{total} exceeds available #{available}"
+      )
+
       sizes
     else
       # Calculate how much each can be reduced

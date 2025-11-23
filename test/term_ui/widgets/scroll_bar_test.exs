@@ -17,13 +17,15 @@ defmodule TermUI.Widgets.ScrollBarTest do
     end
 
     test "initializes with custom values" do
-      props = ScrollBar.new(
-        orientation: :horizontal,
-        total: 200,
-        visible: 50,
-        position: 25,
-        length: 30
-      )
+      props =
+        ScrollBar.new(
+          orientation: :horizontal,
+          total: 200,
+          visible: 50,
+          position: 25,
+          length: 30
+        )
+
       {:ok, state} = ScrollBar.init(props)
 
       assert state.orientation == :horizontal
@@ -34,11 +36,13 @@ defmodule TermUI.Widgets.ScrollBarTest do
     end
 
     test "clamps initial position" do
-      props = ScrollBar.new(
-        total: 100,
-        visible: 20,
-        position: 200
-      )
+      props =
+        ScrollBar.new(
+          total: 100,
+          visible: 20,
+          position: 200
+        )
+
       {:ok, state} = ScrollBar.init(props)
 
       # Should be clamped to max (100 - 20 = 80)
@@ -152,12 +156,14 @@ defmodule TermUI.Widgets.ScrollBarTest do
     end
 
     test "uses custom track and thumb characters" do
-      props = ScrollBar.new(
-        orientation: :horizontal,
-        length: 10,
-        track_char: "-",
-        thumb_char: "#"
-      )
+      props =
+        ScrollBar.new(
+          orientation: :horizontal,
+          length: 10,
+          track_char: "-",
+          thumb_char: "#"
+        )
+
       {:ok, state} = ScrollBar.init(props)
 
       result = ScrollBar.render(state, %{width: 80, height: 24, x: 0, y: 0})
@@ -167,12 +173,14 @@ defmodule TermUI.Widgets.ScrollBarTest do
 
     test "thumb size proportional to visible fraction" do
       # Large visible fraction = large thumb
-      props = ScrollBar.new(
-        orientation: :horizontal,
-        total: 100,
-        visible: 80,
-        length: 20
-      )
+      props =
+        ScrollBar.new(
+          orientation: :horizontal,
+          total: 100,
+          visible: 80,
+          length: 20
+        )
+
       {:ok, state} = ScrollBar.init(props)
 
       result = ScrollBar.render(state, %{width: 80, height: 24, x: 0, y: 0})

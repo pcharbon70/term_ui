@@ -281,9 +281,10 @@ defmodule TermUI.Widgets.TableTest do
   describe "virtual scrolling" do
     setup do
       # Create larger dataset
-      data = Enum.map(1..100, fn i ->
-        %{name: "Person #{i}", age: 20 + rem(i, 50), city: "City #{rem(i, 10)}"}
-      end)
+      data =
+        Enum.map(1..100, fn i ->
+          %{name: "Person #{i}", age: 20 + rem(i, 50), city: "City #{rem(i, 10)}"}
+        end)
 
       props = Table.new(columns: @test_columns, data: data)
       {:ok, state} = Table.init(props)
@@ -412,7 +413,8 @@ defmodule TermUI.Widgets.TableTest do
       data = Enum.map(1..1000, fn i -> %{name: "Person #{i}", age: i, city: "City"} end)
       props = Table.new(columns: @test_columns, data: data)
       {:ok, state} = Table.init(props)
-      area = %{x: 0, y: 0, width: 80, height: 11}  # 10 visible rows + header
+      # 10 visible rows + header
+      area = %{x: 0, y: 0, width: 80, height: 11}
 
       result = Table.render(state, area)
 

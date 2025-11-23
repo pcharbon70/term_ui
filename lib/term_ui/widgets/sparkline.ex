@@ -53,10 +53,11 @@ defmodule TermUI.Widgets.Sparkline do
     style = Keyword.get(opts, :style)
     color_ranges = Keyword.get(opts, :color_ranges, [])
 
-    chars = values
-    |> Enum.map(fn value ->
-      {value_to_bar(value, min, max), value}
-    end)
+    chars =
+      values
+      |> Enum.map(fn value ->
+        {value_to_bar(value, min, max), value}
+      end)
 
     if Enum.empty?(color_ranges) do
       # Simple rendering without colors
@@ -70,14 +71,16 @@ defmodule TermUI.Widgets.Sparkline do
       end
     else
       # Color-coded rendering
-      parts = Enum.map(chars, fn {char, value} ->
-        color = find_color_for_value(value, color_ranges)
-        if color do
-          styled(text(char), color)
-        else
-          text(char)
-        end
-      end)
+      parts =
+        Enum.map(chars, fn {char, value} ->
+          color = find_color_for_value(value, color_ranges)
+
+          if color do
+            styled(text(char), color)
+          else
+            text(char)
+          end
+        end)
 
       result = stack(:horizontal, parts)
 
@@ -183,25 +186,28 @@ defmodule TermUI.Widgets.Sparkline do
 
       parts = []
 
-      parts = if label != "" do
-        [text(label <> " ") | parts]
-      else
-        parts
-      end
+      parts =
+        if label != "" do
+          [text(label <> " ") | parts]
+        else
+          parts
+        end
 
-      parts = if show_range do
-        [text("#{min} ") | parts]
-      else
-        parts
-      end
+      parts =
+        if show_range do
+          [text("#{min} ") | parts]
+        else
+          parts
+        end
 
       parts = [text(sparkline) | parts]
 
-      parts = if show_range do
-        [text(" #{max}") | parts]
-      else
-        parts
-      end
+      parts =
+        if show_range do
+          [text(" #{max}") | parts]
+        else
+          parts
+        end
 
       stack(:horizontal, Enum.reverse(parts))
     end

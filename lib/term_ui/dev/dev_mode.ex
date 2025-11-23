@@ -37,31 +37,31 @@ defmodule TermUI.Dev.DevMode do
   alias TermUI.Dev.PerfMonitor
 
   @type state :: %{
-    enabled: boolean(),
-    ui_inspector: boolean(),
-    state_inspector: boolean(),
-    perf_monitor: boolean(),
-    hot_reload: boolean(),
-    selected_component: term() | nil,
-    components: %{term() => component_info()},
-    metrics: metrics()
-  }
+          enabled: boolean(),
+          ui_inspector: boolean(),
+          state_inspector: boolean(),
+          perf_monitor: boolean(),
+          hot_reload: boolean(),
+          selected_component: term() | nil,
+          components: %{term() => component_info()},
+          metrics: metrics()
+        }
 
   @type component_info :: %{
-    module: module(),
-    state: term(),
-    render_time: integer(),
-    bounds: bounds()
-  }
+          module: module(),
+          state: term(),
+          render_time: integer(),
+          bounds: bounds()
+        }
 
   @type bounds :: %{x: integer(), y: integer(), width: integer(), height: integer()}
 
   @type metrics :: %{
-    fps: float(),
-    frame_times: [integer()],
-    memory: integer(),
-    process_count: integer()
-  }
+          fps: float(),
+          frame_times: [integer()],
+          memory: integer(),
+          process_count: integer()
+        }
 
   # Client API
 
@@ -374,18 +374,22 @@ defmodule TermUI.Dev.DevMode do
   end
 
   def handle_cast({:update_component_state, id, comp_state}, state) do
-    components = update_in(state.components, [id], fn
-      nil -> nil
-      info -> %{info | state: comp_state}
-    end)
+    components =
+      update_in(state.components, [id], fn
+        nil -> nil
+        info -> %{info | state: comp_state}
+      end)
+
     {:noreply, %{state | components: components}}
   end
 
   def handle_cast({:record_render_time, id, time_us}, state) do
-    components = update_in(state.components, [id], fn
-      nil -> nil
-      info -> %{info | render_time: time_us}
-    end)
+    components =
+      update_in(state.components, [id], fn
+        nil -> nil
+        info -> %{info | render_time: time_us}
+      end)
+
     {:noreply, %{state | components: components}}
   end
 
@@ -398,11 +402,13 @@ defmodule TermUI.Dev.DevMode do
     frame_times = [frame_time_us | state.metrics.frame_times] |> Enum.take(60)
 
     # Calculate FPS from average frame time
-    avg_time = if length(frame_times) > 0 do
-      Enum.sum(frame_times) / length(frame_times)
-    else
-      16666  # Default to ~60 FPS
-    end
+    avg_time =
+      if length(frame_times) > 0 do
+        Enum.sum(frame_times) / length(frame_times)
+      else
+        # Default to ~60 FPS
+        16666
+      end
 
     fps = if avg_time > 0, do: 1_000_000 / avg_time, else: 0.0
 
@@ -431,24 +437,27 @@ defmodule TermUI.Dev.DevMode do
   def render_overlays(state, area) do
     overlays = []
 
-    overlays = if state.ui_inspector do
-      [UIInspector.render(state.components, state.selected_component, area) | overlays]
-    else
-      overlays
-    end
+    overlays =
+      if state.ui_inspector do
+        [UIInspector.render(state.components, state.selected_component, area) | overlays]
+      else
+        overlays
+      end
 
-    overlays = if state.state_inspector do
-      selected = state.components[state.selected_component]
-      [StateInspector.render(selected, area) | overlays]
-    else
-      overlays
-    end
+    overlays =
+      if state.state_inspector do
+        selected = state.components[state.selected_component]
+        [StateInspector.render(selected, area) | overlays]
+      else
+        overlays
+      end
 
-    overlays = if state.perf_monitor do
-      [PerfMonitor.render(state.metrics, area) | overlays]
-    else
-      overlays
-    end
+    overlays =
+      if state.perf_monitor do
+        [PerfMonitor.render(state.metrics, area) | overlays]
+      else
+        overlays
+      end
 
     overlays
   end

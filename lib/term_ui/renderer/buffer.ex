@@ -379,7 +379,8 @@ defmodule TermUI.Renderer.Buffer do
       iex> Buffer.write_string(buffer, 1, 1, "Hello")
       5
   """
-  @spec write_string(t(), pos_integer(), pos_integer(), String.t(), keyword()) :: non_neg_integer()
+  @spec write_string(t(), pos_integer(), pos_integer(), String.t(), keyword()) ::
+          non_neg_integer()
   def write_string(%__MODULE__{} = buffer, row, col, string, opts \\ []) do
     style = Keyword.get(opts, :style)
 

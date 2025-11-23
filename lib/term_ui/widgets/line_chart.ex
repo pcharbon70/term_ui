@@ -35,14 +35,22 @@ defmodule TermUI.Widgets.LineChart do
 
   # Dot positions in braille cell (column, row) -> bit
   @dot_bits %{
-    {0, 0} => 0x01,  # dot 1
-    {0, 1} => 0x02,  # dot 2
-    {0, 2} => 0x04,  # dot 3
-    {1, 0} => 0x08,  # dot 4
-    {1, 1} => 0x10,  # dot 5
-    {1, 2} => 0x20,  # dot 6
-    {0, 3} => 0x40,  # dot 7
-    {1, 3} => 0x80   # dot 8
+    # dot 1
+    {0, 0} => 0x01,
+    # dot 2
+    {0, 1} => 0x02,
+    # dot 3
+    {0, 2} => 0x04,
+    # dot 4
+    {1, 0} => 0x08,
+    # dot 5
+    {1, 1} => 0x10,
+    # dot 6
+    {1, 2} => 0x20,
+    # dot 7
+    {0, 3} => 0x40,
+    # dot 8
+    {1, 3} => 0x80
   }
 
   @doc """
@@ -106,27 +114,30 @@ defmodule TermUI.Widgets.LineChart do
     end)
 
     # Convert canvas to braille characters
-    rows = for y <- 0..(height - 1) do
-      chars = for x <- 0..(width - 1) do
-        pattern = get_cell_pattern(canvas, x, y)
-        <<@braille_base + pattern::utf8>>
-      end
+    rows =
+      for y <- 0..(height - 1) do
+        chars =
+          for x <- 0..(width - 1) do
+            pattern = get_cell_pattern(canvas, x, y)
+            <<@braille_base + pattern::utf8>>
+          end
 
-      Enum.join(chars)
-    end
+        Enum.join(chars)
+      end
 
     :ets.delete(canvas)
 
     # Build render tree
     row_nodes = Enum.map(rows, &text/1)
 
-    result = if show_axis do
-      # Add axis
-      axis_row = text("└" <> String.duplicate("─", width - 1))
-      stack(:vertical, row_nodes ++ [axis_row])
-    else
-      stack(:vertical, row_nodes)
-    end
+    result =
+      if show_axis do
+        # Add axis
+        axis_row = text("└" <> String.duplicate("─", width - 1))
+        stack(:vertical, row_nodes ++ [axis_row])
+      else
+        stack(:vertical, row_nodes)
+      end
 
     if style do
       styled(result, style)
@@ -136,13 +147,14 @@ defmodule TermUI.Widgets.LineChart do
   end
 
   defp draw_series(canvas, data, canvas_width, canvas_height, min, max) do
-    points = data
-    |> Enum.with_index()
-    |> Enum.map(fn {value, index} ->
-      x = round(index / max(1, length(data) - 1) * (canvas_width - 1))
-      y = value_to_y(value, min, max, canvas_height)
-      {x, y}
-    end)
+    points =
+      data
+      |> Enum.with_index()
+      |> Enum.map(fn {value, index} ->
+        x = round(index / max(1, length(data) - 1) * (canvas_width - 1))
+        y = value_to_y(value, min, max, canvas_height)
+        {x, y}
+      end)
 
     # Draw lines between consecutive points
     points
@@ -186,17 +198,19 @@ defmodule TermUI.Widgets.LineChart do
     else
       e2 = 2 * err
 
-      {new_x, new_err} = if e2 > -dy do
-        {x + sx, err - dy}
-      else
-        {x, err}
-      end
+      {new_x, new_err} =
+        if e2 > -dy do
+          {x + sx, err - dy}
+        else
+          {x, err}
+        end
 
-      {new_y, new_err} = if e2 < dx do
-        {y + sy, new_err + dx}
-      else
-        {y, new_err}
-      end
+      {new_y, new_err} =
+        if e2 < dx do
+          {y + sy, new_err + dx}
+        else
+          {y, new_err}
+        end
 
       draw_line_loop(canvas, new_x, new_y, x2, y2, dx, dy, sx, sy, new_err)
     end
@@ -229,10 +243,11 @@ defmodule TermUI.Widgets.LineChart do
   """
   @spec dots_to_braille([{0 | 1, 0..3}]) :: String.t()
   def dots_to_braille(dots) do
-    pattern = Enum.reduce(dots, 0, fn {x, y}, acc ->
-      bit = Map.get(@dot_bits, {x, y}, 0)
-      Bitwise.bor(acc, bit)
-    end)
+    pattern =
+      Enum.reduce(dots, 0, fn {x, y}, acc ->
+        bit = Map.get(@dot_bits, {x, y}, 0)
+        Bitwise.bor(acc, bit)
+      end)
 
     <<@braille_base + pattern::utf8>>
   end

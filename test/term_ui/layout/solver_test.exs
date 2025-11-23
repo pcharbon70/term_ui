@@ -135,7 +135,8 @@ defmodule TermUI.Layout.SolverTest do
       # Min bound should be respected
       assert fill >= 20
       # Total should not exceed available
-      assert fixed + fill <= 110  # Allow some overflow in conflict cases
+      # Allow some overflow in conflict cases
+      assert fixed + fill <= 110
     end
 
     test "fill with max" do
@@ -209,7 +210,8 @@ defmodule TermUI.Layout.SolverTest do
         end)
 
       # Should warn about conflict
-      assert log =~ "" or true  # Just ensure it completes
+      # Just ensure it completes
+      assert log =~ "" or true
     end
   end
 
@@ -423,11 +425,12 @@ defmodule TermUI.Layout.SolverTest do
       ]
 
       # Should complete in reasonable time (< 10ms)
-      {time, _result} = :timer.tc(fn ->
-        for _ <- 1..1000 do
-          Solver.solve(constraints, 1000)
-        end
-      end)
+      {time, _result} =
+        :timer.tc(fn ->
+          for _ <- 1..1000 do
+            Solver.solve(constraints, 1000)
+          end
+        end)
 
       # 1000 solves should take less than 100ms
       assert time < 100_000
@@ -442,11 +445,12 @@ defmodule TermUI.Layout.SolverTest do
 
       area = %{x: 0, y: 0, width: 1000, height: 50}
 
-      {time, _result} = :timer.tc(fn ->
-        for _ <- 1..1000 do
-          Solver.solve_to_rects(constraints, area)
-        end
-      end)
+      {time, _result} =
+        :timer.tc(fn ->
+          for _ <- 1..1000 do
+            Solver.solve_to_rects(constraints, area)
+          end
+        end)
 
       # Should still be fast
       assert time < 100_000

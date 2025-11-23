@@ -9,22 +9,38 @@ defmodule TermUI.Capabilities.Fallbacks do
 
   # Standard 16 ANSI colors as RGB
   @ansi_colors %{
-    0 => {0, 0, 0},         # Black
-    1 => {128, 0, 0},       # Red
-    2 => {0, 128, 0},       # Green
-    3 => {128, 128, 0},     # Yellow
-    4 => {0, 0, 128},       # Blue
-    5 => {128, 0, 128},     # Magenta
-    6 => {0, 128, 128},     # Cyan
-    7 => {192, 192, 192},   # White
-    8 => {128, 128, 128},   # Bright Black
-    9 => {255, 0, 0},       # Bright Red
-    10 => {0, 255, 0},      # Bright Green
-    11 => {255, 255, 0},    # Bright Yellow
-    12 => {0, 0, 255},      # Bright Blue
-    13 => {255, 0, 255},    # Bright Magenta
-    14 => {0, 255, 255},    # Bright Cyan
-    15 => {255, 255, 255}   # Bright White
+    # Black
+    0 => {0, 0, 0},
+    # Red
+    1 => {128, 0, 0},
+    # Green
+    2 => {0, 128, 0},
+    # Yellow
+    3 => {128, 128, 0},
+    # Blue
+    4 => {0, 0, 128},
+    # Magenta
+    5 => {128, 0, 128},
+    # Cyan
+    6 => {0, 128, 128},
+    # White
+    7 => {192, 192, 192},
+    # Bright Black
+    8 => {128, 128, 128},
+    # Bright Red
+    9 => {255, 0, 0},
+    # Bright Green
+    10 => {0, 255, 0},
+    # Bright Yellow
+    11 => {255, 255, 0},
+    # Bright Blue
+    12 => {0, 0, 255},
+    # Bright Magenta
+    13 => {255, 0, 255},
+    # Bright Cyan
+    14 => {0, 255, 255},
+    # Bright White
+    15 => {255, 255, 255}
   }
 
   # Box-drawing character fallbacks
@@ -101,7 +117,7 @@ defmodule TermUI.Capabilities.Fallbacks do
       r_idx = color_to_cube_index(r)
       g_idx = color_to_cube_index(g)
       b_idx = color_to_cube_index(b)
-      16 + (36 * r_idx) + (6 * g_idx) + b_idx
+      16 + 36 * r_idx + 6 * g_idx + b_idx
     end
   end
 

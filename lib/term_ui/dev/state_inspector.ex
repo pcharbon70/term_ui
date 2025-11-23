@@ -45,7 +45,8 @@ defmodule TermUI.Dev.StateInspector do
       content: panel,
       x: panel_x,
       y: 0,
-      z: 190  # Below UI inspector but above content
+      # Below UI inspector but above content
+      z: 190
     }
   end
 
@@ -114,16 +115,17 @@ defmodule TermUI.Dev.StateInspector do
 
     header = [indent <> "%{"]
 
-    entries = map
-    |> Enum.flat_map(fn {key, value} ->
-      key_str = format_key(key)
+    entries =
+      map
+      |> Enum.flat_map(fn {key, value} ->
+        key_str = format_key(key)
 
-      if is_simple_value(value) do
-        [indent <> "  #{key_str}: #{format_value(value)}"]
-      else
-        [indent <> "  #{key_str}:" | render_state_tree(value, depth + 2)]
-      end
-    end)
+        if is_simple_value(value) do
+          [indent <> "  #{key_str}: #{format_value(value)}"]
+        else
+          [indent <> "  #{key_str}:" | render_state_tree(value, depth + 2)]
+        end
+      end)
 
     footer = [indent <> "}"]
 
@@ -135,28 +137,31 @@ defmodule TermUI.Dev.StateInspector do
 
     if length(list) > 10 do
       # Truncate long lists
-      first_items = list
-      |> Enum.take(5)
-      |> Enum.with_index()
-      |> Enum.flat_map(fn {item, idx} ->
-        if is_simple_value(item) do
-          [indent <> "  [#{idx}]: #{format_value(item)}"]
-        else
-          [indent <> "  [#{idx}]:" | render_state_tree(item, depth + 2)]
-        end
-      end)
+      first_items =
+        list
+        |> Enum.take(5)
+        |> Enum.with_index()
+        |> Enum.flat_map(fn {item, idx} ->
+          if is_simple_value(item) do
+            [indent <> "  [#{idx}]: #{format_value(item)}"]
+          else
+            [indent <> "  [#{idx}]:" | render_state_tree(item, depth + 2)]
+          end
+        end)
 
-      [indent <> "["] ++ first_items ++ [indent <> "  ... (#{length(list) - 5} more)", indent <> "]"]
+      [indent <> "["] ++
+        first_items ++ [indent <> "  ... (#{length(list) - 5} more)", indent <> "]"]
     else
-      entries = list
-      |> Enum.with_index()
-      |> Enum.flat_map(fn {item, idx} ->
-        if is_simple_value(item) do
-          [indent <> "  [#{idx}]: #{format_value(item)}"]
-        else
-          [indent <> "  [#{idx}]:" | render_state_tree(item, depth + 2)]
-        end
-      end)
+      entries =
+        list
+        |> Enum.with_index()
+        |> Enum.flat_map(fn {item, idx} ->
+          if is_simple_value(item) do
+            [indent <> "  [#{idx}]: #{format_value(item)}"]
+          else
+            [indent <> "  [#{idx}]:" | render_state_tree(item, depth + 2)]
+          end
+        end)
 
       [indent <> "["] ++ entries ++ [indent <> "]"]
     end
@@ -171,15 +176,16 @@ defmodule TermUI.Dev.StateInspector do
       values = Enum.map_join(elements, ", ", &format_value/1)
       [indent <> "{#{values}}"]
     else
-      entries = elements
-      |> Enum.with_index()
-      |> Enum.flat_map(fn {item, idx} ->
-        if is_simple_value(item) do
-          [indent <> "  .#{idx}: #{format_value(item)}"]
-        else
-          [indent <> "  .#{idx}:" | render_state_tree(item, depth + 2)]
-        end
-      end)
+      entries =
+        elements
+        |> Enum.with_index()
+        |> Enum.flat_map(fn {item, idx} ->
+          if is_simple_value(item) do
+            [indent <> "  .#{idx}: #{format_value(item)}"]
+          else
+            [indent <> "  .#{idx}:" | render_state_tree(item, depth + 2)]
+          end
+        end)
 
       [indent <> "{"] ++ entries ++ [indent <> "}"]
     end
@@ -194,16 +200,17 @@ defmodule TermUI.Dev.StateInspector do
     if map_size(map) == 0 do
       [indent <> "%#{struct_name}{}"]
     else
-      entries = map
-      |> Enum.flat_map(fn {key, value} ->
-        key_str = to_string(key)
+      entries =
+        map
+        |> Enum.flat_map(fn {key, value} ->
+          key_str = to_string(key)
 
-        if is_simple_value(value) do
-          [indent <> "  #{key_str}: #{format_value(value)}"]
-        else
-          [indent <> "  #{key_str}:" | render_state_tree(value, depth + 2)]
-        end
-      end)
+          if is_simple_value(value) do
+            [indent <> "  #{key_str}: #{format_value(value)}"]
+          else
+            [indent <> "  #{key_str}:" | render_state_tree(value, depth + 2)]
+          end
+        end)
 
       [indent <> "%#{struct_name}{"] ++ entries ++ [indent <> "}"]
     end
@@ -214,7 +221,7 @@ defmodule TermUI.Dev.StateInspector do
 
   defp is_simple_value(value) do
     is_atom(value) or is_number(value) or is_binary(value) or
-    is_boolean(value) or is_nil(value) or is_pid(value) or is_reference(value)
+      is_boolean(value) or is_nil(value) or is_pid(value) or is_reference(value)
   end
 
   defp format_key(key) when is_atom(key), do: to_string(key)
@@ -226,6 +233,7 @@ defmodule TermUI.Dev.StateInspector do
   defp format_value(value) when is_atom(value), do: ":#{value}"
   defp format_value(value) when is_integer(value), do: to_string(value)
   defp format_value(value) when is_float(value), do: Float.to_string(value)
+
   defp format_value(value) when is_binary(value) do
     if String.printable?(value) do
       if String.length(value) > 30 do
@@ -237,12 +245,15 @@ defmodule TermUI.Dev.StateInspector do
       "<<binary #{byte_size(value)} bytes>>"
     end
   end
+
   defp format_value(value) when is_pid(value), do: inspect(value)
   defp format_value(value) when is_reference(value), do: "#Ref<...>"
+
   defp format_value(value) when is_function(value) do
     info = Function.info(value)
     "#Function<#{info[:arity]}>"
   end
+
   defp format_value(value), do: inspect(value, limit: 10)
 
   defp get_module_name(module) when is_atom(module) do

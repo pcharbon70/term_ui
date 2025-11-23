@@ -60,14 +60,18 @@ defmodule TermUI.Component.HelpersTest do
   describe "props!/2" do
     test "validates required props" do
       props = %{name: "Test"}
-      result = Helpers.props!(props, [
-        {:name, :string, required: true}
-      ])
+
+      result =
+        Helpers.props!(props, [
+          {:name, :string, required: true}
+        ])
+
       assert result.name == "Test"
     end
 
     test "raises on missing required prop" do
       props = %{}
+
       assert_raise ArgumentError, ~r/Required prop :name is missing/, fn ->
         Helpers.props!(props, [
           {:name, :string, required: true}
@@ -77,22 +81,29 @@ defmodule TermUI.Component.HelpersTest do
 
     test "applies default values" do
       props = %{}
-      result = Helpers.props!(props, [
-        {:count, :integer, default: 0}
-      ])
+
+      result =
+        Helpers.props!(props, [
+          {:count, :integer, default: 0}
+        ])
+
       assert result.count == 0
     end
 
     test "passed values override defaults" do
       props = %{count: 42}
-      result = Helpers.props!(props, [
-        {:count, :integer, default: 0}
-      ])
+
+      result =
+        Helpers.props!(props, [
+          {:count, :integer, default: 0}
+        ])
+
       assert result.count == 42
     end
 
     test "validates string type" do
       props = %{name: 123}
+
       assert_raise ArgumentError, ~r/must be a string/, fn ->
         Helpers.props!(props, [
           {:name, :string, required: true}
@@ -102,6 +113,7 @@ defmodule TermUI.Component.HelpersTest do
 
     test "validates integer type" do
       props = %{count: "not a number"}
+
       assert_raise ArgumentError, ~r/must be an integer/, fn ->
         Helpers.props!(props, [
           {:count, :integer, required: true}
@@ -111,6 +123,7 @@ defmodule TermUI.Component.HelpersTest do
 
     test "validates boolean type" do
       props = %{enabled: "yes"}
+
       assert_raise ArgumentError, ~r/must be a boolean/, fn ->
         Helpers.props!(props, [
           {:enabled, :boolean, required: true}
@@ -120,6 +133,7 @@ defmodule TermUI.Component.HelpersTest do
 
     test "validates atom type" do
       props = %{mode: "fast"}
+
       assert_raise ArgumentError, ~r/must be an atom/, fn ->
         Helpers.props!(props, [
           {:mode, :atom, required: true}
@@ -129,6 +143,7 @@ defmodule TermUI.Component.HelpersTest do
 
     test "validates style type" do
       props = %{style: %{}}
+
       assert_raise ArgumentError, ~r/must be a Style/, fn ->
         Helpers.props!(props, [
           {:style, :style, required: true}
@@ -138,27 +153,36 @@ defmodule TermUI.Component.HelpersTest do
 
     test "any type accepts anything" do
       props = %{data: {:some, :tuple}}
-      result = Helpers.props!(props, [
-        {:data, :any, required: true}
-      ])
+
+      result =
+        Helpers.props!(props, [
+          {:data, :any, required: true}
+        ])
+
       assert result.data == {:some, :tuple}
     end
 
     test "nil values pass type validation" do
       props = %{name: nil}
-      result = Helpers.props!(props, [
-        {:name, :string, default: "default"}
-      ])
+
+      result =
+        Helpers.props!(props, [
+          {:name, :string, default: "default"}
+        ])
+
       assert result.name == nil
     end
 
     test "multiple props" do
       props = %{name: "Test", count: 5}
-      result = Helpers.props!(props, [
-        {:name, :string, required: true},
-        {:count, :integer, default: 0},
-        {:enabled, :boolean, default: true}
-      ])
+
+      result =
+        Helpers.props!(props, [
+          {:name, :string, required: true},
+          {:count, :integer, default: 0},
+          {:enabled, :boolean, default: true}
+        ])
+
       assert result.name == "Test"
       assert result.count == 5
       assert result.enabled == true
@@ -167,9 +191,12 @@ defmodule TermUI.Component.HelpersTest do
     test "accepts valid Style struct" do
       style = Style.new() |> Style.fg(:red)
       props = %{style: style}
-      result = Helpers.props!(props, [
-        {:style, :style, required: true}
-      ])
+
+      result =
+        Helpers.props!(props, [
+          {:style, :style, required: true}
+        ])
+
       assert result.style.fg == :red
     end
   end

@@ -328,7 +328,13 @@ defmodule TermUI.Renderer.FramerateLimiter do
     state =
       if state.paused do
         timer_ref = schedule_tick(state)
-        %{state | timer_ref: timer_ref, paused: false, last_tick: System.monotonic_time(:microsecond)}
+
+        %{
+          state
+          | timer_ref: timer_ref,
+            paused: false,
+            last_tick: System.monotonic_time(:microsecond)
+        }
       else
         state
       end

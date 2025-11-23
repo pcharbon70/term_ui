@@ -79,53 +79,60 @@ defmodule TermUI.Widgets.BarChart do
 
   defp do_render_horizontal(data, width, show_values, show_labels, bar_char, colors, style) do
     max_value = data |> Enum.map(& &1.value) |> Enum.max()
-    max_label_len = if show_labels do
-      data |> Enum.map(&String.length(&1.label)) |> Enum.max()
-    else
-      0
-    end
+
+    max_label_len =
+      if show_labels do
+        data |> Enum.map(&String.length(&1.label)) |> Enum.max()
+      else
+        0
+      end
 
     # Calculate bar width
     value_width = if show_values, do: 8, else: 0
     bar_width = width - max_label_len - value_width - 2
 
-    rows = data
-    |> Enum.with_index()
-    |> Enum.map(fn {item, index} ->
-      # Label
-      label = if show_labels do
-        String.pad_trailing(item.label, max_label_len) <> " "
-      else
-        ""
-      end
+    rows =
+      data
+      |> Enum.with_index()
+      |> Enum.map(fn {item, index} ->
+        # Label
+        label =
+          if show_labels do
+            String.pad_trailing(item.label, max_label_len) <> " "
+          else
+            ""
+          end
 
-      # Bar
-      bar_length = if max_value > 0 do
-        round(item.value / max_value * bar_width)
-      else
-        0
-      end
+        # Bar
+        bar_length =
+          if max_value > 0 do
+            round(item.value / max_value * bar_width)
+          else
+            0
+          end
 
-      bar = String.duplicate(bar_char, bar_length)
-      empty = String.duplicate(@empty_char, bar_width - bar_length)
+        bar = String.duplicate(bar_char, bar_length)
+        empty = String.duplicate(@empty_char, bar_width - bar_length)
 
-      # Value
-      value_str = if show_values do
-        " " <> format_value(item.value)
-      else
-        ""
-      end
+        # Value
+        value_str =
+          if show_values do
+            " " <> format_value(item.value)
+          else
+            ""
+          end
 
-      line = label <> bar <> empty <> value_str
+        line = label <> bar <> empty <> value_str
 
-      # Apply color if specified
-      color = Enum.at(colors, rem(index, max(1, length(colors))))
-      if color do
-        styled(text(line), color)
-      else
-        text(line)
-      end
-    end)
+        # Apply color if specified
+        color = Enum.at(colors, rem(index, max(1, length(colors))))
+
+        if color do
+          styled(text(line), color)
+        else
+          text(line)
+        end
+      end)
 
     result = stack(:vertical, rows)
 
@@ -145,65 +152,78 @@ defmodule TermUI.Widgets.BarChart do
     max_value = data |> Enum.map(& &1.value) |> Enum.max()
 
     # Calculate bar heights
-    bar_heights = Enum.map(data, fn item ->
-      if max_value > 0 do
-        round(item.value / max_value * height)
-      else
-        0
-      end
-    end)
+    bar_heights =
+      Enum.map(data, fn item ->
+        if max_value > 0 do
+          round(item.value / max_value * height)
+        else
+          0
+        end
+      end)
 
     # Build rows from top to bottom
-    rows = for row <- (height - 1)..0//-1 do
-      chars = data
-      |> Enum.with_index()
-      |> Enum.map(fn {_item, index} ->
-        bar_height = Enum.at(bar_heights, index)
-        if row < bar_height do
-          color = Enum.at(colors, rem(index, max(1, length(colors))))
-          char = bar_char
-          if color do
-            {char, color}
-          else
-            {char, nil}
-          end
-        else
-          {@empty_char, nil}
-        end
-      end)
+    rows =
+      for row <- (height - 1)..0//-1 do
+        chars =
+          data
+          |> Enum.with_index()
+          |> Enum.map(fn {_item, index} ->
+            bar_height = Enum.at(bar_heights, index)
 
-      # Join chars with spacing
-      line_parts = Enum.map(chars, fn {char, color} ->
-        padded = " " <> char <> " "
-        if color do
-          styled(text(padded), color)
-        else
-          text(padded)
-        end
-      end)
+            if row < bar_height do
+              color = Enum.at(colors, rem(index, max(1, length(colors))))
+              char = bar_char
 
-      stack(:horizontal, line_parts)
-    end
+              if color do
+                {char, color}
+              else
+                {char, nil}
+              end
+            else
+              {@empty_char, nil}
+            end
+          end)
+
+        # Join chars with spacing
+        line_parts =
+          Enum.map(chars, fn {char, color} ->
+            padded = " " <> char <> " "
+
+            if color do
+              styled(text(padded), color)
+            else
+              text(padded)
+            end
+          end)
+
+        stack(:horizontal, line_parts)
+      end
 
     # Add value labels
-    value_row = if show_values do
-      values = Enum.map(data, fn item ->
-        format_value(item.value) |> String.pad_leading(3)
-      end)
-      [text(Enum.join(values, " "))]
-    else
-      []
-    end
+    value_row =
+      if show_values do
+        values =
+          Enum.map(data, fn item ->
+            format_value(item.value) |> String.pad_leading(3)
+          end)
+
+        [text(Enum.join(values, " "))]
+      else
+        []
+      end
 
     # Add labels
-    label_row = if show_labels do
-      labels = Enum.map(data, fn item ->
-        String.slice(item.label, 0, 3) |> String.pad_leading(3)
-      end)
-      [text(Enum.join(labels, " "))]
-    else
-      []
-    end
+    label_row =
+      if show_labels do
+        labels =
+          Enum.map(data, fn item ->
+            String.slice(item.label, 0, 3) |> String.pad_leading(3)
+          end)
+
+        [text(Enum.join(labels, " "))]
+      else
+        []
+      end
 
     result = stack(:vertical, rows ++ value_row ++ label_row)
 
@@ -246,11 +266,12 @@ defmodule TermUI.Widgets.BarChart do
     bar_char = Keyword.get(opts, :bar_char, @bar_char)
     empty_char = Keyword.get(opts, :empty_char, "░")
 
-    filled = if max > 0 do
-      round(value / max * width)
-    else
-      0
-    end
+    filled =
+      if max > 0 do
+        round(value / max * width)
+      else
+        0
+      end
 
     filled = min(filled, width)
     empty = width - filled

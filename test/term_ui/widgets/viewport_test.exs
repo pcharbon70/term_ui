@@ -17,15 +17,17 @@ defmodule TermUI.Widgets.ViewportTest do
     end
 
     test "initializes with custom values" do
-      props = Viewport.new(
-        width: 60,
-        height: 30,
-        scroll_x: 10,
-        scroll_y: 20,
-        content_width: 200,
-        content_height: 100,
-        scroll_bars: :vertical
-      )
+      props =
+        Viewport.new(
+          width: 60,
+          height: 30,
+          scroll_x: 10,
+          scroll_y: 20,
+          content_width: 200,
+          content_height: 100,
+          scroll_bars: :vertical
+        )
+
       {:ok, state} = Viewport.init(props)
 
       assert state.width == 60
@@ -36,19 +38,23 @@ defmodule TermUI.Widgets.ViewportTest do
     end
 
     test "clamps initial scroll position" do
-      props = Viewport.new(
-        width: 40,
-        height: 20,
-        content_width: 50,
-        content_height: 30,
-        scroll_x: 100,
-        scroll_y: 100
-      )
+      props =
+        Viewport.new(
+          width: 40,
+          height: 20,
+          content_width: 50,
+          content_height: 30,
+          scroll_x: 100,
+          scroll_y: 100
+        )
+
       {:ok, state} = Viewport.init(props)
 
       # Should be clamped to max scroll
-      assert state.scroll_x <= 50 - 39  # content_width - viewport_width
-      assert state.scroll_y <= 30 - 19  # content_height - viewport_height
+      # content_width - viewport_width
+      assert state.scroll_x <= 50 - 39
+      # content_height - viewport_height
+      assert state.scroll_y <= 30 - 19
     end
   end
 
@@ -114,18 +120,21 @@ defmodule TermUI.Widgets.ViewportTest do
       {:ok, state} = Viewport.init(props)
 
       {:ok, state} = Viewport.handle_event(%Event.Key{key: :end, modifiers: []}, state)
-      assert state.scroll_y == 81  # 100 - 19
+      # 100 - 19
+      assert state.scroll_y == 81
     end
 
     test "ctrl+home scrolls to top-left" do
-      props = Viewport.new(
-        content_width: 100,
-        content_height: 100,
-        width: 40,
-        height: 20,
-        scroll_x: 50,
-        scroll_y: 50
-      )
+      props =
+        Viewport.new(
+          content_width: 100,
+          content_height: 100,
+          width: 40,
+          height: 20,
+          scroll_x: 50,
+          scroll_y: 50
+        )
+
       {:ok, state} = Viewport.init(props)
 
       {:ok, state} = Viewport.handle_event(%Event.Key{key: :home, modifiers: [:ctrl]}, state)
@@ -134,17 +143,21 @@ defmodule TermUI.Widgets.ViewportTest do
     end
 
     test "ctrl+end scrolls to bottom-right" do
-      props = Viewport.new(
-        content_width: 100,
-        content_height: 100,
-        width: 40,
-        height: 20
-      )
+      props =
+        Viewport.new(
+          content_width: 100,
+          content_height: 100,
+          width: 40,
+          height: 20
+        )
+
       {:ok, state} = Viewport.init(props)
 
       {:ok, state} = Viewport.handle_event(%Event.Key{key: :end, modifiers: [:ctrl]}, state)
-      assert state.scroll_x == 61  # 100 - 39
-      assert state.scroll_y == 81  # 100 - 19
+      # 100 - 39
+      assert state.scroll_x == 61
+      # 100 - 19
+      assert state.scroll_y == 81
     end
   end
 
@@ -249,12 +262,14 @@ defmodule TermUI.Widgets.ViewportTest do
     end
 
     test "scroll_into_view scrolls to make position visible" do
-      props = Viewport.new(
-        content_width: 100,
-        content_height: 100,
-        width: 40,
-        height: 20
-      )
+      props =
+        Viewport.new(
+          content_width: 100,
+          content_height: 100,
+          width: 40,
+          height: 20
+        )
+
       {:ok, state} = Viewport.init(props)
 
       state = Viewport.scroll_into_view(state, 50, 50)

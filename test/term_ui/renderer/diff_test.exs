@@ -27,6 +27,7 @@ defmodule TermUI.Renderer.DiffTest do
       operations = Diff.diff(current, previous)
 
       assert {:move, 1, 1} in operations
+
       assert Enum.any?(operations, fn
                {:text, "X"} -> true
                _ -> false
@@ -46,10 +47,11 @@ defmodule TermUI.Renderer.DiffTest do
       operations = Diff.diff(current, previous)
 
       # Should have moves for both changes
-      move_ops = Enum.filter(operations, fn
-        {:move, _, _} -> true
-        _ -> false
-      end)
+      move_ops =
+        Enum.filter(operations, fn
+          {:move, _, _} -> true
+          _ -> false
+        end)
 
       assert length(move_ops) >= 1
 
@@ -66,10 +68,11 @@ defmodule TermUI.Renderer.DiffTest do
 
       operations = Diff.diff(current, previous)
 
-      move_ops = Enum.filter(operations, fn
-        {:move, _, _} -> true
-        _ -> false
-      end)
+      move_ops =
+        Enum.filter(operations, fn
+          {:move, _, _} -> true
+          _ -> false
+        end)
 
       # Should have at least 2 moves for different rows
       assert length(move_ops) >= 2
@@ -87,10 +90,11 @@ defmodule TermUI.Renderer.DiffTest do
       operations = Diff.diff(current, previous)
 
       # Should have single move for contiguous text
-      move_ops = Enum.filter(operations, fn
-        {:move, _, _} -> true
-        _ -> false
-      end)
+      move_ops =
+        Enum.filter(operations, fn
+          {:move, _, _} -> true
+          _ -> false
+        end)
 
       assert length(move_ops) == 1
       assert {:move, 1, 1} in move_ops
@@ -121,6 +125,7 @@ defmodule TermUI.Renderer.DiffTest do
       operations = Diff.diff_row(current, previous, 2, 10)
 
       assert {:move, 2, 5} in operations
+
       assert Enum.any?(operations, fn
                {:text, "X"} -> true
                _ -> false
@@ -140,10 +145,11 @@ defmodule TermUI.Renderer.DiffTest do
 
       operations = Diff.diff_row(current, previous, 1, 10)
 
-      style_ops = Enum.filter(operations, fn
-        {:style, _} -> true
-        _ -> false
-      end)
+      style_ops =
+        Enum.filter(operations, fn
+          {:style, _} -> true
+          _ -> false
+        end)
 
       assert length(style_ops) >= 1
 
@@ -215,7 +221,13 @@ defmodule TermUI.Renderer.DiffTest do
     end
 
     test "returns single span unchanged" do
-      span = %{row: 1, start_col: 1, end_col: 3, cells: [Cell.new("A"), Cell.new("B"), Cell.new("C")]}
+      span = %{
+        row: 1,
+        start_col: 1,
+        end_col: 3,
+        cells: [Cell.new("A"), Cell.new("B"), Cell.new("C")]
+      }
+
       assert Diff.merge_spans([span]) == [span]
     end
 
@@ -254,6 +266,7 @@ defmodule TermUI.Renderer.DiffTest do
       operations = Diff.span_to_operations(span)
 
       assert {:move, 5, 10} in operations
+
       assert Enum.any?(operations, fn
                {:text, text} -> String.contains?(text, "H") and String.contains?(text, "i")
                _ -> false
@@ -269,10 +282,11 @@ defmodule TermUI.Renderer.DiffTest do
 
       operations = Diff.span_to_operations(span)
 
-      style_ops = Enum.filter(operations, fn
-        {:style, _} -> true
-        _ -> false
-      end)
+      style_ops =
+        Enum.filter(operations, fn
+          {:style, _} -> true
+          _ -> false
+        end)
 
       assert length(style_ops) >= 1
     end
@@ -289,10 +303,11 @@ defmodule TermUI.Renderer.DiffTest do
 
       operations = Diff.span_to_operations(span)
 
-      style_ops = Enum.filter(operations, fn
-        {:style, _} -> true
-        _ -> false
-      end)
+      style_ops =
+        Enum.filter(operations, fn
+          {:style, _} -> true
+          _ -> false
+        end)
 
       # Should have 2 style operations for different colors
       assert length(style_ops) == 2
@@ -361,10 +376,11 @@ defmodule TermUI.Renderer.DiffTest do
       assert {:move, 1, 1} in operations
 
       # Should have text
-      text_ops = Enum.filter(operations, fn
-        {:text, _} -> true
-        _ -> false
-      end)
+      text_ops =
+        Enum.filter(operations, fn
+          {:text, _} -> true
+          _ -> false
+        end)
 
       assert length(text_ops) >= 1
       text = Enum.map_join(text_ops, "", fn {:text, t} -> t end)
@@ -383,10 +399,11 @@ defmodule TermUI.Renderer.DiffTest do
 
       operations = Diff.diff(current, previous)
 
-      style_ops = Enum.filter(operations, fn
-        {:style, s} -> s.fg == :green
-        _ -> false
-      end)
+      style_ops =
+        Enum.filter(operations, fn
+          {:style, s} -> s.fg == :green
+          _ -> false
+        end)
 
       assert length(style_ops) >= 1
 
@@ -408,10 +425,11 @@ defmodule TermUI.Renderer.DiffTest do
       operations = Diff.diff(current, previous)
 
       # Should only update changed portion
-      move_ops = Enum.filter(operations, fn
-        {:move, _, _} -> true
-        _ -> false
-      end)
+      move_ops =
+        Enum.filter(operations, fn
+          {:move, _, _} -> true
+          _ -> false
+        end)
 
       assert length(move_ops) == 1
       [{:move, row, col}] = move_ops
@@ -432,10 +450,11 @@ defmodule TermUI.Renderer.DiffTest do
 
       operations = Diff.diff(current, previous)
 
-      move_ops = Enum.filter(operations, fn
-        {:move, _, _} -> true
-        _ -> false
-      end)
+      move_ops =
+        Enum.filter(operations, fn
+          {:move, _, _} -> true
+          _ -> false
+        end)
 
       # Should have moves for each changed row
       assert length(move_ops) == 3
@@ -488,10 +507,11 @@ defmodule TermUI.Renderer.DiffTest do
       operations = Diff.diff(current, previous)
 
       # Should have operations for all rows
-      move_ops = Enum.filter(operations, fn
-        {:move, _, _} -> true
-        _ -> false
-      end)
+      move_ops =
+        Enum.filter(operations, fn
+          {:move, _, _} -> true
+          _ -> false
+        end)
 
       assert length(move_ops) == 3
 
@@ -509,10 +529,11 @@ defmodule TermUI.Renderer.DiffTest do
 
       operations = Diff.diff(current, previous)
 
-      move_ops = Enum.filter(operations, fn
-        {:move, _, _} -> true
-        _ -> false
-      end)
+      move_ops =
+        Enum.filter(operations, fn
+          {:move, _, _} -> true
+          _ -> false
+        end)
 
       assert length(move_ops) == 2
 

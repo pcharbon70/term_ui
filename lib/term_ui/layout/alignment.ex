@@ -142,7 +142,11 @@ defmodule TermUI.Layout.Alignment do
       iex> Alignment.parse_spacing({1, 2, 3, 4})
       %{top: 1, right: 2, bottom: 3, left: 4}
   """
-  @spec parse_spacing(integer() | {integer(), integer()} | {integer(), integer(), integer(), integer()}) :: spacing()
+  @spec parse_spacing(
+          integer()
+          | {integer(), integer()}
+          | {integer(), integer(), integer(), integer()}
+        ) :: spacing()
   def parse_spacing(value) when is_integer(value) do
     %{top: value, right: value, bottom: value, left: value}
   end

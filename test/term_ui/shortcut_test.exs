@@ -34,8 +34,17 @@ defmodule TermUI.ShortcutTest do
     test "registers multiple shortcuts" do
       {:ok, registry} = Shortcut.start_link()
 
-      Shortcut.register(registry, %Shortcut{key: :q, modifiers: [:ctrl], action: {:function, fn -> :quit end}})
-      Shortcut.register(registry, %Shortcut{key: :s, modifiers: [:ctrl], action: {:function, fn -> :save end}})
+      Shortcut.register(registry, %Shortcut{
+        key: :q,
+        modifiers: [:ctrl],
+        action: {:function, fn -> :quit end}
+      })
+
+      Shortcut.register(registry, %Shortcut{
+        key: :s,
+        modifiers: [:ctrl],
+        action: {:function, fn -> :save end}
+      })
 
       assert length(Shortcut.list(registry)) == 2
     end
@@ -45,7 +54,12 @@ defmodule TermUI.ShortcutTest do
     test "removes a shortcut" do
       {:ok, registry} = Shortcut.start_link()
 
-      Shortcut.register(registry, %Shortcut{key: :q, modifiers: [:ctrl], action: {:function, fn -> :quit end}})
+      Shortcut.register(registry, %Shortcut{
+        key: :q,
+        modifiers: [:ctrl],
+        action: {:function, fn -> :quit end}
+      })
+
       assert length(Shortcut.list(registry)) == 1
 
       Shortcut.unregister(registry, :q, [:ctrl])
@@ -79,7 +93,12 @@ defmodule TermUI.ShortcutTest do
     test "requires all modifiers to match" do
       {:ok, registry} = Shortcut.start_link()
 
-      shortcut = %Shortcut{key: :s, modifiers: [:ctrl, :shift], action: {:function, fn -> :save_as end}}
+      shortcut = %Shortcut{
+        key: :s,
+        modifiers: [:ctrl, :shift],
+        action: {:function, fn -> :save_as end}
+      }
+
       Shortcut.register(registry, shortcut)
 
       # Missing shift
@@ -101,8 +120,19 @@ defmodule TermUI.ShortcutTest do
     test "returns highest priority shortcut on conflict" do
       {:ok, registry} = Shortcut.start_link()
 
-      low = %Shortcut{key: :s, modifiers: [:ctrl], action: {:function, fn -> :low end}, priority: 0}
-      high = %Shortcut{key: :s, modifiers: [:ctrl], action: {:function, fn -> :high end}, priority: 10}
+      low = %Shortcut{
+        key: :s,
+        modifiers: [:ctrl],
+        action: {:function, fn -> :low end},
+        priority: 0
+      }
+
+      high = %Shortcut{
+        key: :s,
+        modifiers: [:ctrl],
+        action: {:function, fn -> :high end},
+        priority: 10
+      }
 
       Shortcut.register(registry, low)
       Shortcut.register(registry, high)
@@ -120,7 +150,13 @@ defmodule TermUI.ShortcutTest do
     test "global shortcuts always match" do
       {:ok, registry} = Shortcut.start_link()
 
-      shortcut = %Shortcut{key: :q, modifiers: [:ctrl], action: {:function, fn -> :quit end}, scope: :global}
+      shortcut = %Shortcut{
+        key: :q,
+        modifiers: [:ctrl],
+        action: {:function, fn -> :quit end},
+        scope: :global
+      }
+
       Shortcut.register(registry, shortcut)
 
       event = Event.key(:q, modifiers: [:ctrl])
@@ -136,6 +172,7 @@ defmodule TermUI.ShortcutTest do
         action: {:function, fn -> :insert end},
         scope: {:mode, :normal}
       }
+
       Shortcut.register(registry, shortcut)
 
       event = Event.key(:i)
@@ -156,6 +193,7 @@ defmodule TermUI.ShortcutTest do
         action: {:function, fn -> :submit end},
         scope: {:component, :text_input}
       }
+
       Shortcut.register(registry, shortcut)
 
       event = Event.key(:enter)
@@ -178,6 +216,7 @@ defmodule TermUI.ShortcutTest do
         action: {:function, fn -> :go_top end},
         sequence: [:g, :g]
       }
+
       Shortcut.register(registry, shortcut)
 
       event1 = Event.key(:g)
@@ -200,6 +239,7 @@ defmodule TermUI.ShortcutTest do
         action: {:function, fn -> :go_top end},
         sequence: [:g, :g]
       }
+
       Shortcut.register(registry, shortcut)
 
       event = Event.key(:g)
@@ -238,6 +278,7 @@ defmodule TermUI.ShortcutTest do
 
     test "returns command tuple for command action" do
       command = {:file_write, "/path", "content"}
+
       shortcut = %Shortcut{
         key: :s,
         modifiers: [:ctrl],
@@ -265,9 +306,23 @@ defmodule TermUI.ShortcutTest do
     test "filters shortcuts by scope" do
       {:ok, registry} = Shortcut.start_link()
 
-      Shortcut.register(registry, %Shortcut{key: :q, action: {:function, fn -> :quit end}, scope: :global})
-      Shortcut.register(registry, %Shortcut{key: :i, action: {:function, fn -> :insert end}, scope: {:mode, :normal}})
-      Shortcut.register(registry, %Shortcut{key: :d, action: {:function, fn -> :delete end}, scope: {:mode, :normal}})
+      Shortcut.register(registry, %Shortcut{
+        key: :q,
+        action: {:function, fn -> :quit end},
+        scope: :global
+      })
+
+      Shortcut.register(registry, %Shortcut{
+        key: :i,
+        action: {:function, fn -> :insert end},
+        scope: {:mode, :normal}
+      })
+
+      Shortcut.register(registry, %Shortcut{
+        key: :d,
+        action: {:function, fn -> :delete end},
+        scope: {:mode, :normal}
+      })
 
       global = Shortcut.list_for_scope(registry, :global)
       assert length(global) == 1
@@ -314,6 +369,7 @@ defmodule TermUI.ShortcutTest do
         modifiers: [:ctrl],
         action: {:function, fn -> :any_ctrl end}
       }
+
       Shortcut.register(registry, shortcut)
 
       event = Event.key(:x, modifiers: [:ctrl])

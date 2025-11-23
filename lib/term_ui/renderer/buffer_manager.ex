@@ -201,7 +201,13 @@ defmodule TermUI.Renderer.BufferManager do
 
   This is a direct access operation (no GenServer call).
   """
-  @spec clear_region(GenServer.server(), pos_integer(), pos_integer(), pos_integer(), pos_integer()) ::
+  @spec clear_region(
+          GenServer.server(),
+          pos_integer(),
+          pos_integer(),
+          pos_integer(),
+          pos_integer()
+        ) ::
           :ok
   def clear_region(server \\ __MODULE__, start_row, start_col, width, height) do
     buffer = get_current_buffer(server)

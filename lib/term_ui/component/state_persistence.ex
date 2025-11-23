@@ -143,10 +143,12 @@ defmodule TermUI.Component.StatePersistence do
   def get_metadata(component_id) do
     case :ets.lookup(@table_name, component_id) do
       [{^component_id, entry}] ->
-        {:ok, %{
-          persisted_at: entry.persisted_at,
-          has_props: not is_nil(entry.props)
-        }}
+        {:ok,
+         %{
+           persisted_at: entry.persisted_at,
+           has_props: not is_nil(entry.props)
+         }}
+
       [] ->
         :not_found
     end
@@ -199,6 +201,7 @@ defmodule TermUI.Component.StatePersistence do
           max_restarts: 3,
           max_seconds: 5
         }
+
         :ets.insert(@metadata_table, {component_id, metadata})
     end
 
@@ -257,6 +260,7 @@ defmodule TermUI.Component.StatePersistence do
           max_restarts: max_restarts,
           max_seconds: max_seconds
         }
+
         :ets.insert(@metadata_table, {component_id, metadata})
     end
 

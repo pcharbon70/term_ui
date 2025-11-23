@@ -203,7 +203,9 @@ defmodule TermUI.Widgets.Tabs do
   defp find_tab_at_position(tabs, x) do
     {result, _} =
       Enum.reduce_while(tabs, {nil, 0}, fn tab, {_, offset} ->
-        label_len = String.length(tab.label) + 4  # " label " + borders
+        # " label " + borders
+        label_len = String.length(tab.label) + 4
+
         if x >= offset and x < offset + label_len do
           {:halt, {tab.id, offset}}
         else

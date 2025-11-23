@@ -85,8 +85,11 @@ defmodule TermUI.Renderer.Diff do
     previous_row = Buffer.get_row(previous, row)
 
     # Convert to indexed format for find_changed_spans
-    current_cells = current_row |> Enum.with_index(1) |> Enum.map(fn {cell, col} -> {col, cell} end)
-    previous_cells = previous_row |> Enum.with_index(1) |> Enum.map(fn {cell, col} -> {col, cell} end)
+    current_cells =
+      current_row |> Enum.with_index(1) |> Enum.map(fn {cell, col} -> {col, cell} end)
+
+    previous_cells =
+      previous_row |> Enum.with_index(1) |> Enum.map(fn {cell, col} -> {col, cell} end)
 
     # Find changed spans
     spans = find_changed_spans(current_cells, previous_cells, row)

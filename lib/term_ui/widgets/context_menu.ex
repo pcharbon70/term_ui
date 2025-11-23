@@ -129,7 +129,7 @@ defmodule TermUI.Widgets.ContextMenu do
 
     # Check if click is inside menu bounds
     if x >= pos_x and x < pos_x + menu_width and
-       y >= pos_y and y < pos_y + menu_height do
+         y >= pos_y and y < pos_y + menu_height do
       # Click inside menu - select item
       relative_y = y - pos_y
       item = Enum.at(state.items, relative_y)
@@ -215,6 +215,7 @@ defmodule TermUI.Widgets.ContextMenu do
         if state.on_select && not Map.get(item, :disabled, false) do
           state.on_select.(item.id)
         end
+
         close_menu(state)
 
       _ ->
@@ -226,6 +227,7 @@ defmodule TermUI.Widgets.ContextMenu do
     if state.on_close do
       state.on_close.()
     end
+
     %{state | visible: false}
   end
 

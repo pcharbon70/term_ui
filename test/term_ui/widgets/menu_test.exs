@@ -77,11 +77,12 @@ defmodule TermUI.Widgets.MenuTest do
       on_select = fn _ -> :ok end
       on_toggle = fn _, _ -> :ok end
 
-      props = Menu.new(
-        items: test_items(),
-        on_select: on_select,
-        on_toggle: on_toggle
-      )
+      props =
+        Menu.new(
+          items: test_items(),
+          on_select: on_select,
+          on_toggle: on_toggle
+        )
 
       assert props.on_select == on_select
       assert props.on_toggle == on_toggle
@@ -166,9 +167,9 @@ defmodule TermUI.Widgets.MenuTest do
       {:ok, _state, effects} = Menu.handle_event(event, state)
 
       assert Enum.any?(effects, fn
-        {:send, _, :menu_close} -> true
-        _ -> false
-      end)
+               {:send, _, :menu_close} -> true
+               _ -> false
+             end)
     end
   end
 

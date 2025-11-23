@@ -144,7 +144,8 @@ defmodule TermUI.Layout.IntegrationTest do
 
       # Items positioned within column
       assert Enum.at(items, 0).height == 5
-      assert Enum.at(items, 1).height == 16  # 24 - 5 - 3
+      # 24 - 5 - 3
+      assert Enum.at(items, 1).height == 16
       assert Enum.at(items, 2).height == 3
 
       # All items have column width

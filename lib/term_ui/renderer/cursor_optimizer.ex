@@ -281,13 +281,14 @@ defmodule TermUI.Renderer.CursorOptimizer do
       options = []
 
       # Option 1: CR + newlines (for moving down to column 1)
-      options = if row_diff > 0 do
-        # \r\n\n\n... is 1 + row_diff bytes
-        lf_seq = ["\r", String.duplicate("\n", row_diff)]
-        [{lf_seq, cost_cr() + row_diff} | options]
-      else
-        options
-      end
+      options =
+        if row_diff > 0 do
+          # \r\n\n\n... is 1 + row_diff bytes
+          lf_seq = ["\r", String.duplicate("\n", row_diff)]
+          [{lf_seq, cost_cr() + row_diff} | options]
+        else
+          options
+        end
 
       # Option 2: CR + escape sequence (for up or large down)
       {v_seq, v_cost} = vertical_sequence(row_diff)

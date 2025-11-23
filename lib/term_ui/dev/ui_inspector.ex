@@ -23,10 +23,11 @@ defmodule TermUI.Dev.UIInspector do
   @spec render(map(), term() | nil, map()) :: term()
   def render(components, selected_id, _area) do
     # Render boundaries for all components
-    boundaries = components
-    |> Enum.map(fn {id, info} ->
-      render_component_boundary(id, info, id == selected_id)
-    end)
+    boundaries =
+      components
+      |> Enum.map(fn {id, info} ->
+        render_component_boundary(id, info, id == selected_id)
+      end)
 
     # Create overlay container
     %{
@@ -34,7 +35,8 @@ defmodule TermUI.Dev.UIInspector do
       content: stack(:vertical, boundaries),
       x: 0,
       y: 0,
-      z: 200  # Above normal content
+      # Above normal content
+      z: 200
     }
   end
 
@@ -56,9 +58,10 @@ defmodule TermUI.Dev.UIInspector do
     top_line = create_labeled_border(label, bounds.width, border_char)
 
     # Side borders
-    side_lines = for _y <- 1..(bounds.height - 2) do
-      border_char <> String.duplicate(" ", bounds.width - 2) <> border_char
-    end
+    side_lines =
+      for _y <- 1..(bounds.height - 2) do
+        border_char <> String.duplicate(" ", bounds.width - 2) <> border_char
+      end
 
     # Bottom border
     bottom_line = String.duplicate(border_char, bounds.width)
@@ -137,8 +140,9 @@ defmodule TermUI.Dev.UIInspector do
     components
     |> Enum.filter(fn {_id, info} ->
       bounds = info.bounds
+
       x >= bounds.x and x < bounds.x + bounds.width and
-      y >= bounds.y and y < bounds.y + bounds.height
+        y >= bounds.y and y < bounds.y + bounds.height
     end)
     |> Enum.sort_by(fn {_id, info} ->
       # Prefer smaller (more specific) components

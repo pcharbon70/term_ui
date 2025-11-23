@@ -264,12 +264,13 @@ defmodule TermUI.Capabilities do
 
         cond do
           program in @true_color_terminals ->
-            %{caps |
-              color_mode: :true_color,
-              max_colors: 16_777_216,
-              mouse: true,
-              bracketed_paste: true,
-              focus_events: true
+            %{
+              caps
+              | color_mode: :true_color,
+                max_colors: 16_777_216,
+                mouse: true,
+                bracketed_paste: true,
+                focus_events: true
             }
 
           program in @color_256_terminals ->
@@ -339,10 +340,11 @@ defmodule TermUI.Capabilities do
     # Enable features for any terminal with 256+ colors
     # as these are typically modern terminals
     if caps.max_colors >= 256 do
-      %{caps |
-        mouse: caps.mouse || true,
-        bracketed_paste: caps.bracketed_paste || true,
-        focus_events: caps.focus_events || caps.max_colors >= 16_777_216
+      %{
+        caps
+        | mouse: caps.mouse || true,
+          bracketed_paste: caps.bracketed_paste || true,
+          focus_events: caps.focus_events || caps.max_colors >= 16_777_216
       }
     else
       caps

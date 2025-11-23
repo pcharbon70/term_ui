@@ -104,8 +104,8 @@ defmodule TermUI.Widget.Block do
     %{
       x: area.x + border_offset + padding.left,
       y: area.y + border_offset + padding.top,
-      width: max(0, area.width - (2 * border_offset) - padding.left - padding.right),
-      height: max(0, area.height - (2 * border_offset) - padding.top - padding.bottom)
+      width: max(0, area.width - 2 * border_offset - padding.left - padding.right),
+      height: max(0, area.height - 2 * border_offset - padding.top - padding.bottom)
     }
   end
 
@@ -127,7 +127,9 @@ defmodule TermUI.Widget.Block do
   end
 
   defp render_top_border(chars, title, title_align, area, style) do
-    if area.height < 1 || area.width < 1, do: [], else: do_render_top(chars, title, title_align, area, style)
+    if area.height < 1 || area.width < 1,
+      do: [],
+      else: do_render_top(chars, title, title_align, area, style)
   end
 
   defp do_render_top(chars, nil, _title_align, area, style) do
@@ -142,7 +144,10 @@ defmodule TermUI.Widget.Block do
     inner_width = area.width - 2
 
     if inner_width < 1 do
-      [positioned_cell(0, 0, chars.tl, style), positioned_cell(area.width - 1, 0, chars.tr, style)]
+      [
+        positioned_cell(0, 0, chars.tl, style),
+        positioned_cell(area.width - 1, 0, chars.tr, style)
+      ]
     else
       title_text = String.slice(title, 0, inner_width)
       title_len = String.length(title_text)
@@ -158,11 +163,12 @@ defmodule TermUI.Widget.Block do
       top_cells = [positioned_cell(0, 0, chars.tl, style)]
 
       # Left padding
-      top_cells = if left_pad > 0 do
-        top_cells ++ for(x <- 1..left_pad, do: positioned_cell(x, 0, chars.h, style))
-      else
-        top_cells
-      end
+      top_cells =
+        if left_pad > 0 do
+          top_cells ++ for(x <- 1..left_pad, do: positioned_cell(x, 0, chars.h, style))
+        else
+          top_cells
+        end
 
       # Title
       top_cells =
@@ -175,14 +181,15 @@ defmodule TermUI.Widget.Block do
            end))
 
       # Right padding
-      top_cells = if right_pad > 0 do
-        top_cells ++
-          for i <- 0..(right_pad - 1) do
-            positioned_cell(1 + left_pad + title_len + i, 0, chars.h, style)
-          end
-      else
-        top_cells
-      end
+      top_cells =
+        if right_pad > 0 do
+          top_cells ++
+            for i <- 0..(right_pad - 1) do
+              positioned_cell(1 + left_pad + title_len + i, 0, chars.h, style)
+            end
+        else
+          top_cells
+        end
 
       top_cells ++ [positioned_cell(area.width - 1, 0, chars.tr, style)]
     end

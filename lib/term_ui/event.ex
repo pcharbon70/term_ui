@@ -72,7 +72,8 @@ defmodule TermUI.Event do
     Represents mouse actions with position and button info.
     """
 
-    @type action :: :click | :double_click | :move | :drag | :scroll_up | :scroll_down | :press | :release
+    @type action ::
+            :click | :double_click | :move | :drag | :scroll_up | :scroll_down | :press | :release
     @type button :: :left | :middle | :right | nil
 
     @type t :: %__MODULE__{
@@ -393,7 +394,7 @@ defmodule TermUI.Event do
   Returns the event type as an atom.
   """
   @spec type(Key.t() | Mouse.t() | Focus.t() | Custom.t() | Resize.t() | Paste.t() | Tick.t()) ::
-    :key | :mouse | :focus | :custom | :resize | :paste | :tick
+          :key | :mouse | :focus | :custom | :resize | :paste | :tick
   def type(%Key{}), do: :key
   def type(%Mouse{}), do: :mouse
   def type(%Focus{}), do: :focus

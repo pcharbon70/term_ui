@@ -117,6 +117,7 @@ defmodule TermUI.Widgets.Dialog do
     if state.on_confirm && state.focused_button do
       state.on_confirm.(state.focused_button)
     end
+
     {:ok, state}
   end
 
@@ -138,9 +139,11 @@ defmodule TermUI.Widgets.Dialog do
 
       button_id ->
         state = %{state | focused_button: button_id}
+
         if state.on_confirm do
           state.on_confirm.(button_id)
         end
+
         {:ok, state}
     end
   end
@@ -215,6 +218,7 @@ defmodule TermUI.Widgets.Dialog do
     if state.on_close do
       state.on_close.()
     end
+
     {:ok, %{state | visible: false}}
   end
 
@@ -247,13 +251,14 @@ defmodule TermUI.Widgets.Dialog do
     backdrop_char = "░"
     backdrop_line = String.duplicate(backdrop_char, area.width)
 
-    lines = for _y <- 0..(area.height - 1) do
-      if state.backdrop_style do
-        styled(text(backdrop_line), state.backdrop_style)
-      else
-        text(backdrop_line)
+    lines =
+      for _y <- 0..(area.height - 1) do
+        if state.backdrop_style do
+          styled(text(backdrop_line), state.backdrop_style)
+        else
+          text(backdrop_line)
+        end
       end
-    end
 
     stack(:vertical, lines)
   end
@@ -290,8 +295,11 @@ defmodule TermUI.Widgets.Dialog do
     left_pad = div(padding, 2)
     right_pad = padding - left_pad
 
-    line = "│ " <> String.duplicate(" ", left_pad) <> title_text <>
-           String.duplicate(" ", right_pad) <> " │"
+    line =
+      "│ " <>
+        String.duplicate(" ", left_pad) <>
+        title_text <>
+        String.duplicate(" ", right_pad) <> " │"
 
     if state.title_style do
       styled(text(line), state.title_style)
@@ -306,11 +314,12 @@ defmodule TermUI.Widgets.Dialog do
 
   defp render_content(state, width) do
     # Wrap content with borders
-    content_text = case state.content do
-      %{type: :text, content: t} -> t
-      %{type: :empty} -> ""
-      _ -> ""
-    end
+    content_text =
+      case state.content do
+        %{type: :text, content: t} -> t
+        %{type: :empty} -> ""
+        _ -> ""
+      end
 
     # Pad content to width
     inner_width = width - 4
@@ -327,15 +336,16 @@ defmodule TermUI.Widgets.Dialog do
   end
 
   defp render_buttons(state) do
-    button_texts = Enum.map(state.buttons, fn button ->
-      label = button.label
+    button_texts =
+      Enum.map(state.buttons, fn button ->
+        label = button.label
 
-      if button.id == state.focused_button do
-        "[ " <> label <> " ]"
-      else
-        "  " <> label <> "  "
-      end
-    end)
+        if button.id == state.focused_button do
+          "[ " <> label <> " ]"
+        else
+          "  " <> label <> "  "
+        end
+      end)
 
     buttons_line = Enum.join(button_texts, " ")
 
@@ -344,8 +354,11 @@ defmodule TermUI.Widgets.Dialog do
     padding = inner_width - String.length(buttons_line)
     left_pad = div(padding, 2)
 
-    line = "│ " <> String.duplicate(" ", left_pad) <> buttons_line <>
-           String.duplicate(" ", inner_width - left_pad - String.length(buttons_line)) <> " │"
+    line =
+      "│ " <>
+        String.duplicate(" ", left_pad) <>
+        buttons_line <>
+        String.duplicate(" ", inner_width - left_pad - String.length(buttons_line)) <> " │"
 
     if state.focused_button_style do
       styled(text(line), state.focused_button_style)

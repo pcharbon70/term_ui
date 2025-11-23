@@ -479,9 +479,12 @@ defmodule TermUI.Renderer.SequenceBufferTest do
       binary = IO.iodata_to_binary(data)
 
       # Should contain off codes for removed attributes
-      assert String.contains?(binary, "22") # bold off
-      assert String.contains?(binary, "23") # italic off
-      assert String.contains?(binary, "24") # underline off
+      # bold off
+      assert String.contains?(binary, "22")
+      # italic off
+      assert String.contains?(binary, "23")
+      # underline off
+      assert String.contains?(binary, "24")
     end
 
     test "removing blink attribute emits correct off code" do
@@ -496,7 +499,8 @@ defmodule TermUI.Renderer.SequenceBufferTest do
       {data, _buffer} = SequenceBuffer.flush(buffer)
       binary = IO.iodata_to_binary(data)
 
-      assert String.contains?(binary, "25") # blink off
+      # blink off
+      assert String.contains?(binary, "25")
     end
 
     test "removing reverse attribute emits correct off code" do
@@ -511,7 +515,8 @@ defmodule TermUI.Renderer.SequenceBufferTest do
       {data, _buffer} = SequenceBuffer.flush(buffer)
       binary = IO.iodata_to_binary(data)
 
-      assert String.contains?(binary, "27") # reverse off
+      # reverse off
+      assert String.contains?(binary, "27")
     end
 
     test "removing hidden attribute emits correct off code" do
@@ -526,7 +531,8 @@ defmodule TermUI.Renderer.SequenceBufferTest do
       {data, _buffer} = SequenceBuffer.flush(buffer)
       binary = IO.iodata_to_binary(data)
 
-      assert String.contains?(binary, "28") # hidden off
+      # hidden off
+      assert String.contains?(binary, "28")
     end
 
     test "removing strikethrough attribute emits correct off code" do
@@ -541,7 +547,8 @@ defmodule TermUI.Renderer.SequenceBufferTest do
       {data, _buffer} = SequenceBuffer.flush(buffer)
       binary = IO.iodata_to_binary(data)
 
-      assert String.contains?(binary, "29") # strikethrough off
+      # strikethrough off
+      assert String.contains?(binary, "29")
     end
 
     test "removing dim attribute uses same off code as bold" do
@@ -556,7 +563,8 @@ defmodule TermUI.Renderer.SequenceBufferTest do
       {data, _buffer} = SequenceBuffer.flush(buffer)
       binary = IO.iodata_to_binary(data)
 
-      assert String.contains?(binary, "22") # dim off (same as bold)
+      # dim off (same as bold)
+      assert String.contains?(binary, "22")
     end
 
     test "background color change emits new background code" do
@@ -571,7 +579,8 @@ defmodule TermUI.Renderer.SequenceBufferTest do
       {data, _buffer} = SequenceBuffer.flush(buffer)
       binary = IO.iodata_to_binary(data)
 
-      assert String.contains?(binary, "44") # blue background
+      # blue background
+      assert String.contains?(binary, "44")
     end
   end
 end

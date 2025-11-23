@@ -159,8 +159,13 @@ defmodule TermUI.Integration.CapabilityAccuracyTest do
         assert caps.unicode == true
       after
         # Restore
-        if original_lc, do: System.put_env("LC_ALL", original_lc), else: System.delete_env("LC_ALL")
-        if original_lang, do: System.put_env("LANG", original_lang), else: System.delete_env("LANG")
+        if original_lc,
+          do: System.put_env("LC_ALL", original_lc),
+          else: System.delete_env("LC_ALL")
+
+        if original_lang,
+          do: System.put_env("LANG", original_lang),
+          else: System.delete_env("LANG")
       end
     end
 

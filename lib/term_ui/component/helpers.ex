@@ -231,7 +231,8 @@ defmodule TermUI.Component.Helpers do
       compute_node_size(box([], width: 20, height: 10))
       # {20, 10}
   """
-  @spec compute_node_size(RenderNode.t()) :: {non_neg_integer() | :auto, non_neg_integer() | :auto}
+  @spec compute_node_size(RenderNode.t()) ::
+          {non_neg_integer() | :auto, non_neg_integer() | :auto}
   def compute_node_size(%RenderNode{type: :text, content: content}) do
     compute_size(content || "")
   end
@@ -255,7 +256,8 @@ defmodule TermUI.Component.Helpers do
       fits_in_rect?({30, 5}, %{x: 0, y: 0, width: 20, height: 10})
       # false
   """
-  @spec fits_in_rect?({non_neg_integer(), non_neg_integer()}, TermUI.Component.rect()) :: boolean()
+  @spec fits_in_rect?({non_neg_integer(), non_neg_integer()}, TermUI.Component.rect()) ::
+          boolean()
   def fits_in_rect?({width, height}, %{width: max_width, height: max_height}) do
     width <= max_width and height <= max_height
   end
@@ -299,7 +301,12 @@ defmodule TermUI.Component.Helpers do
         opts = []
         opts = if style.fg not in [nil, :default], do: [{:fg, style.fg} | opts], else: opts
         opts = if style.bg not in [nil, :default], do: [{:bg, style.bg} | opts], else: opts
-        opts = if MapSet.size(style.attrs) > 0, do: [{:attrs, MapSet.to_list(style.attrs)} | opts], else: opts
+
+        opts =
+          if MapSet.size(style.attrs) > 0,
+            do: [{:attrs, MapSet.to_list(style.attrs)} | opts],
+            else: opts
+
         opts
       else
         []

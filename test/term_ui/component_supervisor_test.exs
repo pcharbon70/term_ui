@@ -137,23 +137,25 @@ defmodule TermUI.ComponentSupervisorTest do
     end
 
     test "starts with :permanent restart option" do
-      {:ok, _pid} = ComponentSupervisor.start_component(
-        SimpleComponent,
-        %{},
-        id: :permanent_comp,
-        restart: :permanent
-      )
+      {:ok, _pid} =
+        ComponentSupervisor.start_component(
+          SimpleComponent,
+          %{},
+          id: :permanent_comp,
+          restart: :permanent
+        )
 
       assert ComponentSupervisor.count_children() == 1
     end
 
     test "starts with :temporary restart option" do
-      {:ok, _pid} = ComponentSupervisor.start_component(
-        SimpleComponent,
-        %{},
-        id: :temp_comp,
-        restart: :temporary
-      )
+      {:ok, _pid} =
+        ComponentSupervisor.start_component(
+          SimpleComponent,
+          %{},
+          id: :temp_comp,
+          restart: :temporary
+        )
 
       assert ComponentSupervisor.count_children() == 1
     end
@@ -161,23 +163,25 @@ defmodule TermUI.ComponentSupervisorTest do
 
   describe "shutdown options" do
     test "uses custom shutdown timeout" do
-      {:ok, pid} = ComponentSupervisor.start_component(
-        SimpleComponent,
-        %{},
-        id: :custom_shutdown,
-        shutdown: 10_000
-      )
+      {:ok, pid} =
+        ComponentSupervisor.start_component(
+          SimpleComponent,
+          %{},
+          id: :custom_shutdown,
+          shutdown: 10_000
+        )
 
       assert Process.alive?(pid)
     end
 
     test "accepts :brutal_kill shutdown" do
-      {:ok, pid} = ComponentSupervisor.start_component(
-        SimpleComponent,
-        %{},
-        id: :brutal_kill_comp,
-        shutdown: :brutal_kill
-      )
+      {:ok, pid} =
+        ComponentSupervisor.start_component(
+          SimpleComponent,
+          %{},
+          id: :brutal_kill_comp,
+          shutdown: :brutal_kill
+        )
 
       assert Process.alive?(pid)
     end
@@ -185,34 +189,37 @@ defmodule TermUI.ComponentSupervisorTest do
 
   describe "recovery options" do
     test "sets :last_state recovery by default" do
-      {:ok, _pid} = ComponentSupervisor.start_component(
-        SimpleComponent,
-        %{initial: 42},
-        id: :recovery_test
-      )
+      {:ok, _pid} =
+        ComponentSupervisor.start_component(
+          SimpleComponent,
+          %{initial: 42},
+          id: :recovery_test
+        )
 
       # Component is started with last_state recovery
       assert ComponentSupervisor.count_children() == 1
     end
 
     test "accepts :reset recovery option" do
-      {:ok, _pid} = ComponentSupervisor.start_component(
-        SimpleComponent,
-        %{},
-        id: :reset_recovery,
-        recovery: :reset
-      )
+      {:ok, _pid} =
+        ComponentSupervisor.start_component(
+          SimpleComponent,
+          %{},
+          id: :reset_recovery,
+          recovery: :reset
+        )
 
       assert ComponentSupervisor.count_children() == 1
     end
 
     test "accepts :last_props recovery option" do
-      {:ok, _pid} = ComponentSupervisor.start_component(
-        SimpleComponent,
-        %{},
-        id: :props_recovery,
-        recovery: :last_props
-      )
+      {:ok, _pid} =
+        ComponentSupervisor.start_component(
+          SimpleComponent,
+          %{},
+          id: :props_recovery,
+          recovery: :last_props
+        )
 
       assert ComponentSupervisor.count_children() == 1
     end
@@ -270,13 +277,14 @@ defmodule TermUI.ComponentSupervisorTest do
 
   describe "restart limits" do
     test "sets restart limits when specified" do
-      {:ok, _pid} = ComponentSupervisor.start_component(
-        SimpleComponent,
-        %{},
-        id: :limited_restart,
-        max_restarts: 5,
-        max_seconds: 10
-      )
+      {:ok, _pid} =
+        ComponentSupervisor.start_component(
+          SimpleComponent,
+          %{},
+          id: :limited_restart,
+          max_restarts: 5,
+          max_seconds: 10
+        )
 
       # Verify limits were set
       StatePersistence.record_restart(:limited_restart)

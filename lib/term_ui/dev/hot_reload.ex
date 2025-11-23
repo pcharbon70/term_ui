@@ -31,14 +31,15 @@ defmodule TermUI.Dev.HotReload do
 
   require Logger
 
-  @poll_interval 1000  # 1 second
+  # 1 second
+  @poll_interval 1000
 
   @type state :: %{
-    enabled: boolean(),
-    watched_dirs: [String.t()],
-    file_mtimes: %{String.t() => integer()},
-    on_reload: (module() -> any()) | nil
-  }
+          enabled: boolean(),
+          watched_dirs: [String.t()],
+          file_mtimes: %{String.t() => integer()},
+          on_reload: (module() -> any()) | nil
+        }
 
   # Client API
 
@@ -140,14 +141,15 @@ defmodule TermUI.Dev.HotReload do
   def handle_call({:reload_module, module}, _from, state) do
     result = do_reload_module(module)
 
-    state = case result do
-      :ok ->
-        notify_reload(state.on_reload, module)
-        add_recent_reload(state, module)
+    state =
+      case result do
+        :ok ->
+          notify_reload(state.on_reload, module)
+          add_recent_reload(state, module)
 
-      _ ->
-        state
-    end
+        _ ->
+          state
+      end
 
     {:reply, result, state}
   end
@@ -211,20 +213,22 @@ defmodule TermUI.Dev.HotReload do
     current_mtimes = scan_files(state.watched_dirs)
 
     # Find changed files
-    changed_files = current_mtimes
-    |> Enum.filter(fn {path, mtime} ->
-      old_mtime = Map.get(state.file_mtimes, path, 0)
-      mtime > old_mtime
-    end)
-    |> Enum.map(fn {path, _} -> path end)
+    changed_files =
+      current_mtimes
+      |> Enum.filter(fn {path, mtime} ->
+        old_mtime = Map.get(state.file_mtimes, path, 0)
+        mtime > old_mtime
+      end)
+      |> Enum.map(fn {path, _} -> path end)
 
     if length(changed_files) > 0 do
       Logger.debug("Hot reload detected changes in #{length(changed_files)} files")
 
       # Reload changed files
-      state = Enum.reduce(changed_files, state, fn path, acc ->
-        reload_file(path, acc)
-      end)
+      state =
+        Enum.reduce(changed_files, state, fn path, acc ->
+          reload_file(path, acc)
+        end)
 
       %{state | file_mtimes: current_mtimes}
     else
@@ -309,6 +313,7 @@ defmodule TermUI.Dev.HotReload do
   end
 
   defp notify_reload(nil, _module), do: :ok
+
   defp notify_reload(callback, module) when is_function(callback, 1) do
     try do
       callback.(module)
@@ -348,8 +353,8 @@ defmodule TermUI.Dev.HotReload do
   def can_reload?(module) do
     try do
       # Check if module exists and is loaded
+      # Check if it has source info (not a native module)
       Code.ensure_loaded?(module) and
-        # Check if it has source info (not a native module)
         is_list(module.__info__(:compile)[:source])
     rescue
       _ -> false

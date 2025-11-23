@@ -20,7 +20,8 @@ defmodule TermUI.Widget.TextInputTest do
       {:ok, state} = TextInput.init(%{value: "Hello"})
 
       assert state.value == "Hello"
-      assert state.cursor == 5  # at end
+      # at end
+      assert state.cursor == 5
     end
 
     test "stores props in state" do
@@ -148,7 +149,8 @@ defmodule TermUI.Widget.TextInputTest do
 
       {:ok, new_state} = TextInput.handle_info({:changed, "TooLongValue"}, state)
       assert new_state.value == "TooLo"
-      assert new_state.cursor == 5  # adjusted to end
+      # adjusted to end
+      assert new_state.cursor == 5
     end
 
     test "submit message invokes on_submit callback" do
@@ -198,7 +200,8 @@ defmodule TermUI.Widget.TextInputTest do
     test "shows cursor with inverted style" do
       props = %{value: "Hello", cursor_style: %{bg: :white, fg: :black}}
       {:ok, state} = TextInput.init(props)
-      state = %{state | cursor: 2}  # cursor at 'l'
+      # cursor at 'l'
+      state = %{state | cursor: 2}
       result = TextInput.render(state, @area)
 
       assert %RenderNode{type: :cells, cells: cells} = result

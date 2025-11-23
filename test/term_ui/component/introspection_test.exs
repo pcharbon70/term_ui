@@ -92,7 +92,9 @@ defmodule TermUI.Component.IntrospectionTest do
 
   describe "get_component_info/1" do
     test "returns detailed component information" do
-      {:ok, pid} = ComponentSupervisor.start_component(TestComponent, %{initial: 42}, id: :test_comp)
+      {:ok, pid} =
+        ComponentSupervisor.start_component(TestComponent, %{initial: 42}, id: :test_comp)
+
       ComponentServer.mount(pid)
 
       assert {:ok, info} = Introspection.get_component_info(:test_comp)

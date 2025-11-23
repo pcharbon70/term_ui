@@ -276,11 +276,12 @@ defmodule TermUI.StyleTest do
 
   describe "build_variants/1" do
     test "builds complete variant map with inheritance" do
-      variants = Style.build_variants(%{
-        normal: Style.new() |> Style.fg(:white) |> Style.bold(),
-        focused: Style.new() |> Style.fg(:blue),
-        disabled: Style.new() |> Style.fg(:bright_black)
-      })
+      variants =
+        Style.build_variants(%{
+          normal: Style.new() |> Style.fg(:white) |> Style.bold(),
+          focused: Style.new() |> Style.fg(:blue),
+          disabled: Style.new() |> Style.fg(:bright_black)
+        })
 
       # Normal unchanged
       assert variants.normal.fg == :white
@@ -296,9 +297,10 @@ defmodule TermUI.StyleTest do
     end
 
     test "creates normal when not provided" do
-      variants = Style.build_variants(%{
-        focused: Style.new() |> Style.fg(:blue)
-      })
+      variants =
+        Style.build_variants(%{
+          focused: Style.new() |> Style.fg(:blue)
+        })
 
       assert variants.focused.fg == :blue
     end
@@ -487,9 +489,22 @@ defmodule TermUI.StyleTest do
 
     test "handles all 16 named colors" do
       colors = [
-        :black, :red, :green, :yellow, :blue, :magenta, :cyan, :white,
-        :bright_black, :bright_red, :bright_green, :bright_yellow,
-        :bright_blue, :bright_magenta, :bright_cyan, :bright_white
+        :black,
+        :red,
+        :green,
+        :yellow,
+        :blue,
+        :magenta,
+        :cyan,
+        :white,
+        :bright_black,
+        :bright_red,
+        :bright_green,
+        :bright_yellow,
+        :bright_blue,
+        :bright_magenta,
+        :bright_cyan,
+        :bright_white
       ]
 
       for color <- colors do

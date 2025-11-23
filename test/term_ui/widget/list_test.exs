@@ -238,7 +238,8 @@ defmodule TermUI.Widget.ListTest do
     test "scrolls to keep selection visible" do
       props = %{items: @items}
       {:ok, state} = ListWidget.init(props)
-      state = %{state | selected_index: 6}  # Last item
+      # Last item
+      state = %{state | selected_index: 6}
       result = ListWidget.render(state, @area)
 
       assert %RenderNode{type: :cells, cells: cells} = result

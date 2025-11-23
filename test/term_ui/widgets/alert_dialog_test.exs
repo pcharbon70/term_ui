@@ -6,11 +6,12 @@ defmodule TermUI.Widgets.AlertDialogTest do
 
   describe "new/1" do
     test "creates alert with required fields" do
-      props = AlertDialog.new(
-        type: :info,
-        title: "Information",
-        message: "This is an info message"
-      )
+      props =
+        AlertDialog.new(
+          type: :info,
+          title: "Information",
+          message: "This is an info message"
+        )
 
       assert props.type == :info
       assert props.title == "Information"
@@ -19,22 +20,24 @@ defmodule TermUI.Widgets.AlertDialogTest do
     end
 
     test "creates alert with correct buttons for info type" do
-      props = AlertDialog.new(
-        type: :info,
-        title: "Info",
-        message: "Message"
-      )
+      props =
+        AlertDialog.new(
+          type: :info,
+          title: "Info",
+          message: "Message"
+        )
 
       assert length(props.buttons) == 1
       assert hd(props.buttons).id == :ok
     end
 
     test "creates alert with correct buttons for confirm type" do
-      props = AlertDialog.new(
-        type: :confirm,
-        title: "Confirm",
-        message: "Are you sure?"
-      )
+      props =
+        AlertDialog.new(
+          type: :confirm,
+          title: "Confirm",
+          message: "Are you sure?"
+        )
 
       assert length(props.buttons) == 2
       button_ids = Enum.map(props.buttons, & &1.id)
@@ -43,11 +46,12 @@ defmodule TermUI.Widgets.AlertDialogTest do
     end
 
     test "creates alert with correct buttons for ok_cancel type" do
-      props = AlertDialog.new(
-        type: :ok_cancel,
-        title: "Save",
-        message: "Save changes?"
-      )
+      props =
+        AlertDialog.new(
+          type: :ok_cancel,
+          title: "Save",
+          message: "Save changes?"
+        )
 
       assert length(props.buttons) == 2
       button_ids = Enum.map(props.buttons, & &1.id)

@@ -328,9 +328,12 @@ defmodule TermUI.Style do
     if abs(r - g) < 10 and abs(g - b) < 10 and abs(r - b) < 10 do
       # Grayscale
       gray = div(r + g + b, 3)
+
       cond do
-        gray < 8 -> 16  # black
-        gray > 248 -> 231  # white
+        # black
+        gray < 8 -> 16
+        # white
+        gray > 248 -> 231
         true -> 232 + div((gray - 8) * 24, 240)
       end
     else

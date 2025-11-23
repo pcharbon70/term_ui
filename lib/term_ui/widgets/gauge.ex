@@ -63,14 +63,36 @@ defmodule TermUI.Widgets.Gauge do
 
     case style_type do
       :bar ->
-        render_bar(value, min, max, width, show_value, show_range, zones, label, bar_char, empty_char)
+        render_bar(
+          value,
+          min,
+          max,
+          width,
+          show_value,
+          show_range,
+          zones,
+          label,
+          bar_char,
+          empty_char
+        )
 
       :arc ->
         render_arc(value, min, max, width, show_value, zones, label)
     end
   end
 
-  defp render_bar(value, min, max, width, show_value, show_range, zones, label, bar_char, empty_char) do
+  defp render_bar(
+         value,
+         min,
+         max,
+         width,
+         show_value,
+         show_range,
+         zones,
+         label,
+         bar_char,
+         empty_char
+       ) do
     # Calculate fill
     normalized = normalize_value(value, min, max)
     filled_width = round(normalized * width)
@@ -83,21 +105,23 @@ defmodule TermUI.Widgets.Gauge do
     # Apply zone color
     zone_style = find_zone_style(value, zones)
 
-    bar = if zone_style do
-      styled(text(filled), zone_style)
-    else
-      text(filled)
-    end
+    bar =
+      if zone_style do
+        styled(text(filled), zone_style)
+      else
+        text(filled)
+      end
 
     # Build components
     parts = []
 
     # Label row
-    parts = if label do
-      [text(label) | parts]
-    else
-      parts
-    end
+    parts =
+      if label do
+        [text(label) | parts]
+      else
+        parts
+      end
 
     # Bar row
     bar_row = stack(:horizontal, [bar, text(empty)])
@@ -106,40 +130,46 @@ defmodule TermUI.Widgets.Gauge do
     # Range/value row
     bottom_parts = []
 
-    bottom_parts = if show_range do
-      [text(format_number(min)) | bottom_parts]
-    else
-      bottom_parts
-    end
-
-    bottom_parts = if show_value do
-      value_str = format_number(value)
-      # Center the value
-      padding = if show_range do
-        div(width - String.length(value_str), 2)
+    bottom_parts =
+      if show_range do
+        [text(format_number(min)) | bottom_parts]
       else
-        0
+        bottom_parts
       end
-      [text(String.duplicate(" ", padding) <> value_str) | bottom_parts]
-    else
-      bottom_parts
-    end
 
-    bottom_parts = if show_range do
-      max_str = format_number(max)
-      padding = width - String.length(max_str)
-      padding = if show_value, do: div(padding, 2), else: padding
-      [text(String.duplicate(" ", max(0, padding)) <> max_str) | bottom_parts]
-    else
-      bottom_parts
-    end
+    bottom_parts =
+      if show_value do
+        value_str = format_number(value)
+        # Center the value
+        padding =
+          if show_range do
+            div(width - String.length(value_str), 2)
+          else
+            0
+          end
 
-    parts = if Enum.empty?(bottom_parts) do
-      parts
-    else
-      bottom_row = stack(:horizontal, Enum.reverse(bottom_parts))
-      [bottom_row | parts]
-    end
+        [text(String.duplicate(" ", padding) <> value_str) | bottom_parts]
+      else
+        bottom_parts
+      end
+
+    bottom_parts =
+      if show_range do
+        max_str = format_number(max)
+        padding = width - String.length(max_str)
+        padding = if show_value, do: div(padding, 2), else: padding
+        [text(String.duplicate(" ", max(0, padding)) <> max_str) | bottom_parts]
+      else
+        bottom_parts
+      end
+
+    parts =
+      if Enum.empty?(bottom_parts) do
+        parts
+      else
+        bottom_row = stack(:horizontal, Enum.reverse(bottom_parts))
+        [bottom_row | parts]
+      end
 
     stack(:vertical, Enum.reverse(parts))
   end
@@ -155,8 +185,11 @@ defmodule TermUI.Widgets.Gauge do
     top = "╭" <> String.duplicate("─", width - 2) <> "╮"
 
     # Middle shows value position
-    indicator_line = String.duplicate(" ", arc_position) <> "▼" <>
-                     String.duplicate(" ", width - arc_position - 3)
+    indicator_line =
+      String.duplicate(" ", arc_position) <>
+        "▼" <>
+        String.duplicate(" ", width - arc_position - 3)
+
     middle = "│" <> indicator_line <> "│"
 
     bottom = "╰" <> String.duplicate("─", width - 2) <> "╯"
@@ -164,22 +197,24 @@ defmodule TermUI.Widgets.Gauge do
     parts = [text(top), text(middle), text(bottom)]
 
     # Add value display
-    parts = if show_value do
-      value_str = format_number(value)
-      padding = div(width - String.length(value_str), 2)
-      value_row = text(String.duplicate(" ", padding) <> value_str)
-      parts ++ [value_row]
-    else
-      parts
-    end
+    parts =
+      if show_value do
+        value_str = format_number(value)
+        padding = div(width - String.length(value_str), 2)
+        value_row = text(String.duplicate(" ", padding) <> value_str)
+        parts ++ [value_row]
+      else
+        parts
+      end
 
     # Add label
-    parts = if label do
-      label_row = text(label)
-      [label_row | parts]
-    else
-      parts
-    end
+    parts =
+      if label do
+        label_row = text(label)
+        [label_row | parts]
+      else
+        parts
+      end
 
     stack(:vertical, parts)
   end
@@ -218,13 +253,17 @@ defmodule TermUI.Widgets.Gauge do
   """
   @spec percentage(number(), keyword()) :: TermUI.Component.RenderNode.t()
   def percentage(value, opts \\ []) do
-    opts = Keyword.merge([
-      value: value,
-      min: 0,
-      max: 100,
-      show_value: true,
-      show_range: false
-    ], opts)
+    opts =
+      Keyword.merge(
+        [
+          value: value,
+          min: 0,
+          max: 100,
+          show_value: true,
+          show_range: false
+        ],
+        opts
+      )
 
     render(opts)
   end
@@ -246,9 +285,12 @@ defmodule TermUI.Widgets.Gauge do
 
     # Note: These would need actual Style structs in real usage
     zones = [
-      {0, nil},       # green zone (default)
-      {warning, nil}, # yellow zone
-      {danger, nil}   # red zone
+      # green zone (default)
+      {0, nil},
+      # yellow zone
+      {warning, nil},
+      # red zone
+      {danger, nil}
     ]
 
     opts = Keyword.merge(opts, zones: zones)

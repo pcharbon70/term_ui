@@ -19,7 +19,9 @@ defmodule TermUI.ComponentRegistryTest do
       pid2 = spawn(fn -> Process.sleep(10000) end)
 
       :ok = ComponentRegistry.register(:same_id, pid1, TestModule)
-      assert {:error, :already_registered} = ComponentRegistry.register(:same_id, pid2, TestModule)
+
+      assert {:error, :already_registered} =
+               ComponentRegistry.register(:same_id, pid2, TestModule)
     end
 
     test "can register with reference as id" do

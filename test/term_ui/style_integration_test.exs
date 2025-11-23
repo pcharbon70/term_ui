@@ -106,11 +106,12 @@ defmodule TermUI.StyleIntegrationTest do
 
   describe "variant selection" do
     test "select variant based on state" do
-      variants = Style.build_variants(%{
-        normal: Style.new() |> Style.fg(:white),
-        focused: Style.new() |> Style.fg(:blue) |> Style.bold(),
-        disabled: Style.new() |> Style.fg(:bright_black)
-      })
+      variants =
+        Style.build_variants(%{
+          normal: Style.new() |> Style.fg(:white),
+          focused: Style.new() |> Style.fg(:blue) |> Style.bold(),
+          disabled: Style.new() |> Style.fg(:bright_black)
+        })
 
       normal = Style.get_variant(variants, :normal)
       focused = Style.get_variant(variants, :focused)
@@ -126,10 +127,11 @@ defmodule TermUI.StyleIntegrationTest do
     end
 
     test "variants inherit from normal" do
-      variants = Style.build_variants(%{
-        normal: Style.new() |> Style.fg(:white) |> Style.bg(:black),
-        focused: Style.new() |> Style.fg(:blue)
-      })
+      variants =
+        Style.build_variants(%{
+          normal: Style.new() |> Style.fg(:white) |> Style.bg(:black),
+          focused: Style.new() |> Style.fg(:blue)
+        })
 
       focused = Style.get_variant(variants, :focused)
 
@@ -240,12 +242,13 @@ defmodule TermUI.StyleIntegrationTest do
         |> Style.bg(:bright_black)
 
       # Variants
-      variants = Style.build_variants(%{
-        normal: base,
-        focused: Style.new() |> Style.bg(:blue) |> Style.bold(),
-        pressed: Style.new() |> Style.bg(:cyan) |> Style.reverse(),
-        disabled: Style.new() |> Style.fg(:bright_black) |> Style.bg(:black)
-      })
+      variants =
+        Style.build_variants(%{
+          normal: base,
+          focused: Style.new() |> Style.bg(:blue) |> Style.bold(),
+          pressed: Style.new() |> Style.bg(:cyan) |> Style.reverse(),
+          disabled: Style.new() |> Style.fg(:bright_black) |> Style.bg(:black)
+        })
 
       # Simulate state changes
       states = [:normal, :focused, :pressed, :disabled]

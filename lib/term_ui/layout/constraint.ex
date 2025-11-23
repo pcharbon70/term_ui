@@ -294,7 +294,8 @@ defmodule TermUI.Layout.Constraint do
   Raises `ArgumentError` if min > max or values are invalid.
   """
   @spec min_max(non_neg_integer(), non_neg_integer()) :: Min.t()
-  def min_max(min_val, max_val) when is_integer(min_val) and is_integer(max_val) and min_val >= 0 and max_val >= 0 do
+  def min_max(min_val, max_val)
+      when is_integer(min_val) and is_integer(max_val) and min_val >= 0 and max_val >= 0 do
     if min_val > max_val do
       raise ArgumentError, "min (#{min_val}) cannot be greater than max (#{max_val})"
     end
@@ -303,7 +304,8 @@ defmodule TermUI.Layout.Constraint do
   end
 
   def min_max(min_val, max_val) do
-    raise ArgumentError, "min_max requires non-negative integers, got: min=#{inspect(min_val)}, max=#{inspect(max_val)}"
+    raise ArgumentError,
+          "min_max requires non-negative integers, got: min=#{inspect(min_val)}, max=#{inspect(max_val)}"
   end
 
   @doc """

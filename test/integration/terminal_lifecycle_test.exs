@@ -46,7 +46,6 @@ defmodule TermUI.Integration.TerminalLifecycleTest do
       assert is_struct(caps, TermUI.Capabilities)
       assert caps.color_mode in [:monochrome, :color_16, :color_256, :true_color]
     end
-
   end
 
   describe "1.6.1.1 tests requiring terminal" do
@@ -127,7 +126,6 @@ defmodule TermUI.Integration.TerminalLifecycleTest do
       # State should still be clean
       IntegrationHelpers.assert_terminal_clean()
     end
-
   end
 
   describe "1.6.1.2 tests requiring terminal" do
@@ -329,8 +327,11 @@ defmodule TermUI.Integration.TerminalLifecycleTest do
         100 ->
           # No notification in non-terminal environment is expected
           case Terminal.get_terminal_size() do
-            {:ok, _} -> flunk("Did not receive resize notification despite terminal being available")
-            {:error, _} -> :ok
+            {:ok, _} ->
+              flunk("Did not receive resize notification despite terminal being available")
+
+            {:error, _} ->
+              :ok
           end
       end
 
@@ -357,5 +358,4 @@ defmodule TermUI.Integration.TerminalLifecycleTest do
       end
     end
   end
-
 end

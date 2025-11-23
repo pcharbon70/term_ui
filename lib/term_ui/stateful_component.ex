@@ -278,7 +278,12 @@ defmodule TermUI.StatefulComponent do
               | {:noreply, state()}
               | {:noreply, state(), [command()]}
 
-  @optional_callbacks mount: 1, update: 2, unmount: 1, terminate: 2, handle_info: 2, handle_call: 3
+  @optional_callbacks mount: 1,
+                      update: 2,
+                      unmount: 1,
+                      terminate: 2,
+                      handle_info: 2,
+                      handle_call: 3
 
   @doc false
   defmacro __using__(_opts) do

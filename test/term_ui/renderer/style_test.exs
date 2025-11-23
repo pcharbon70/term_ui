@@ -304,7 +304,11 @@ defmodule TermUI.Renderer.StyleTest do
     end
 
     test "accepts all valid attributes" do
-      style = Style.new(attrs: [:bold, :dim, :italic, :underline, :blink, :reverse, :hidden, :strikethrough])
+      style =
+        Style.new(
+          attrs: [:bold, :dim, :italic, :underline, :blink, :reverse, :hidden, :strikethrough]
+        )
+
       assert MapSet.size(style.attrs) == 8
     end
   end

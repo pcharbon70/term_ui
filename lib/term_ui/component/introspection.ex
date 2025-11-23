@@ -122,18 +122,20 @@ defmodule TermUI.Component.Introspection do
         # Calculate uptime (use reductions as proxy since start_time not always available)
         uptime_ms =
           case Process.info(pid, :reductions) do
-            {:reductions, _} -> 0  # Can't reliably calculate uptime
+            # Can't reliably calculate uptime
+            {:reductions, _} -> 0
             nil -> 0
           end
 
-        enhanced_info = Map.merge(info, %{
-          state: state,
-          props: props,
-          lifecycle: lifecycle,
-          restart_count: restart_count,
-          child_count: child_count,
-          uptime_ms: uptime_ms
-        })
+        enhanced_info =
+          Map.merge(info, %{
+            state: state,
+            props: props,
+            lifecycle: lifecycle,
+            restart_count: restart_count,
+            child_count: child_count,
+            uptime_ms: uptime_ms
+          })
 
         {:ok, enhanced_info}
 
@@ -162,12 +164,13 @@ defmodule TermUI.Component.Introspection do
         child_count = length(ComponentRegistry.get_children(component_id))
 
         # Get process info
-        info = Process.info(pid, [
-          :memory,
-          :message_queue_len,
-          :reductions,
-          :status
-        ]) || []
+        info =
+          Process.info(pid, [
+            :memory,
+            :message_queue_len,
+            :reductions,
+            :status
+          ]) || []
 
         # uptime_ms not reliably available
         uptime_ms = 0
@@ -267,9 +270,11 @@ defmodule TermUI.Component.Introspection do
     components = ComponentRegistry.list_all()
 
     total_count = length(components)
-    total_restarts = Enum.reduce(components, 0, fn c, acc ->
-      acc + StatePersistence.get_restart_count(c.id)
-    end)
+
+    total_restarts =
+      Enum.reduce(components, 0, fn c, acc ->
+        acc + StatePersistence.get_restart_count(c.id)
+      end)
 
     total_memory =
       Enum.reduce(components, 0, fn c, acc ->
