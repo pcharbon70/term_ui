@@ -138,8 +138,8 @@ defmodule TermUI.Focus.Tracker do
 
   @type t :: %__MODULE__{
           has_focus: boolean(),
-          on_gained: [(() -> any())],
-          on_lost: [(() -> any())],
+          on_gained: [(-> any())],
+          on_lost: [(-> any())],
           paused: boolean(),
           reduced_framerate: boolean(),
           auto_pause: boolean(),
@@ -189,7 +189,7 @@ defmodule TermUI.Focus.Tracker do
   @doc """
   Registers an action to execute when focus is gained.
   """
-  @spec on_focus_gained(GenServer.server(), (() -> any())) :: :ok
+  @spec on_focus_gained(GenServer.server(), (-> any())) :: :ok
   def on_focus_gained(tracker, action) when is_function(action, 0) do
     GenServer.call(tracker, {:on_focus_gained, action})
   end
@@ -197,7 +197,7 @@ defmodule TermUI.Focus.Tracker do
   @doc """
   Registers an action to execute when focus is lost.
   """
-  @spec on_focus_lost(GenServer.server(), (() -> any())) :: :ok
+  @spec on_focus_lost(GenServer.server(), (-> any())) :: :ok
   def on_focus_lost(tracker, action) when is_function(action, 0) do
     GenServer.call(tracker, {:on_focus_lost, action})
   end

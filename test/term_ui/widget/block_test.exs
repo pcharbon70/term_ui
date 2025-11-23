@@ -146,7 +146,8 @@ defmodule TermUI.Widget.BlockTest do
 
       # "Hi" is 2 chars, inner width is 18, so left padding = 8
       h_cell = Enum.find(cells, fn c -> c.y == 0 && c.cell.char == "H" end)
-      assert h_cell.x == 9  # 1 (corner) + 8 (padding)
+      # 1 (corner) + 8 (padding)
+      assert h_cell.x == 9
     end
 
     test "renders right-aligned title" do
@@ -236,20 +237,27 @@ defmodule TermUI.Widget.BlockTest do
       props = %{border: :single, padding: 2}
       inner = Block.inner_area(props, @area)
 
-      assert inner.x == 3  # 1 border + 2 padding
+      # 1 border + 2 padding
+      assert inner.x == 3
       assert inner.y == 3
-      assert inner.width == 14  # 20 - 2 - 4
-      assert inner.height == 4  # 10 - 2 - 4
+      # 20 - 2 - 4
+      assert inner.width == 14
+      # 10 - 2 - 4
+      assert inner.height == 4
     end
 
     test "calculates inner area with directional padding" do
       props = %{border: :single, padding: %{top: 1, right: 2, bottom: 3, left: 4}}
       inner = Block.inner_area(props, @area)
 
-      assert inner.x == 5  # 1 border + 4 left
-      assert inner.y == 2  # 1 border + 1 top
-      assert inner.width == 12  # 20 - 2 - 4 - 2
-      assert inner.height == 4  # 10 - 2 - 1 - 3
+      # 1 border + 4 left
+      assert inner.x == 5
+      # 1 border + 1 top
+      assert inner.y == 2
+      # 20 - 2 - 4 - 2
+      assert inner.width == 12
+      # 10 - 2 - 1 - 3
+      assert inner.height == 4
     end
 
     test "handles negative inner dimensions" do

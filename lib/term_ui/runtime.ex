@@ -116,18 +116,20 @@ defmodule TermUI.Runtime do
     render_interval = Keyword.get(opts, :render_interval, @default_render_interval)
 
     # Initialize root component state
-    root_state = if function_exported?(root_module, :init, 1) do
-      root_module.init(opts)
-    else
-      %{}
-    end
+    root_state =
+      if function_exported?(root_module, :init, 1) do
+        root_module.init(opts)
+      else
+        %{}
+      end
 
     state = %State{
       root_module: root_module,
       root_state: root_state,
       message_queue: MessageQueue.new(),
       render_interval: render_interval,
-      dirty: true,  # Initial render needed
+      # Initial render needed
+      dirty: true,
       focused_component: :root,
       components: %{root: %{module: root_module, state: root_state}},
       pending_commands: %{},
@@ -281,7 +283,8 @@ defmodule TermUI.Runtime do
     {messages, queue} = MessageQueue.flush(state.message_queue)
 
     {state, commands} =
-      Enum.reduce(messages, {%{state | message_queue: queue}, []}, fn {component_id, message}, {acc_state, acc_cmds} ->
+      Enum.reduce(messages, {%{state | message_queue: queue}, []}, fn {component_id, message},
+                                                                      {acc_state, acc_cmds} ->
         {new_state, cmds} = process_message(component_id, message, acc_state)
         {new_state, acc_cmds ++ cmds}
       end)
@@ -303,19 +306,21 @@ defmodule TermUI.Runtime do
         {new_component_state, commands} = Elm.normalize_update_result(result, component_state)
 
         # Update component state
-        components = Map.update!(state.components, component_id, fn comp ->
-          %{comp | state: new_component_state}
-        end)
+        components =
+          Map.update!(state.components, component_id, fn comp ->
+            %{comp | state: new_component_state}
+          end)
 
         # Mark dirty if state changed
-        dirty = state.dirty or (new_component_state != component_state)
+        dirty = state.dirty or new_component_state != component_state
 
         # Update root_state if this is root
-        state = if component_id == :root do
-          %{state | root_state: new_component_state, components: components, dirty: dirty}
-        else
-          %{state | components: components, dirty: dirty}
-        end
+        state =
+          if component_id == :root do
+            %{state | root_state: new_component_state, components: components, dirty: dirty}
+          else
+            %{state | components: components, dirty: dirty}
+          end
 
         # Tag commands with component_id
         tagged_commands = Enum.map(commands, fn cmd -> {component_id, cmd} end)
@@ -331,10 +336,11 @@ defmodule TermUI.Runtime do
   defp execute_commands(commands, state) do
     # For now, just track pending commands
     # Actual execution will be implemented in 5.3
-    pending = Enum.reduce(commands, state.pending_commands, fn {component_id, cmd}, acc ->
-      command_id = make_ref()
-      Map.put(acc, command_id, %{component_id: component_id, command: cmd})
-    end)
+    pending =
+      Enum.reduce(commands, state.pending_commands, fn {component_id, cmd}, acc ->
+        command_id = make_ref()
+        Map.put(acc, command_id, %{component_id: component_id, command: cmd})
+      end)
 
     %{state | pending_commands: pending}
   end
@@ -359,11 +365,12 @@ defmodule TermUI.Runtime do
     state = process_messages(state)
 
     # Render if dirty
-    state = if state.dirty and not state.shutting_down do
-      do_render(state)
-    else
-      state
-    end
+    state =
+      if state.dirty and not state.shutting_down do
+        do_render(state)
+      else
+        state
+      end
 
     # Schedule next render unless shutting down
     unless state.shutting_down do

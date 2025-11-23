@@ -6,10 +6,14 @@ defmodule TermUI.PerformanceTest do
   alias TermUI.Theme
 
   # Performance targets (in microseconds)
-  @layout_solve_target_us 1000  # 1ms
-  @cache_lookup_target_us 100   # 0.1ms
-  @style_resolution_target_us 500  # 0.5ms
-  @frame_target_us 5000  # 5ms
+  # 1ms
+  @layout_solve_target_us 1000
+  # 0.1ms
+  @cache_lookup_target_us 100
+  # 0.5ms
+  @style_resolution_target_us 500
+  # 5ms
+  @frame_target_us 5000
 
   # Multiplier for slower CI environments
   @ci_multiplier if System.get_env("CI"), do: 3, else: 1
@@ -43,11 +47,13 @@ defmodule TermUI.PerformanceTest do
         Constraint.length(20)
       ]
 
-      avg_us = measure_with_warmup(100, fn ->
-        Solver.solve(constraints, 100)
-      end)
+      avg_us =
+        measure_with_warmup(100, fn ->
+          Solver.solve(constraints, 100)
+        end)
 
       target = adjusted_target(@layout_solve_target_us)
+
       assert avg_us < target,
              "Simple solve took #{avg_us}us, target is #{target}us"
     end
@@ -59,11 +65,13 @@ defmodule TermUI.PerformanceTest do
         Constraint.percentage(25)
       ]
 
-      avg_us = measure_with_warmup(100, fn ->
-        Solver.solve(constraints, 200)
-      end)
+      avg_us =
+        measure_with_warmup(100, fn ->
+          Solver.solve(constraints, 200)
+        end)
 
       target = adjusted_target(@layout_solve_target_us)
+
       assert avg_us < target,
              "Percentage solve took #{avg_us}us, target is #{target}us"
     end
@@ -75,11 +83,13 @@ defmodule TermUI.PerformanceTest do
         Constraint.ratio(3)
       ]
 
-      avg_us = measure_with_warmup(100, fn ->
-        Solver.solve(constraints, 300)
-      end)
+      avg_us =
+        measure_with_warmup(100, fn ->
+          Solver.solve(constraints, 300)
+        end)
 
       target = adjusted_target(@layout_solve_target_us)
+
       assert avg_us < target,
              "Ratio solve took #{avg_us}us, target is #{target}us"
     end
@@ -92,11 +102,13 @@ defmodule TermUI.PerformanceTest do
         Constraint.fill()
       ]
 
-      avg_us = measure_with_warmup(100, fn ->
-        Solver.solve(constraints, 200)
-      end)
+      avg_us =
+        measure_with_warmup(100, fn ->
+          Solver.solve(constraints, 200)
+        end)
 
       target = adjusted_target(@layout_solve_target_us)
+
       assert avg_us < target,
              "Mixed solve took #{avg_us}us, target is #{target}us"
     end
@@ -111,12 +123,14 @@ defmodule TermUI.PerformanceTest do
           end
         end
 
-      avg_us = measure_with_warmup(100, fn ->
-        Solver.solve(constraints, 500)
-      end)
+      avg_us =
+        measure_with_warmup(100, fn ->
+          Solver.solve(constraints, 500)
+        end)
 
       # Allow 2x for larger constraint sets
       target = adjusted_target(@layout_solve_target_us * 2)
+
       assert avg_us < target,
              "10-constraint solve took #{avg_us}us, target is #{target}us"
     end
@@ -152,11 +166,13 @@ defmodule TermUI.PerformanceTest do
       Cache.solve(constraints, area)
 
       # Measure hits with warmup
-      avg_us = measure_with_warmup(1000, fn ->
-        Cache.solve(constraints, area)
-      end)
+      avg_us =
+        measure_with_warmup(1000, fn ->
+          Cache.solve(constraints, area)
+        end)
 
       target = adjusted_target(@cache_lookup_target_us)
+
       assert avg_us < target,
              "Cache hit took #{avg_us}us, target is #{target}us"
     end
@@ -172,12 +188,14 @@ defmodule TermUI.PerformanceTest do
       key = {constraints, area.width, area.height}
 
       # Measure direct lookups with warmup
-      avg_us = measure_with_warmup(1000, fn ->
-        Cache.lookup(key)
-      end)
+      avg_us =
+        measure_with_warmup(1000, fn ->
+          Cache.lookup(key)
+        end)
 
       # Direct lookup should be even faster
       target = adjusted_target(@cache_lookup_target_us / 2)
+
       assert avg_us < target,
              "Direct lookup took #{avg_us}us, target is #{target}us"
     end
@@ -218,14 +236,16 @@ defmodule TermUI.PerformanceTest do
 
   describe "style resolution performance" do
     test "style creation is fast" do
-      avg_us = measure_with_warmup(1000, fn ->
-        Style.new()
-        |> Style.fg(:blue)
-        |> Style.bg(:white)
-        |> Style.bold()
-      end)
+      avg_us =
+        measure_with_warmup(1000, fn ->
+          Style.new()
+          |> Style.fg(:blue)
+          |> Style.bg(:white)
+          |> Style.bold()
+        end)
 
       target = adjusted_target(@style_resolution_target_us)
+
       assert avg_us < target,
              "Style creation took #{avg_us}us, target is #{target}us"
     end
@@ -234,11 +254,13 @@ defmodule TermUI.PerformanceTest do
       base = Style.new() |> Style.fg(:blue) |> Style.bg(:white)
       overlay = Style.new() |> Style.bold() |> Style.underline()
 
-      avg_us = measure_with_warmup(1000, fn ->
-        Style.merge(base, overlay)
-      end)
+      avg_us =
+        measure_with_warmup(1000, fn ->
+          Style.merge(base, overlay)
+        end)
 
       target = adjusted_target(@style_resolution_target_us)
+
       assert avg_us < target,
              "Style merge took #{avg_us}us, target is #{target}us"
     end
@@ -253,29 +275,34 @@ defmodule TermUI.PerformanceTest do
         Style.new() |> Style.underline()
       ]
 
-      avg_us = measure_with_warmup(1000, fn ->
-        Enum.reduce(styles, Style.new(), fn child, parent ->
-          Style.inherit(child, parent)
+      avg_us =
+        measure_with_warmup(1000, fn ->
+          Enum.reduce(styles, Style.new(), fn child, parent ->
+            Style.inherit(child, parent)
+          end)
         end)
-      end)
 
       target = adjusted_target(@style_resolution_target_us)
+
       assert avg_us < target,
              "5-level inheritance took #{avg_us}us, target is #{target}us"
     end
 
     test "variant selection is fast" do
-      variants = Style.build_variants(%{
-        normal: Style.new() |> Style.fg(:white),
-        focused: Style.new() |> Style.fg(:blue) |> Style.bold(),
-        disabled: Style.new() |> Style.fg(:bright_black)
-      })
+      variants =
+        Style.build_variants(%{
+          normal: Style.new() |> Style.fg(:white),
+          focused: Style.new() |> Style.fg(:blue) |> Style.bold(),
+          disabled: Style.new() |> Style.fg(:bright_black)
+        })
 
-      avg_us = measure_with_warmup(1000, fn ->
-        Style.get_variant(variants, :focused)
-      end)
+      avg_us =
+        measure_with_warmup(1000, fn ->
+          Style.get_variant(variants, :focused)
+        end)
 
       target = adjusted_target(@style_resolution_target_us / 5)
+
       assert avg_us < target,
              "Variant selection took #{avg_us}us, target is #{target}us"
     end
@@ -289,31 +316,37 @@ defmodule TermUI.PerformanceTest do
     end
 
     test "theme access via ETS is fast", %{server: server} do
-      avg_us = measure_with_warmup(1000, fn ->
-        Theme.get_theme(server)
-      end)
+      avg_us =
+        measure_with_warmup(1000, fn ->
+          Theme.get_theme(server)
+        end)
 
       target = adjusted_target(@cache_lookup_target_us)
+
       assert avg_us < target,
              "Theme access took #{avg_us}us, target is #{target}us"
     end
 
     test "color lookup is fast", %{server: server} do
-      avg_us = measure_with_warmup(1000, fn ->
-        Theme.get_color(:primary, server)
-      end)
+      avg_us =
+        measure_with_warmup(1000, fn ->
+          Theme.get_color(:primary, server)
+        end)
 
       target = adjusted_target(@cache_lookup_target_us)
+
       assert avg_us < target,
              "Color lookup took #{avg_us}us, target is #{target}us"
     end
 
     test "component style access is fast", %{server: server} do
-      avg_us = measure_with_warmup(1000, fn ->
-        Theme.get_component_style(:button, :focused, server)
-      end)
+      avg_us =
+        measure_with_warmup(1000, fn ->
+          Theme.get_component_style(:button, :focused, server)
+        end)
 
       target = adjusted_target(@cache_lookup_target_us * 2)
+
       assert avg_us < target,
              "Component style took #{avg_us}us, target is #{target}us"
     end
@@ -355,12 +388,14 @@ defmodule TermUI.PerformanceTest do
         Constraint.ratio(3),
         Constraint.length(30)
       ]
+
       area = %{x: 0, y: 0, width: 150, height: 40}
 
       # Warmup
       for _ <- 1..@warmup_iterations do
         _layout = Cache.solve(constraints, area)
         base_style = Style.new() |> Style.fg(:white) |> Style.bg(:black)
+
         for _ <- 1..10 do
           component_style = Style.new() |> Style.bold()
           _effective = Style.inherit(component_style, base_style)
@@ -384,6 +419,7 @@ defmodule TermUI.PerformanceTest do
         end)
 
       target = adjusted_target(@frame_target_us)
+
       assert time_us < target,
              "Frame took #{time_us}us, target is #{target}us"
     end
@@ -403,18 +439,22 @@ defmodule TermUI.PerformanceTest do
       for _ <- 1..@warmup_iterations do
         _outer = Cache.solve(outer_constraints, outer_area)
         _inner = Cache.solve(inner_constraints, inner_area)
+
         styles = [
           Style.new() |> Style.fg(:blue),
           Style.new() |> Style.bg(:white),
           Style.new() |> Style.bold(),
           Style.new() |> Style.underline()
         ]
+
         Enum.reduce(styles, Style.new(), fn child, parent ->
           Style.inherit(child, parent)
         end)
+
         for color <- [:background, :foreground, :primary, :secondary] do
           Theme.get_color(color, theme)
         end
+
         for semantic <- [:success, :warning, :error] do
           Theme.get_semantic(semantic, theme)
         end
@@ -450,6 +490,7 @@ defmodule TermUI.PerformanceTest do
         end)
 
       target = adjusted_target(@frame_target_us * 2)
+
       assert time_us < target,
              "Complex frame took #{time_us}us, target is #{target}us"
     end
@@ -464,9 +505,10 @@ defmodule TermUI.PerformanceTest do
               Constraint.ratio(1)
             end
 
-          avg_us = measure_with_warmup(100, fn ->
-            Solver.solve(constraints, n * 50)
-          end)
+          avg_us =
+            measure_with_warmup(100, fn ->
+              Solver.solve(constraints, n * 50)
+            end)
 
           {n, avg_us}
         end

@@ -407,7 +407,9 @@ defmodule TermUI.Layout.ConstraintTest do
     end
 
     test "returns tuple for bounded constraints" do
-      assert {:min, :percentage} = Constraint.type(Constraint.percentage(50) |> Constraint.with_min(10))
+      assert {:min, :percentage} =
+               Constraint.type(Constraint.percentage(50) |> Constraint.with_min(10))
+
       assert {:max, :fill} = Constraint.type(Constraint.max(100))
     end
   end

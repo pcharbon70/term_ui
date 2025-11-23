@@ -83,9 +83,11 @@ defmodule TermUI.ComponentTest do
       area = %{x: 5, y: 10, width: 40, height: 12}
       result = ComplexComponent.render(%{}, area)
       # Find the text node that shows width
-      width_text = Enum.find(result.children, fn child ->
-        child.type == :text and String.contains?(child.content || "", "Width")
-      end)
+      width_text =
+        Enum.find(result.children, fn child ->
+          child.type == :text and String.contains?(child.content || "", "Width")
+        end)
+
       assert width_text.content == "Width: 40"
     end
   end

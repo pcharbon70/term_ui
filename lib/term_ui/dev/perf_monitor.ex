@@ -84,7 +84,7 @@ defmodule TermUI.Dev.PerfMonitor do
     text("│ " <> padded <> " │")
   end
 
-  defp render_frame_graph(frame_times) when length(frame_times) == 0 do
+  defp render_frame_graph(frame_times) when frame_times == [] do
     # Empty graph
     for _i <- 1..@graph_height do
       text("│" <> String.duplicate(" ", @panel_width - 2) <> "│")
@@ -106,11 +106,9 @@ defmodule TermUI.Dev.PerfMonitor do
       threshold = min_time + row / @graph_height * range
 
       chars =
-        times
-        |> Enum.map(fn time ->
+        Enum.map_join(times, "", fn time ->
           if time >= threshold, do: "▄", else: " "
         end)
-        |> Enum.join("")
 
       padded = String.pad_trailing(chars, graph_width)
       text("│ " <> padded <> " │")
@@ -178,8 +176,8 @@ defmodule TermUI.Dev.PerfMonitor do
   """
   @spec get_scheduler_utilization() :: [float()]
   def get_scheduler_utilization do
-    # Use apply to avoid compile-time warning about undefined module
-    case apply(:scheduler, :utilization, [1]) do
+    # The :scheduler module may not be available in all environments
+    case :scheduler.utilization(1) do
       [{:total, _, total} | _schedulers] ->
         [total]
 
@@ -187,7 +185,6 @@ defmodule TermUI.Dev.PerfMonitor do
         []
     end
   rescue
-    # The :scheduler module may not be available in all environments
     UndefinedFunctionError -> []
   end
 
@@ -221,12 +218,10 @@ defmodule TermUI.Dev.PerfMonitor do
     bars = ["▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"]
     range = max(1, max_val - min_val)
 
-    values
-    |> Enum.map(fn value ->
+    Enum.map_join(values, "", fn value ->
       normalized = (value - min_val) / range
       index = min(7, trunc(normalized * 8))
       Enum.at(bars, index)
     end)
-    |> Enum.join("")
   end
 end

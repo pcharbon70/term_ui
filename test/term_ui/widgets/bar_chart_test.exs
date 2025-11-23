@@ -30,12 +30,13 @@ defmodule TermUI.Widgets.BarChartTest do
         %{label: "B", value: 20}
       ]
 
-      result = BarChart.render(
-        data: data,
-        width: 30,
-        show_labels: false,
-        show_values: false
-      )
+      result =
+        BarChart.render(
+          data: data,
+          width: 30,
+          show_labels: false,
+          show_values: false
+        )
 
       # Second bar should be longer than first
       [first, second] = result.children
@@ -45,11 +46,12 @@ defmodule TermUI.Widgets.BarChartTest do
     end
 
     test "shows value labels when enabled" do
-      result = BarChart.render(
-        data: @test_data,
-        width: 40,
-        show_values: true
-      )
+      result =
+        BarChart.render(
+          data: @test_data,
+          width: 40,
+          show_values: true
+        )
 
       # Values should be in the output
       [first | _] = result.children
@@ -57,36 +59,39 @@ defmodule TermUI.Widgets.BarChartTest do
     end
 
     test "shows bar labels when enabled" do
-      result = BarChart.render(
-        data: @test_data,
-        width: 40,
-        show_labels: true
-      )
+      result =
+        BarChart.render(
+          data: @test_data,
+          width: 40,
+          show_labels: true
+        )
 
       [first | _] = result.children
       assert String.contains?(first.content, "A")
     end
 
     test "hides labels when disabled" do
-      result = BarChart.render(
-        data: @test_data,
-        width: 40,
-        show_labels: false,
-        show_values: false
-      )
+      result =
+        BarChart.render(
+          data: @test_data,
+          width: 40,
+          show_labels: false,
+          show_values: false
+        )
 
       [first | _] = result.children
       refute String.contains?(first.content, "A")
     end
 
     test "uses custom bar character" do
-      result = BarChart.render(
-        data: [%{label: "A", value: 10}],
-        width: 20,
-        bar_char: "#",
-        show_labels: false,
-        show_values: false
-      )
+      result =
+        BarChart.render(
+          data: [%{label: "A", value: 10}],
+          width: 20,
+          bar_char: "#",
+          show_labels: false,
+          show_values: false
+        )
 
       [first] = result.children
       assert String.contains?(first.content, "#")
@@ -95,24 +100,26 @@ defmodule TermUI.Widgets.BarChartTest do
 
   describe "render/1 vertical" do
     test "renders vertical bar chart" do
-      result = BarChart.render(
-        data: @test_data,
-        direction: :vertical,
-        width: 20,
-        height: 5
-      )
+      result =
+        BarChart.render(
+          data: @test_data,
+          direction: :vertical,
+          width: 20,
+          height: 5
+        )
 
       assert result.type == :stack
       assert result.direction == :vertical
     end
 
     test "returns empty for empty data" do
-      result = BarChart.render(
-        data: [],
-        direction: :vertical,
-        width: 20,
-        height: 5
-      )
+      result =
+        BarChart.render(
+          data: [],
+          direction: :vertical,
+          width: 20,
+          height: 5
+        )
 
       assert result.type == :empty
     end
@@ -130,9 +137,10 @@ defmodule TermUI.Widgets.BarChartTest do
       result = BarChart.bar(value: 50, max: 100, width: 10)
 
       # Should be half filled
-      filled_count = result.content
-      |> String.graphemes()
-      |> Enum.count(&(&1 == "█"))
+      filled_count =
+        result.content
+        |> String.graphemes()
+        |> Enum.count(&(&1 == "█"))
 
       assert filled_count == 5
     end
@@ -146,21 +154,23 @@ defmodule TermUI.Widgets.BarChartTest do
     test "clamps to max width" do
       result = BarChart.bar(value: 200, max: 100, width: 10)
 
-      filled_count = result.content
-      |> String.graphemes()
-      |> Enum.count(&(&1 == "█"))
+      filled_count =
+        result.content
+        |> String.graphemes()
+        |> Enum.count(&(&1 == "█"))
 
       assert filled_count == 10
     end
 
     test "uses custom characters" do
-      result = BarChart.bar(
-        value: 50,
-        max: 100,
-        width: 10,
-        bar_char: "=",
-        empty_char: "-"
-      )
+      result =
+        BarChart.bar(
+          value: 50,
+          max: 100,
+          width: 10,
+          bar_char: "=",
+          empty_char: "-"
+        )
 
       assert String.contains?(result.content, "=")
       assert String.contains?(result.content, "-")
@@ -169,22 +179,24 @@ defmodule TermUI.Widgets.BarChartTest do
 
   describe "formatting" do
     test "formats integer values" do
-      result = BarChart.render(
-        data: [%{label: "A", value: 42}],
-        width: 30,
-        show_values: true
-      )
+      result =
+        BarChart.render(
+          data: [%{label: "A", value: 42}],
+          width: 30,
+          show_values: true
+        )
 
       [first] = result.children
       assert String.contains?(first.content, "42")
     end
 
     test "formats float values" do
-      result = BarChart.render(
-        data: [%{label: "A", value: 3.14159}],
-        width: 30,
-        show_values: true
-      )
+      result =
+        BarChart.render(
+          data: [%{label: "A", value: 3.14159}],
+          width: 30,
+          show_values: true
+        )
 
       [first] = result.children
       assert String.contains?(first.content, "3.1")

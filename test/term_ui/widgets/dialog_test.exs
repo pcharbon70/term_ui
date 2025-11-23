@@ -29,11 +29,12 @@ defmodule TermUI.Widgets.DialogTest do
       on_close = fn -> :ok end
       on_confirm = fn _ -> :ok end
 
-      props = Dialog.new(
-        title: "Test",
-        on_close: on_close,
-        on_confirm: on_confirm
-      )
+      props =
+        Dialog.new(
+          title: "Test",
+          on_close: on_close,
+          on_confirm: on_confirm
+        )
 
       assert props.on_close == on_close
       assert props.on_confirm == on_confirm
@@ -195,6 +196,7 @@ defmodule TermUI.Widgets.DialogTest do
         %{id: :cancel, label: "Cancel"},
         %{id: :ok, label: "OK"}
       ]
+
       state = %{state | buttons: buttons}
 
       state = Dialog.focus_button(state, :cancel)

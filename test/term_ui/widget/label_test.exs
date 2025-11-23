@@ -12,7 +12,8 @@ defmodule TermUI.Widget.LabelTest do
       result = Label.render(props, @area)
 
       assert %RenderNode{type: :cells, cells: cells} = result
-      assert length(cells) == 20  # padded to area width
+      # padded to area width
+      assert length(cells) == 20
 
       # Check first 5 cells contain "Hello"
       chars = Enum.map(Enum.take(cells, 5), fn %{cell: cell} -> cell.char end)

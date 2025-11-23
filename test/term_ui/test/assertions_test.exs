@@ -20,6 +20,7 @@ defmodule TermUI.Test.AssertionsTest do
       assert_raise ExUnit.AssertionError, ~r/Text assertion failed/, fn ->
         assert_text(renderer, 1, 1, "World")
       end
+
       TestRenderer.destroy(renderer)
     end
   end
@@ -39,6 +40,7 @@ defmodule TermUI.Test.AssertionsTest do
       assert_raise ExUnit.AssertionError, ~r/Text refutation failed/, fn ->
         refute_text(renderer, 1, 1, "Hello")
       end
+
       TestRenderer.destroy(renderer)
     end
   end
@@ -58,6 +60,7 @@ defmodule TermUI.Test.AssertionsTest do
       assert_raise ExUnit.AssertionError, ~r/Text contains assertion failed/, fn ->
         assert_text_contains(renderer, 1, 1, 5, "World")
       end
+
       TestRenderer.destroy(renderer)
     end
   end
@@ -77,6 +80,7 @@ defmodule TermUI.Test.AssertionsTest do
       assert_raise ExUnit.AssertionError, ~r/Text contains refutation failed/, fn ->
         refute_text_contains(renderer, 1, 1, 13, "World")
       end
+
       TestRenderer.destroy(renderer)
     end
   end
@@ -95,6 +99,7 @@ defmodule TermUI.Test.AssertionsTest do
       assert_raise ExUnit.AssertionError, ~r/Text existence assertion failed/, fn ->
         assert_text_exists(renderer, "NotFound")
       end
+
       TestRenderer.destroy(renderer)
     end
   end
@@ -114,6 +119,7 @@ defmodule TermUI.Test.AssertionsTest do
       assert_raise ExUnit.AssertionError, ~r/Text existence refutation failed/, fn ->
         refute_text_exists(renderer, "Error")
       end
+
       TestRenderer.destroy(renderer)
     end
   end
@@ -151,6 +157,7 @@ defmodule TermUI.Test.AssertionsTest do
       assert_raise ExUnit.AssertionError, ~r/Style assertion failed/, fn ->
         assert_style(renderer, 1, 1, fg: :blue)
       end
+
       TestRenderer.destroy(renderer)
     end
   end
@@ -172,6 +179,7 @@ defmodule TermUI.Test.AssertionsTest do
       assert_raise ExUnit.AssertionError, ~r/Attribute assertion failed/, fn ->
         assert_attr(renderer, 1, 1, :bold)
       end
+
       TestRenderer.destroy(renderer)
     end
   end
@@ -193,6 +201,7 @@ defmodule TermUI.Test.AssertionsTest do
       assert_raise ExUnit.AssertionError, ~r/Attribute refutation failed/, fn ->
         refute_attr(renderer, 1, 1, :bold)
       end
+
       TestRenderer.destroy(renderer)
     end
   end
@@ -260,6 +269,7 @@ defmodule TermUI.Test.AssertionsTest do
       assert_raise ExUnit.AssertionError, ~r/Snapshot assertion failed/, fn ->
         assert_snapshot(renderer, snapshot)
       end
+
       TestRenderer.destroy(renderer)
     end
   end
@@ -278,6 +288,7 @@ defmodule TermUI.Test.AssertionsTest do
       assert_raise ExUnit.AssertionError, ~r/Empty buffer assertion failed/, fn ->
         assert_empty(renderer)
       end
+
       TestRenderer.destroy(renderer)
     end
   end
@@ -297,6 +308,7 @@ defmodule TermUI.Test.AssertionsTest do
       assert_raise ExUnit.AssertionError, ~r/Row assertion failed/, fn ->
         assert_row(renderer, 1, "World")
       end
+
       TestRenderer.destroy(renderer)
     end
   end

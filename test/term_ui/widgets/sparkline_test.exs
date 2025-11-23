@@ -17,11 +17,12 @@ defmodule TermUI.Widgets.SparklineTest do
     end
 
     test "uses custom min/max" do
-      result = Sparkline.render(
-        values: [5, 5, 5],
-        min: 0,
-        max: 10
-      )
+      result =
+        Sparkline.render(
+          values: [5, 5, 5],
+          min: 0,
+          max: 10
+        )
 
       assert result.type == :text
       # All values at 50% should produce same character
@@ -104,11 +105,12 @@ defmodule TermUI.Widgets.SparklineTest do
 
   describe "render_labeled/1" do
     test "renders labeled sparkline with range" do
-      result = Sparkline.render_labeled(
-        values: [1, 5, 10],
-        label: "CPU",
-        show_range: true
-      )
+      result =
+        Sparkline.render_labeled(
+          values: [1, 5, 10],
+          label: "CPU",
+          show_range: true
+        )
 
       assert result.type == :stack
       assert result.direction == :horizontal
@@ -121,10 +123,11 @@ defmodule TermUI.Widgets.SparklineTest do
     end
 
     test "omits range when disabled" do
-      result = Sparkline.render_labeled(
-        values: [1, 5, 10],
-        show_range: false
-      )
+      result =
+        Sparkline.render_labeled(
+          values: [1, 5, 10],
+          show_range: false
+        )
 
       # Should have fewer children
       assert result.type == :stack
@@ -134,14 +137,18 @@ defmodule TermUI.Widgets.SparklineTest do
   describe "color ranges" do
     test "applies colors based on value ranges" do
       # This would need actual Style structs in real tests
-      result = Sparkline.render(
-        values: [10, 50, 90],
-        color_ranges: [
-          {0, nil},   # Would be green
-          {60, nil},  # Would be yellow
-          {80, nil}   # Would be red
-        ]
-      )
+      result =
+        Sparkline.render(
+          values: [10, 50, 90],
+          color_ranges: [
+            # Would be green
+            {0, nil},
+            # Would be yellow
+            {60, nil},
+            # Would be red
+            {80, nil}
+          ]
+        )
 
       # With color ranges, output is a stack of styled parts
       assert result.type == :stack

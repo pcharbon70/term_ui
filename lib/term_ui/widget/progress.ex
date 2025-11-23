@@ -97,7 +97,8 @@ defmodule TermUI.Widget.Progress do
     # Calculate bar width (reserve space for percentage if shown)
     bar_width =
       if show_percentage do
-        max(1, area.width - 5)  # " 100%"
+        # " 100%"
+        max(1, area.width - 5)
       else
         area.width
       end

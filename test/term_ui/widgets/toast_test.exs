@@ -217,11 +217,12 @@ defmodule TermUI.Widgets.ToastTest do
     end
 
     test "new with custom options" do
-      manager = ToastManager.new(
-        position: :top_right,
-        max_toasts: 3,
-        default_duration: 5000
-      )
+      manager =
+        ToastManager.new(
+          position: :top_right,
+          max_toasts: 3,
+          default_duration: 5000
+        )
 
       assert manager.position == :top_right
       assert manager.max_toasts == 3

@@ -23,7 +23,8 @@ defmodule TermUI.Dev.HotReloadTest do
   end
 
   describe "reload_module/1" do
-    @tag :skip  # Reloading standard library modules can cause issues
+    # Reloading standard library modules can cause issues
+    @tag :skip
     test "reloads an existing module" do
       result = HotReload.reload_module(Enum)
       assert result == :ok

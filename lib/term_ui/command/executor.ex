@@ -217,21 +217,26 @@ defmodule TermUI.Command.Executor do
   end
 
   @impl true
-  def handle_info({:interval_tick, command_id, runtime_pid, component_id, message, interval_ms}, state) do
+  def handle_info(
+        {:interval_tick, command_id, runtime_pid, component_id, message, interval_ms},
+        state
+      ) do
     # Deliver interval message
     send_result(runtime_pid, component_id, command_id, message)
 
     # Schedule next tick
-    timer_ref = Process.send_after(
-      self(),
-      {:interval_tick, command_id, runtime_pid, component_id, message, interval_ms},
-      interval_ms
-    )
+    timer_ref =
+      Process.send_after(
+        self(),
+        {:interval_tick, command_id, runtime_pid, component_id, message, interval_ms},
+        interval_ms
+      )
 
-    intervals = Map.put(state.intervals, command_id, %{
-      timer_ref: timer_ref,
-      component_id: component_id
-    })
+    intervals =
+      Map.put(state.intervals, command_id, %{
+        timer_ref: timer_ref,
+        component_id: component_id
+      })
 
     {:noreply, %{state | intervals: intervals}}
   end
@@ -258,16 +263,18 @@ defmodule TermUI.Command.Executor do
   end
 
   defp execute_command(%Command{type: :timer} = cmd, runtime_pid, component_id, state) do
-    task = Task.Supervisor.async_nolink(state.task_supervisor, fn ->
-      Process.sleep(cmd.payload)
-      cmd.on_result
-    end)
+    task =
+      Task.Supervisor.async_nolink(state.task_supervisor, fn ->
+        Process.sleep(cmd.payload)
+        cmd.on_result
+      end)
 
-    running = Map.put(state.running, cmd.id, %{
-      task: task,
-      runtime_pid: runtime_pid,
-      component_id: component_id
-    })
+    running =
+      Map.put(state.running, cmd.id, %{
+        task: task,
+        runtime_pid: runtime_pid,
+        component_id: component_id
+      })
 
     # Set timeout if specified
     if cmd.timeout != :infinity do
@@ -279,33 +286,37 @@ defmodule TermUI.Command.Executor do
 
   defp execute_command(%Command{type: :interval} = cmd, runtime_pid, component_id, state) do
     # Schedule first tick
-    timer_ref = Process.send_after(
-      self(),
-      {:interval_tick, cmd.id, runtime_pid, component_id, cmd.on_result, cmd.payload},
-      cmd.payload
-    )
+    timer_ref =
+      Process.send_after(
+        self(),
+        {:interval_tick, cmd.id, runtime_pid, component_id, cmd.on_result, cmd.payload},
+        cmd.payload
+      )
 
-    intervals = Map.put(state.intervals, cmd.id, %{
-      timer_ref: timer_ref,
-      component_id: component_id
-    })
+    intervals =
+      Map.put(state.intervals, cmd.id, %{
+        timer_ref: timer_ref,
+        component_id: component_id
+      })
 
     {:ok, %{state | intervals: intervals}}
   end
 
   defp execute_command(%Command{type: :file_read} = cmd, runtime_pid, component_id, state) do
-    task = Task.Supervisor.async_nolink(state.task_supervisor, fn ->
-      case File.read(cmd.payload) do
-        {:ok, content} -> {cmd.on_result, {:ok, content}}
-        {:error, reason} -> {cmd.on_result, {:error, reason}}
-      end
-    end)
+    task =
+      Task.Supervisor.async_nolink(state.task_supervisor, fn ->
+        case File.read(cmd.payload) do
+          {:ok, content} -> {cmd.on_result, {:ok, content}}
+          {:error, reason} -> {cmd.on_result, {:error, reason}}
+        end
+      end)
 
-    running = Map.put(state.running, cmd.id, %{
-      task: task,
-      runtime_pid: runtime_pid,
-      component_id: component_id
-    })
+    running =
+      Map.put(state.running, cmd.id, %{
+        task: task,
+        runtime_pid: runtime_pid,
+        component_id: component_id
+      })
 
     if cmd.timeout != :infinity do
       Process.send_after(self(), {:timeout, cmd.id}, cmd.timeout)
@@ -317,17 +328,19 @@ defmodule TermUI.Command.Executor do
   defp execute_command(%Command{type: :send_after} = cmd, runtime_pid, component_id, state) do
     {target_component, message, delay_ms} = cmd.payload
 
-    task = Task.Supervisor.async_nolink(state.task_supervisor, fn ->
-      Process.sleep(delay_ms)
-      # Return the target and message for the runtime to route
-      {:send_to, target_component, message}
-    end)
+    task =
+      Task.Supervisor.async_nolink(state.task_supervisor, fn ->
+        Process.sleep(delay_ms)
+        # Return the target and message for the runtime to route
+        {:send_to, target_component, message}
+      end)
 
-    running = Map.put(state.running, cmd.id, %{
-      task: task,
-      runtime_pid: runtime_pid,
-      component_id: component_id
-    })
+    running =
+      Map.put(state.running, cmd.id, %{
+        task: task,
+        runtime_pid: runtime_pid,
+        component_id: component_id
+      })
 
     {:ok, %{state | running: running}}
   end

@@ -165,7 +165,10 @@ defmodule TermUI.ViewCache do
         case check_performance(cache) do
           {:slow_view, time} ->
             require Logger
-            Logger.warning("Slow view function: #{time}µs (threshold: #{@slow_view_threshold_us}µs)")
+
+            Logger.warning(
+              "Slow view function: #{time}µs (threshold: #{@slow_view_threshold_us}µs)"
+            )
 
           :ok ->
             :ok

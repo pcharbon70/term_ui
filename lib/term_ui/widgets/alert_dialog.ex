@@ -213,6 +213,7 @@ defmodule TermUI.Widgets.AlertDialog do
     if state.on_result do
       state.on_result.(result)
     end
+
     {:ok, %{state | visible: false}}
   end
 
@@ -256,8 +257,11 @@ defmodule TermUI.Widgets.AlertDialog do
     left_pad = div(padding, 2)
     right_pad = padding - left_pad
 
-    line = "│ " <> String.duplicate(" ", left_pad) <> title_text <>
-           String.duplicate(" ", right_pad) <> " │"
+    line =
+      "│ " <>
+        String.duplicate(" ", left_pad) <>
+        title_text <>
+        String.duplicate(" ", right_pad) <> " │"
 
     text(line)
   end
@@ -267,11 +271,12 @@ defmodule TermUI.Widgets.AlertDialog do
     icon = state.icon
     message = state.message
 
-    content_text = if icon != "" do
-      icon <> "  " <> message
-    else
-      message
-    end
+    content_text =
+      if icon != "" do
+        icon <> "  " <> message
+      else
+        message
+      end
 
     # Pad to width
     inner_width = width - 4
@@ -288,15 +293,16 @@ defmodule TermUI.Widgets.AlertDialog do
   end
 
   defp render_buttons(state, width) do
-    button_texts = Enum.map(state.buttons, fn button ->
-      label = button.label
+    button_texts =
+      Enum.map(state.buttons, fn button ->
+        label = button.label
 
-      if button.id == state.focused_button do
-        "[ " <> label <> " ]"
-      else
-        "  " <> label <> "  "
-      end
-    end)
+        if button.id == state.focused_button do
+          "[ " <> label <> " ]"
+        else
+          "  " <> label <> "  "
+        end
+      end)
 
     buttons_line = Enum.join(button_texts, " ")
 
@@ -305,8 +311,12 @@ defmodule TermUI.Widgets.AlertDialog do
     padding = inner_width - String.length(buttons_line)
     left_pad = max(0, div(padding, 2))
 
-    line = "│ " <> String.duplicate(" ", left_pad) <> buttons_line <>
-           String.duplicate(" ", max(0, inner_width - left_pad - String.length(buttons_line))) <> " │"
+    line =
+      "│ " <>
+        String.duplicate(" ", left_pad) <>
+        buttons_line <>
+        String.duplicate(" ", max(0, inner_width - left_pad - String.length(buttons_line))) <>
+        " │"
 
     text(line)
   end

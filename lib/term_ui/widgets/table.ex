@@ -188,7 +188,8 @@ defmodule TermUI.Widgets.Table do
 
   def handle_event(%Event.Mouse{action: :click, y: y}, state) do
     # Determine which row was clicked
-    row_index = state.scroll_offset + y - 1  # -1 for header
+    # -1 for header
+    row_index = state.scroll_offset + y - 1
 
     if row_index >= 0 and row_index < length(state.sorted_data) do
       state = %{state | cursor: row_index}
@@ -217,7 +218,8 @@ defmodule TermUI.Widgets.Table do
   @impl true
   def render(state, area) do
     # Update visible height based on area
-    visible_height = max(1, area.height - 1)  # -1 for header
+    # -1 for header
+    visible_height = max(1, area.height - 1)
     state = %{state | visible_height: visible_height}
 
     # Calculate column widths

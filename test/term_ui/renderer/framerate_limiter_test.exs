@@ -170,9 +170,7 @@ defmodule TermUI.Renderer.FramerateLimiterTest do
 
     test "render_immediate clears dirty flag" do
       {:ok, pid} =
-        FramerateLimiter.start_link(
-          render_callback: fn -> :ok end
-        )
+        FramerateLimiter.start_link(render_callback: fn -> :ok end)
 
       FramerateLimiter.mark_dirty(pid)
       assert FramerateLimiter.dirty?(pid)

@@ -54,12 +54,13 @@ defmodule TermUI.Widgets.ContextMenuTest do
       on_select = fn _ -> :ok end
       on_close = fn -> :ok end
 
-      props = ContextMenu.new(
-        items: test_items(),
-        position: {0, 0},
-        on_select: on_select,
-        on_close: on_close
-      )
+      props =
+        ContextMenu.new(
+          items: test_items(),
+          position: {0, 0},
+          on_select: on_select,
+          on_close: on_close
+        )
 
       assert props.on_select == on_select
       assert props.on_close == on_close

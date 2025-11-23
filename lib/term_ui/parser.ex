@@ -269,7 +269,8 @@ defmodule TermUI.Parser do
         parse_bytes(rest, %{state | mode: :ground, paste_buffer: <<>>}, [event | events])
 
       :nomatch ->
-        {Enum.reverse(events), <<>>, %{state | paste_buffer: <<state.paste_buffer::binary, input::binary>>}}
+        {Enum.reverse(events), <<>>,
+         %{state | paste_buffer: <<state.paste_buffer::binary, input::binary>>}}
     end
   end
 

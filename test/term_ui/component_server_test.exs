@@ -176,6 +176,7 @@ defmodule TermUI.ComponentServerTest do
       case result do
         {:ok, pid} ->
           assert_receive {:EXIT, ^pid, {:init_timeout, 50}}
+
         {:error, {:init_timeout, 50}} ->
           :ok
       end

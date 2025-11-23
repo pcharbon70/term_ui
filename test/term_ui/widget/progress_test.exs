@@ -63,10 +63,12 @@ defmodule TermUI.Widget.ProgressTest do
     test "tick wraps around spinner frames" do
       {:ok, state} = Progress.init(%{mode: :spinner})
       # Advance 10 times (number of spinner frames)
-      final_state = Enum.reduce(1..10, state, fn _, s ->
-        {:ok, new_s} = Progress.handle_event(:tick, s)
-        new_s
-      end)
+      final_state =
+        Enum.reduce(1..10, state, fn _, s ->
+          {:ok, new_s} = Progress.handle_event(:tick, s)
+          new_s
+        end)
+
       assert final_state.spinner_frame == 0
     end
 

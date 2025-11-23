@@ -14,11 +14,13 @@ defmodule TermUI.Widgets.CanvasTest do
     end
 
     test "initializes with custom values" do
-      props = Canvas.new(
-        width: 60,
-        height: 30,
-        default_char: "."
-      )
+      props =
+        Canvas.new(
+          width: 60,
+          height: 30,
+          default_char: "."
+        )
+
       {:ok, state} = Canvas.init(props)
 
       assert state.width == 60
@@ -260,8 +262,10 @@ defmodule TermUI.Widgets.CanvasTest do
       {:ok, state} = Canvas.init(props)
 
       {w, h} = Canvas.braille_resolution(state)
-      assert w == 80  # 40 * 2
-      assert h == 80  # 20 * 4
+      # 40 * 2
+      assert w == 80
+      # 20 * 4
+      assert h == 80
     end
 
     test "clear_braille removes all dots" do
@@ -315,9 +319,10 @@ defmodule TermUI.Widgets.CanvasTest do
     end
 
     test "draw creates and draws on canvas" do
-      state = Canvas.draw(10, 5, fn canvas ->
-        Canvas.set_char(canvas, 0, 0, "X")
-      end)
+      state =
+        Canvas.draw(10, 5, fn canvas ->
+          Canvas.set_char(canvas, 0, 0, "X")
+        end)
 
       assert Canvas.get_char(state, 0, 0) == "X"
       assert state.width == 10
@@ -341,9 +346,10 @@ defmodule TermUI.Widgets.CanvasTest do
       props = Canvas.new(width: 12, height: 5)
       {:ok, state} = Canvas.init(props)
 
-      state = state
-      |> Canvas.draw_rect(0, 0, 12, 5)
-      |> Canvas.draw_text(2, 2, "Content")
+      state =
+        state
+        |> Canvas.draw_rect(0, 0, 12, 5)
+        |> Canvas.draw_text(2, 2, "Content")
 
       # Verify box corners
       assert Canvas.get_char(state, 0, 0) == "┌"
@@ -354,13 +360,14 @@ defmodule TermUI.Widgets.CanvasTest do
     end
 
     test "can chain multiple operations" do
-      state = Canvas.draw(20, 10, fn canvas ->
-        canvas
-        |> Canvas.fill(".")
-        |> Canvas.draw_rect(2, 2, 10, 5)
-        |> Canvas.fill_rect(3, 3, 8, 3, " ")
-        |> Canvas.draw_text(4, 4, "Hi")
-      end)
+      state =
+        Canvas.draw(20, 10, fn canvas ->
+          canvas
+          |> Canvas.fill(".")
+          |> Canvas.draw_rect(2, 2, 10, 5)
+          |> Canvas.fill_rect(3, 3, 8, 3, " ")
+          |> Canvas.draw_text(4, 4, "Hi")
+        end)
 
       # Background should be dots
       assert Canvas.get_char(state, 0, 0) == "."

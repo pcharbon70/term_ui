@@ -123,7 +123,8 @@ defmodule TermUI.Widgets.Toast do
         content: toast,
         x: pos_x,
         y: pos_y,
-        z: 150  # Higher z-order than dialogs
+        # Higher z-order than dialogs
+        z: 150
       }
     end
   end
@@ -132,7 +133,8 @@ defmodule TermUI.Widgets.Toast do
 
   defp calculate_position(state, area) do
     width = state.width
-    height = 3  # Single line toast
+    # Single line toast
+    height = 3
 
     case state.position do
       :top_left -> {1, 1}
@@ -152,11 +154,12 @@ defmodule TermUI.Widgets.Toast do
     icon = state.icon
     message = state.message
 
-    content_text = if icon != "" do
-      icon <> " " <> message
-    else
-      message
-    end
+    content_text =
+      if icon != "" do
+        icon <> " " <> message
+      else
+        message
+      end
 
     # Truncate if too long
     inner_width = width - 4
@@ -181,6 +184,7 @@ defmodule TermUI.Widgets.Toast do
     if state.on_dismiss do
       state.on_dismiss.()
     end
+
     {:ok, %{state | visible: false}}
   end
 
@@ -202,6 +206,7 @@ defmodule TermUI.Widgets.Toast do
     if state.on_dismiss do
       state.on_dismiss.()
     end
+
     %{state | visible: false}
   end
 
@@ -284,14 +289,15 @@ defmodule TermUI.Widgets.ToastManager do
   """
   @spec add_toast(map(), String.t(), atom(), keyword()) :: map()
   def add_toast(manager, message, type \\ :info, opts \\ []) do
-    toast_props = Toast.new(
-      message: message,
-      type: type,
-      duration: Keyword.get(opts, :duration, manager.default_duration),
-      position: manager.position,
-      width: Keyword.get(opts, :width, 40),
-      on_dismiss: Keyword.get(opts, :on_dismiss)
-    )
+    toast_props =
+      Toast.new(
+        message: message,
+        type: type,
+        duration: Keyword.get(opts, :duration, manager.default_duration),
+        position: manager.position,
+        width: Keyword.get(opts, :width, 40),
+        on_dismiss: Keyword.get(opts, :on_dismiss)
+      )
 
     {:ok, toast_state} = Toast.init(toast_props)
 
@@ -307,10 +313,11 @@ defmodule TermUI.Widgets.ToastManager do
   """
   @spec tick(map()) :: map()
   def tick(manager) do
-    toasts = manager.toasts
-    |> Enum.filter(fn toast ->
-      Toast.visible?(toast) && not Toast.should_dismiss?(toast)
-    end)
+    toasts =
+      manager.toasts
+      |> Enum.filter(fn toast ->
+        Toast.visible?(toast) && not Toast.should_dismiss?(toast)
+      end)
 
     %{manager | toasts: toasts}
   end
@@ -350,14 +357,16 @@ defmodule TermUI.Widgets.ToastManager do
       %{type: :empty}
     else
       # Render each toast with offset for stacking
-      toast_nodes = toasts
-      |> Enum.with_index()
-      |> Enum.map(fn {toast, index} ->
-        # Adjust position for stacking
-        offset = index * (3 + manager.spacing)  # 3 = toast height
-        adjusted_area = adjust_area_for_stack(area, manager.position, offset)
-        Toast.render(toast, adjusted_area)
-      end)
+      toast_nodes =
+        toasts
+        |> Enum.with_index()
+        |> Enum.map(fn {toast, index} ->
+          # Adjust position for stacking
+          # 3 = toast height
+          offset = index * (3 + manager.spacing)
+          adjusted_area = adjust_area_for_stack(area, manager.position, offset)
+          Toast.render(toast, adjusted_area)
+        end)
 
       %{type: :stack, direction: :vertical, children: toast_nodes}
     end

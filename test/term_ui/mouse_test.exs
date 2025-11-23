@@ -367,18 +367,25 @@ defmodule TermUI.Mouse.RouterTest do
       bounds = %{x: 10, y: 20, width: 30, height: 15}
 
       assert Router.point_in_bounds?(15, 25, bounds)
-      assert Router.point_in_bounds?(10, 20, bounds)  # top-left corner
-      assert Router.point_in_bounds?(39, 34, bounds)  # just inside bottom-right
+      # top-left corner
+      assert Router.point_in_bounds?(10, 20, bounds)
+      # just inside bottom-right
+      assert Router.point_in_bounds?(39, 34, bounds)
     end
 
     test "returns false for point outside bounds" do
       bounds = %{x: 10, y: 20, width: 30, height: 15}
 
-      refute Router.point_in_bounds?(5, 25, bounds)   # left
-      refute Router.point_in_bounds?(50, 25, bounds)  # right
-      refute Router.point_in_bounds?(15, 10, bounds)  # above
-      refute Router.point_in_bounds?(15, 40, bounds)  # below
-      refute Router.point_in_bounds?(40, 35, bounds)  # bottom-right (exclusive)
+      # left
+      refute Router.point_in_bounds?(5, 25, bounds)
+      # right
+      refute Router.point_in_bounds?(50, 25, bounds)
+      # above
+      refute Router.point_in_bounds?(15, 10, bounds)
+      # below
+      refute Router.point_in_bounds?(15, 40, bounds)
+      # bottom-right (exclusive)
+      refute Router.point_in_bounds?(40, 35, bounds)
     end
   end
 

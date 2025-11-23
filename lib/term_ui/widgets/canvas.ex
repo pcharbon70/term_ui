@@ -283,7 +283,19 @@ defmodule TermUI.Widgets.Canvas do
           String.t(),
           String.t()
         ) :: map()
-  def draw_rect(state, x, y, width, height, h \\ "─", v \\ "│", tl \\ "┌", tr \\ "┐", bl \\ "└", br \\ "┘") do
+  def draw_rect(
+        state,
+        x,
+        y,
+        width,
+        height,
+        h \\ "─",
+        v \\ "│",
+        tl \\ "┌",
+        tr \\ "┐",
+        bl \\ "└",
+        br \\ "┘"
+      ) do
     # Top edge
     state = set_char(state, x, y, tl)
     state = draw_hline(state, x + 1, y, width - 2, h)

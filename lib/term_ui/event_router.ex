@@ -60,7 +60,8 @@ defmodule TermUI.EventRouter do
   - `:unhandled` - No component handled the event
   - `{:error, reason}` - Routing failed
   """
-  @spec route(Event.Key.t() | Event.Mouse.t() | Event.Focus.t() | Event.Custom.t()) :: route_result()
+  @spec route(Event.Key.t() | Event.Mouse.t() | Event.Focus.t() | Event.Custom.t()) ::
+          route_result()
   def route(event) do
     GenServer.call(__MODULE__, {:route, event})
   end

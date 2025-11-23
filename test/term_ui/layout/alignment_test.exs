@@ -182,14 +182,17 @@ defmodule TermUI.Layout.AlignmentTest do
         %{x: 0, y: 0, width: 20, height: 10},
         %{x: 20, y: 0, width: 30, height: 20}
       ]
+
       area = %{x: 0, y: 0, width: 100, height: 50}
 
       result = Alignment.apply(rects, area, align: :center)
 
       # Each centered independently
       assert [
-               %{y: 20, height: 10},  # (50 - 10) / 2 = 20
-               %{y: 15, height: 20}   # (50 - 20) / 2 = 15
+               # (50 - 10) / 2 = 20
+               %{y: 20, height: 10},
+               # (50 - 20) / 2 = 15
+               %{y: 15, height: 20}
              ] = result
     end
   end
@@ -221,6 +224,7 @@ defmodule TermUI.Layout.AlignmentTest do
         %{x: 0, y: 0, width: 20, height: 10},
         %{x: 20, y: 0, width: 30, height: 20}
       ]
+
       area = %{x: 0, y: 0, width: 100, height: 50}
 
       result = Alignment.apply(rects, area, align: :stretch)
@@ -239,17 +243,22 @@ defmodule TermUI.Layout.AlignmentTest do
         %{x: 20, y: 0, width: 30, height: 10},
         %{x: 50, y: 0, width: 20, height: 10}
       ]
+
       area = %{x: 0, y: 0, width: 100, height: 50}
 
-      result = Alignment.apply(rects, area,
-        align: :start,
-        align_self: [:center, nil, :end]
-      )
+      result =
+        Alignment.apply(rects, area,
+          align: :start,
+          align_self: [:center, nil, :end]
+        )
 
       assert [
-               %{y: 20, height: 10},  # center
-               %{y: 0, height: 10},   # start (nil = use container)
-               %{y: 40, height: 10}   # end
+               # center
+               %{y: 20, height: 10},
+               # start (nil = use container)
+               %{y: 0, height: 10},
+               # end
+               %{y: 40, height: 10}
              ] = result
     end
   end
@@ -260,6 +269,7 @@ defmodule TermUI.Layout.AlignmentTest do
         %{x: 0, y: 0, width: 10, height: 20},
         %{x: 0, y: 20, width: 10, height: 30}
       ]
+
       area = %{x: 0, y: 0, width: 50, height: 100}
 
       result = Alignment.apply(rects, area, direction: :vertical, justify: :center)
@@ -297,6 +307,7 @@ defmodule TermUI.Layout.AlignmentTest do
         %{x: 0, y: 0, width: 100, height: 50},
         %{x: 100, y: 0, width: 100, height: 50}
       ]
+
       margin = %{top: 5, right: 5, bottom: 5, left: 5}
 
       result = Alignment.apply_margins(rects, margin)
@@ -312,6 +323,7 @@ defmodule TermUI.Layout.AlignmentTest do
         %{x: 0, y: 0, width: 100, height: 50},
         %{x: 100, y: 0, width: 100, height: 50}
       ]
+
       margins = [
         %{top: 5, right: 5, bottom: 5, left: 5},
         %{top: 10, right: 10, bottom: 10, left: 10}

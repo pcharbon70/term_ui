@@ -203,9 +203,10 @@ defmodule TermUI.Test.ComponentHarnessTest do
     test "updates state with function" do
       {:ok, harness} = ComponentHarness.mount_test(Counter, initial: 5)
 
-      harness = ComponentHarness.update_state(harness, fn state ->
-        %{state | count: state.count * 2}
-      end)
+      harness =
+        ComponentHarness.update_state(harness, fn state ->
+          %{state | count: state.count * 2}
+        end)
 
       assert ComponentHarness.get_state(harness) == %{count: 10}
       ComponentHarness.unmount(harness)

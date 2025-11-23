@@ -269,6 +269,7 @@ defmodule TermUI.Widgets.Menu do
         if state.on_select && not Map.get(item, :disabled, false) do
           state.on_select.(item.id)
         end
+
         state
 
       %{type: :submenu} ->
@@ -287,9 +288,10 @@ defmodule TermUI.Widgets.Menu do
   end
 
   defp toggle_checkbox(state, item_id) do
-    items = update_item(state.items, item_id, fn item ->
-      %{item | checked: not item.checked}
-    end)
+    items =
+      update_item(state.items, item_id, fn item ->
+        %{item | checked: not item.checked}
+      end)
 
     if state.on_toggle do
       new_item = find_item(items, item_id)

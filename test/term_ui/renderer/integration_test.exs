@@ -1,14 +1,25 @@
 defmodule TermUI.Renderer.IntegrationTest do
   use ExUnit.Case, async: true
 
-  alias TermUI.Renderer.{Buffer, BufferManager, Cell, CursorOptimizer, Diff, FramerateLimiter, SequenceBuffer, Style}
+  alias TermUI.Renderer.{
+    Buffer,
+    BufferManager,
+    Cell,
+    CursorOptimizer,
+    Diff,
+    FramerateLimiter,
+    SequenceBuffer,
+    Style
+  }
 
   # Helper to render a frame and return the output
   defp render_frame(current, previous) do
     operations = Diff.diff(current, previous)
 
     {output, _optimizer} =
-      Enum.reduce(operations, {SequenceBuffer.new(), CursorOptimizer.new()}, fn op, {buffer, optimizer} ->
+      Enum.reduce(operations, {SequenceBuffer.new(), CursorOptimizer.new()}, fn op,
+                                                                                {buffer,
+                                                                                 optimizer} ->
         case op do
           {:move, row, col} ->
             {seq, new_optimizer} = CursorOptimizer.move_to(optimizer, row, col)
@@ -225,8 +236,8 @@ defmodule TermUI.Renderer.IntegrationTest do
       # Calculate naive output (absolute positioning for each)
       naive_size =
         String.length("\e[1;1HA") +
-        String.length("\e[2;1HB") +
-        String.length("\e[3;1HC")
+          String.length("\e[2;1HB") +
+          String.length("\e[3;1HC")
 
       # Optimized should be at least as good
       assert byte_size(optimized_output) <= naive_size
@@ -515,12 +526,15 @@ defmodule TermUI.Renderer.IntegrationTest do
           text = "Line #{row}"
           # ESC[row;1H = 4 base + digits(row) + digits(1) + text
           # ESC [ row ; col H = 1+1+digits(row)+1+1+1 = 5 + digits(row)
-          pos_cost = 5 + (if row >= 10, do: 2, else: 1)
+          pos_cost = 5 + if row >= 10, do: 2, else: 1
           acc + pos_cost + String.length(text)
         end)
 
       savings = ((naive_size - byte_size(optimized)) / naive_size * 100) |> Float.round(1)
-      IO.puts("\nCursor optimization: #{byte_size(optimized)} bytes vs #{naive_size} naive (#{savings}% savings)")
+
+      IO.puts(
+        "\nCursor optimization: #{byte_size(optimized)} bytes vs #{naive_size} naive (#{savings}% savings)"
+      )
 
       # Should have some savings
       assert byte_size(optimized) < naive_size
