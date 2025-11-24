@@ -389,20 +389,39 @@ defmodule TermUI.Terminal do
 
   defp do_enable_raw_mode do
     if terminal?() do
+      # Save original terminal settings first
+      original_settings = save_terminal_settings()
+
       try do
         # OTP 28 raw mode activation
         # This sets character-at-a-time mode with no echo
         case :shell.start_interactive({:noshell, :raw}) do
           :ok ->
-            {:ok, :raw_mode}
+            # Apply additional stty settings to ensure full raw mode
+            # This guarantees echo is disabled and input is unbuffered
+            apply_stty_raw_settings()
+            {:ok, original_settings}
 
           {:error, reason} ->
-            {:error, reason}
+            # Try stty fallback
+            case apply_stty_raw_settings() do
+              :ok ->
+                {:ok, original_settings}
+
+              {:error, _stty_reason} ->
+                {:error, reason}
+            end
         end
       rescue
         _e in UndefinedFunctionError ->
-          # Not OTP 28+
-          {:error, {:otp_version, "OTP 28+ required for raw mode support"}}
+          # Not OTP 28+, use stty fallback
+          case apply_stty_raw_settings() do
+            :ok ->
+              {:ok, original_settings}
+
+            {:error, reason} ->
+              {:error, {:otp_version, "OTP 28+ required and stty fallback failed: #{inspect(reason)}"}}
+          end
 
         e ->
           {:error, {:raw_mode_failed, Exception.message(e)}}
@@ -415,13 +434,71 @@ defmodule TermUI.Terminal do
     end
   end
 
-  defp do_disable_raw_mode(_original_settings) do
+  defp save_terminal_settings do
+    case System.cmd("stty", ["-g"], stderr_to_stdout: true) do
+      {output, 0} ->
+        String.trim(output)
+
+      _ ->
+        nil
+    end
+  rescue
+    _ -> nil
+  end
+
+  defp apply_stty_raw_settings do
+    # Apply comprehensive raw mode settings:
+    # -echo: disable echoing of input characters
+    # -icanon: disable canonical mode (line-at-a-time)
+    # min 1: minimum number of characters for read
+    # time 0: timeout in tenths of a second (0 = no timeout)
+    # -isig: disable signal generation (Ctrl+C etc handled by app)
+    # -ixon: disable XON/XOFF flow control
+    case System.cmd("stty", ["raw", "-echo", "-isig", "-ixon", "min", "1", "time", "0"],
+           stderr_to_stdout: true
+         ) do
+      {_output, 0} ->
+        :ok
+
+      {error, _code} ->
+        {:error, {:stty_failed, error}}
+    end
+  rescue
+    e ->
+      {:error, {:stty_exception, Exception.message(e)}}
+  end
+
+  defp do_disable_raw_mode(original_settings) do
+    # First try to restore original settings if we have them
+    if is_binary(original_settings) and original_settings != "" do
+      restore_terminal_settings(original_settings)
+    else
+      # Fallback: use stty sane to restore reasonable defaults
+      restore_stty_sane()
+    end
+
+    # Always write reset sequence as final cleanup
     write_to_terminal(@reset_terminal)
     :ok
   rescue
     _ -> :ok
   catch
     _, _ -> :ok
+  end
+
+  defp restore_terminal_settings(settings) do
+    System.cmd("stty", [settings], stderr_to_stdout: true)
+    :ok
+  rescue
+    _ -> :ok
+  end
+
+  defp restore_stty_sane do
+    # Restore terminal to reasonable defaults
+    System.cmd("stty", ["sane"], stderr_to_stdout: true)
+    :ok
+  rescue
+    _ -> :ok
   end
 
   defp do_get_terminal_size do
