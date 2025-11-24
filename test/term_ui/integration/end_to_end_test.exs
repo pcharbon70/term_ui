@@ -15,6 +15,14 @@ defmodule TermUI.Integration.EndToEndTest do
 
   # Simple counter component for testing
   defmodule Counter do
+    @moduledoc """
+    Test component for end-to-end event cycle testing.
+
+    A simple counter that responds to keyboard events (up/down), mouse clicks,
+    resize events, and quit commands. Used to verify the complete event flow
+    from input through state updates to rendering.
+    """
+
     use TermUI.Elm
 
     @impl true
@@ -57,6 +65,13 @@ defmodule TermUI.Integration.EndToEndTest do
 
   # Component that can trigger rapid events
   defmodule RapidCounter do
+    @moduledoc """
+    Test component for rapid event processing tests.
+
+    Tracks the total number of events received to verify that the Runtime
+    can handle high-frequency event sequences without dropping events.
+    """
+
     use TermUI.Elm
 
     @impl true
@@ -316,6 +331,13 @@ defmodule TermUI.Integration.EndToEndTest do
 
   # Components that crash in various ways for error handling tests
   defmodule CrashingUpdateComponent do
+    @moduledoc """
+    Test component that crashes in the update/2 callback.
+
+    Used to verify that the Runtime gracefully handles component crashes
+    during state updates and remains operational.
+    """
+
     use TermUI.Elm
 
     @impl true
@@ -342,6 +364,13 @@ defmodule TermUI.Integration.EndToEndTest do
   end
 
   defmodule CrashingEventToMsgComponent do
+    @moduledoc """
+    Test component that crashes in the event_to_msg/2 callback.
+
+    Used to verify that the Runtime gracefully handles component crashes
+    during event processing and continues to function.
+    """
+
     use TermUI.Elm
 
     @impl true
@@ -367,6 +396,13 @@ defmodule TermUI.Integration.EndToEndTest do
   end
 
   defmodule CrashingViewComponent do
+    @moduledoc """
+    Test component that crashes in the view/1 callback.
+
+    Used to verify that the Runtime gracefully handles component crashes
+    during rendering without bringing down the entire system.
+    """
+
     use TermUI.Elm
 
     @impl true

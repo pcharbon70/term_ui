@@ -23,6 +23,14 @@ defmodule TermUI.Integration.PropertyTest do
 
   # Simple counter component for property testing
   defmodule PropertyCounter do
+    @moduledoc """
+    Counter component for property-based testing.
+
+    Tracks both count (up/down) and total events received, enabling
+    property tests to verify event processing invariants with random
+    event sequences.
+    """
+
     use TermUI.Elm
 
     @impl true
@@ -58,6 +66,14 @@ defmodule TermUI.Integration.PropertyTest do
 
   # Multi-component for focus testing
   defmodule PropertyMultiRoot do
+    @moduledoc """
+    Multi-component root for property-based focus testing.
+
+    Manages focus between two children with keyboard (Tab) and mouse
+    input. Used to verify focus invariants (always valid) and count
+    consistency across random event sequences.
+    """
+
     use TermUI.Elm
 
     @impl true

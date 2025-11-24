@@ -13,6 +13,14 @@ defmodule TermUI.Integration.DashboardTest do
 
   # Mock Dashboard component that mimics Dashboard.App behavior
   defmodule MockDashboard do
+    @moduledoc """
+    Mock dashboard component for integration testing.
+
+    Mimics the Dashboard.App behavior with theme toggling, process selection,
+    resize handling, and quit functionality. Used to test dashboard-like
+    interactions without requiring the actual dashboard example.
+    """
+
     use TermUI.Elm
 
     @impl true
