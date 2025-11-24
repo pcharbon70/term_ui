@@ -32,7 +32,8 @@ defmodule TermUI.Integration.DashboardTest do
     def init(_opts) do
       %{
         theme: :dark,
-        selected_process: 0
+        selected_process: 0,
+        screen_size: {80, 24}
       }
     end
 
@@ -41,6 +42,7 @@ defmodule TermUI.Integration.DashboardTest do
     def event_to_msg(%Event.Key{key: "t"}, _state), do: {:msg, :toggle_theme}
     def event_to_msg(%Event.Key{key: :down}, _state), do: {:msg, :select_next}
     def event_to_msg(%Event.Key{key: :up}, _state), do: {:msg, :select_prev}
+    def event_to_msg(%Event.Resize{width: w, height: h}, _state), do: {:msg, {:resize, w, h}}
     def event_to_msg(_, _state), do: :ignore
 
     def update(:quit, state), do: {state, [TermUI.Command.quit()]}
@@ -60,6 +62,10 @@ defmodule TermUI.Integration.DashboardTest do
     def update(:select_prev, state) do
       new_selected = max(state.selected_process - 1, 0)
       {%{state | selected_process: new_selected}, []}
+    end
+
+    def update({:resize, w, h}, state) do
+      {%{state | screen_size: {w, h}}, []}
     end
 
     def update(_msg, state), do: {state, []}
@@ -189,6 +195,36 @@ defmodule TermUI.Integration.DashboardTest do
 
       # Should terminate
       assert_receive {:DOWN, ^ref, :process, ^runtime, :normal}, 1000
+    end
+  end
+
+  describe "dashboard resize handling" do
+    test "resize event updates screen size" do
+      runtime = start_test_runtime(@dashboard_module)
+
+      # Initial screen size
+      state = Runtime.get_state(runtime)
+      assert state.root_state.screen_size == {80, 24}
+
+      # Send resize event
+      Runtime.send_event(runtime, Event.resize(120, 40))
+      Runtime.sync(runtime)
+
+      state = Runtime.get_state(runtime)
+      assert state.root_state.screen_size == {120, 40}
+    end
+
+    test "multiple resize events update correctly" do
+      runtime = start_test_runtime(@dashboard_module)
+
+      # Send multiple resize events
+      Runtime.send_event(runtime, Event.resize(100, 30))
+      Runtime.send_event(runtime, Event.resize(160, 50))
+      Runtime.sync(runtime)
+
+      state = Runtime.get_state(runtime)
+      # Should have the last resize value
+      assert state.root_state.screen_size == {160, 50}
     end
   end
 
