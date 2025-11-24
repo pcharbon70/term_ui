@@ -175,6 +175,38 @@ defmodule TermUI.Integration.MultiComponentTest do
       state = Runtime.get_state(runtime)
       assert state.root_state.focused == :child_a
     end
+
+    test "mouse focus boundary at x=40" do
+      runtime = start_test_runtime(MultiRoot)
+
+      # x=39 should focus child_a (last pixel of left side)
+      Runtime.send_event(runtime, Event.mouse(:press, :left, 39, 10))
+      Runtime.sync(runtime)
+
+      state = Runtime.get_state(runtime)
+      assert state.root_state.focused == :child_a
+
+      # x=40 should focus child_b (first pixel of right side)
+      Runtime.send_event(runtime, Event.mouse(:press, :left, 40, 10))
+      Runtime.sync(runtime)
+
+      state = Runtime.get_state(runtime)
+      assert state.root_state.focused == :child_b
+
+      # x=0 should focus child_a (leftmost pixel)
+      Runtime.send_event(runtime, Event.mouse(:press, :left, 0, 10))
+      Runtime.sync(runtime)
+
+      state = Runtime.get_state(runtime)
+      assert state.root_state.focused == :child_a
+
+      # x=79 should focus child_b (rightmost pixel in 80-column terminal)
+      Runtime.send_event(runtime, Event.mouse(:press, :left, 79, 10))
+      Runtime.sync(runtime)
+
+      state = Runtime.get_state(runtime)
+      assert state.root_state.focused == :child_b
+    end
   end
 
   describe "broadcast events" do
