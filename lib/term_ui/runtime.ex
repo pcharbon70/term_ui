@@ -107,6 +107,25 @@ defmodule TermUI.Runtime do
   end
 
   @doc """
+  Synchronously waits for all pending events and messages to be processed.
+
+  This is primarily useful for testing to avoid race conditions from
+  Process.sleep. It processes all queued messages and returns when complete.
+
+  ## Example
+
+      Runtime.send_event(runtime, Event.key(:up))
+      Runtime.send_event(runtime, Event.key(:up))
+      Runtime.sync(runtime)  # Wait for both events to be processed
+      state = Runtime.get_state(runtime)
+      assert state.root_state.count == 2
+  """
+  @spec sync(GenServer.server(), timeout()) :: :ok
+  def sync(runtime, timeout \\ 5000) do
+    GenServer.call(runtime, :sync, timeout)
+  end
+
+  @doc """
   Forces an immediate render (bypassing framerate limiter).
   """
   @spec force_render(GenServer.server()) :: :ok
@@ -292,6 +311,13 @@ defmodule TermUI.Runtime do
   end
 
   @impl true
+  def handle_call(:sync, _from, state) do
+    # Process all pending messages synchronously
+    state = process_messages(state)
+    {:reply, :ok, state}
+  end
+
+  @impl true
   def terminate(_reason, state) do
     # Wrap all cleanup in try/rescue to ensure we attempt all cleanup steps
     # even if some fail
@@ -379,16 +405,23 @@ defmodule TermUI.Runtime do
         state
 
       %{module: module, state: component_state} ->
-        # Transform event to message
-        case module.event_to_msg(event, component_state) do
-          {:msg, message} ->
-            enqueue_message(component_id, message, state)
+        # Transform event to message, with error handling
+        try do
+          case module.event_to_msg(event, component_state) do
+            {:msg, message} ->
+              enqueue_message(component_id, message, state)
 
-          :ignore ->
-            state
+            :ignore ->
+              state
 
-          :propagate ->
-            # Would propagate to parent, for now just ignore
+            :propagate ->
+              # Would propagate to parent, for now just ignore
+              state
+          end
+        rescue
+          error ->
+            require Logger
+            Logger.error("Component #{component_id} crashed in event_to_msg: #{inspect(error)}")
             state
         end
     end
@@ -429,31 +462,39 @@ defmodule TermUI.Runtime do
         {state, []}
 
       %{module: module, state: component_state} ->
-        # Call update function
-        result = module.update(message, component_state)
-        {new_component_state, commands} = Elm.normalize_update_result(result, component_state)
+        # Call update function with error handling
+        try do
+          result = module.update(message, component_state)
+          {new_component_state, commands} = Elm.normalize_update_result(result, component_state)
 
-        # Update component state
-        components =
-          Map.update!(state.components, component_id, fn comp ->
-            %{comp | state: new_component_state}
-          end)
+          # Update component state
+          components =
+            Map.update!(state.components, component_id, fn comp ->
+              %{comp | state: new_component_state}
+            end)
 
-        # Mark dirty if state changed
-        dirty = state.dirty or new_component_state != component_state
+          # Mark dirty if state changed
+          dirty = state.dirty or new_component_state != component_state
 
-        # Update root_state if this is root
-        state =
-          if component_id == :root do
-            %{state | root_state: new_component_state, components: components, dirty: dirty}
-          else
-            %{state | components: components, dirty: dirty}
-          end
+          # Update root_state if this is root
+          state =
+            if component_id == :root do
+              %{state | root_state: new_component_state, components: components, dirty: dirty}
+            else
+              %{state | components: components, dirty: dirty}
+            end
 
-        # Tag commands with component_id
-        tagged_commands = Enum.map(commands, fn cmd -> {component_id, cmd} end)
+          # Tag commands with component_id
+          tagged_commands = Enum.map(commands, fn cmd -> {component_id, cmd} end)
 
-        {state, tagged_commands}
+          {state, tagged_commands}
+        rescue
+          error ->
+            require Logger
+            Logger.error("Component #{component_id} crashed in update: #{inspect(error)}")
+            # Return unchanged state and no commands
+            {state, []}
+        end
     end
   end
 
@@ -529,9 +570,19 @@ defmodule TermUI.Runtime do
     if not state.terminal_started do
       %{state | dirty: false}
     else
-      # Call view on root component
+      # Call view on root component with error handling
       %{module: module, state: component_state} = Map.get(state.components, :root)
-      render_tree = module.view(component_state)
+
+      render_tree =
+        try do
+          module.view(component_state)
+        rescue
+          error ->
+            require Logger
+            Logger.error("Component :root crashed in view: #{inspect(error)}")
+            # Return a simple error indicator
+            {:text, "[Render Error]"}
+        end
 
       # Clear current buffer
       BufferManager.clear_current(state.buffer_manager)

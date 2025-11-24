@@ -14,6 +14,17 @@ defmodule TermUI.Integration.DashboardTest do
   alias TermUI.Runtime
   alias TermUI.Event
 
+  # Helper to start runtime with automatic cleanup on test exit
+  defp start_test_runtime(component) do
+    {:ok, runtime} = Runtime.start_link(root: component, skip_terminal: true)
+
+    on_exit(fn ->
+      if Process.alive?(runtime), do: Runtime.shutdown(runtime)
+    end)
+
+    runtime
+  end
+
   # Mock Dashboard component that mimics Dashboard.App behavior
   defmodule MockDashboard do
     @behaviour TermUI.Elm
@@ -32,7 +43,7 @@ defmodule TermUI.Integration.DashboardTest do
     def event_to_msg(%Event.Key{key: :up}, _state), do: {:msg, :select_prev}
     def event_to_msg(_, _state), do: :ignore
 
-    def update(:quit, state), do: {state, []}
+    def update(:quit, state), do: {state, [TermUI.Command.quit()]}
     def update(:refresh, state), do: {state, []}
 
     def update(:toggle_theme, state) do
@@ -62,20 +73,17 @@ defmodule TermUI.Integration.DashboardTest do
 
   describe "dashboard initialization" do
     test "dashboard starts with initial state" do
-      {:ok, runtime} = Runtime.start_link(root: @dashboard_module, skip_terminal: true)
+      runtime = start_test_runtime(@dashboard_module)
 
       state = Runtime.get_state(runtime)
 
       # Check initial dashboard state
       assert state.root_state.theme == :dark
       assert state.root_state.selected_process == 0
-
-      Runtime.shutdown(runtime)
-      Process.sleep(50)
     end
 
     test "dashboard renders initial view" do
-      {:ok, runtime} = Runtime.start_link(root: @dashboard_module, skip_terminal: true)
+      runtime = start_test_runtime(@dashboard_module)
 
       state = Runtime.get_state(runtime)
       component = Map.get(state.components, :root)
@@ -83,15 +91,12 @@ defmodule TermUI.Integration.DashboardTest do
       # View function should return a render tree
       view_result = component.module.view(component.state)
       assert is_tuple(view_result)
-
-      Runtime.shutdown(runtime)
-      Process.sleep(50)
     end
   end
 
   describe "dashboard keyboard navigation" do
     test "'t' key toggles theme" do
-      {:ok, runtime} = Runtime.start_link(root: @dashboard_module, skip_terminal: true)
+      runtime = start_test_runtime(@dashboard_module)
 
       # Initial theme is dark
       state = Runtime.get_state(runtime)
@@ -99,24 +104,21 @@ defmodule TermUI.Integration.DashboardTest do
 
       # Toggle theme
       Runtime.send_event(runtime, Event.key("t"))
-      Process.sleep(50)
+      Runtime.sync(runtime)
 
       state = Runtime.get_state(runtime)
       assert state.root_state.theme == :light
 
       # Toggle again
       Runtime.send_event(runtime, Event.key("t"))
-      Process.sleep(50)
+      Runtime.sync(runtime)
 
       state = Runtime.get_state(runtime)
       assert state.root_state.theme == :dark
-
-      Runtime.shutdown(runtime)
-      Process.sleep(50)
     end
 
     test "down arrow selects next process" do
-      {:ok, runtime} = Runtime.start_link(root: @dashboard_module, skip_terminal: true)
+      runtime = start_test_runtime(@dashboard_module)
 
       # Initial selection is 0
       state = Runtime.get_state(runtime)
@@ -124,144 +126,119 @@ defmodule TermUI.Integration.DashboardTest do
 
       # Navigate down
       Runtime.send_event(runtime, Event.key(:down))
-      Process.sleep(50)
+      Runtime.sync(runtime)
 
       state = Runtime.get_state(runtime)
       assert state.root_state.selected_process == 1
-
-      Runtime.shutdown(runtime)
-      Process.sleep(50)
     end
 
     test "up arrow selects previous process" do
-      {:ok, runtime} = Runtime.start_link(root: @dashboard_module, skip_terminal: true)
+      runtime = start_test_runtime(@dashboard_module)
 
       # Navigate down first
       Runtime.send_event(runtime, Event.key(:down))
       Runtime.send_event(runtime, Event.key(:down))
-      Process.sleep(50)
+      Runtime.sync(runtime)
 
       state = Runtime.get_state(runtime)
       assert state.root_state.selected_process == 2
 
       # Navigate up
       Runtime.send_event(runtime, Event.key(:up))
-      Process.sleep(50)
+      Runtime.sync(runtime)
 
       state = Runtime.get_state(runtime)
       assert state.root_state.selected_process == 1
-
-      Runtime.shutdown(runtime)
-      Process.sleep(50)
     end
 
     test "up arrow at top stays at 0" do
-      {:ok, runtime} = Runtime.start_link(root: @dashboard_module, skip_terminal: true)
+      runtime = start_test_runtime(@dashboard_module)
 
       # Try to navigate up from 0
       Runtime.send_event(runtime, Event.key(:up))
-      Process.sleep(50)
+      Runtime.sync(runtime)
 
       state = Runtime.get_state(runtime)
       assert state.root_state.selected_process == 0
-
-      Runtime.shutdown(runtime)
-      Process.sleep(50)
     end
 
     test "'r' key triggers refresh" do
-      {:ok, runtime} = Runtime.start_link(root: @dashboard_module, skip_terminal: true)
+      runtime = start_test_runtime(@dashboard_module)
 
       # Refresh just triggers re-render, state unchanged
       initial_state = Runtime.get_state(runtime)
 
       Runtime.send_event(runtime, Event.key("r"))
-      Process.sleep(50)
+      Runtime.sync(runtime)
 
       state = Runtime.get_state(runtime)
       assert state.root_state.theme == initial_state.root_state.theme
       assert state.root_state.selected_process == initial_state.root_state.selected_process
-
-      Runtime.shutdown(runtime)
-      Process.sleep(50)
     end
   end
 
   describe "dashboard quit behavior" do
-    test "'q' key message is handled" do
+    test "'q' key quits the dashboard" do
       {:ok, runtime} = Runtime.start_link(root: @dashboard_module, skip_terminal: true)
 
-      # The dashboard's update(:quit, state) currently just returns state
-      # because proper quit handling was left as TODO
-      # This test verifies the message is received without crash
+      # Monitor for termination
+      ref = Process.monitor(runtime)
 
+      # Send quit key
       Runtime.send_event(runtime, Event.key("q"))
-      Process.sleep(50)
 
-      # Process should still be running (dashboard doesn't return quit command yet)
-      assert Process.alive?(runtime)
-
-      Runtime.shutdown(runtime)
-      Process.sleep(50)
+      # Should terminate
+      assert_receive {:DOWN, ^ref, :process, ^runtime, :normal}, 1000
     end
   end
 
   describe "dashboard state consistency" do
     test "multiple theme toggles maintain consistency" do
-      {:ok, runtime} = Runtime.start_link(root: @dashboard_module, skip_terminal: true)
+      runtime = start_test_runtime(@dashboard_module)
 
       # Toggle theme multiple times
       for _ <- 1..10 do
         Runtime.send_event(runtime, Event.key("t"))
       end
-      Process.sleep(100)
+      Runtime.sync(runtime)
 
       state = Runtime.get_state(runtime)
       # Even number of toggles should return to dark
       assert state.root_state.theme == :dark
-
-      Runtime.shutdown(runtime)
-      Process.sleep(50)
     end
 
     test "navigation and theme changes are independent" do
-      {:ok, runtime} = Runtime.start_link(root: @dashboard_module, skip_terminal: true)
+      runtime = start_test_runtime(@dashboard_module)
 
       # Navigate and toggle
       Runtime.send_event(runtime, Event.key(:down))
       Runtime.send_event(runtime, Event.key("t"))
       Runtime.send_event(runtime, Event.key(:down))
-      Process.sleep(100)
+      Runtime.sync(runtime)
 
       state = Runtime.get_state(runtime)
       assert state.root_state.selected_process == 2
       assert state.root_state.theme == :light
-
-      Runtime.shutdown(runtime)
-      Process.sleep(50)
     end
 
     test "rapid event handling maintains state integrity" do
-      {:ok, runtime} = Runtime.start_link(root: @dashboard_module, skip_terminal: true)
+      runtime = start_test_runtime(@dashboard_module)
 
       # Send many navigation events rapidly
       for _ <- 1..50 do
         Runtime.send_event(runtime, Event.key(:down))
       end
-      Process.sleep(200)
+      Runtime.sync(runtime)
 
       state = Runtime.get_state(runtime)
       # Should be clamped to max process index
-      assert state.root_state.selected_process >= 0
-
-      Runtime.shutdown(runtime)
-      Process.sleep(50)
+      assert state.root_state.selected_process == 9
     end
   end
 
   describe "dashboard event ignoring" do
     test "unknown keys are ignored" do
-      {:ok, runtime} = Runtime.start_link(root: @dashboard_module, skip_terminal: true)
+      runtime = start_test_runtime(@dashboard_module)
 
       initial_state = Runtime.get_state(runtime)
 
@@ -269,43 +246,34 @@ defmodule TermUI.Integration.DashboardTest do
       Runtime.send_event(runtime, Event.key("x"))
       Runtime.send_event(runtime, Event.key("z"))
       Runtime.send_event(runtime, Event.key(:enter))
-      Process.sleep(50)
+      Runtime.sync(runtime)
 
       state = Runtime.get_state(runtime)
       assert state.root_state == initial_state.root_state
-
-      Runtime.shutdown(runtime)
-      Process.sleep(50)
     end
 
     test "mouse events are ignored" do
-      {:ok, runtime} = Runtime.start_link(root: @dashboard_module, skip_terminal: true)
+      runtime = start_test_runtime(@dashboard_module)
 
       initial_state = Runtime.get_state(runtime)
 
       # Send mouse events
       Runtime.send_event(runtime, Event.mouse(:press, :left, 10, 10))
       Runtime.send_event(runtime, Event.mouse(:release, :left, 10, 10))
-      Process.sleep(50)
+      Runtime.sync(runtime)
 
       state = Runtime.get_state(runtime)
       assert state.root_state == initial_state.root_state
-
-      Runtime.shutdown(runtime)
-      Process.sleep(50)
     end
   end
 
   describe "test isolation" do
     test "each test starts with fresh state" do
-      {:ok, runtime} = Runtime.start_link(root: @dashboard_module, skip_terminal: true)
+      runtime = start_test_runtime(@dashboard_module)
 
       state = Runtime.get_state(runtime)
       assert state.root_state.theme == :dark
       assert state.root_state.selected_process == 0
-
-      Runtime.shutdown(runtime)
-      Process.sleep(50)
     end
 
     test "cleanup is complete" do
@@ -314,13 +282,15 @@ defmodule TermUI.Integration.DashboardTest do
       # Modify state
       Runtime.send_event(runtime, Event.key("t"))
       Runtime.send_event(runtime, Event.key(:down))
-      Process.sleep(50)
+      Runtime.sync(runtime)
+
+      # Monitor for termination
+      ref = Process.monitor(runtime)
 
       Runtime.shutdown(runtime)
-      Process.sleep(50)
 
-      # Process should be gone
-      refute Process.alive?(runtime)
+      # Wait for process to terminate
+      assert_receive {:DOWN, ^ref, :process, ^runtime, :normal}, 1000
     end
   end
 end
