@@ -34,6 +34,7 @@ defmodule TermUI.Runtime do
   alias TermUI.Runtime.NodeRenderer
   alias TermUI.Runtime.State
   alias TermUI.Terminal
+  alias TermUI.Terminal.InputReader
 
   @type option ::
           {:root, module()}
@@ -132,6 +133,15 @@ defmodule TermUI.Runtime do
     # Initialize root component state
     root_state = root_module.init(opts)
 
+    # Start input reader if terminal is available
+    input_reader =
+      if terminal_started do
+        {:ok, reader_pid} = InputReader.start_link(target: self())
+        reader_pid
+      else
+        nil
+      end
+
     state = %State{
       root_module: root_module,
       root_state: root_state,
@@ -145,7 +155,8 @@ defmodule TermUI.Runtime do
       shutting_down: false,
       terminal_started: terminal_started,
       buffer_manager: buffer_manager,
-      dimensions: dimensions
+      dimensions: dimensions,
+      input_reader: input_reader
     }
 
     # Schedule first render
@@ -237,6 +248,17 @@ defmodule TermUI.Runtime do
   end
 
   @impl true
+  def handle_info({:input, event}, state) do
+    # Keyboard/mouse input from InputReader
+    if state.shutting_down do
+      {:noreply, state}
+    else
+      state = dispatch_event(event, state)
+      {:noreply, state}
+    end
+  end
+
+  @impl true
   def handle_info({:DOWN, _ref, :process, _pid, _reason}, state) do
     # Command task completed (handled via command_result)
     {:noreply, state}
@@ -249,6 +271,11 @@ defmodule TermUI.Runtime do
 
   @impl true
   def terminate(_reason, state) do
+    # Stop input reader first
+    if state.input_reader do
+      InputReader.stop(state.input_reader)
+    end
+
     # Ensure clean shutdown
     if not state.shutting_down do
       do_shutdown(state)
