@@ -12,6 +12,11 @@ defmodule TermUI.Integration.EndToEndTest do
   alias TermUI.Event
   alias TermUI.Command
 
+  # Timeout constants for async crash handling tests
+  # These sleeps are necessary because crashes are processed asynchronously
+  @crash_processing_timeout 50
+  @multiple_crash_timeout 100
+
   # Helper to start runtime with automatic cleanup on test exit
   defp start_test_runtime(component) do
     {:ok, runtime} = Runtime.start_link(root: component, skip_terminal: true)
@@ -320,7 +325,7 @@ defmodule TermUI.Integration.EndToEndTest do
       Runtime.send_event(runtime, Event.key("c"))
 
       # Give it time to process (crash happens async)
-      Process.sleep(50)
+      Process.sleep(@crash_processing_timeout)
 
       # Runtime should still be alive
       assert Process.alive?(runtime)
@@ -340,7 +345,7 @@ defmodule TermUI.Integration.EndToEndTest do
       Runtime.send_event(runtime, Event.key("c"))
 
       # Give it time to process (crash happens async)
-      Process.sleep(50)
+      Process.sleep(@crash_processing_timeout)
 
       # Runtime should still be alive
       assert Process.alive?(runtime)
@@ -355,7 +360,7 @@ defmodule TermUI.Integration.EndToEndTest do
 
       # Trigger crash
       Runtime.send_event(runtime, Event.key("c"))
-      Process.sleep(50)
+      Process.sleep(@crash_processing_timeout)
 
       # Should still be able to increment after crash
       Runtime.send_event(runtime, Event.key(:up))
@@ -375,7 +380,7 @@ defmodule TermUI.Integration.EndToEndTest do
         Runtime.send_event(runtime, Event.key("c"))
       end
 
-      Process.sleep(100)
+      Process.sleep(@multiple_crash_timeout)
 
       # Runtime should still be alive after multiple crashes
       assert Process.alive?(runtime)
