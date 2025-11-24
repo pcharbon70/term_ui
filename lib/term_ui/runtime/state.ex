@@ -25,7 +25,8 @@ defmodule TermUI.Runtime.State do
           shutting_down: boolean(),
           terminal_started: boolean(),
           buffer_manager: pid() | nil,
-          dimensions: {pos_integer(), pos_integer()} | nil
+          dimensions: {pos_integer(), pos_integer()} | nil,
+          input_reader: pid() | nil
         }
 
   @type component_entry :: %{
@@ -50,6 +51,7 @@ defmodule TermUI.Runtime.State do
     :shutting_down,
     :terminal_started,
     :buffer_manager,
-    :dimensions
+    :dimensions,
+    :input_reader
   ]
 end
