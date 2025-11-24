@@ -31,7 +31,8 @@ defmodule TermUI.MixProject do
   defp deps do
     [
       {:excoveralls, "~> 0.18", only: :test},
-      {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:stream_data, "~> 1.0", only: :test}
     ]
   end
 end
