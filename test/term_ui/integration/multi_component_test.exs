@@ -10,6 +10,14 @@ defmodule TermUI.Integration.MultiComponentTest do
 
   # Root component that manages child components
   defmodule MultiRoot do
+    @moduledoc """
+    Multi-component root for focus and event routing tests.
+
+    Manages two child components (child_a, child_b) with focus switching
+    via Tab key or mouse clicks. Tests focus management, event routing
+    to focused components, and broadcast events like resize.
+    """
+
     use TermUI.Elm
 
     @impl true
@@ -79,6 +87,13 @@ defmodule TermUI.Integration.MultiComponentTest do
 
   # Component that tracks messages from parent
   defmodule MessageTracker do
+    @moduledoc """
+    Test component for message passing verification.
+
+    Tracks messages sent directly to the component and command results,
+    used to verify the message passing and command result delivery systems.
+    """
+
     use TermUI.Elm
 
     @impl true
