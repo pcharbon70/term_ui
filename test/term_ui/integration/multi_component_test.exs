@@ -11,6 +11,17 @@ defmodule TermUI.Integration.MultiComponentTest do
   alias TermUI.Runtime
   alias TermUI.Event
 
+  # Helper to start runtime with automatic cleanup on test exit
+  defp start_test_runtime(component) do
+    {:ok, runtime} = Runtime.start_link(root: component, skip_terminal: true)
+
+    on_exit(fn ->
+      if Process.alive?(runtime), do: Runtime.shutdown(runtime)
+    end)
+
+    runtime
+  end
+
   # Root component that manages child components
   defmodule MultiRoot do
     @behaviour TermUI.Elm
@@ -107,7 +118,7 @@ defmodule TermUI.Integration.MultiComponentTest do
 
   describe "focus management" do
     test "keyboard events go to focused component" do
-      {:ok, runtime} = Runtime.start_link(root: MultiRoot, skip_terminal: true)
+      runtime = start_test_runtime(MultiRoot)
 
       # Initial focus is child_a
       state = Runtime.get_state(runtime)
@@ -115,154 +126,130 @@ defmodule TermUI.Integration.MultiComponentTest do
 
       # Increment should affect child_a
       Runtime.send_event(runtime, Event.key(:up))
-      Process.sleep(50)
+      Runtime.sync(runtime)
 
       state = Runtime.get_state(runtime)
       assert state.root_state.child_a.count == 1
       assert state.root_state.child_b.count == 0
-
-      Runtime.shutdown(runtime)
-      Process.sleep(50)
     end
 
     test "tab toggles focus between components" do
-      {:ok, runtime} = Runtime.start_link(root: MultiRoot, skip_terminal: true)
+      runtime = start_test_runtime(MultiRoot)
 
       # Toggle focus
       Runtime.send_event(runtime, Event.key(:tab))
-      Process.sleep(50)
+      Runtime.sync(runtime)
 
       state = Runtime.get_state(runtime)
       assert state.root_state.focused == :child_b
 
       # Toggle again
       Runtime.send_event(runtime, Event.key(:tab))
-      Process.sleep(50)
+      Runtime.sync(runtime)
 
       state = Runtime.get_state(runtime)
       assert state.root_state.focused == :child_a
-
-      Runtime.shutdown(runtime)
-      Process.sleep(50)
     end
 
     test "focus change routes keyboard to new component" do
-      {:ok, runtime} = Runtime.start_link(root: MultiRoot, skip_terminal: true)
+      runtime = start_test_runtime(MultiRoot)
 
       # Increment child_a
       Runtime.send_event(runtime, Event.key(:up))
-      Process.sleep(50)
+      Runtime.sync(runtime)
 
       # Toggle to child_b
       Runtime.send_event(runtime, Event.key(:tab))
-      Process.sleep(50)
+      Runtime.sync(runtime)
 
       # Increment should now affect child_b
       Runtime.send_event(runtime, Event.key(:up))
       Runtime.send_event(runtime, Event.key(:up))
-      Process.sleep(50)
+      Runtime.sync(runtime)
 
       state = Runtime.get_state(runtime)
       assert state.root_state.child_a.count == 1
       assert state.root_state.child_b.count == 2
-
-      Runtime.shutdown(runtime)
-      Process.sleep(50)
     end
 
     test "mouse click can change focus" do
-      {:ok, runtime} = Runtime.start_link(root: MultiRoot, skip_terminal: true)
+      runtime = start_test_runtime(MultiRoot)
 
       # Click on right side (x >= 40) to focus child_b
       Runtime.send_event(runtime, Event.mouse(:press, :left, 50, 10))
-      Process.sleep(50)
+      Runtime.sync(runtime)
 
       state = Runtime.get_state(runtime)
       assert state.root_state.focused == :child_b
 
       # Click on left side (x < 40) to focus child_a
       Runtime.send_event(runtime, Event.mouse(:press, :left, 20, 10))
-      Process.sleep(50)
+      Runtime.sync(runtime)
 
       state = Runtime.get_state(runtime)
       assert state.root_state.focused == :child_a
-
-      Runtime.shutdown(runtime)
-      Process.sleep(50)
     end
   end
 
   describe "broadcast events" do
     test "resize events reach component" do
-      {:ok, runtime} = Runtime.start_link(root: MultiRoot, skip_terminal: true)
+      runtime = start_test_runtime(MultiRoot)
 
       # Send resize events
       Runtime.send_event(runtime, Event.resize(120, 40))
       Runtime.send_event(runtime, Event.resize(80, 24))
-      Process.sleep(100)
+      Runtime.sync(runtime)
 
       state = Runtime.get_state(runtime)
       assert state.root_state.broadcasts_received == 2
-
-      Runtime.shutdown(runtime)
-      Process.sleep(50)
     end
   end
 
   describe "message passing" do
     test "direct messages update component state" do
-      {:ok, runtime} = Runtime.start_link(root: MessageTracker, skip_terminal: true)
+      runtime = start_test_runtime(MessageTracker)
 
       # Send direct message
       Runtime.send_message(runtime, :root, :send_message)
-      Process.sleep(50)
+      Runtime.sync(runtime)
 
       state = Runtime.get_state(runtime)
       assert length(state.root_state.messages) == 1
-
-      Runtime.shutdown(runtime)
-      Process.sleep(50)
     end
 
     test "multiple messages are processed in order" do
-      {:ok, runtime} = Runtime.start_link(root: MessageTracker, skip_terminal: true)
+      runtime = start_test_runtime(MessageTracker)
 
       # Send multiple messages
       Runtime.send_message(runtime, :root, :send_message)
       Runtime.send_message(runtime, :root, :send_message)
       Runtime.send_message(runtime, :root, :send_message)
-      Process.sleep(100)
+      Runtime.sync(runtime)
 
       state = Runtime.get_state(runtime)
       assert length(state.root_state.messages) == 3
-
-      Runtime.shutdown(runtime)
-      Process.sleep(50)
     end
 
     test "command results return to component" do
-      {:ok, runtime} = Runtime.start_link(root: MessageTracker, skip_terminal: true)
+      runtime = start_test_runtime(MessageTracker)
 
       # Simulate command result
       Runtime.command_result(runtime, :root, make_ref(), {:result, :success})
-      Process.sleep(50)
+      Runtime.sync(runtime)
 
       state = Runtime.get_state(runtime)
       assert length(state.root_state.results) == 1
-
-      Runtime.shutdown(runtime)
-      Process.sleep(50)
     end
   end
 
   describe "component isolation" do
     test "components maintain independent state" do
-      {:ok, runtime} = Runtime.start_link(root: MultiRoot, skip_terminal: true)
+      runtime = start_test_runtime(MultiRoot)
 
       # Increment child_a twice
       Runtime.send_event(runtime, Event.key(:up))
       Runtime.send_event(runtime, Event.key(:up))
-      Process.sleep(100)
+      Runtime.sync(runtime)
 
       state = Runtime.get_state(runtime)
       assert state.root_state.child_a.count == 2
@@ -270,9 +257,10 @@ defmodule TermUI.Integration.MultiComponentTest do
 
       # Toggle to child_b and increment once
       Runtime.send_event(runtime, Event.key(:tab))
-      Process.sleep(50)
+      Runtime.sync(runtime)
+
       Runtime.send_event(runtime, Event.key(:up))
-      Process.sleep(100)
+      Runtime.sync(runtime)
 
       state = Runtime.get_state(runtime)
       assert state.root_state.child_a.count == 2
@@ -280,68 +268,59 @@ defmodule TermUI.Integration.MultiComponentTest do
 
       # Decrement child_b
       Runtime.send_event(runtime, Event.key(:down))
-      Process.sleep(100)
+      Runtime.sync(runtime)
 
       state = Runtime.get_state(runtime)
       assert state.root_state.child_a.count == 2
       assert state.root_state.child_b.count == 0
-
-      Runtime.shutdown(runtime)
-      Process.sleep(50)
     end
   end
 
   describe "complex interactions" do
     test "rapid focus changes and events" do
-      {:ok, runtime} = Runtime.start_link(root: MultiRoot, skip_terminal: true)
+      runtime = start_test_runtime(MultiRoot)
 
       # Rapid interactions
       for _ <- 1..10 do
         Runtime.send_event(runtime, Event.key(:up))
         Runtime.send_event(runtime, Event.key(:tab))
       end
-      Process.sleep(200)
+      Runtime.sync(runtime)
 
       state = Runtime.get_state(runtime)
       # After 10 iterations: each component gets incremented when focused
       # Tab toggles focus, so alternating increments
       total = state.root_state.child_a.count + state.root_state.child_b.count
       assert total == 10
-
-      Runtime.shutdown(runtime)
-      Process.sleep(50)
     end
 
     test "mixed event types in sequence" do
-      {:ok, runtime} = Runtime.start_link(root: MultiRoot, skip_terminal: true)
+      runtime = start_test_runtime(MultiRoot)
 
-      # Mix of keyboard, mouse, and resize events with waits between
+      # Mix of keyboard, mouse, and resize events
       # Initial focus is child_a
       Runtime.send_event(runtime, Event.key(:up))  # child_a: 1
-      Process.sleep(50)
+      Runtime.sync(runtime)
 
       Runtime.send_event(runtime, Event.mouse(:press, :left, 50, 10))  # focus child_b
-      Process.sleep(50)
+      Runtime.sync(runtime)
 
       Runtime.send_event(runtime, Event.key(:up))  # child_b: 1
-      Process.sleep(50)
+      Runtime.sync(runtime)
 
       Runtime.send_event(runtime, Event.resize(100, 50))  # broadcast
-      Process.sleep(50)
+      Runtime.sync(runtime)
 
       Runtime.send_event(runtime, Event.key(:tab))  # focus child_a
-      Process.sleep(50)
+      Runtime.sync(runtime)
 
       Runtime.send_event(runtime, Event.key(:up))  # child_a: 2
-      Process.sleep(100)
+      Runtime.sync(runtime)
 
       state = Runtime.get_state(runtime)
       assert state.root_state.child_a.count == 2
       assert state.root_state.child_b.count == 1
       assert state.root_state.broadcasts_received == 1
-
-      Runtime.shutdown(runtime)
-      Process.sleep(50)
     end
   end
 end
