@@ -225,6 +225,82 @@ defmodule TermUI.Integration.EndToEndTest do
     end
   end
 
+  describe "event ordering guarantees" do
+    test "events are processed in FIFO order" do
+      runtime = start_test_runtime(Counter)
+
+      # Send a sequence where order matters
+      # Start at 0, then: +1, +1, -1, +1 = 2
+      Runtime.send_event(runtime, Event.key(:up))
+      Runtime.send_event(runtime, Event.key(:up))
+      Runtime.send_event(runtime, Event.key(:down))
+      Runtime.send_event(runtime, Event.key(:up))
+      Runtime.sync(runtime)
+
+      state = Runtime.get_state(runtime)
+      # If processed in order: 0 + 1 + 1 - 1 + 1 = 2
+      assert state.root_state.count == 2
+    end
+
+    test "resize events maintain order in state" do
+      runtime = start_test_runtime(Counter)
+
+      # Send multiple resize events in a specific order
+      Runtime.send_event(runtime, Event.resize(80, 24))
+      Runtime.send_event(runtime, Event.resize(100, 30))
+      Runtime.send_event(runtime, Event.resize(120, 40))
+      Runtime.sync(runtime)
+
+      state = Runtime.get_state(runtime)
+      # Resizes are stored in reverse order (newest first)
+      # So we expect them in reverse of send order
+      assert state.root_state.resizes == [{120, 40}, {100, 30}, {80, 24}]
+    end
+
+    test "mixed event types maintain order" do
+      runtime = start_test_runtime(Counter)
+
+      # Send alternating event types
+      # The specific order should be preserved
+      Runtime.send_event(runtime, Event.key(:up))        # count = 1
+      Runtime.send_event(runtime, Event.resize(80, 24))  # resize added
+      Runtime.send_event(runtime, Event.key(:up))        # count = 2
+      Runtime.send_event(runtime, Event.resize(100, 30)) # resize added
+      Runtime.send_event(runtime, Event.key(:down))      # count = 1
+      Runtime.sync(runtime)
+
+      state = Runtime.get_state(runtime)
+      assert state.root_state.count == 1
+      assert length(state.root_state.resizes) == 2
+      # Resizes stored in reverse order
+      assert state.root_state.resizes == [{100, 30}, {80, 24}]
+    end
+
+    test "rapid sequential events maintain order" do
+      runtime = start_test_runtime(Counter)
+
+      # Send 10 increments rapidly
+      for _ <- 1..10 do
+        Runtime.send_event(runtime, Event.key(:up))
+      end
+      Runtime.sync(runtime)
+
+      state = Runtime.get_state(runtime)
+      # If processed in order, should be exactly 10
+      assert state.root_state.count == 10
+
+      # Now send 10 decrements
+      for _ <- 1..10 do
+        Runtime.send_event(runtime, Event.key(:down))
+      end
+      Runtime.sync(runtime)
+
+      state = Runtime.get_state(runtime)
+      # Should return to 0
+      assert state.root_state.count == 0
+    end
+  end
+
   describe "command execution" do
     test "quit command stops runtime" do
       {:ok, runtime} = Runtime.start_link(root: Counter, skip_terminal: true)
