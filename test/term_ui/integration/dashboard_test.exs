@@ -27,7 +27,7 @@ defmodule TermUI.Integration.DashboardTest do
 
   # Mock Dashboard component that mimics Dashboard.App behavior
   defmodule MockDashboard do
-    @behaviour TermUI.Elm
+    use TermUI.Elm
 
     def init(_opts) do
       %{

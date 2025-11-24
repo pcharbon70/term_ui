@@ -30,7 +30,7 @@ defmodule TermUI.Integration.EndToEndTest do
 
   # Simple counter component for testing
   defmodule Counter do
-    @behaviour TermUI.Elm
+    use TermUI.Elm
 
     def init(_opts), do: %{count: 0, resizes: []}
 
@@ -68,7 +68,7 @@ defmodule TermUI.Integration.EndToEndTest do
 
   # Component that can trigger rapid events
   defmodule RapidCounter do
-    @behaviour TermUI.Elm
+    use TermUI.Elm
 
     def init(_opts), do: %{events: 0}
 
@@ -247,7 +247,7 @@ defmodule TermUI.Integration.EndToEndTest do
 
   # Components that crash in various ways for error handling tests
   defmodule CrashingUpdateComponent do
-    @behaviour TermUI.Elm
+    use TermUI.Elm
 
     def init(_opts), do: %{count: 0}
 
@@ -269,7 +269,7 @@ defmodule TermUI.Integration.EndToEndTest do
   end
 
   defmodule CrashingEventToMsgComponent do
-    @behaviour TermUI.Elm
+    use TermUI.Elm
 
     def init(_opts), do: %{count: 0}
 
@@ -290,7 +290,7 @@ defmodule TermUI.Integration.EndToEndTest do
   end
 
   defmodule CrashingViewComponent do
-    @behaviour TermUI.Elm
+    use TermUI.Elm
 
     def init(_opts), do: %{should_crash: false}
 
