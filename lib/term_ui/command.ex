@@ -12,6 +12,7 @@ defmodule TermUI.Command do
   - `:interval` - Deliver repeated messages at interval
   - `:file_read` - Read file contents
   - `:send_after` - Send message to component after delay
+  - `:quit` - Request application shutdown
   - `:none` - No-op command (useful for conditional commands)
 
   ## Usage
@@ -35,7 +36,7 @@ defmodule TermUI.Command do
           timeout: pos_integer() | :infinity
         }
 
-  @type command_type :: :timer | :interval | :file_read | :send_after | :none
+  @type command_type :: :timer | :interval | :file_read | :send_after | :quit | :none
 
   defstruct [
     :id,
@@ -122,6 +123,30 @@ defmodule TermUI.Command do
   end
 
   @doc """
+  Creates a quit command to request application shutdown.
+
+  The runtime will initiate graceful shutdown, cleaning up all resources
+  and restoring the terminal to its original state.
+
+  ## Examples
+
+      # Simple quit
+      Command.quit()
+
+      # Quit with reason
+      Command.quit(:normal)
+      Command.quit(:user_requested)
+  """
+  @spec quit(term()) :: t()
+  def quit(reason \\ :normal) do
+    %__MODULE__{
+      type: :quit,
+      payload: reason,
+      on_result: nil
+    }
+  end
+
+  @doc """
   Creates a no-op command.
 
   Useful for conditional commands where you might not need an effect.
@@ -176,6 +201,8 @@ defmodule TermUI.Command do
   def validate(%__MODULE__{type: :send_after, payload: {id, _msg, delay}})
       when is_atom(id) and is_integer(delay) and delay > 0,
       do: :ok
+
+  def validate(%__MODULE__{type: :quit}), do: :ok
 
   def validate(%__MODULE__{type: type, payload: payload}) do
     {:error, {:invalid_command, type, payload}}
