@@ -133,10 +133,11 @@ defmodule TermUI.Runtime do
     # Initialize root component state
     root_state = root_module.init(opts)
 
-    # Start input reader if terminal is available
+    # Start input reader and register for resize callbacks if terminal is available
     input_reader =
       if terminal_started do
         {:ok, reader_pid} = InputReader.start_link(target: self())
+        Terminal.register_resize_callback(self())
         reader_pid
       else
         nil
@@ -260,6 +261,17 @@ defmodule TermUI.Runtime do
   end
 
   @impl true
+  def handle_info({:terminal_resize, {rows, cols}}, state) do
+    # Terminal window was resized
+    if state.shutting_down do
+      {:noreply, state}
+    else
+      state = handle_resize(rows, cols, state)
+      {:noreply, state}
+    end
+  end
+
+  @impl true
   def handle_info({:DOWN, _ref, :process, _pid, _reason}, state) do
     # Command task completed (handled via command_result)
     {:noreply, state}
@@ -275,6 +287,11 @@ defmodule TermUI.Runtime do
     # Stop input reader first
     if state.input_reader do
       InputReader.stop(state.input_reader)
+    end
+
+    # Unregister from resize callbacks
+    if state.terminal_started do
+      Terminal.unregister_resize_callback(self())
     end
 
     # Ensure clean shutdown
@@ -526,6 +543,34 @@ defmodule TermUI.Runtime do
 
   defp apply_operation(:reset, buffer) do
     SequenceBuffer.append!(buffer, "\e[0m")
+  end
+
+  # --- Resize Handling ---
+
+  defp handle_resize(rows, cols, state) do
+    # Skip if terminal not available
+    if not state.terminal_started do
+      state
+    else
+      # Update dimensions in state
+      new_dimensions = {cols, rows}
+
+      # Resize buffer manager
+      if state.buffer_manager do
+        BufferManager.resize(state.buffer_manager, rows, cols)
+      end
+
+      # Clear screen to avoid artifacts
+      IO.write("\e[2J")
+
+      # Create resize event and broadcast to all components
+      resize_event = Event.Resize.new(cols, rows)
+      state = broadcast_event(resize_event, %{state | dimensions: new_dimensions})
+
+      # Mark dirty and force immediate render
+      state = %{state | dirty: true}
+      do_render(state)
+    end
   end
 
   # --- Shutdown ---
