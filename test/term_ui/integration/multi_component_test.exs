@@ -12,6 +12,7 @@ defmodule TermUI.Integration.MultiComponentTest do
   defmodule MultiRoot do
     use TermUI.Elm
 
+    @impl true
     def init(_opts) do
       %{
         focused: :child_a,
@@ -21,6 +22,7 @@ defmodule TermUI.Integration.MultiComponentTest do
       }
     end
 
+    @impl true
     def event_to_msg(%Event.Key{key: :tab}, _state), do: {:msg, :toggle_focus}
     def event_to_msg(%Event.Key{key: :up}, state), do: {:msg, {:increment, state.focused}}
     def event_to_msg(%Event.Key{key: :down}, state), do: {:msg, {:decrement, state.focused}}
@@ -29,6 +31,7 @@ defmodule TermUI.Integration.MultiComponentTest do
     def event_to_msg(%Event.Mouse{x: x}, _state) when x >= 40, do: {:msg, :focus_b}
     def event_to_msg(_, _), do: :ignore
 
+    @impl true
     def update(:toggle_focus, state) do
       new_focused = if state.focused == :child_a, do: :child_b, else: :child_a
       {%{state | focused: new_focused}, []}
@@ -68,6 +71,7 @@ defmodule TermUI.Integration.MultiComponentTest do
 
     def update(_msg, state), do: {state, []}
 
+    @impl true
     def view(state) do
       {:text, "A: #{state.child_a.count}, B: #{state.child_b.count}, Focus: #{state.focused}"}
     end
@@ -77,6 +81,7 @@ defmodule TermUI.Integration.MultiComponentTest do
   defmodule MessageTracker do
     use TermUI.Elm
 
+    @impl true
     def init(_opts) do
       %{
         messages: [],
@@ -84,9 +89,11 @@ defmodule TermUI.Integration.MultiComponentTest do
       }
     end
 
+    @impl true
     def event_to_msg(%Event.Key{key: "m"}, _state), do: {:msg, :send_message}
     def event_to_msg(_, _), do: :ignore
 
+    @impl true
     def update(:send_message, state) do
       {%{state | messages: [:sent | state.messages]}, []}
     end
@@ -97,6 +104,7 @@ defmodule TermUI.Integration.MultiComponentTest do
 
     def update(_msg, state), do: {state, []}
 
+    @impl true
     def view(state) do
       {:text, "Messages: #{length(state.messages)}, Results: #{length(state.results)}"}
     end

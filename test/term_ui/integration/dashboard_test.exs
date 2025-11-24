@@ -15,6 +15,7 @@ defmodule TermUI.Integration.DashboardTest do
   defmodule MockDashboard do
     use TermUI.Elm
 
+    @impl true
     def init(_opts) do
       %{
         theme: :dark,
@@ -23,6 +24,7 @@ defmodule TermUI.Integration.DashboardTest do
       }
     end
 
+    @impl true
     def event_to_msg(%Event.Key{key: "q"}, _state), do: {:msg, :quit}
     def event_to_msg(%Event.Key{key: "r"}, _state), do: {:msg, :refresh}
     def event_to_msg(%Event.Key{key: "t"}, _state), do: {:msg, :toggle_theme}
@@ -31,6 +33,7 @@ defmodule TermUI.Integration.DashboardTest do
     def event_to_msg(%Event.Resize{width: w, height: h}, _state), do: {:msg, {:resize, w, h}}
     def event_to_msg(_, _state), do: :ignore
 
+    @impl true
     def update(:quit, state), do: {state, [TermUI.Command.quit()]}
     def update(:refresh, state), do: {state, []}
 
@@ -56,6 +59,7 @@ defmodule TermUI.Integration.DashboardTest do
 
     def update(_msg, state), do: {state, []}
 
+    @impl true
     def view(state) do
       {:text, "Dashboard - Theme: #{state.theme}, Selected: #{state.selected_process}"}
     end
