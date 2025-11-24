@@ -130,12 +130,7 @@ defmodule TermUI.Runtime do
       end
 
     # Initialize root component state
-    root_state =
-      if function_exported?(root_module, :init, 1) do
-        root_module.init(opts)
-      else
-        %{}
-      end
+    root_state = root_module.init(opts)
 
     state = %State{
       root_module: root_module,
