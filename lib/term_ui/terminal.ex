@@ -581,6 +581,9 @@ defmodule TermUI.Terminal do
       do_disable_raw_mode(state.original_settings)
     end
 
+    # Reset terminal attributes (colors, styles)
+    write_to_terminal("\e[0m")
+
     if :ets.whereis(@ets_table) != :undefined do
       :ets.insert(@ets_table, {:raw_mode_active, false})
     end
