@@ -24,7 +24,7 @@ defmodule TermUI.Integration.MultiComponentTest do
 
   # Root component that manages child components
   defmodule MultiRoot do
-    @behaviour TermUI.Elm
+    use TermUI.Elm
 
     def init(_opts) do
       %{
@@ -89,7 +89,7 @@ defmodule TermUI.Integration.MultiComponentTest do
 
   # Component that tracks messages from parent
   defmodule MessageTracker do
-    @behaviour TermUI.Elm
+    use TermUI.Elm
 
     def init(_opts) do
       %{
