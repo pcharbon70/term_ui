@@ -80,9 +80,11 @@ defmodule TermUI.Integration.DashboardTest do
       state = Runtime.get_state(runtime)
       component = Map.get(state.components, :root)
 
-      # View function should return a render tree
+      # View function should return a render tree with expected content
       view_result = component.module.view(component.state)
-      assert is_tuple(view_result)
+      assert {:text, content} = view_result
+      assert content =~ "Theme: dark"
+      assert content =~ "Selected: 0"
     end
   end
 

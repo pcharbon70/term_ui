@@ -17,8 +17,10 @@ defmodule TermUI.Integration.EndToEndTest do
   defmodule Counter do
     use TermUI.Elm
 
+    @impl true
     def init(_opts), do: %{count: 0, resizes: []}
 
+    @impl true
     def event_to_msg(%Event.Key{key: :up}, _state), do: {:msg, :increment}
     def event_to_msg(%Event.Key{key: :down}, _state), do: {:msg, :decrement}
     def event_to_msg(%Event.Key{key: "q"}, _state), do: {:msg, :quit}
@@ -26,6 +28,7 @@ defmodule TermUI.Integration.EndToEndTest do
     def event_to_msg(%Event.Resize{width: w, height: h}, _state), do: {:msg, {:resize, w, h}}
     def event_to_msg(_, _), do: :ignore
 
+    @impl true
     def update(:increment, state) do
       {%{state | count: state.count + 1}, []}
     end
@@ -48,6 +51,7 @@ defmodule TermUI.Integration.EndToEndTest do
 
     def update(_msg, state), do: {state, []}
 
+    @impl true
     def view(state), do: {:text, "Count: #{state.count}"}
   end
 
@@ -55,17 +59,21 @@ defmodule TermUI.Integration.EndToEndTest do
   defmodule RapidCounter do
     use TermUI.Elm
 
+    @impl true
     def init(_opts), do: %{events: 0}
 
+    @impl true
     def event_to_msg(%Event.Key{key: :up}, _state), do: {:msg, :tick}
     def event_to_msg(_, _), do: :ignore
 
+    @impl true
     def update(:tick, state) do
       {%{state | events: state.events + 1}, []}
     end
 
     def update(_msg, state), do: {state, []}
 
+    @impl true
     def view(state), do: {:text, "Events: #{state.events}"}
   end
 
@@ -234,12 +242,15 @@ defmodule TermUI.Integration.EndToEndTest do
   defmodule CrashingUpdateComponent do
     use TermUI.Elm
 
+    @impl true
     def init(_opts), do: %{count: 0}
 
+    @impl true
     def event_to_msg(%Event.Key{key: "c"}, _state), do: {:msg, :crash}
     def event_to_msg(%Event.Key{key: :up}, _state), do: {:msg, :increment}
     def event_to_msg(_, _), do: :ignore
 
+    @impl true
     def update(:crash, _state) do
       raise "Intentional crash in update/2"
     end
@@ -250,14 +261,17 @@ defmodule TermUI.Integration.EndToEndTest do
 
     def update(_msg, state), do: {state, []}
 
+    @impl true
     def view(state), do: {:text, "Count: #{state.count}"}
   end
 
   defmodule CrashingEventToMsgComponent do
     use TermUI.Elm
 
+    @impl true
     def init(_opts), do: %{count: 0}
 
+    @impl true
     def event_to_msg(%Event.Key{key: "c"}, _state) do
       raise "Intentional crash in event_to_msg/2"
     end
@@ -265,29 +279,35 @@ defmodule TermUI.Integration.EndToEndTest do
     def event_to_msg(%Event.Key{key: :up}, _state), do: {:msg, :increment}
     def event_to_msg(_, _), do: :ignore
 
+    @impl true
     def update(:increment, state) do
       {%{state | count: state.count + 1}, []}
     end
 
     def update(_msg, state), do: {state, []}
 
+    @impl true
     def view(state), do: {:text, "Count: #{state.count}"}
   end
 
   defmodule CrashingViewComponent do
     use TermUI.Elm
 
+    @impl true
     def init(_opts), do: %{should_crash: false}
 
+    @impl true
     def event_to_msg(%Event.Key{key: "c"}, _state), do: {:msg, :set_crash}
     def event_to_msg(_, _), do: :ignore
 
+    @impl true
     def update(:set_crash, state) do
       {%{state | should_crash: true}, []}
     end
 
     def update(_msg, state), do: {state, []}
 
+    @impl true
     def view(%{should_crash: true}) do
       raise "Intentional crash in view/1"
     end
