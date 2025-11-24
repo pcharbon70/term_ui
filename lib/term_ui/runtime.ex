@@ -118,6 +118,9 @@ defmodule TermUI.Runtime do
 
   @impl true
   def init(opts) do
+    # Trap exits to ensure terminate/2 is called even on crashes
+    Process.flag(:trap_exit, true)
+
     root_module = Keyword.fetch!(opts, :root)
     render_interval = Keyword.get(opts, :render_interval, @default_render_interval)
     skip_terminal = Keyword.get(opts, :skip_terminal, false)
@@ -278,30 +281,55 @@ defmodule TermUI.Runtime do
   end
 
   @impl true
+  def handle_info(:stop_runtime, state) do
+    # Stop the GenServer after shutdown cleanup
+    {:stop, :normal, state}
+  end
+
+  @impl true
   def handle_call(:get_state, _from, state) do
     {:reply, state, state}
   end
 
   @impl true
   def terminate(_reason, state) do
-    # Stop input reader first
-    if state.input_reader do
-      InputReader.stop(state.input_reader)
+    # Wrap all cleanup in try/rescue to ensure we attempt all cleanup steps
+    # even if some fail
+
+    # Stop input reader first to stop receiving events
+    try do
+      if state.input_reader do
+        InputReader.stop(state.input_reader)
+      end
+    rescue
+      _ -> :ok
     end
 
     # Unregister from resize callbacks
-    if state.terminal_started do
-      Terminal.unregister_resize_callback(self())
+    try do
+      if state.terminal_started do
+        Terminal.unregister_resize_callback(self())
+      end
+    rescue
+      _ -> :ok
     end
 
     # Ensure clean shutdown
-    if not state.shutting_down do
-      do_shutdown(state)
+    try do
+      if not state.shutting_down do
+        do_shutdown(state)
+      end
+    rescue
+      _ -> :ok
     end
 
-    # Restore terminal
-    if state.terminal_started do
-      Terminal.restore()
+    # Restore terminal - this is critical for user experience
+    try do
+      if state.terminal_started do
+        Terminal.restore()
+      end
+    rescue
+      _ -> :ok
     end
 
     :ok
@@ -434,15 +462,31 @@ defmodule TermUI.Runtime do
   defp execute_commands([], state), do: state
 
   defp execute_commands(commands, state) do
-    # For now, just track pending commands
-    # Actual execution will be implemented in 5.3
-    pending =
-      Enum.reduce(commands, state.pending_commands, fn {component_id, cmd}, acc ->
-        command_id = make_ref()
-        Map.put(acc, command_id, %{component_id: component_id, command: cmd})
-      end)
+    # Check for quit command first
+    # Handle both Command struct and legacy atom :quit
+    quit_cmd = Enum.find(commands, fn {_component_id, cmd} ->
+      case cmd do
+        %{type: :quit} -> true
+        :quit -> true
+        _ -> false
+      end
+    end)
 
-    %{state | pending_commands: pending}
+    if quit_cmd do
+      # Quit command takes precedence - initiate shutdown
+      # Stop the GenServer after cleanup
+      GenServer.cast(self(), :shutdown)
+      %{state | shutting_down: true}
+    else
+      # Track pending commands for execution
+      pending =
+        Enum.reduce(commands, state.pending_commands, fn {component_id, cmd}, acc ->
+          command_id = make_ref()
+          Map.put(acc, command_id, %{component_id: component_id, command: cmd})
+        end)
+
+      %{state | pending_commands: pending}
+    end
   end
 
   defp handle_command_result(component_id, command_id, result, state) do
@@ -576,8 +620,14 @@ defmodule TermUI.Runtime do
   # --- Shutdown ---
 
   defp initiate_shutdown(state) do
-    %{state | shutting_down: true}
-    |> do_shutdown()
+    state = %{state | shutting_down: true}
+    state = do_shutdown(state)
+
+    # Schedule the GenServer to stop after returning from this callback
+    # This allows terminate/2 to run and clean up properly
+    Process.send_after(self(), :stop_runtime, 0)
+
+    state
   end
 
   defp do_shutdown(state) do
