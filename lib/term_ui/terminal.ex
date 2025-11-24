@@ -21,6 +21,16 @@ defmodule TermUI.Terminal do
   @show_cursor "\e[?25h"
   @reset_terminal "\ec"
 
+  # Mouse tracking escape sequences
+  @mouse_click_on "\e[?1000h"
+  @mouse_click_off "\e[?1000l"
+  @mouse_drag_on "\e[?1002h"
+  @mouse_drag_off "\e[?1002l"
+  @mouse_all_on "\e[?1003h"
+  @mouse_all_off "\e[?1003l"
+  @mouse_sgr_on "\e[?1006h"
+  @mouse_sgr_off "\e[?1006l"
+
   # Client API
 
   @doc """
@@ -146,6 +156,30 @@ defmodule TermUI.Terminal do
     GenServer.call(__MODULE__, :get_state)
   end
 
+  @doc """
+  Enables mouse tracking with the specified mode.
+
+  ## Modes
+
+  - `:click` - Report button press and release only
+  - `:drag` - Also report mouse motion while button is pressed
+  - `:all` - Report all mouse motion (generates many events)
+
+  Also enables SGR extended mode for accurate coordinates.
+  """
+  @spec enable_mouse_tracking(:click | :drag | :all) :: :ok
+  def enable_mouse_tracking(mode \\ :click) when mode in [:click, :drag, :all] do
+    GenServer.call(__MODULE__, {:enable_mouse_tracking, mode})
+  end
+
+  @doc """
+  Disables mouse tracking.
+  """
+  @spec disable_mouse_tracking() :: :ok
+  def disable_mouse_tracking do
+    GenServer.call(__MODULE__, :disable_mouse_tracking)
+  end
+
   # Server callbacks
 
   @impl true
@@ -264,6 +298,43 @@ defmodule TermUI.Terminal do
   @impl true
   def handle_call(:get_state, _from, state) do
     {:reply, state, state}
+  end
+
+  @impl true
+  def handle_call({:enable_mouse_tracking, mode}, _from, state) do
+    # First disable any existing tracking
+    if state.mouse_tracking != :off do
+      disable_current_mouse_mode(state.mouse_tracking)
+    end
+
+    # Enable new tracking mode with SGR
+    case mode do
+      :click ->
+        write_to_terminal(@mouse_click_on)
+        write_to_terminal(@mouse_sgr_on)
+
+      :drag ->
+        write_to_terminal(@mouse_drag_on)
+        write_to_terminal(@mouse_sgr_on)
+
+      :all ->
+        write_to_terminal(@mouse_all_on)
+        write_to_terminal(@mouse_sgr_on)
+    end
+
+    new_state = %{state | mouse_tracking: mode}
+    {:reply, :ok, new_state}
+  end
+
+  @impl true
+  def handle_call(:disable_mouse_tracking, _from, state) do
+    if state.mouse_tracking != :off do
+      disable_current_mouse_mode(state.mouse_tracking)
+      write_to_terminal(@mouse_sgr_off)
+    end
+
+    new_state = %{state | mouse_tracking: :off}
+    {:reply, :ok, new_state}
   end
 
   @impl true
@@ -420,6 +491,11 @@ defmodule TermUI.Terminal do
       write_to_terminal(@show_cursor)
     end
 
+    if state.mouse_tracking != :off do
+      disable_current_mouse_mode(state.mouse_tracking)
+      write_to_terminal(@mouse_sgr_off)
+    end
+
     if state.alternate_screen_active do
       write_to_terminal(@leave_alternate_screen)
     end
@@ -433,6 +509,15 @@ defmodule TermUI.Terminal do
     end
 
     State.new()
+  end
+
+  defp disable_current_mouse_mode(mode) do
+    case mode do
+      :click -> write_to_terminal(@mouse_click_off)
+      :drag -> write_to_terminal(@mouse_drag_off)
+      :all -> write_to_terminal(@mouse_all_off)
+      _ -> :ok
+    end
   end
 
   defp write_to_terminal(data) do

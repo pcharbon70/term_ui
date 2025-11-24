@@ -185,6 +185,7 @@ defmodule TermUI.Runtime do
     Terminal.enable_raw_mode()
     Terminal.enter_alternate_screen()
     Terminal.hide_cursor()
+    Terminal.enable_mouse_tracking(:click)
 
     # Get terminal dimensions
     {rows, cols} =

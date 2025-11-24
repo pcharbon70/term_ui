@@ -208,6 +208,11 @@ defmodule TermUI.Terminal.EscapeParser do
     {:ok, event, rest}
   end
 
+  # SGR mouse events: ESC [ < Cb ; Cx ; Cy M/m
+  defp parse_csi_sequence(<<"<", rest::binary>>) do
+    parse_sgr_mouse(rest)
+  end
+
   # Incomplete CSI sequence - need more bytes
   defp parse_csi_sequence(input) do
     # Check if we have a partial number sequence
@@ -244,11 +249,126 @@ defmodule TermUI.Terminal.EscapeParser do
     :incomplete
   end
 
+  # SGR mouse sequence parsing: Cb;Cx;CyM or Cb;Cx;Cym
+  defp parse_sgr_mouse(input) do
+    # Find the terminator (M for press, m for release)
+    case find_mouse_terminator(input) do
+      {:ok, params, terminator, rest} ->
+        case parse_mouse_params(params) do
+          {:ok, cb, cx, cy} ->
+            event = decode_mouse_event(cb, cx, cy, terminator)
+            {:ok, event, rest}
+
+          :error ->
+            {:ok, Event.key(:unknown), input}
+        end
+
+      :incomplete ->
+        :incomplete
+    end
+  end
+
+  defp find_mouse_terminator(input) do
+    find_mouse_terminator(input, <<>>)
+  end
+
+  defp find_mouse_terminator(<<>>, _acc), do: :incomplete
+
+  defp find_mouse_terminator(<<"M", rest::binary>>, acc) do
+    {:ok, acc, :press, rest}
+  end
+
+  defp find_mouse_terminator(<<"m", rest::binary>>, acc) do
+    {:ok, acc, :release, rest}
+  end
+
+  defp find_mouse_terminator(<<char, rest::binary>>, acc) when char in [?0..?9, ?;] do
+    find_mouse_terminator(rest, <<acc::binary, char>>)
+  end
+
+  defp find_mouse_terminator(<<char, rest::binary>>, acc) when char >= ?0 and char <= ?9 do
+    find_mouse_terminator(rest, <<acc::binary, char>>)
+  end
+
+  defp find_mouse_terminator(<<";", rest::binary>>, acc) do
+    find_mouse_terminator(rest, <<acc::binary, ";">>)
+  end
+
+  defp find_mouse_terminator(_input, _acc), do: :incomplete
+
+  defp parse_mouse_params(params) do
+    case String.split(params, ";") do
+      [cb_str, cx_str, cy_str] ->
+        with {cb, ""} <- Integer.parse(cb_str),
+             {cx, ""} <- Integer.parse(cx_str),
+             {cy, ""} <- Integer.parse(cy_str) do
+          {:ok, cb, cx, cy}
+        else
+          _ -> :error
+        end
+
+      _ ->
+        :error
+    end
+  end
+
+  defp decode_mouse_event(cb, cx, cy, terminator) do
+    # Extract button from lower bits (0-2)
+    button_code = cb &&& 0b11
+
+    # Check for scroll (bit 6) and motion (bit 5)
+    is_scroll = (cb &&& 64) != 0
+    is_motion = (cb &&& 32) != 0
+
+    # Determine action and button
+    {action, button} =
+      cond do
+        is_scroll and button_code == 0 ->
+          {:scroll_up, nil}
+
+        is_scroll and button_code == 1 ->
+          {:scroll_down, nil}
+
+        is_motion and terminator == :press ->
+          # Motion with button held = drag
+          button = decode_button(button_code)
+          {:drag, button}
+
+        terminator == :release ->
+          # On release, button_code is usually 3 (meaning "released")
+          # We use :left as default since we don't track which was pressed
+          {:release, :left}
+
+        true ->
+          # Normal press
+          button = decode_button(button_code)
+          {:press, button}
+      end
+
+    # Extract modifiers from bits 2-4
+    modifiers = []
+    modifiers = if (cb &&& 4) != 0, do: [:shift | modifiers], else: modifiers
+    modifiers = if (cb &&& 8) != 0, do: [:alt | modifiers], else: modifiers
+    modifiers = if (cb &&& 16) != 0, do: [:ctrl | modifiers], else: modifiers
+
+    # Convert 1-indexed terminal coords to 0-indexed
+    x = cx - 1
+    y = cy - 1
+
+    Event.mouse(action, button, x, y, modifiers: modifiers)
+  end
+
+  defp decode_button(0), do: :left
+  defp decode_button(1), do: :middle
+  defp decode_button(2), do: :right
+  defp decode_button(_), do: nil
+
   # Check if input looks like a partial CSI sequence
   defp partial_csi?(input) do
     # CSI sequences end with a letter or ~
     # If we only have numbers and ; so far, it's partial
-    String.match?(input, ~r/^[\d;]*$/)
+    # Also handle SGR mouse sequences that start with <
+    String.match?(input, ~r/^[\d;]*$/) or String.match?(input, ~r/^<[\d;]*$/)
   end
 
   # Decode modifier byte (2=shift, 3=alt, 4=shift+alt, 5=ctrl, etc.)
