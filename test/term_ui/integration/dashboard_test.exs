@@ -9,21 +9,7 @@ defmodule TermUI.Integration.DashboardTest do
   is in the examples directory and not compiled with the main test suite.
   """
 
-  use ExUnit.Case, async: false
-
-  alias TermUI.Runtime
-  alias TermUI.Event
-
-  # Helper to start runtime with automatic cleanup on test exit
-  defp start_test_runtime(component) do
-    {:ok, runtime} = Runtime.start_link(root: component, skip_terminal: true)
-
-    on_exit(fn ->
-      if Process.alive?(runtime), do: Runtime.shutdown(runtime)
-    end)
-
-    runtime
-  end
+  use TermUI.RuntimeTestCase
 
   # Mock Dashboard component that mimics Dashboard.App behavior
   defmodule MockDashboard do

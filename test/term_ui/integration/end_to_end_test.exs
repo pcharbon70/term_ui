@@ -6,27 +6,12 @@ defmodule TermUI.Integration.EndToEndTest do
   view rendering, and back to display.
   """
 
-  use ExUnit.Case, async: false
-
-  alias TermUI.Runtime
-  alias TermUI.Event
-  alias TermUI.Command
+  use TermUI.RuntimeTestCase
 
   # Timeout constants for async crash handling tests
   # These sleeps are necessary because crashes are processed asynchronously
   @crash_processing_timeout 50
   @multiple_crash_timeout 100
-
-  # Helper to start runtime with automatic cleanup on test exit
-  defp start_test_runtime(component) do
-    {:ok, runtime} = Runtime.start_link(root: component, skip_terminal: true)
-
-    on_exit(fn ->
-      if Process.alive?(runtime), do: Runtime.shutdown(runtime)
-    end)
-
-    runtime
-  end
 
   # Simple counter component for testing
   defmodule Counter do
