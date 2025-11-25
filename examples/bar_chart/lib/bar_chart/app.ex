@@ -199,6 +199,6 @@ defmodule BarChart.App do
   Run the bar chart example application.
   """
   def run do
-    TermUI.run(__MODULE__)
+    TermUI.Runtime.run(root: __MODULE__)
   end
 end

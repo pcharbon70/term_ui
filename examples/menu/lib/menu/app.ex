@@ -301,6 +301,6 @@ defmodule Menu.App do
   Run the menu example application.
   """
   def run do
-    TermUI.run(__MODULE__)
+    TermUI.Runtime.run(root: __MODULE__)
   end
 end
