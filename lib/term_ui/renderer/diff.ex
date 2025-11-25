@@ -193,7 +193,8 @@ defmodule TermUI.Renderer.Diff do
     style_groups = group_by_style(cells)
 
     # Generate operations
-    [{:move, row, start_col} | style_groups_to_operations(style_groups, start_col)]
+    # Reset style before move to prevent style bleeding from previous position
+    [:reset, {:move, row, start_col} | style_groups_to_operations(style_groups, start_col)]
   end
 
   @doc """

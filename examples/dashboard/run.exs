@@ -1,1 +1,1 @@
-Dashboard.start()
+Dashboard.run()
