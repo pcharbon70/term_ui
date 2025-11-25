@@ -1,0 +1,1 @@
+BarChart.App.run()
