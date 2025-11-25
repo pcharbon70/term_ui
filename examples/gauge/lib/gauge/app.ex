@@ -17,15 +17,12 @@ defmodule Gauge.App do
   - Q: Quit the application
   """
 
-  @behaviour TermUI.Component
-
-  # Import view helpers for building render trees
-  import TermUI.Component.RenderNode
+  use TermUI.Elm
 
   # Import the Gauge widget
   alias TermUI.Widgets.Gauge
   alias TermUI.Event
-  alias TermUI.Style
+  alias TermUI.Renderer.Style
 
   # ----------------------------------------------------------------------------
   # Component Callbacks
@@ -38,7 +35,6 @@ defmodule Gauge.App do
   - value: Current gauge value (0-100)
   - style_type: :bar or :arc display style
   """
-  @impl true
   def init(_opts) do
     %{
       value: 50,
@@ -51,7 +47,6 @@ defmodule Gauge.App do
 
   This is where we map user input to application messages.
   """
-  @impl true
   def event_to_msg(%Event.Key{key: :up}, _state), do: {:msg, {:change_value, 5}}
   def event_to_msg(%Event.Key{key: :down}, _state), do: {:msg, {:change_value, -5}}
   def event_to_msg(%Event.Key{key: :right}, _state), do: {:msg, {:change_value, 10}}
@@ -65,7 +60,6 @@ defmodule Gauge.App do
 
   Returns {new_state, commands} where commands is a list of side effects.
   """
-  @impl true
   def update({:change_value, delta}, state) do
     # Clamp value between 0 and 100
     new_value = max(0, min(100, state.value + delta))
@@ -88,25 +82,21 @@ defmodule Gauge.App do
 
   This is called every frame to produce the UI.
   """
-  @impl true
   def view(state) do
     stack(:vertical, [
       # Title
-      styled(
-        text("Gauge Widget Example"),
-        Style.new(fg: :cyan, attrs: [:bold])
-      ),
-      text(""),
+      text("Gauge Widget Example", Style.new(fg: :cyan, attrs: [:bold])),
+      text("", nil),
 
       # Simple percentage gauge
       # The Gauge.percentage/2 helper creates a 0-100 gauge with value display
-      text("Simple Percentage Gauge:"),
+      text("Simple Percentage Gauge:", nil),
       Gauge.percentage(state.value, width: 30),
-      text(""),
+      text("", nil),
 
       # Gauge with color zones
       # Zones are {threshold, style} tuples - the color applies when value >= threshold
-      text("Gauge with Color Zones:"),
+      text("Gauge with Color Zones:", nil),
       Gauge.render(
         value: state.value,
         min: 0,
@@ -123,10 +113,10 @@ defmodule Gauge.App do
         ],
         label: "CPU Usage"
       ),
-      text(""),
+      text("", nil),
 
       # Gauge with custom characters
-      text("Gauge with Custom Characters:"),
+      text("Gauge with Custom Characters:", nil),
       Gauge.render(
         value: state.value,
         min: 0,
@@ -138,19 +128,16 @@ defmodule Gauge.App do
         show_value: true,
         show_range: false
       ),
-      text(""),
+      text("", nil),
 
       # Controls help
-      styled(
-        text("Controls:"),
-        Style.new(fg: :yellow)
-      ),
-      text("  ↑/↓     Adjust value by 5"),
-      text("  ←/→     Adjust value by 10"),
-      text("  S       Toggle bar/arc style"),
-      text("  Q       Quit"),
-      text(""),
-      text("Current style: #{state.style_type}")
+      text("Controls:", Style.new(fg: :yellow)),
+      text("  ↑/↓     Adjust value by 5", nil),
+      text("  ←/→     Adjust value by 10", nil),
+      text("  S       Toggle bar/arc style", nil),
+      text("  Q       Quit", nil),
+      text("", nil),
+      text("Current style: #{state.style_type}", nil)
     ])
   end
 

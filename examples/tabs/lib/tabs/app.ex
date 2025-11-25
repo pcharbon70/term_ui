@@ -21,12 +21,10 @@ defmodule Tabs.App do
   - Q: Quit the application
   """
 
-  @behaviour TermUI.Component
-
-  import TermUI.Component.RenderNode
+  use TermUI.Elm
 
   alias TermUI.Event
-  alias TermUI.Style
+  alias TermUI.Renderer.Style
 
   # ----------------------------------------------------------------------------
   # Component Callbacks
@@ -35,7 +33,6 @@ defmodule Tabs.App do
   @doc """
   Initialize the component state.
   """
-  @impl true
   def init(_opts) do
     %{
       tabs: initial_tabs(),
@@ -57,7 +54,6 @@ defmodule Tabs.App do
   @doc """
   Convert keyboard events to messages.
   """
-  @impl true
   def event_to_msg(%Event.Key{key: :left}, _state), do: {:msg, {:move_focus, -1}}
   def event_to_msg(%Event.Key{key: :right}, _state), do: {:msg, {:move_focus, 1}}
   def event_to_msg(%Event.Key{key: :home}, _state), do: {:msg, :focus_first}
@@ -72,7 +68,6 @@ defmodule Tabs.App do
   @doc """
   Update state based on messages.
   """
-  @impl true
   def update({:move_focus, delta}, state) do
     enabled_tabs = Enum.filter(state.tabs, fn t -> not t.disabled end)
     ids = Enum.map(enabled_tabs, & &1.id)
@@ -160,45 +155,38 @@ defmodule Tabs.App do
   @doc """
   Render the current state to a render tree.
   """
-  @impl true
   def view(state) do
     stack(:vertical, [
       # Title
-      styled(
-        text("Tabs Widget Example"),
-        Style.new(fg: :cyan, attrs: [:bold])
-      ),
-      text(""),
+      text("Tabs Widget Example", Style.new(fg: :cyan, attrs: [:bold])),
+      text("", nil),
 
       # Tab bar
       render_tab_bar(state),
 
       # Content area border
-      text("┌" <> String.duplicate("─", 50) <> "┐"),
+      text("┌" <> String.duplicate("─", 50) <> "┐", nil),
 
       # Content for selected tab
       render_content(state),
 
       # Content area border
-      text("└" <> String.duplicate("─", 50) <> "┘"),
-      text(""),
+      text("└" <> String.duplicate("─", 50) <> "┘", nil),
+      text("", nil),
 
       # Status
-      text("Selected: #{state.selected} | Focused: #{state.focused}"),
-      text("Tab count: #{length(state.tabs)}"),
-      text(""),
+      text("Selected: #{state.selected} | Focused: #{state.focused}", nil),
+      text("Tab count: #{length(state.tabs)}", nil),
+      text("", nil),
 
       # Controls
-      styled(
-        text("Controls:"),
-        Style.new(fg: :yellow)
-      ),
-      text("  ←/→       Navigate tabs"),
-      text("  Enter     Select focused tab"),
-      text("  Home/End  Jump to first/last"),
-      text("  A         Add new tab"),
-      text("  D         Remove current tab"),
-      text("  Q         Quit")
+      text("Controls:", Style.new(fg: :yellow)),
+      text("  ←/→       Navigate tabs", nil),
+      text("  Enter     Select focused tab", nil),
+      text("  Home/End  Jump to first/last", nil),
+      text("  A         Add new tab", nil),
+      text("  D         Remove current tab", nil),
+      text("  Q         Quit", nil)
     ])
   end
 
@@ -233,7 +221,7 @@ defmodule Tabs.App do
           {" #{label} ", Style.new(fg: :white)}
       end
 
-    styled(text(decorated), style)
+    text(decorated, style)
   end
 
   defp render_content(state) do
@@ -272,7 +260,7 @@ defmodule Tabs.App do
           ]
       end
 
-    stack(:vertical, Enum.map(content_text, &text/1))
+    stack(:vertical, Enum.map(content_text, &text(&1, nil)))
   end
 
   # ----------------------------------------------------------------------------

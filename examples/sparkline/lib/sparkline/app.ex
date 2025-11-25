@@ -19,13 +19,11 @@ defmodule Sparkline.App do
   - Q: Quit the application
   """
 
-  @behaviour TermUI.Component
-
-  import TermUI.Component.RenderNode
+  use TermUI.Elm
 
   alias TermUI.Widgets.Sparkline
   alias TermUI.Event
-  alias TermUI.Style
+  alias TermUI.Renderer.Style
 
   # ----------------------------------------------------------------------------
   # Component Callbacks
@@ -38,7 +36,6 @@ defmodule Sparkline.App do
   - values: List of data points for the sparkline
   - colored: Whether to show color-coded sparkline
   """
-  @impl true
   def init(_opts) do
     %{
       # Initial sample data simulating CPU usage over time
@@ -50,7 +47,6 @@ defmodule Sparkline.App do
   @doc """
   Convert keyboard events to messages.
   """
-  @impl true
   def event_to_msg(%Event.Key{key: " "}, _state), do: {:msg, :add_point}
   def event_to_msg(%Event.Key{key: key}, _state) when key in ["r", "R"], do: {:msg, :reset}
   def event_to_msg(%Event.Key{key: key}, _state) when key in ["c", "C"], do: {:msg, :toggle_color}
@@ -60,7 +56,6 @@ defmodule Sparkline.App do
   @doc """
   Update state based on messages.
   """
-  @impl true
   def update(:add_point, state) do
     # Add a random value between 10 and 100
     new_value = :rand.uniform(90) + 10
@@ -90,72 +85,65 @@ defmodule Sparkline.App do
   @doc """
   Render the current state to a render tree.
   """
-  @impl true
   def view(state) do
     stack(:vertical, [
       # Title
-      styled(
-        text("Sparkline Widget Example"),
-        Style.new(fg: :cyan, attrs: [:bold])
-      ),
-      text(""),
+      text("Sparkline Widget Example", Style.new(fg: :cyan, attrs: [:bold])),
+      text("", nil),
 
       # Basic sparkline
       # The simplest usage - just pass a list of values
-      text("Basic Sparkline:"),
+      text("Basic Sparkline:", nil),
       Sparkline.render(values: state.values),
-      text(""),
+      text("", nil),
 
       # Sparkline with explicit min/max
       # Useful when you want consistent scaling across multiple sparklines
-      text("Sparkline with fixed scale (0-100):"),
+      text("Sparkline with fixed scale (0-100):", nil),
       Sparkline.render(
         values: state.values,
         min: 0,
         max: 100
       ),
-      text(""),
+      text("", nil),
 
       # Labeled sparkline
       # Shows label and min/max values alongside the sparkline
-      text("Labeled Sparkline:"),
+      text("Labeled Sparkline:", nil),
       Sparkline.render_labeled(
         values: state.values,
         label: "CPU",
         show_range: true
       ),
-      text(""),
+      text("", nil),
 
       # Styled sparkline
       # Apply a color to the entire sparkline
-      text("Styled Sparkline:"),
+      text("Styled Sparkline:", nil),
       Sparkline.render(
         values: state.values,
         style: Style.new(fg: :green)
       ),
-      text(""),
+      text("", nil),
 
       # Color-coded sparkline (when enabled)
       # Different colors based on value thresholds
       render_colored_sparkline(state),
-      text(""),
+      text("", nil),
 
       # Show the bar characters used
-      text("Sparkline bar characters:"),
-      text(Enum.join(Sparkline.bar_characters(), " ")),
-      text(""),
+      text("Sparkline bar characters:", nil),
+      text(Enum.join(Sparkline.bar_characters(), " "), nil),
+      text("", nil),
 
       # Controls
-      styled(
-        text("Controls:"),
-        Style.new(fg: :yellow)
-      ),
-      text("  Space   Add random data point"),
-      text("  R       Reset data"),
-      text("  C       Toggle color mode (#{if state.colored, do: "ON", else: "OFF"})"),
-      text("  Q       Quit"),
-      text(""),
-      text("Data points: #{length(state.values)}")
+      text("Controls:", Style.new(fg: :yellow)),
+      text("  Space   Add random data point", nil),
+      text("  R       Reset data", nil),
+      text("  C       Toggle color mode (#{if state.colored, do: "ON", else: "OFF"})", nil),
+      text("  Q       Quit", nil),
+      text("", nil),
+      text("Data points: #{length(state.values)}", nil)
     ])
   end
 
@@ -166,7 +154,7 @@ defmodule Sparkline.App do
   defp render_colored_sparkline(state) do
     if state.colored do
       stack(:vertical, [
-        text("Color-coded Sparkline (green < 50 < yellow < 75 < red):"),
+        text("Color-coded Sparkline (green < 50 < yellow < 75 < red):", nil),
         Sparkline.render(
           values: state.values,
           # Color ranges: {threshold, color}
@@ -180,8 +168,8 @@ defmodule Sparkline.App do
       ])
     else
       stack(:vertical, [
-        text("Color-coded Sparkline (press C to enable):"),
-        text("(disabled)")
+        text("Color-coded Sparkline (press C to enable):", nil),
+        text("(disabled)", nil)
       ])
     end
   end

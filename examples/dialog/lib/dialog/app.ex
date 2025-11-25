@@ -22,12 +22,10 @@ defmodule Dialog.App do
   - Q: Quit the application
   """
 
-  @behaviour TermUI.Component
-
-  import TermUI.Component.RenderNode
+  use TermUI.Elm
 
   alias TermUI.Event
-  alias TermUI.Style
+  alias TermUI.Renderer.Style
 
   # ----------------------------------------------------------------------------
   # Component Callbacks
@@ -36,7 +34,6 @@ defmodule Dialog.App do
   @doc """
   Initialize the component state.
   """
-  @impl true
   def init(_opts) do
     %{
       # Dialog state
@@ -54,7 +51,6 @@ defmodule Dialog.App do
   @doc """
   Convert keyboard events to messages.
   """
-  @impl true
   def event_to_msg(%Event.Key{key: "1"}, state) when not state.dialog_visible, do: {:msg, :show_info}
   def event_to_msg(%Event.Key{key: "2"}, state) when not state.dialog_visible, do: {:msg, :show_confirm}
   def event_to_msg(%Event.Key{key: "3"}, state) when not state.dialog_visible, do: {:msg, :show_warning}
@@ -73,7 +69,6 @@ defmodule Dialog.App do
   @doc """
   Update state based on messages.
   """
-  @impl true
   def update(:show_info, state) do
     {%{state |
       dialog_visible: true,
@@ -134,14 +129,13 @@ defmodule Dialog.App do
   @doc """
   Render the current state to a render tree.
   """
-  @impl true
   def view(state) do
     main_content = render_main_content(state)
 
     if state.dialog_visible do
       stack(:vertical, [
         main_content,
-        text(""),
+        text("", nil),
         render_dialog(state)
       ])
     else
@@ -156,34 +150,28 @@ defmodule Dialog.App do
   defp render_main_content(state) do
     stack(:vertical, [
       # Title
-      styled(
-        text("Dialog Widget Example"),
-        Style.new(fg: :cyan, attrs: [:bold])
-      ),
-      text(""),
+      text("Dialog Widget Example", Style.new(fg: :cyan, attrs: [:bold])),
+      text("", nil),
 
       # Instructions
-      text("Press a number key to show different dialog types:"),
-      text(""),
-      text("  1 - Info Dialog (single button)"),
-      text("  2 - Confirm Dialog (two buttons)"),
-      text("  3 - Warning Dialog (three buttons)"),
-      text(""),
+      text("Press a number key to show different dialog types:", nil),
+      text("", nil),
+      text("  1 - Info Dialog (single button)", nil),
+      text("  2 - Confirm Dialog (two buttons)", nil),
+      text("  3 - Warning Dialog (three buttons)", nil),
+      text("", nil),
 
       # Last result
-      text("Last result: #{state.last_result || "(none)"}"),
-      text(""),
+      text("Last result: #{state.last_result || "(none)"}", nil),
+      text("", nil),
 
       # Controls
-      styled(
-        text("Controls:"),
-        Style.new(fg: :yellow)
-      ),
-      text("  1/2/3     Show dialog"),
-      text("  Tab/←/→   Navigate buttons (in dialog)"),
-      text("  Enter     Select button"),
-      text("  Escape    Close dialog"),
-      text("  Q         Quit")
+      text("Controls:", Style.new(fg: :yellow)),
+      text("  1/2/3     Show dialog", nil),
+      text("  Tab/←/→   Navigate buttons (in dialog)", nil),
+      text("  Enter     Select button", nil),
+      text("  Escape    Close dialog", nil),
+      text("  Q         Quit", nil)
     ])
   end
 
@@ -202,28 +190,25 @@ defmodule Dialog.App do
     # Build dialog
     stack(:vertical, [
       # Top border
-      text("┌" <> String.duplicate("─", width - 2) <> "┐"),
+      text("┌" <> String.duplicate("─", width - 2) <> "┐", nil),
 
       # Title
-      styled(
-        text("│ " <> String.pad_trailing(state.dialog_title, width - 4) <> " │"),
-        title_style
-      ),
+      text("│ " <> String.pad_trailing(state.dialog_title, width - 4) <> " │", title_style),
 
       # Separator
-      text("├" <> String.duplicate("─", width - 2) <> "┤"),
+      text("├" <> String.duplicate("─", width - 2) <> "┤", nil),
 
       # Content
       render_dialog_content(state.dialog_content, width),
 
       # Separator
-      text("├" <> String.duplicate("─", width - 2) <> "┤"),
+      text("├" <> String.duplicate("─", width - 2) <> "┤", nil),
 
       # Buttons
       render_buttons(state, width),
 
       # Bottom border
-      text("└" <> String.duplicate("─", width - 2) <> "┘")
+      text("└" <> String.duplicate("─", width - 2) <> "┘", nil)
     ])
   end
 
@@ -234,7 +219,7 @@ defmodule Dialog.App do
       Enum.map(lines, fn line ->
         padded = String.pad_trailing(line, width - 4)
         truncated = String.slice(padded, 0, width - 4)
-        text("│ " <> truncated <> " │")
+        text("│ " <> truncated <> " │", nil)
       end)
 
     stack(:vertical, rows)
@@ -263,7 +248,7 @@ defmodule Dialog.App do
            buttons_line <>
            String.duplicate(" ", inner_width - left_pad - String.length(buttons_line)) <> " │"
 
-    text(line)
+    text(line, nil)
   end
 
   # ----------------------------------------------------------------------------

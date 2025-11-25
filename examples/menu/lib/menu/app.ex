@@ -21,13 +21,10 @@ defmodule Menu.App do
   - Q: Quit the application
   """
 
-  @behaviour TermUI.Component
+  use TermUI.Elm
 
-  import TermUI.Component.RenderNode
-
-  alias TermUI.Widgets.Menu
   alias TermUI.Event
-  alias TermUI.Style
+  alias TermUI.Renderer.Style
 
   # ----------------------------------------------------------------------------
   # Component Callbacks
@@ -39,7 +36,6 @@ defmodule Menu.App do
   We build a menu structure with different item types and manage
   selection state manually for this example.
   """
-  @impl true
   def init(_opts) do
     %{
       # Current cursor position in the menu
@@ -60,7 +56,6 @@ defmodule Menu.App do
   @doc """
   Convert keyboard events to messages.
   """
-  @impl true
   def event_to_msg(%Event.Key{key: :up}, _state), do: {:msg, {:move, -1}}
   def event_to_msg(%Event.Key{key: :down}, _state), do: {:msg, {:move, 1}}
   def event_to_msg(%Event.Key{key: :right}, _state), do: {:msg, :expand}
@@ -73,7 +68,6 @@ defmodule Menu.App do
   @doc """
   Update state based on messages.
   """
-  @impl true
   def update({:move, delta}, state) do
     items = get_visible_items(state)
     max_index = length(items) - 1
@@ -145,34 +139,27 @@ defmodule Menu.App do
   @doc """
   Render the current state to a render tree.
   """
-  @impl true
   def view(state) do
     stack(:vertical, [
       # Title
-      styled(
-        text("Menu Widget Example"),
-        Style.new(fg: :cyan, attrs: [:bold])
-      ),
-      text(""),
+      text("Menu Widget Example", Style.new(fg: :cyan, attrs: [:bold])),
+      text("", nil),
 
       # Render the menu
       render_menu(state),
 
       # Show last action
-      text(""),
-      text("Last action: #{state.last_action || "(none)"}"),
-      text(""),
+      text("", nil),
+      text("Last action: #{state.last_action || "(none)"}", nil),
+      text("", nil),
 
       # Controls
-      styled(
-        text("Controls:"),
-        Style.new(fg: :yellow)
-      ),
-      text("  ↑/↓     Navigate"),
-      text("  →       Expand submenu"),
-      text("  ←       Collapse submenu"),
-      text("  Enter   Select / Toggle"),
-      text("  Q       Quit")
+      text("Controls:", Style.new(fg: :yellow)),
+      text("  ↑/↓     Navigate", nil),
+      text("  →       Expand submenu", nil),
+      text("  ←       Collapse submenu", nil),
+      text("  Enter   Select / Toggle", nil),
+      text("  Q       Quit", nil)
     ])
   end
 
@@ -249,7 +236,7 @@ defmodule Menu.App do
   end
 
   defp render_item(:separator, _index, _state) do
-    text("  ────────────────────────────")
+    text("  ────────────────────────────", nil)
   end
 
   defp render_item({:action, _id, label, shortcut}, index, state) do
@@ -259,9 +246,9 @@ defmodule Menu.App do
     line = "#{prefix}#{label}#{shortcut_str}"
 
     if is_selected do
-      styled(text(line), Style.new(fg: :black, bg: :cyan))
+      text(line, Style.new(fg: :black, bg: :cyan))
     else
-      text(line)
+      text(line, nil)
     end
   end
 
@@ -273,9 +260,9 @@ defmodule Menu.App do
     line = "#{prefix}#{checkbox} #{label}"
 
     if is_selected do
-      styled(text(line), Style.new(fg: :black, bg: :cyan))
+      text(line, Style.new(fg: :black, bg: :cyan))
     else
-      text(line)
+      text(line, nil)
     end
   end
 
@@ -287,9 +274,9 @@ defmodule Menu.App do
     line = "#{prefix}#{arrow} #{label}"
 
     if is_selected do
-      styled(text(line), Style.new(fg: :black, bg: :cyan))
+      text(line, Style.new(fg: :black, bg: :cyan))
     else
-      text(line)
+      text(line, nil)
     end
   end
 

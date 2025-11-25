@@ -22,14 +22,12 @@ defmodule Table.App do
   - Q: Quit the application
   """
 
-  @behaviour TermUI.Component
-
-  import TermUI.Component.RenderNode
+  use TermUI.Elm
 
   alias TermUI.Widgets.Table.Column
   alias TermUI.Layout.Constraint
   alias TermUI.Event
-  alias TermUI.Style
+  alias TermUI.Renderer.Style
 
   # ----------------------------------------------------------------------------
   # Component Callbacks
@@ -38,7 +36,6 @@ defmodule Table.App do
   @doc """
   Initialize the component state.
   """
-  @impl true
   def init(_opts) do
     %{
       data: sample_data(),
@@ -68,7 +65,6 @@ defmodule Table.App do
   @doc """
   Convert keyboard events to messages.
   """
-  @impl true
   def event_to_msg(%Event.Key{key: :up}, _state), do: {:msg, {:move, -1}}
   def event_to_msg(%Event.Key{key: :down}, _state), do: {:msg, {:move, 1}}
   def event_to_msg(%Event.Key{key: :page_up}, _state), do: {:msg, {:move, -5}}
@@ -81,7 +77,6 @@ defmodule Table.App do
   @doc """
   Update state based on messages.
   """
-  @impl true
   def update({:move, delta}, state) do
     max_index = length(state.data) - 1
     new_selected = max(0, min(max_index, state.selected + delta))
@@ -119,7 +114,6 @@ defmodule Table.App do
   @doc """
   Render the current state to a render tree.
   """
-  @impl true
   def view(state) do
     # Define columns with different width constraints
     columns = [
@@ -144,35 +138,29 @@ defmodule Table.App do
 
     stack(:vertical, [
       # Title
-      styled(
-        text("Table Widget Example"),
-        Style.new(fg: :cyan, attrs: [:bold])
-      ),
-      text(""),
+      text("Table Widget Example", Style.new(fg: :cyan, attrs: [:bold])),
+      text("", nil),
 
       # Header row
       render_header(columns),
 
       # Separator
-      text(String.duplicate("─", 80)),
+      text(String.duplicate("─", 80), nil),
 
       # Data rows
       render_rows(state, columns),
 
       # Footer info
-      text(""),
-      text("Row #{state.selected + 1} of #{length(state.data)}"),
-      text(""),
+      text("", nil),
+      text("Row #{state.selected + 1} of #{length(state.data)}", nil),
+      text("", nil),
 
       # Controls
-      styled(
-        text("Controls:"),
-        Style.new(fg: :yellow)
-      ),
-      text("  ↑/↓         Move selection"),
-      text("  Page Up/Down  Scroll by 5"),
-      text("  Home/End    Jump to first/last"),
-      text("  Q           Quit")
+      text("Controls:", Style.new(fg: :yellow)),
+      text("  ↑/↓         Move selection", nil),
+      text("  Page Up/Down  Scroll by 5", nil),
+      text("  Home/End    Jump to first/last", nil),
+      text("  Q           Quit", nil)
     ])
   end
 
@@ -196,10 +184,7 @@ defmodule Table.App do
       end)
       |> Enum.join(" ")
 
-    styled(
-      text(header_text),
-      Style.new(fg: :white, attrs: [:bold])
-    )
+    text(header_text, Style.new(fg: :white, attrs: [:bold]))
   end
 
   # Render visible data rows
@@ -230,12 +215,9 @@ defmodule Table.App do
 
     # Highlight selected row
     if index == state.selected do
-      styled(
-        text(row_text),
-        Style.new(fg: :black, bg: :cyan)
-      )
+      text(row_text, Style.new(fg: :black, bg: :cyan))
     else
-      text(row_text)
+      text(row_text, nil)
     end
   end
 
