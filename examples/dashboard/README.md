@@ -8,79 +8,85 @@ A terminal-based system monitoring dashboard built with TermUI. This example dem
 - **Memory Gauge** - Memory utilization with visual feedback
 - **System Info** - Hostname, uptime, and load averages
 - **Network Sparklines** - RX/TX activity visualization
-- **Process Table** - Sortable list of running processes
+- **Process Table** - Navigable list of running processes
 - **Theme Switching** - Toggle between dark and light themes
 
-## Running the Dashboard
+## Requirements
+
+- Elixir 1.15+
+- OTP 28+
+- Terminal with Unicode support
+- 80x24 minimum terminal size (larger recommended)
+
+## Installation
 
 ```bash
-# Navigate to the example directory
+# From the project root, navigate to the example
 cd examples/dashboard
 
 # Install dependencies
 mix deps.get
-
-# Run the dashboard
-mix run --no-halt
 ```
 
-Alternatively, from the project root:
+## Running
 
 ```bash
-cd examples/dashboard && mix deps.get && mix run --no-halt
+# Run the dashboard
+mix run run.exs
 ```
+
+The dashboard will take over your terminal. Press `Q` to quit and restore normal terminal operation.
 
 ## Controls
 
 | Key | Action |
 |-----|--------|
-| `q` | Quit the application |
-| `r` | Force refresh data |
-| `t` | Toggle theme (dark/light) |
+| `Q` | Quit the application |
+| `R` | Force refresh data |
+| `T` | Toggle theme (dark/light) |
 | `↑` | Select previous process |
 | `↓` | Select next process |
+
+Keys are case-insensitive (both `q` and `Q` work).
 
 ## Architecture
 
 ```
 lib/
-  dashboard.ex              # Main module and entry point
+  dashboard.ex              # Entry points (start/run)
   dashboard/
     application.ex          # OTP application
-    app.ex                  # Root StatefulComponent
+    app.ex                  # Root Elm component
     data/
       metrics.ex            # Simulated metrics generator
 ```
 
-### Key Concepts Demonstrated
+### The Elm Architecture
 
-1. **StatefulComponent** - The main `Dashboard.App` uses stateful component pattern with `init/1`, `handle_event/2`, and `render/2`
+The dashboard uses TermUI's Elm Architecture pattern:
 
-2. **Commands** - Timer commands for periodic data refresh:
-   ```elixir
-   commands = [{:timer, @refresh_interval, :refresh}]
-   ```
+1. **init/1** - Initialize component state
+2. **event_to_msg/2** - Convert terminal events to messages
+3. **update/2** - Handle messages and return new state + commands
+4. **view/1** - Render state to UI tree
 
-3. **Event Handling** - Keyboard events for navigation and actions:
-   ```elixir
-   def handle_event(%KeyEvent{key: "q"}, state) do
-     {:stop, :normal, state}
-   end
-   ```
+```elixir
+def event_to_msg(%Event.Key{key: key}, _state) when key in ["q", "Q"] do
+  {:msg, :quit}
+end
 
-4. **Render Tree** - Building UI with `stack/2` and widget helpers:
-   ```elixir
-   stack(:vertical, [
-     render_header(theme),
-     stack(:horizontal, [gauge1, gauge2, info]),
-     render_table(...)
-   ])
-   ```
+def update(:quit, state) do
+  {state, [:quit]}  # Return quit command
+end
 
-5. **Theming** - Dynamic style switching with Style structs:
-   ```elixir
-   Style.new(fg: :cyan, attrs: [:bold])
-   ```
+def view(state) do
+  stack(:vertical, [
+    render_header(theme),
+    stack(:horizontal, [gauge1, gauge2, info]),
+    render_processes(...)
+  ])
+end
+```
 
 ## Simulated Metrics
 
@@ -89,29 +95,13 @@ The dashboard uses simulated metrics that follow realistic patterns:
 - **CPU** - Smooth variations with occasional spikes
 - **Memory** - Gradual increase with periodic drops (simulating GC)
 - **Network** - Bursty traffic patterns
-- **Processes** - Stable with slight variations
+- **Processes** - Stable list with slight variations
 
-This approach ensures the example works on any system without requiring actual system metrics access.
+This ensures the example works on any system without requiring actual system metrics access.
 
 ## Customization
 
-### Refresh Rate
-
-Modify the `@refresh_interval` module attribute in `lib/dashboard/app.ex`:
-
-```elixir
-@refresh_interval 500  # Update every 500ms
-```
-
-### Adding Widgets
-
-The dashboard showcases several TermUI widgets. To add more:
-
-1. Import the widget module
-2. Add to the render tree using `stack` or other layout helpers
-3. Style with `Style.new/1`
-
-### Custom Themes
+### Adding Themes
 
 Add new themes in `get_theme/1`:
 
@@ -125,9 +115,17 @@ defp get_theme(:custom) do
 end
 ```
 
-## Requirements
+### Adding Widgets
 
-- Elixir 1.15+
-- OTP 28+
-- Terminal with Unicode support
-- 80x24 minimum terminal size (larger recommended)
+Import widget modules and add to the render tree:
+
+```elixir
+alias TermUI.Widgets.{Gauge, Sparkline, Table}
+
+def view(state) do
+  stack(:vertical, [
+    Gauge.render(value: cpu, width: 20),
+    Sparkline.render(values: history, min: 0, max: 100)
+  ])
+end
+```
