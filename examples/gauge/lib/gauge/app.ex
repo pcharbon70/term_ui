@@ -162,6 +162,6 @@ defmodule Gauge.App do
   Run the gauge example application.
   """
   def run do
-    TermUI.run(__MODULE__)
+    TermUI.Runtime.run(root: __MODULE__)
   end
 end
