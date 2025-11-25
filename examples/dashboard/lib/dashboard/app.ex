@@ -30,8 +30,8 @@ defmodule Dashboard.App do
   def event_to_msg(_, _state), do: :ignore
 
   def update(:quit, state) do
-    # For now just return state - proper quit handling needs Runtime support
-    {state, []}
+    # Return :quit command to trigger runtime shutdown
+    {state, [:quit]}
   end
 
   def update(:refresh, state) do
