@@ -234,14 +234,18 @@ defmodule TermUI.Renderer.SequenceBuffer do
 
     params =
       if style.fg != last.fg do
-        [color_to_sgr(:fg, style.fg) | params]
+        # Use :default when fg is nil to reset to default foreground
+        fg = style.fg || :default
+        [color_to_sgr(:fg, fg) | params]
       else
         params
       end
 
     params =
       if style.bg != last.bg do
-        [color_to_sgr(:bg, style.bg) | params]
+        # Use :default when bg is nil to reset to default background
+        bg = style.bg || :default
+        [color_to_sgr(:bg, bg) | params]
       else
         params
       end

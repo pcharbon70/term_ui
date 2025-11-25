@@ -607,17 +607,32 @@ defmodule TermUI.Terminal do
   end
 
   defp terminal? do
-    case :io.getopts(:standard_io) do
-      {:ok, opts} ->
-        Keyword.has_key?(opts, :terminal)
+    # Try multiple methods to detect if we have a terminal
+    # This is important for SSH sessions where standard_io may not report terminal correctly
+    cond do
+      # Method 1: Check :io.getopts for terminal key
+      io_has_terminal?() -> true
 
-      _ ->
-        check_tty()
+      # Method 2: Check if /dev/tty exists and is accessible (Unix/Linux/macOS)
+      File.exists?("/dev/tty") -> true
+
+      # Method 3: Check if stdout is a tty using test command
+      check_tty() -> true
+
+      # No terminal detected
+      true -> false
+    end
+  end
+
+  defp io_has_terminal? do
+    case :io.getopts(:standard_io) do
+      {:ok, opts} -> Keyword.get(opts, :terminal, false) == true
+      _ -> false
     end
   end
 
   defp check_tty do
-    case System.cmd("test", ["-t", "1"], stderr_to_stdout: true) do
+    case System.cmd("test", ["-t", "0"], stderr_to_stdout: true) do
       {_, 0} -> true
       _ -> false
     end

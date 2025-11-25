@@ -22,9 +22,9 @@ defmodule Dashboard.App do
     }
   end
 
-  def event_to_msg(%Event.Key{key: "q"}, _state), do: {:msg, :quit}
-  def event_to_msg(%Event.Key{key: "r"}, _state), do: {:msg, :refresh}
-  def event_to_msg(%Event.Key{key: "t"}, _state), do: {:msg, :toggle_theme}
+  def event_to_msg(%Event.Key{key: key}, _state) when key in ["q", "Q"], do: {:msg, :quit}
+  def event_to_msg(%Event.Key{key: key}, _state) when key in ["r", "R"], do: {:msg, :refresh}
+  def event_to_msg(%Event.Key{key: key}, _state) when key in ["t", "T"], do: {:msg, :toggle_theme}
   def event_to_msg(%Event.Key{key: :down}, _state), do: {:msg, :select_next}
   def event_to_msg(%Event.Key{key: :up}, _state), do: {:msg, :select_prev}
   def event_to_msg(_, _state), do: :ignore
@@ -194,7 +194,7 @@ defmodule Dashboard.App do
   end
 
   defp render_help(theme) do
-    text("[q] Quit  [r] Refresh  [t] Theme  [↑/↓] Navigate", theme.help)
+    text("[Q] Quit  [R] Refresh  [T] Theme  [↑/↓] Navigate", theme.help)
   end
 
   # Formatting helpers
@@ -255,16 +255,16 @@ defmodule Dashboard.App do
 
   defp get_theme(:light) do
     %{
-      header: Style.new(fg: :blue, attrs: [:bold]),
-      border: Style.new(fg: :blue),
-      text: Style.new(fg: :black),
+      header: Style.new(fg: :yellow, attrs: [:bold]),
+      border: Style.new(fg: :yellow),
+      text: Style.new(fg: :bright_white),
       label: Style.new(fg: :bright_black),
       help: Style.new(fg: :bright_black),
-      sparkline_rx: Style.new(fg: :green),
-      sparkline_tx: Style.new(fg: :blue),
-      table_header: Style.new(fg: :blue, attrs: [:bold]),
-      table_row: Style.new(fg: :black),
-      table_selected: Style.new(fg: :white, bg: :blue)
+      sparkline_rx: Style.new(fg: :bright_green),
+      sparkline_tx: Style.new(fg: :bright_cyan),
+      table_header: Style.new(fg: :yellow, attrs: [:bold]),
+      table_row: Style.new(fg: :bright_white),
+      table_selected: Style.new(fg: :black, bg: :yellow)
     }
   end
 end

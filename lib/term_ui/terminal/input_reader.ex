@@ -71,15 +71,45 @@ defmodule TermUI.Terminal.InputReader do
       timer_ref: nil
     }
 
-    # Open port for stdin reading
-    # Using `cat` as a simple way to read stdin
-    port = Port.open({:spawn, "cat"}, [:binary, :eof])
+    # Spawn a process that reads from standard_io using Erlang's IO system
+    # This integrates with OTP's terminal handling and works cross-platform
+    parent = self()
+    reader_pid = spawn_link(fn -> io_reader_loop(parent) end)
 
-    {:ok, %{state | port: port}}
+    # Store reader_pid in port field (repurposing the field)
+    {:ok, %{state | port: reader_pid}}
+  end
+
+  # Reader loop that uses Erlang's IO system
+  # This runs in a separate process because IO.getn blocks
+  defp io_reader_loop(parent) do
+    # Read one character at a time from standard_io
+    # In raw mode, this returns immediately without waiting for Enter
+    case IO.getn("", 1) do
+      :eof ->
+        send(parent, {:io_data, :eof})
+
+      {:error, reason} ->
+        send(parent, {:io_data, {:error, reason}})
+
+      data when is_binary(data) ->
+        send(parent, {:io_data, data})
+        io_reader_loop(parent)
+    end
   end
 
   @impl true
-  def handle_info({port, {:data, data}}, %{port: port} = state) do
+  def handle_info({:io_data, :eof}, state) do
+    {:stop, :normal, state}
+  end
+
+  @impl true
+  def handle_info({:io_data, {:error, _reason}}, state) do
+    {:stop, :normal, state}
+  end
+
+  @impl true
+  def handle_info({:io_data, data}, state) when is_binary(data) do
     # Cancel any pending escape timeout
     state = cancel_timer(state)
 
@@ -145,21 +175,16 @@ defmodule TermUI.Terminal.InputReader do
   end
 
   @impl true
-  def handle_info({port, :eof}, %{port: port} = state) do
-    # stdin closed
-    {:stop, :normal, state}
-  end
-
-  @impl true
   def handle_info(_msg, state) do
     {:noreply, state}
   end
 
   @impl true
   def terminate(_reason, state) do
-    # Close port if open
-    if state.port && Port.info(state.port) do
-      Port.close(state.port)
+    # Kill reader process if running (port field now holds the reader pid)
+    reader_pid = state.port
+    if is_pid(reader_pid) and Process.alive?(reader_pid) do
+      Process.exit(reader_pid, :shutdown)
     end
 
     :ok

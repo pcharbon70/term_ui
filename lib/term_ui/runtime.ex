@@ -133,6 +133,40 @@ defmodule TermUI.Runtime do
     GenServer.cast(runtime, :force_render)
   end
 
+  @doc """
+  Starts the runtime and blocks until it shuts down.
+
+  This is the main entry point for running a TUI application. It starts the
+  runtime, takes over the terminal, and blocks the calling process until
+  the application exits (e.g., user presses quit key).
+
+  ## Options
+
+  Same as `start_link/1`.
+
+  ## Example
+
+      # In your application entry point:
+      TermUI.Runtime.run(root: MyApp.Root)
+      # This blocks until the app exits
+  """
+  @spec run([option()]) :: :ok | {:error, term()}
+  def run(opts) do
+    case start_link(opts) do
+      {:ok, runtime} ->
+        # Monitor the runtime process and block until it exits
+        ref = Process.monitor(runtime)
+
+        receive do
+          {:DOWN, ^ref, :process, ^runtime, _reason} ->
+            :ok
+        end
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
   # --- GenServer Callbacks ---
 
   @impl true
@@ -617,6 +651,9 @@ defmodule TermUI.Runtime do
         apply_operation(op, buf)
       end)
 
+    # Reset style at end of frame to avoid bleeding into next frame
+    seq_buffer = SequenceBuffer.append!(seq_buffer, "\e[0m")
+
     # Flush to terminal
     {output, _buf} = SequenceBuffer.flush(seq_buffer)
     IO.write(output)
@@ -637,7 +674,9 @@ defmodule TermUI.Runtime do
   end
 
   defp apply_operation(:reset, buffer) do
-    SequenceBuffer.append!(buffer, "\e[0m")
+    buffer = SequenceBuffer.append!(buffer, "\e[0m")
+    # Reset style tracking so next style is emitted in full
+    SequenceBuffer.reset_style(buffer)
   end
 
   # --- Resize Handling ---

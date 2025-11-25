@@ -24,7 +24,19 @@ defmodule Dashboard do
   - `↑/↓` - Scroll process table
   """
 
+  @doc """
+  Starts the dashboard in non-blocking mode. Returns immediately with {:ok, pid}.
+  Useful for development in IEx.
+  """
   def start do
     TermUI.Runtime.start_link(root: Dashboard.App)
+  end
+
+  @doc """
+  Runs the dashboard in blocking mode. Takes over the terminal and blocks
+  until the user quits. This is the main entry point for running as a standalone app.
+  """
+  def run do
+    TermUI.Runtime.run(root: Dashboard.App)
   end
 end
