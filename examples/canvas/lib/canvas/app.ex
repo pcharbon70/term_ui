@@ -20,13 +20,11 @@ defmodule Canvas.App do
   - Q: Quit the application
   """
 
-  @behaviour TermUI.Component
-
-  import TermUI.Component.RenderNode
+  use TermUI.Elm
 
   alias TermUI.Widgets.Canvas
   alias TermUI.Event
-  alias TermUI.Style
+  alias TermUI.Renderer.Style
 
   # Canvas dimensions
   @canvas_width 50
@@ -39,7 +37,6 @@ defmodule Canvas.App do
   @doc """
   Initialize the component state.
   """
-  @impl true
   def init(_opts) do
     %{
       demo: :shapes,
@@ -74,7 +71,6 @@ defmodule Canvas.App do
   @doc """
   Convert keyboard events to messages.
   """
-  @impl true
   def event_to_msg(%Event.Key{key: "1"}, _state), do: {:msg, {:set_demo, :shapes}}
   def event_to_msg(%Event.Key{key: "2"}, _state), do: {:msg, {:set_demo, :boxes}}
   def event_to_msg(%Event.Key{key: "3"}, _state), do: {:msg, {:set_demo, :braille}}
@@ -85,7 +81,6 @@ defmodule Canvas.App do
   @doc """
   Update state based on messages.
   """
-  @impl true
   def update({:set_demo, demo}, state) do
     {%{state | demo: demo, canvas: create_canvas(demo)}, []}
   end
@@ -101,34 +96,27 @@ defmodule Canvas.App do
   @doc """
   Render the current state to a render tree.
   """
-  @impl true
   def view(state) do
     stack(:vertical, [
       # Title
-      styled(
-        text("Canvas Widget Example"),
-        Style.new(fg: :cyan, attrs: [:bold])
-      ),
-      text(""),
+      text("Canvas Widget Example", Style.new(fg: :cyan, attrs: [:bold])),
+      text("", nil),
 
       # Canvas area with border
       render_canvas(state.canvas),
-      text(""),
+      text("", nil),
 
       # Current demo
-      text("Demo: #{state.demo}"),
-      text(""),
+      text("Demo: #{state.demo}", nil),
+      text("", nil),
 
       # Controls
-      styled(
-        text("Controls:"),
-        Style.new(fg: :yellow)
-      ),
-      text("  1   Basic shapes demo"),
-      text("  2   Box drawing demo"),
-      text("  3   Braille drawing demo"),
-      text("  C   Clear canvas"),
-      text("  Q   Quit")
+      text("Controls:", Style.new(fg: :yellow)),
+      text("  1   Basic shapes demo", nil),
+      text("  2   Box drawing demo", nil),
+      text("  3   Braille drawing demo", nil),
+      text("  C   Clear canvas", nil),
+      text("  Q   Quit", nil)
     ])
   end
 
@@ -145,12 +133,12 @@ defmodule Canvas.App do
             Map.get(canvas.buffer, {x, y}, " ")
           end
 
-        text("│" <> Enum.join(row) <> "│")
+        text("│" <> Enum.join(row) <> "│", nil)
       end
 
     # Add borders
-    top_border = text("┌" <> String.duplicate("─", canvas.width) <> "┐")
-    bottom_border = text("└" <> String.duplicate("─", canvas.width) <> "┘")
+    top_border = text("┌" <> String.duplicate("─", canvas.width) <> "┐", nil)
+    bottom_border = text("└" <> String.duplicate("─", canvas.width) <> "┘", nil)
 
     stack(:vertical, [top_border | lines] ++ [bottom_border])
   end
@@ -302,8 +290,7 @@ defmodule Canvas.App do
 
       {new_y, new_err} =
         if e2 < dx do
-          {new_y, new_err + dx} = {y + sy, new_err + dx}
-          {new_y, new_err}
+          {y + sy, new_err + dx}
         else
           {y, new_err}
         end

@@ -22,13 +22,11 @@ defmodule LineChart.App do
   - Q: Quit the application
   """
 
-  @behaviour TermUI.Component
-
-  import TermUI.Component.RenderNode
+  use TermUI.Elm
 
   alias TermUI.Widgets.LineChart
   alias TermUI.Event
-  alias TermUI.Style
+  alias TermUI.Renderer.Style
 
   # ----------------------------------------------------------------------------
   # Component Callbacks
@@ -37,7 +35,6 @@ defmodule LineChart.App do
   @doc """
   Initialize the component state.
   """
-  @impl true
   def init(_opts) do
     %{
       # Single series data (simulating CPU usage over time)
@@ -63,7 +60,6 @@ defmodule LineChart.App do
   @doc """
   Convert keyboard events to messages.
   """
-  @impl true
   def event_to_msg(%Event.Key{key: " "}, _state), do: {:msg, :add_point}
   def event_to_msg(%Event.Key{key: key}, _state) when key in ["r", "R"], do: {:msg, :reset}
   def event_to_msg(%Event.Key{key: key}, _state) when key in ["a", "A"], do: {:msg, :toggle_axis}
@@ -73,7 +69,6 @@ defmodule LineChart.App do
   @doc """
   Update state based on messages.
   """
-  @impl true
   def update(:add_point, state) do
     # Add a new point to both series (sliding window)
     cpu_last = List.last(state.cpu_data) || 50
@@ -102,18 +97,14 @@ defmodule LineChart.App do
   @doc """
   Render the current state to a render tree.
   """
-  @impl true
   def view(state) do
     stack(:vertical, [
       # Title
-      styled(
-        text("Line Chart Widget Example"),
-        Style.new(fg: :cyan, attrs: [:bold])
-      ),
-      text(""),
+      text("Line Chart Widget Example", Style.new(fg: :cyan, attrs: [:bold])),
+      text("", nil),
 
       # Single series chart
-      text("Single Series (CPU Usage):"),
+      text("Single Series (CPU Usage):", nil),
       LineChart.render(
         data: state.cpu_data,
         width: 40,
@@ -123,10 +114,10 @@ defmodule LineChart.App do
         show_axis: state.show_axis,
         style: Style.new(fg: :green)
       ),
-      text(""),
+      text("", nil),
 
       # Multi-series chart
-      text("Multi Series (CPU + Memory):"),
+      text("Multi Series (CPU + Memory):", nil),
       LineChart.render(
         series: [
           %{data: state.cpu_data, color: Style.new(fg: :cyan)},
@@ -138,25 +129,22 @@ defmodule LineChart.App do
         max: 100,
         show_axis: state.show_axis
       ),
-      text("  Cyan = CPU, Magenta = Memory"),
-      text(""),
+      text("  Cyan = CPU, Magenta = Memory", nil),
+      text("", nil),
 
       # Braille pattern demo
-      text("Braille characters for line drawing:"),
+      text("Braille characters for line drawing:", nil),
       render_braille_demo(),
-      text(""),
+      text("", nil),
 
       # Controls
-      styled(
-        text("Controls:"),
-        Style.new(fg: :yellow)
-      ),
-      text("  Space   Add new data point"),
-      text("  R       Reset/randomize data"),
-      text("  A       Toggle axis (#{if state.show_axis, do: "ON", else: "OFF"})"),
-      text("  Q       Quit"),
-      text(""),
-      text("Data points: #{length(state.cpu_data)}")
+      text("Controls:", Style.new(fg: :yellow)),
+      text("  Space   Add new data point", nil),
+      text("  R       Reset/randomize data", nil),
+      text("  A       Toggle axis (#{if state.show_axis, do: "ON", else: "OFF"})", nil),
+      text("  Q       Quit", nil),
+      text("", nil),
+      text("Data points: #{length(state.cpu_data)}", nil)
     ])
   end
 
@@ -177,7 +165,7 @@ defmodule LineChart.App do
       LineChart.full_braille()
     ]
 
-    text("  " <> Enum.join(patterns, " "))
+    text("  " <> Enum.join(patterns, " "), nil)
   end
 
   # ----------------------------------------------------------------------------

@@ -20,13 +20,11 @@ defmodule BarChart.App do
   - Q: Quit the application
   """
 
-  @behaviour TermUI.Component
-
-  import TermUI.Component.RenderNode
+  use TermUI.Elm
 
   alias TermUI.Widgets.BarChart
   alias TermUI.Event
-  alias TermUI.Style
+  alias TermUI.Renderer.Style
 
   # ----------------------------------------------------------------------------
   # Component Callbacks
@@ -35,7 +33,6 @@ defmodule BarChart.App do
   @doc """
   Initialize the component state.
   """
-  @impl true
   def init(_opts) do
     %{
       data: sample_data(),
@@ -58,7 +55,6 @@ defmodule BarChart.App do
   @doc """
   Convert keyboard events to messages.
   """
-  @impl true
   def event_to_msg(%Event.Key{key: key}, _state) when key in ["d", "D"], do: {:msg, :toggle_direction}
   def event_to_msg(%Event.Key{key: key}, _state) when key in ["v", "V"], do: {:msg, :toggle_values}
   def event_to_msg(%Event.Key{key: key}, _state) when key in ["l", "L"], do: {:msg, :toggle_labels}
@@ -69,7 +65,6 @@ defmodule BarChart.App do
   @doc """
   Update state based on messages.
   """
-  @impl true
   def update(:toggle_direction, state) do
     new_direction = if state.direction == :horizontal, do: :vertical, else: :horizontal
     {%{state | direction: new_direction}, []}
@@ -100,31 +95,27 @@ defmodule BarChart.App do
   @doc """
   Render the current state to a render tree.
   """
-  @impl true
   def view(state) do
     stack(:vertical, [
       # Title
-      styled(
-        text("Bar Chart Widget Example"),
-        Style.new(fg: :cyan, attrs: [:bold])
-      ),
-      text(""),
+      text("Bar Chart Widget Example", Style.new(fg: :cyan, attrs: [:bold])),
+      text("", nil),
 
       # Main chart based on current direction
       render_main_chart(state),
-      text(""),
+      text("", nil),
 
       # Simple bar example
-      text("Simple single bar:"),
+      text("Simple single bar:", nil),
       BarChart.bar(
         value: 75,
         max: 100,
         width: 30
       ),
-      text(""),
+      text("", nil),
 
       # Colored bar chart example
-      text("Bar chart with colors:"),
+      text("Bar chart with colors:", nil),
       BarChart.render(
         data: [
           %{label: "Red", value: 80},
@@ -141,18 +132,15 @@ defmodule BarChart.App do
           Style.new(fg: :blue)
         ]
       ),
-      text(""),
+      text("", nil),
 
       # Controls
-      styled(
-        text("Controls:"),
-        Style.new(fg: :yellow)
-      ),
-      text("  D   Toggle direction (#{state.direction})"),
-      text("  V   Toggle values (#{if state.show_values, do: "ON", else: "OFF"})"),
-      text("  L   Toggle labels (#{if state.show_labels, do: "ON", else: "OFF"})"),
-      text("  R   Randomize data"),
-      text("  Q   Quit")
+      text("Controls:", Style.new(fg: :yellow)),
+      text("  D   Toggle direction (#{state.direction})", nil),
+      text("  V   Toggle values (#{if state.show_values, do: "ON", else: "OFF"})", nil),
+      text("  L   Toggle labels (#{if state.show_labels, do: "ON", else: "OFF"})", nil),
+      text("  R   Randomize data", nil),
+      text("  Q   Quit", nil)
     ])
   end
 
@@ -164,7 +152,7 @@ defmodule BarChart.App do
     case state.direction do
       :horizontal ->
         stack(:vertical, [
-          text("Horizontal Bar Chart:"),
+          text("Horizontal Bar Chart:", nil),
           BarChart.render(
             data: state.data,
             direction: :horizontal,
@@ -177,7 +165,7 @@ defmodule BarChart.App do
 
       :vertical ->
         stack(:vertical, [
-          text("Vertical Bar Chart:"),
+          text("Vertical Bar Chart:", nil),
           BarChart.render(
             data: state.data,
             direction: :vertical,

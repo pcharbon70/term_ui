@@ -21,12 +21,10 @@ defmodule Viewport.App do
   - Q: Quit the application
   """
 
-  @behaviour TermUI.Component
-
-  import TermUI.Component.RenderNode
+  use TermUI.Elm
 
   alias TermUI.Event
-  alias TermUI.Style
+  alias TermUI.Renderer.Style
 
   # Content configuration
   @content_height 50
@@ -39,7 +37,6 @@ defmodule Viewport.App do
   @doc """
   Initialize the component state.
   """
-  @impl true
   def init(_opts) do
     %{
       scroll_y: 0,
@@ -63,7 +60,6 @@ defmodule Viewport.App do
   @doc """
   Convert keyboard events to messages.
   """
-  @impl true
   def event_to_msg(%Event.Key{key: :up}, _state), do: {:msg, {:scroll, -1}}
   def event_to_msg(%Event.Key{key: :down}, _state), do: {:msg, {:scroll, 1}}
   def event_to_msg(%Event.Key{key: :page_up}, _state), do: {:msg, {:scroll, -5}}
@@ -76,7 +72,6 @@ defmodule Viewport.App do
   @doc """
   Update state based on messages.
   """
-  @impl true
   def update({:scroll, delta}, state) do
     max_scroll = @content_height - @viewport_height
     new_scroll = max(0, min(max_scroll, state.scroll_y + delta))
@@ -99,34 +94,27 @@ defmodule Viewport.App do
   @doc """
   Render the current state to a render tree.
   """
-  @impl true
   def view(state) do
     stack(:vertical, [
       # Title
-      styled(
-        text("Viewport Widget Example"),
-        Style.new(fg: :cyan, attrs: [:bold])
-      ),
-      text(""),
+      text("Viewport Widget Example", Style.new(fg: :cyan, attrs: [:bold])),
+      text("", nil),
 
       # Content area with scroll bar
       render_viewport_area(state),
-      text(""),
+      text("", nil),
 
       # Scroll position info
-      text("Scroll: #{state.scroll_y}/#{@content_height - @viewport_height}"),
-      text("Showing lines #{state.scroll_y + 1}-#{state.scroll_y + @viewport_height} of #{@content_height}"),
-      text(""),
+      text("Scroll: #{state.scroll_y}/#{@content_height - @viewport_height}", nil),
+      text("Showing lines #{state.scroll_y + 1}-#{state.scroll_y + @viewport_height} of #{@content_height}", nil),
+      text("", nil),
 
       # Controls
-      styled(
-        text("Controls:"),
-        Style.new(fg: :yellow)
-      ),
-      text("  ↑/↓         Scroll one line"),
-      text("  Page Up/Down  Scroll by 5"),
-      text("  Home/End    Jump to top/bottom"),
-      text("  Q           Quit")
+      text("Controls:", Style.new(fg: :yellow)),
+      text("  ↑/↓         Scroll one line", nil),
+      text("  Page Up/Down  Scroll by 5", nil),
+      text("  Home/End    Jump to top/bottom", nil),
+      text("  Q           Quit", nil)
     ])
   end
 
@@ -146,7 +134,7 @@ defmodule Viewport.App do
         # Truncate to fit viewport width
         truncated = String.slice(content, 0, 50)
         padded = String.pad_trailing(truncated, 50)
-        text("│ " <> padded <> " ")
+        text("│ " <> padded <> " ", nil)
       end)
 
     # Render scroll bar
@@ -156,12 +144,12 @@ defmodule Viewport.App do
     rows_with_bar =
       Enum.zip(content_rows, scroll_bar)
       |> Enum.map(fn {content_row, bar_char} ->
-        stack(:horizontal, [content_row, text(bar_char), text("│")])
+        stack(:horizontal, [content_row, text(bar_char, nil), text("│", nil)])
       end)
 
     # Add top and bottom borders
-    top_border = text("┌" <> String.duplicate("─", 52) <> "┬─┐")
-    bottom_border = text("└" <> String.duplicate("─", 52) <> "┴─┘")
+    top_border = text("┌" <> String.duplicate("─", 52) <> "┬─┐", nil)
+    bottom_border = text("└" <> String.duplicate("─", 52) <> "┴─┘", nil)
 
     stack(:vertical, [top_border | rows_with_bar] ++ [bottom_border])
   end
