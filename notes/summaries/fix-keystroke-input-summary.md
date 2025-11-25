@@ -60,12 +60,12 @@ Verified working:
 - T key toggles theme (dark/light)
 - Arrow keys navigate process list
 - R key refreshes
-- Q key captured (exit not yet implemented)
+- Q key quits the application
 - No character echoing
 - Works over SSH sessions
 
 ## Notes
 
-- The Q key sends a `:quit` message but the dashboard doesn't exit yet (needs `Runtime.shutdown` integration)
+- The Q key returns a `:quit` command which triggers `Runtime.shutdown` for graceful exit
 - Raw mode is enabled via `:shell.start_interactive({:noshell, :raw})` on OTP 28+
 - Falls back to `stty` commands if OTP 28 shell API unavailable

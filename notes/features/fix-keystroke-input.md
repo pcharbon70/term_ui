@@ -51,12 +51,12 @@ Without raw mode enabled (because terminal detection failed), the terminal drive
 ## Success Criteria
 
 1. ✅ Dashboard starts and displays correctly
-2. ⏳ Pressing Q quits the application (needs Runtime.shutdown integration)
+2. ✅ Pressing Q quits the application
 3. ✅ Pressing R triggers refresh
 4. ✅ Pressing T toggles theme
 5. ✅ Arrow keys navigate the process list
 6. ✅ No character echoing to terminal
-7. ✅ Terminal restores to normal state after exit (Ctrl+C)
+7. ✅ Terminal restores to normal state after exit
 
 ## Files Changed
 
@@ -70,4 +70,4 @@ Without raw mode enabled (because terminal detection failed), the terminal drive
 
 - Works over SSH sessions where `:io.getopts` reports `terminal: false`
 - The `/dev/tty` device check is Unix-specific but provides good SSH compatibility
-- Q key exit functionality requires additional `Runtime.shutdown` integration (future work)
+- Q key triggers `:quit` command which is handled by Runtime to initiate graceful shutdown
