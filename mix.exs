@@ -126,7 +126,30 @@ defmodule TermUI.MixProject do
         ],
         Layout: ~r/TermUI\.Layout\..*/,
         Terminal: ~r/TermUI\.Terminal\..*/
-      ]
+      ],
+      before_closing_body_tag: %{
+        html: """
+        <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+        <script>
+          document.addEventListener("DOMContentLoaded", function () {
+            mermaid.initialize({ startOnLoad: false, theme: "default" });
+            let id = 0;
+            for (const codeEl of document.querySelectorAll("pre code.mermaid")) {
+              const preEl = codeEl.parentElement;
+              const graphDefinition = codeEl.textContent;
+              const graphEl = document.createElement("div");
+              const graphId = "mermaid-graph-" + id++;
+              mermaid.render(graphId, graphDefinition).then(({svg, bindFunctions}) => {
+                graphEl.innerHTML = svg;
+                bindFunctions?.(graphEl);
+                preEl.insertAdjacentElement("afterend", graphEl);
+                preEl.remove();
+              });
+            }
+          });
+        </script>
+        """
+      }
     ]
   end
 end
