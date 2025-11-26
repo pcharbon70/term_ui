@@ -121,7 +121,7 @@ mix run run.exs
 ## Requirements
 
 - Elixir 1.15+
-- OTP 26+ (OTP 28+ recommended for native raw mode)
+- OTP 28+ (required for native raw terminal mode)
 - Terminal with Unicode support
 
 ## License
