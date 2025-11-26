@@ -14,6 +14,7 @@ Technical documentation for TermUI internals and architecture.
 | [06-terminal-layer.md](06-terminal-layer.md) | Raw mode, ANSI sequences, platform handling |
 | [07-elm-implementation.md](07-elm-implementation.md) | The Elm Architecture adapted for OTP |
 | [08-creating-widgets.md](08-creating-widgets.md) | How to create and contribute new widgets |
+| [09-testing-framework.md](09-testing-framework.md) | Component and widget testing framework |
 
 ## Reading Order
 

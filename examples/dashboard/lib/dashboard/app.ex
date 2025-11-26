@@ -11,7 +11,7 @@ defmodule Dashboard.App do
   alias Dashboard.Data.Metrics
   alias TermUI.Event
   alias TermUI.Renderer.Style
-  alias TermUI.Widgets.{Gauge, Sparkline}
+  alias TermUI.Widgets.Sparkline
 
   # Elm callbacks
 
@@ -92,64 +92,124 @@ defmodule Dashboard.App do
     ])
   end
 
+  @dashboard_width 58
+
   defp render_header(theme) do
-    text("═══ System Dashboard ═══", theme.header)
+    title = " System Dashboard "
+    title_len = String.length(title)
+    total_padding = @dashboard_width - title_len
+    left_padding = div(total_padding, 2)
+    right_padding = total_padding - left_padding
+
+    line = String.duplicate("═", left_padding) <> title <> String.duplicate("═", right_padding)
+    text(line, theme.header)
   end
 
   defp render_cpu_gauge(cpu_value, theme) do
+    gauge_width = 12
+    # Inner content: 1 space + gauge (12) + 1 space = 14
+    inner_width = gauge_width + 2
+
+    # Title "─ CPU ─" is 7 chars, remaining is inner_width - 7
+    top_border = "┌─ CPU " <> String.duplicate("─", inner_width - 7) <> "─┐"
+    bottom_border = "└" <> String.duplicate("─", inner_width) <> "┘"
+
+    filled = round(cpu_value / 100 * gauge_width)
+    empty = gauge_width - filled
+
     stack(:vertical, [
-      text("┌─ CPU ─┐", theme.border),
-      text(" #{format_percent(cpu_value)} ", theme.text),
-      Gauge.render(
-        value: cpu_value,
-        width: 12,
-        zones: cpu_zones(),
-        show_value: false,
-        show_range: false
-      ),
-      text("└───────┘", theme.border)
+      text(top_border, theme.border),
+      text("│" <> String.pad_trailing(format_percent(cpu_value), inner_width) <> "│", theme.text),
+      text("│ " <> String.duplicate("█", filled) <> String.duplicate("░", empty) <> " │", get_gauge_style(cpu_value, theme)),
+      text(bottom_border, theme.border)
     ])
   end
 
   defp render_memory_gauge(memory_value, theme) do
+    gauge_width = 12
+    inner_width = gauge_width + 2
+
+    # Title "─ Memory ─" is 10 chars, remaining is inner_width - 10
+    top_border = "┌─ Memory " <> String.duplicate("─", inner_width - 10) <> "─┐"
+    bottom_border = "└" <> String.duplicate("─", inner_width) <> "┘"
+
+    filled = round(memory_value / 100 * gauge_width)
+    empty = gauge_width - filled
+
     stack(:vertical, [
-      text("┌─ Memory ─┐", theme.border),
-      text(" #{format_percent(memory_value)} ", theme.text),
-      Gauge.render(
-        value: memory_value,
-        width: 12,
-        zones: memory_zones(),
-        show_value: false,
-        show_range: false
-      ),
-      text("└──────────┘", theme.border)
+      text(top_border, theme.border),
+      text("│" <> String.pad_trailing(format_percent(memory_value), inner_width) <> "│", theme.text),
+      text("│ " <> String.duplicate("█", filled) <> String.duplicate("░", empty) <> " │", get_memory_style(memory_value, theme)),
+      text(bottom_border, theme.border)
     ])
+  end
+
+  defp get_gauge_style(value, _theme) do
+    cond do
+      value >= 80 -> Style.new(fg: :red)
+      value >= 60 -> Style.new(fg: :yellow)
+      true -> Style.new(fg: :green)
+    end
+  end
+
+  defp get_memory_style(value, _theme) do
+    cond do
+      value >= 85 -> Style.new(fg: :red)
+      value >= 70 -> Style.new(fg: :yellow)
+      true -> Style.new(fg: :green)
+    end
   end
 
   defp render_system_info(theme) do
     info = Metrics.get_system_info()
     {load1, load2, load3} = info.load_avg
 
+    # Calculate content to determine box width
+    host_line = " Host: #{info.hostname}"
+    up_line = " Up: #{info.uptime}"
+    load_line = " Load: #{load1} #{load2} #{load3}"
+
+    # Find the widest content line and add padding
+    content_width = Enum.max([String.length(host_line), String.length(up_line), String.length(load_line)]) + 1
+
+    # Box width includes the border characters
+    box_width = content_width + 2
+
+    # Build the box
+    title = "─ System Info ─"
+    top_padding = box_width - String.length(title) - 2
+    top_border = "┌" <> title <> String.duplicate("─", top_padding) <> "┐"
+    bottom_border = "└" <> String.duplicate("─", box_width - 2) <> "┘"
+
     stack(:vertical, [
-      text("┌─ System Info ─┐", theme.border),
-      text(" Host: #{info.hostname}", theme.text),
-      text(" Up: #{info.uptime}", theme.text),
-      text(" Load: #{load1} #{load2} #{load3}", theme.text),
-      text("└───────────────┘", theme.border)
+      text(top_border, theme.border),
+      text(String.pad_trailing(host_line, content_width), theme.text),
+      text(String.pad_trailing(up_line, content_width), theme.text),
+      text(String.pad_trailing(load_line, content_width), theme.text),
+      text(bottom_border, theme.border)
     ])
   end
 
   defp render_network(metrics, theme) do
+    # Match process table width
+    label_width = 6  # " RX: " or " TX: "
+    sparkline_width = @dashboard_width - label_width - 4  # 4 for borders and padding
+
+    top_border = "┌─ Network " <> String.duplicate("─", @dashboard_width - 12) <> "┐"
+    bottom_border = "└" <> String.duplicate("─", @dashboard_width - 2) <> "┘"
+
     stack(:vertical, [
-      text("┌─ Network ─┐", theme.border),
+      text(top_border, theme.border),
       stack(:horizontal, [
         text(" RX: ", theme.label),
         Sparkline.render(
           values: Enum.reverse(metrics.network_rx),
           min: 0,
           max: 100,
+          width: sparkline_width,
           style: theme.sparkline_rx
-        )
+        ),
+        text(" ", nil)
       ]),
       stack(:horizontal, [
         text(" TX: ", theme.label),
@@ -157,10 +217,12 @@ defmodule Dashboard.App do
           values: Enum.reverse(metrics.network_tx),
           min: 0,
           max: 100,
+          width: sparkline_width,
           style: theme.sparkline_tx
-        )
+        ),
+        text(" ", nil)
       ]),
-      text("└───────────┘", theme.border)
+      text(bottom_border, theme.border)
     ])
   end
 
@@ -194,7 +256,18 @@ defmodule Dashboard.App do
   end
 
   defp render_help(theme) do
-    text("[Q] Quit  [R] Refresh  [T] Theme  [↑/↓] Navigate", theme.help)
+    controls = " [Q] Quit  [R] Refresh  [T] Theme  [↑/↓] Navigate"
+    inner_width = @dashboard_width - 2
+
+    top_border = "┌─ Controls " <> String.duplicate("─", inner_width - 12) <> "─┐"
+    bottom_border = "└" <> String.duplicate("─", inner_width) <> "┘"
+
+    stack(:vertical, [
+      text("", nil),
+      text(top_border, theme.border),
+      text("│" <> String.pad_trailing(controls, inner_width) <> "│", theme.help),
+      text(bottom_border, theme.border)
+    ])
   end
 
   # Formatting helpers
@@ -216,24 +289,6 @@ defmodule Dashboard.App do
       mb >= 1024 -> "#{Float.round(mb / 1024, 1)} GB"
       true -> "#{mb} MB"
     end
-  end
-
-  # Color zones
-
-  defp cpu_zones do
-    [
-      {0, Style.new(fg: :green)},
-      {60, Style.new(fg: :yellow)},
-      {80, Style.new(fg: :red)}
-    ]
-  end
-
-  defp memory_zones do
-    [
-      {0, Style.new(fg: :green)},
-      {70, Style.new(fg: :yellow)},
-      {85, Style.new(fg: :red)}
-    ]
   end
 
   # Themes

@@ -90,7 +90,8 @@ defmodule TermUI.Runtime.NodeRenderer do
 
   # Text rendering
   defp render_text(nil, _buffer, _row, _col, _style), do: {0, 0}
-  defp render_text("", _buffer, _row, _col, _style), do: {0, 0}
+  # Empty string should still take up one line (for blank lines)
+  defp render_text("", _buffer, _row, _col, _style), do: {0, 1}
 
   defp render_text(text, buffer, row, col, style) when is_binary(text) do
     lines = String.split(text, "\n")

@@ -137,13 +137,27 @@ defmodule Sparkline.App do
       text("", nil),
 
       # Controls
-      text("Controls:", Style.new(fg: :yellow)),
-      text("  Space   Add random data point", nil),
-      text("  R       Reset data", nil),
-      text("  C       Toggle color mode (#{if state.colored, do: "ON", else: "OFF"})", nil),
-      text("  Q       Quit", nil),
+      render_controls(state)
+    ])
+  end
+
+  defp render_controls(state) do
+    box_width = 56
+    inner_width = box_width - 2
+
+    top_border = "┌─ Controls " <> String.duplicate("─", inner_width - 12) <> "─┐"
+    bottom_border = "└" <> String.duplicate("─", inner_width) <> "┘"
+
+    stack(:vertical, [
       text("", nil),
-      text("Data points: #{length(state.values)}", nil)
+      text(top_border, Style.new(fg: :yellow)),
+      text("│" <> String.pad_trailing("  Space   Add random data point", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  R       Reset data", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  C       Toggle color mode (#{if state.colored, do: "ON", else: "OFF"})", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  Q       Quit", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  Data points: #{length(state.values)}", inner_width) <> "│", nil),
+      text(bottom_border, Style.new(fg: :yellow))
     ])
   end
 

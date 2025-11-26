@@ -105,16 +105,31 @@ defmodule Viewport.App do
       text("", nil),
 
       # Scroll position info
-      text("Scroll: #{state.scroll_y}/#{@content_height - @viewport_height}", nil),
-      text("Showing lines #{state.scroll_y + 1}-#{state.scroll_y + @viewport_height} of #{@content_height}", nil),
       text("", nil),
 
       # Controls
-      text("Controls:", Style.new(fg: :yellow)),
-      text("  ↑/↓         Scroll one line", nil),
-      text("  Page Up/Down  Scroll by 5", nil),
-      text("  Home/End    Jump to top/bottom", nil),
-      text("  Q           Quit", nil)
+      render_controls(state)
+    ])
+  end
+
+  defp render_controls(state) do
+    box_width = 56
+    inner_width = box_width - 2
+
+    top_border = "┌─ Controls " <> String.duplicate("─", inner_width - 12) <> "─┐"
+    bottom_border = "└" <> String.duplicate("─", inner_width) <> "┘"
+
+    stack(:vertical, [
+      text("", nil),
+      text(top_border, Style.new(fg: :yellow)),
+      text("│" <> String.pad_trailing("  ↑/↓           Scroll one line", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  Page Up/Down  Scroll by 5", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  Home/End      Jump to top/bottom", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  Q             Quit", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  Scroll: #{state.scroll_y}/#{@content_height - @viewport_height}", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  Showing lines #{state.scroll_y + 1}-#{state.scroll_y + @viewport_height} of #{@content_height}", inner_width) <> "│", nil),
+      text(bottom_border, Style.new(fg: :yellow))
     ])
   end
 

@@ -74,16 +74,25 @@ TermUI.Runtime.run(root: Counter)
 
 The `examples/` directory contains standalone applications demonstrating each widget:
 
+| Example | Description |
+|---------|-------------|
+| [dashboard](examples/dashboard) | System monitoring dashboard with multiple widgets |
+| [gauge](examples/gauge) | Progress bars and percentage indicators |
+| [sparkline](examples/sparkline) | Inline data visualization |
+| [bar_chart](examples/bar_chart) | Horizontal and vertical bar charts |
+| [line_chart](examples/line_chart) | Braille-based line charts |
+| [table](examples/table) | Scrollable data tables with selection |
+| [menu](examples/menu) | Nested menus with keyboard navigation |
+| [tabs](examples/tabs) | Tab-based navigation |
+| [dialog](examples/dialog) | Modal dialogs with buttons |
+| [viewport](examples/viewport) | Scrollable content areas |
+| [canvas](examples/canvas) | Free-form drawing with box/braille characters |
+
 ```bash
-# Run the dashboard example
+# Run any example
 cd examples/dashboard
 mix deps.get
 mix run run.exs
-
-# Run individual widget examples
-cd examples/gauge && mix run run.exs
-cd examples/table && mix run run.exs
-cd examples/menu && mix run run.exs
 ```
 
 ## Requirements

@@ -96,7 +96,8 @@ defmodule TermUI.MixProject do
         "guides/user/09-commands.md": [title: "Commands"],
         "guides/developer/README.md": [filename: "developer-guides", title: "Developer Guides"],
         "guides/developer/01-architecture-overview.md": [title: "Architecture Overview"],
-        "guides/developer/08-creating-widgets.md": [title: "Creating Widgets"]
+        "guides/developer/08-creating-widgets.md": [title: "Creating Widgets"],
+        "guides/developer/09-testing-framework.md": [title: "Testing Framework"]
       ],
       groups_for_extras: [
         "User Guides": ~r/guides\/user\/.*/,
