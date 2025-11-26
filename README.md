@@ -9,9 +9,9 @@ A direct-mode Terminal UI framework for Elixir/BEAM, inspired by [BubbleTea](htt
 TermUI leverages BEAM's unique strengths—fault tolerance, actor model, hot code reloading—to build robust terminal applications using The Elm Architecture.
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/pcharbon70/term_ui/main/assets/blue_theme.jpg" width="45%" alt="Blue Theme">
+  <img src="https://raw.githubusercontent.com/pcharbon70/term_ui/main/assets/dashboard_blue.jpg" width="45%" alt="Blue Theme">
   &nbsp;&nbsp;
-  <img src="https://raw.githubusercontent.com/pcharbon70/term_ui/main/assets/yellow_theme.jpg" width="45%" alt="Yellow Theme">
+  <img src="https://raw.githubusercontent.com/pcharbon70/term_ui/main/assets/dashboard_yellow.jpg" width="45%" alt="Yellow Theme">
 </p>
 
 ## Features
