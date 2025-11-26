@@ -13,6 +13,7 @@ TermUI leverages BEAM's unique strengths—fault tolerance, actor model, hot cod
 - **Elm Architecture** - Predictable state management with `init/update/view`
 - **Rich Widget Library** - Gauges, tables, menus, charts, dialogs, and more
 - **Efficient Rendering** - Double-buffered differential updates at 60 FPS
+- **Themable** - True color RGB support (16 million colors)
 - **Cross-Platform** - Linux, macOS, Windows 10+ terminal support
 - **OTP Integration** - Supervision trees, fault tolerance, hot code reload
 
