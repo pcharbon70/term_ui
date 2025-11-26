@@ -19,8 +19,10 @@ defmodule TermUI.Focus.Indicator do
 
   alias TermUI.Renderer.Style
 
+  @type border_style :: :none | :single | :double | :rounded | :thick
+
   @type indicator_style :: %{
-          border: Style.border_style() | nil,
+          border: border_style() | nil,
           fg: Style.color() | nil,
           bg: Style.color() | nil,
           bold: boolean()

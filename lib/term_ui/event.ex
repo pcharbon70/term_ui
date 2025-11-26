@@ -29,6 +29,10 @@ defmodule TermUI.Event do
       event = Event.focus(:lost)
   """
 
+  @typedoc "Union type for all event types"
+  @type t ::
+          Key.t() | Mouse.t() | Focus.t() | Custom.t() | Resize.t() | Paste.t() | Tick.t()
+
   # Key Event
 
   defmodule Key do
