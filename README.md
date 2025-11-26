@@ -65,10 +65,33 @@ TermUI.Runtime.run(root: Counter)
 
 ## Documentation
 
-- [Getting Started](https://hexdocs.pm/term_ui/getting-started.html)
-- [The Elm Architecture](https://hexdocs.pm/term_ui/elm-architecture.html)
-- [Widget Reference](https://hexdocs.pm/term_ui/widgets.html)
-- [API Reference](https://hexdocs.pm/term_ui/api-reference.html)
+### User Guides
+
+| Guide | Description |
+|-------|-------------|
+| [Overview](https://github.com/pcharbon70/term_ui/blob/main/guides/user/01-overview.md) | Introduction to TermUI concepts |
+| [Getting Started](https://github.com/pcharbon70/term_ui/blob/main/guides/user/02-getting-started.md) | First steps and setup |
+| [Elm Architecture](https://github.com/pcharbon70/term_ui/blob/main/guides/user/03-elm-architecture.md) | Understanding init/update/view |
+| [Events](https://github.com/pcharbon70/term_ui/blob/main/guides/user/04-events.md) | Handling keyboard and mouse input |
+| [Styling](https://github.com/pcharbon70/term_ui/blob/main/guides/user/05-styling.md) | Colors, attributes, and themes |
+| [Layout](https://github.com/pcharbon70/term_ui/blob/main/guides/user/06-layout.md) | Arranging components on screen |
+| [Widgets](https://github.com/pcharbon70/term_ui/blob/main/guides/user/07-widgets.md) | Using built-in widgets |
+| [Terminal](https://github.com/pcharbon70/term_ui/blob/main/guides/user/08-terminal.md) | Terminal capabilities and modes |
+| [Commands](https://github.com/pcharbon70/term_ui/blob/main/guides/user/09-commands.md) | Side effects and async operations |
+
+### Developer Guides
+
+| Guide | Description |
+|-------|-------------|
+| [Architecture Overview](https://github.com/pcharbon70/term_ui/blob/main/guides/developer/01-architecture-overview.md) | System layers and design |
+| [Runtime Internals](https://github.com/pcharbon70/term_ui/blob/main/guides/developer/02-runtime-internals.md) | GenServer event loop and state |
+| [Rendering Pipeline](https://github.com/pcharbon70/term_ui/blob/main/guides/developer/03-rendering-pipeline.md) | View to terminal output stages |
+| [Event System](https://github.com/pcharbon70/term_ui/blob/main/guides/developer/04-event-system.md) | Input parsing and dispatch |
+| [Buffer Management](https://github.com/pcharbon70/term_ui/blob/main/guides/developer/05-buffer-management.md) | ETS double buffering |
+| [Terminal Layer](https://github.com/pcharbon70/term_ui/blob/main/guides/developer/06-terminal-layer.md) | Raw mode and ANSI sequences |
+| [Elm Implementation](https://github.com/pcharbon70/term_ui/blob/main/guides/developer/07-elm-implementation.md) | Elm Architecture for OTP |
+| [Creating Widgets](https://github.com/pcharbon70/term_ui/blob/main/guides/developer/08-creating-widgets.md) | How to build and contribute widgets |
+| [Testing Framework](https://github.com/pcharbon70/term_ui/blob/main/guides/developer/09-testing-framework.md) | Component and widget testing |
 
 ## Examples
 
