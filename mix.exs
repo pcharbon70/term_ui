@@ -96,6 +96,12 @@ defmodule TermUI.MixProject do
         "guides/user/09-commands.md": [title: "Commands"],
         "guides/developer/README.md": [filename: "developer-guides", title: "Developer Guides"],
         "guides/developer/01-architecture-overview.md": [title: "Architecture Overview"],
+        "guides/developer/02-runtime-internals.md": [title: "Runtime Internals"],
+        "guides/developer/03-rendering-pipeline.md": [title: "Rendering Pipeline"],
+        "guides/developer/04-event-system.md": [title: "Event System"],
+        "guides/developer/05-buffer-management.md": [title: "Buffer Management"],
+        "guides/developer/06-terminal-layer.md": [title: "Terminal Layer"],
+        "guides/developer/07-elm-implementation.md": [title: "Elm Implementation"],
         "guides/developer/08-creating-widgets.md": [title: "Creating Widgets"],
         "guides/developer/09-testing-framework.md": [title: "Testing Framework"]
       ],
