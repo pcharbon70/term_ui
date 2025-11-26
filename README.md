@@ -2,7 +2,7 @@
 
 [![Hex.pm](https://img.shields.io/hexpm/v/term_ui.svg)](https://hex.pm/packages/term_ui)
 [![Docs](https://img.shields.io/badge/hex-docs-blue.svg)](https://hexdocs.pm/term_ui)
-[![License](https://img.shields.io/hexpm/l/term_ui.svg)](LICENSE)
+[![License](https://img.shields.io/hexpm/l/term_ui.svg)](https://github.com/pcharbon70/term_ui/blob/main/LICENSE)
 
 A direct-mode Terminal UI framework for Elixir/BEAM, inspired by [BubbleTea](https://github.com/charmbracelet/bubbletea) (Go) and [Ratatui](https://github.com/ratatui-org/ratatui) (Rust).
 
@@ -76,17 +76,17 @@ The `examples/` directory contains standalone applications demonstrating each wi
 
 | Example | Description |
 |---------|-------------|
-| [dashboard](examples/dashboard) | System monitoring dashboard with multiple widgets |
-| [gauge](examples/gauge) | Progress bars and percentage indicators |
-| [sparkline](examples/sparkline) | Inline data visualization |
-| [bar_chart](examples/bar_chart) | Horizontal and vertical bar charts |
-| [line_chart](examples/line_chart) | Braille-based line charts |
-| [table](examples/table) | Scrollable data tables with selection |
-| [menu](examples/menu) | Nested menus with keyboard navigation |
-| [tabs](examples/tabs) | Tab-based navigation |
-| [dialog](examples/dialog) | Modal dialogs with buttons |
-| [viewport](examples/viewport) | Scrollable content areas |
-| [canvas](examples/canvas) | Free-form drawing with box/braille characters |
+| [dashboard](https://github.com/pcharbon70/term_ui/tree/main/examples/dashboard) | System monitoring dashboard with multiple widgets |
+| [gauge](https://github.com/pcharbon70/term_ui/tree/main/examples/gauge) | Progress bars and percentage indicators |
+| [sparkline](https://github.com/pcharbon70/term_ui/tree/main/examples/sparkline) | Inline data visualization |
+| [bar_chart](https://github.com/pcharbon70/term_ui/tree/main/examples/bar_chart) | Horizontal and vertical bar charts |
+| [line_chart](https://github.com/pcharbon70/term_ui/tree/main/examples/line_chart) | Braille-based line charts |
+| [table](https://github.com/pcharbon70/term_ui/tree/main/examples/table) | Scrollable data tables with selection |
+| [menu](https://github.com/pcharbon70/term_ui/tree/main/examples/menu) | Nested menus with keyboard navigation |
+| [tabs](https://github.com/pcharbon70/term_ui/tree/main/examples/tabs) | Tab-based navigation |
+| [dialog](https://github.com/pcharbon70/term_ui/tree/main/examples/dialog) | Modal dialogs with buttons |
+| [viewport](https://github.com/pcharbon70/term_ui/tree/main/examples/viewport) | Scrollable content areas |
+| [canvas](https://github.com/pcharbon70/term_ui/tree/main/examples/canvas) | Free-form drawing with box/braille characters |
 
 ```bash
 # Run any example
@@ -103,4 +103,4 @@ mix run run.exs
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
+MIT License - see [LICENSE](https://github.com/pcharbon70/term_ui/blob/main/LICENSE) for details.
