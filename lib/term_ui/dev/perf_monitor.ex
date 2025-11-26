@@ -176,8 +176,9 @@ defmodule TermUI.Dev.PerfMonitor do
   """
   @spec get_scheduler_utilization() :: [float()]
   def get_scheduler_utilization do
-    # The :scheduler module may not be available in all environments
-    case :scheduler.utilization(1) do
+    # The :scheduler module is only available in OTP 28+
+    # Use apply/3 to avoid compile-time warnings
+    case apply(:scheduler, :utilization, [1]) do
       [{:total, _, total} | _schedulers] ->
         [total]
 

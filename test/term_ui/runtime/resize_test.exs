@@ -1,8 +1,8 @@
 defmodule TermUI.Runtime.ResizeTest do
   use ExUnit.Case, async: false
 
-  alias TermUI.Runtime
   alias TermUI.Event
+  alias TermUI.Runtime
 
   # Simple test component
   defmodule TestComponent do
@@ -68,8 +68,8 @@ defmodule TermUI.Runtime.ResizeTest do
     end
 
     test "new/3 accepts timestamp option" do
-      resize = Event.Resize.new(100, 50, timestamp: 12345)
-      assert resize.timestamp == 12345
+      resize = Event.Resize.new(100, 50, timestamp: 12_345)
+      assert resize.timestamp == 12_345
     end
   end
 end

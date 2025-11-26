@@ -30,22 +30,46 @@ defmodule TermUI.Runtime.NodeRenderer do
   # Handle RenderNode structs
   defp render_node(%RenderNode{type: :empty}, _buffer, _row, _col, _style), do: {0, 0}
 
-  defp render_node(%RenderNode{type: :text, content: content, style: style}, buffer, row, col, parent_style) do
+  defp render_node(
+         %RenderNode{type: :text, content: content, style: style},
+         buffer,
+         row,
+         col,
+         parent_style
+       ) do
     effective_style = merge_styles(parent_style, style)
     render_text(content, buffer, row, col, effective_style)
   end
 
-  defp render_node(%RenderNode{type: :box, children: children, style: style}, buffer, row, col, parent_style) do
+  defp render_node(
+         %RenderNode{type: :box, children: children, style: style},
+         buffer,
+         row,
+         col,
+         parent_style
+       ) do
     effective_style = merge_styles(parent_style, style)
     render_children_vertical(children, buffer, row, col, effective_style)
   end
 
-  defp render_node(%RenderNode{type: :stack, direction: :vertical, children: children, style: style}, buffer, row, col, parent_style) do
+  defp render_node(
+         %RenderNode{type: :stack, direction: :vertical, children: children, style: style},
+         buffer,
+         row,
+         col,
+         parent_style
+       ) do
     effective_style = merge_styles(parent_style, style)
     render_children_vertical(children, buffer, row, col, effective_style)
   end
 
-  defp render_node(%RenderNode{type: :stack, direction: :horizontal, children: children, style: style}, buffer, row, col, parent_style) do
+  defp render_node(
+         %RenderNode{type: :stack, direction: :horizontal, children: children, style: style},
+         buffer,
+         row,
+         col,
+         parent_style
+       ) do
     effective_style = merge_styles(parent_style, style)
     render_children_horizontal(children, buffer, row, col, effective_style)
   end
@@ -179,7 +203,11 @@ defmodule TermUI.Runtime.NodeRenderer do
     opts = []
     opts = if style.fg && style.fg != :default, do: [{:fg, style.fg} | opts], else: opts
     opts = if style.bg && style.bg != :default, do: [{:bg, style.bg} | opts], else: opts
-    opts = if MapSet.size(style.attrs) > 0, do: [{:attrs, MapSet.to_list(style.attrs)} | opts], else: opts
+
+    opts =
+      if MapSet.size(style.attrs) > 0,
+        do: [{:attrs, MapSet.to_list(style.attrs)} | opts],
+        else: opts
 
     if opts == [] do
       cell

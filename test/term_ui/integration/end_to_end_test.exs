@@ -277,11 +277,16 @@ defmodule TermUI.Integration.EndToEndTest do
 
       # Send alternating event types
       # The specific order should be preserved
-      Runtime.send_event(runtime, Event.key(:up))        # count = 1
-      Runtime.send_event(runtime, Event.resize(80, 24))  # resize added
-      Runtime.send_event(runtime, Event.key(:up))        # count = 2
-      Runtime.send_event(runtime, Event.resize(100, 30)) # resize added
-      Runtime.send_event(runtime, Event.key(:down))      # count = 1
+      # count = 1
+      Runtime.send_event(runtime, Event.key(:up))
+      # resize added
+      Runtime.send_event(runtime, Event.resize(80, 24))
+      # count = 2
+      Runtime.send_event(runtime, Event.key(:up))
+      # resize added
+      Runtime.send_event(runtime, Event.resize(100, 30))
+      # count = 1
+      Runtime.send_event(runtime, Event.key(:down))
       Runtime.sync(runtime)
 
       state = Runtime.get_state(runtime)
@@ -298,6 +303,7 @@ defmodule TermUI.Integration.EndToEndTest do
       for _ <- 1..10 do
         Runtime.send_event(runtime, Event.key(:up))
       end
+
       Runtime.sync(runtime)
 
       state = Runtime.get_state(runtime)
@@ -308,6 +314,7 @@ defmodule TermUI.Integration.EndToEndTest do
       for _ <- 1..10 do
         Runtime.send_event(runtime, Event.key(:down))
       end
+
       Runtime.sync(runtime)
 
       state = Runtime.get_state(runtime)

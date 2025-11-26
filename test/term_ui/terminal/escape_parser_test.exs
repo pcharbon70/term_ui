@@ -1,8 +1,8 @@
 defmodule TermUI.Terminal.EscapeParserTest do
   use ExUnit.Case, async: true
 
-  alias TermUI.Terminal.EscapeParser
   alias TermUI.Event
+  alias TermUI.Terminal.EscapeParser
 
   describe "parse/1 - single characters" do
     test "parses lowercase letters" do

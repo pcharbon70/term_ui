@@ -1,8 +1,8 @@
 defmodule TermUI.Terminal.MouseTest do
   use ExUnit.Case, async: true
 
-  alias TermUI.Terminal.EscapeParser
   alias TermUI.Event
+  alias TermUI.Terminal.EscapeParser
 
   describe "mouse event parsing - button press" do
     test "parses left button press" do
