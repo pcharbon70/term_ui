@@ -225,7 +225,9 @@ end
 
 ## Writing Tests
 
-**Tests are required for all new widgets.** Create a test file in `test/term_ui/widgets/`:
+**Tests are required for all new widgets.** See [Testing Framework](09-testing-framework.md) for comprehensive testing documentation.
+
+Create a test file in `test/term_ui/widgets/`:
 
 ```elixir
 defmodule TermUI.Widgets.MyWidgetTest do
@@ -401,6 +403,7 @@ Look at existing widgets for reference:
 
 ## Next Steps
 
+- [Testing Framework](09-testing-framework.md) - Comprehensive testing guide
 - [Architecture Overview](01-architecture-overview.md) - Understand the system
 - [Elm Implementation](07-elm-implementation.md) - Learn the component model
 - [Rendering Pipeline](03-rendering-pipeline.md) - How widgets become output

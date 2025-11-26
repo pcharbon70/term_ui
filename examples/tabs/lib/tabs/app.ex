@@ -175,18 +175,33 @@ defmodule Tabs.App do
       text("", nil),
 
       # Status
-      text("Selected: #{state.selected} | Focused: #{state.focused}", nil),
-      text("Tab count: #{length(state.tabs)}", nil),
       text("", nil),
 
       # Controls
-      text("Controls:", Style.new(fg: :yellow)),
-      text("  ←/→       Navigate tabs", nil),
-      text("  Enter     Select focused tab", nil),
-      text("  Home/End  Jump to first/last", nil),
-      text("  A         Add new tab", nil),
-      text("  D         Remove current tab", nil),
-      text("  Q         Quit", nil)
+      render_controls(state)
+    ])
+  end
+
+  defp render_controls(state) do
+    box_width = 44
+    inner_width = box_width - 2
+
+    top_border = "┌─ Controls " <> String.duplicate("─", inner_width - 12) <> "─┐"
+    bottom_border = "└" <> String.duplicate("─", inner_width) <> "┘"
+
+    stack(:vertical, [
+      text("", nil),
+      text(top_border, Style.new(fg: :yellow)),
+      text("│" <> String.pad_trailing("  ←/→       Navigate tabs", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  Enter     Select focused tab", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  Home/End  Jump to first/last", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  A         Add new tab", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  D         Remove current tab", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  Q         Quit", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  Selected: #{state.selected} | Focused: #{state.focused}", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  Tab count: #{length(state.tabs)}", inner_width) <> "│", nil),
+      text(bottom_border, Style.new(fg: :yellow))
     ])
   end
 

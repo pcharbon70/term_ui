@@ -135,12 +135,26 @@ defmodule BarChart.App do
       text("", nil),
 
       # Controls
-      text("Controls:", Style.new(fg: :yellow)),
-      text("  D   Toggle direction (#{state.direction})", nil),
-      text("  V   Toggle values (#{if state.show_values, do: "ON", else: "OFF"})", nil),
-      text("  L   Toggle labels (#{if state.show_labels, do: "ON", else: "OFF"})", nil),
-      text("  R   Randomize data", nil),
-      text("  Q   Quit", nil)
+      render_controls(state)
+    ])
+  end
+
+  defp render_controls(state) do
+    box_width = 50
+    inner_width = box_width - 2
+
+    top_border = "┌─ Controls " <> String.duplicate("─", inner_width - 12) <> "─┐"
+    bottom_border = "└" <> String.duplicate("─", inner_width) <> "┘"
+
+    stack(:vertical, [
+      text("", nil),
+      text(top_border, Style.new(fg: :yellow)),
+      text("│" <> String.pad_trailing("  D   Toggle direction (#{state.direction})", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  V   Toggle values (#{if state.show_values, do: "ON", else: "OFF"})", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  L   Toggle labels (#{if state.show_labels, do: "ON", else: "OFF"})", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  R   Randomize data", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  Q   Quit", inner_width) <> "│", nil),
+      text(bottom_border, Style.new(fg: :yellow))
     ])
   end
 

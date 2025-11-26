@@ -161,17 +161,31 @@ defmodule Dialog.App do
       text("  3 - Warning Dialog (three buttons)", nil),
       text("", nil),
 
-      # Last result
-      text("Last result: #{state.last_result || "(none)"}", nil),
       text("", nil),
 
       # Controls
-      text("Controls:", Style.new(fg: :yellow)),
-      text("  1/2/3     Show dialog", nil),
-      text("  Tab/←/→   Navigate buttons (in dialog)", nil),
-      text("  Enter     Select button", nil),
-      text("  Escape    Close dialog", nil),
-      text("  Q         Quit", nil)
+      render_controls(state)
+    ])
+  end
+
+  defp render_controls(state) do
+    box_width = 50
+    inner_width = box_width - 2
+
+    top_border = "┌─ Controls " <> String.duplicate("─", inner_width - 12) <> "─┐"
+    bottom_border = "└" <> String.duplicate("─", inner_width) <> "┘"
+
+    stack(:vertical, [
+      text("", nil),
+      text(top_border, Style.new(fg: :yellow)),
+      text("│" <> String.pad_trailing("  1/2/3     Show dialog", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  Tab/←/→   Navigate buttons (in dialog)", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  Enter     Select button", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  Escape    Close dialog", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  Q         Quit", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  Last result: #{state.last_result || "(none)"}", inner_width) <> "│", nil),
+      text(bottom_border, Style.new(fg: :yellow))
     ])
   end
 

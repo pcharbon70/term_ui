@@ -130,14 +130,28 @@ defmodule Gauge.App do
       ),
       text("", nil),
 
-      # Controls help
-      text("Controls:", Style.new(fg: :yellow)),
-      text("  ↑/↓     Adjust value by 5", nil),
-      text("  ←/→     Adjust value by 10", nil),
-      text("  S       Toggle bar/arc style", nil),
-      text("  Q       Quit", nil),
+      # Controls
+      render_controls(state)
+    ])
+  end
+
+  defp render_controls(state) do
+    box_width = 40
+    inner_width = box_width - 2
+
+    top_border = "┌─ Controls " <> String.duplicate("─", inner_width - 12) <> "─┐"
+    bottom_border = "└" <> String.duplicate("─", inner_width) <> "┘"
+
+    stack(:vertical, [
       text("", nil),
-      text("Current style: #{state.style_type}", nil)
+      text(top_border, Style.new(fg: :yellow)),
+      text("│" <> String.pad_trailing("  ↑/↓     Adjust value by 5", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  ←/→     Adjust value by 10", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  S       Toggle bar/arc style", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  Q       Quit", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  Current style: #{state.style_type}", inner_width) <> "│", nil),
+      text(bottom_border, Style.new(fg: :yellow))
     ])
   end
 

@@ -150,17 +150,31 @@ defmodule Table.App do
       # Data rows
       render_rows(state, columns),
 
-      # Footer info
-      text("", nil),
-      text("Row #{state.selected + 1} of #{length(state.data)}", nil),
+      # Blank line before controls
       text("", nil),
 
       # Controls
-      text("Controls:", Style.new(fg: :yellow)),
-      text("  ↑/↓         Move selection", nil),
-      text("  Page Up/Down  Scroll by 5", nil),
-      text("  Home/End    Jump to first/last", nil),
-      text("  Q           Quit", nil)
+      render_controls(state)
+    ])
+  end
+
+  defp render_controls(state) do
+    box_width = 44
+    inner_width = box_width - 2
+
+    top_border = "┌─ Controls " <> String.duplicate("─", inner_width - 12) <> "─┐"
+    bottom_border = "└" <> String.duplicate("─", inner_width) <> "┘"
+
+    stack(:vertical, [
+      text("", nil),
+      text(top_border, Style.new(fg: :yellow)),
+      text("│" <> String.pad_trailing("  ↑/↓           Move selection", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  Page Up/Down  Scroll by 5", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  Home/End      Jump to first/last", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  Q             Quit", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  Row #{state.selected + 1} of #{length(state.data)}", inner_width) <> "│", nil),
+      text(bottom_border, Style.new(fg: :yellow))
     ])
   end
 

@@ -138,13 +138,27 @@ defmodule LineChart.App do
       text("", nil),
 
       # Controls
-      text("Controls:", Style.new(fg: :yellow)),
-      text("  Space   Add new data point", nil),
-      text("  R       Reset/randomize data", nil),
-      text("  A       Toggle axis (#{if state.show_axis, do: "ON", else: "OFF"})", nil),
-      text("  Q       Quit", nil),
+      render_controls(state)
+    ])
+  end
+
+  defp render_controls(state) do
+    box_width = 48
+    inner_width = box_width - 2
+
+    top_border = "┌─ Controls " <> String.duplicate("─", inner_width - 12) <> "─┐"
+    bottom_border = "└" <> String.duplicate("─", inner_width) <> "┘"
+
+    stack(:vertical, [
       text("", nil),
-      text("Data points: #{length(state.cpu_data)}", nil)
+      text(top_border, Style.new(fg: :yellow)),
+      text("│" <> String.pad_trailing("  Space   Add new data point", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  R       Reset/randomize data", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  A       Toggle axis (#{if state.show_axis, do: "ON", else: "OFF"})", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  Q       Quit", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  Data points: #{length(state.cpu_data)}", inner_width) <> "│", nil),
+      text(bottom_border, Style.new(fg: :yellow))
     ])
   end
 

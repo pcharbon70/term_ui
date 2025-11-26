@@ -106,17 +106,31 @@ defmodule Canvas.App do
       render_canvas(state.canvas),
       text("", nil),
 
-      # Current demo
-      text("Demo: #{state.demo}", nil),
       text("", nil),
 
       # Controls
-      text("Controls:", Style.new(fg: :yellow)),
-      text("  1   Basic shapes demo", nil),
-      text("  2   Box drawing demo", nil),
-      text("  3   Braille drawing demo", nil),
-      text("  C   Clear canvas", nil),
-      text("  Q   Quit", nil)
+      render_controls(state)
+    ])
+  end
+
+  defp render_controls(state) do
+    box_width = 36
+    inner_width = box_width - 2
+
+    top_border = "┌─ Controls " <> String.duplicate("─", inner_width - 12) <> "─┐"
+    bottom_border = "└" <> String.duplicate("─", inner_width) <> "┘"
+
+    stack(:vertical, [
+      text("", nil),
+      text(top_border, Style.new(fg: :yellow)),
+      text("│" <> String.pad_trailing("  1   Basic shapes demo", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  2   Box drawing demo", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  3   Braille drawing demo", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  C   Clear canvas", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  Q   Quit", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  Demo: #{state.demo}", inner_width) <> "│", nil),
+      text(bottom_border, Style.new(fg: :yellow))
     ])
   end
 

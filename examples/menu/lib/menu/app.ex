@@ -150,16 +150,30 @@ defmodule Menu.App do
 
       # Show last action
       text("", nil),
-      text("Last action: #{state.last_action || "(none)"}", nil),
-      text("", nil),
 
       # Controls
-      text("Controls:", Style.new(fg: :yellow)),
-      text("  ↑/↓     Navigate", nil),
-      text("  →       Expand submenu", nil),
-      text("  ←       Collapse submenu", nil),
-      text("  Enter   Select / Toggle", nil),
-      text("  Q       Quit", nil)
+      render_controls(state)
+    ])
+  end
+
+  defp render_controls(state) do
+    box_width = 44
+    inner_width = box_width - 2
+
+    top_border = "┌─ Controls " <> String.duplicate("─", inner_width - 12) <> "─┐"
+    bottom_border = "└" <> String.duplicate("─", inner_width) <> "┘"
+
+    stack(:vertical, [
+      text("", nil),
+      text(top_border, Style.new(fg: :yellow)),
+      text("│" <> String.pad_trailing("  ↑/↓     Navigate", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  →       Expand submenu", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  ←       Collapse submenu", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  Enter   Select / Toggle", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  Q       Quit", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  Last action: #{state.last_action || "(none)"}", inner_width) <> "│", nil),
+      text(bottom_border, Style.new(fg: :yellow))
     ])
   end
 
