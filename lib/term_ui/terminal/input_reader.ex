@@ -183,6 +183,7 @@ defmodule TermUI.Terminal.InputReader do
   def terminate(_reason, state) do
     # Kill reader process if running (port field now holds the reader pid)
     reader_pid = state.port
+
     if is_pid(reader_pid) and Process.alive?(reader_pid) do
       Process.exit(reader_pid, :shutdown)
     end

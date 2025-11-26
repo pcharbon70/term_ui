@@ -104,22 +104,22 @@ defmodule TermUI.MixProject do
         "Developer Guides": ~r/guides\/developer\/.*/
       ],
       groups_for_modules: [
-        "Core": [
+        Core: [
           TermUI,
           TermUI.Elm,
           TermUI.Runtime,
           TermUI.Component,
           TermUI.Event
         ],
-        "Widgets": ~r/TermUI\.Widgets\..*/,
-        "Rendering": [
+        Widgets: ~r/TermUI\.Widgets\..*/,
+        Rendering: [
           TermUI.Renderer.Style,
           TermUI.Renderer.Cell,
           TermUI.Renderer.Buffer,
           TermUI.Component.RenderNode
         ],
-        "Layout": ~r/TermUI\.Layout\..*/,
-        "Terminal": ~r/TermUI\.Terminal\..*/
+        Layout: ~r/TermUI\.Layout\..*/,
+        Terminal: ~r/TermUI\.Terminal\..*/
       ]
     ]
   end

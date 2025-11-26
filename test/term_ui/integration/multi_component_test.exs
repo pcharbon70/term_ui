@@ -326,6 +326,7 @@ defmodule TermUI.Integration.MultiComponentTest do
         Runtime.send_event(runtime, Event.key(:up))
         Runtime.send_event(runtime, Event.key(:tab))
       end
+
       Runtime.sync(runtime)
 
       state = Runtime.get_state(runtime)
@@ -340,22 +341,28 @@ defmodule TermUI.Integration.MultiComponentTest do
 
       # Mix of keyboard, mouse, and resize events
       # Initial focus is child_a
-      Runtime.send_event(runtime, Event.key(:up))  # child_a: 1
+      # child_a: 1
+      Runtime.send_event(runtime, Event.key(:up))
       Runtime.sync(runtime)
 
-      Runtime.send_event(runtime, Event.mouse(:press, :left, 50, 10))  # focus child_b
+      # focus child_b
+      Runtime.send_event(runtime, Event.mouse(:press, :left, 50, 10))
       Runtime.sync(runtime)
 
-      Runtime.send_event(runtime, Event.key(:up))  # child_b: 1
+      # child_b: 1
+      Runtime.send_event(runtime, Event.key(:up))
       Runtime.sync(runtime)
 
-      Runtime.send_event(runtime, Event.resize(100, 50))  # broadcast
+      # broadcast
+      Runtime.send_event(runtime, Event.resize(100, 50))
       Runtime.sync(runtime)
 
-      Runtime.send_event(runtime, Event.key(:tab))  # focus child_a
+      # focus child_a
+      Runtime.send_event(runtime, Event.key(:tab))
       Runtime.sync(runtime)
 
-      Runtime.send_event(runtime, Event.key(:up))  # child_a: 2
+      # child_a: 2
+      Runtime.send_event(runtime, Event.key(:up))
       Runtime.sync(runtime)
 
       state = Runtime.get_state(runtime)

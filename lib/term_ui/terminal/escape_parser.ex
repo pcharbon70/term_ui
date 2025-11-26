@@ -69,7 +69,8 @@ defmodule TermUI.Terminal.EscapeParser do
 
   # Control characters (Ctrl+A through Ctrl+Z, except backspace/tab/enter)
   defp parse_bytes(<<char, rest::binary>>, events) when char in 1..26 do
-    key = <<char + 96>>  # Convert to lowercase letter
+    # Convert to lowercase letter
+    key = <<char + 96>>
     event = Event.key(key, modifiers: [:ctrl])
     parse_bytes(rest, [event | events])
   end
@@ -196,12 +197,13 @@ defmodule TermUI.Terminal.EscapeParser do
   # Modified arrow keys with modifiers: ESC [ 1 ; modifier A/B/C/D
   defp parse_csi_sequence(<<"1;", modifier, dir, rest::binary>>)
        when dir in [?A, ?B, ?C, ?D] do
-    key = case dir do
-      ?A -> :up
-      ?B -> :down
-      ?C -> :right
-      ?D -> :left
-    end
+    key =
+      case dir do
+        ?A -> :up
+        ?B -> :down
+        ?C -> :right
+        ?D -> :left
+      end
 
     modifiers = decode_modifier(modifier - ?0)
     event = Event.key(key, modifiers: modifiers)
@@ -374,7 +376,8 @@ defmodule TermUI.Terminal.EscapeParser do
   # Decode modifier byte (2=shift, 3=alt, 4=shift+alt, 5=ctrl, etc.)
   # Returns a list of modifiers like [:shift, :alt, :ctrl]
   defp decode_modifier(n) do
-    n = n - 1  # Modifier is 1-based
+    # Modifier is 1-based
+    n = n - 1
     modifiers = []
     modifiers = if (n &&& 1) != 0, do: [:shift | modifiers], else: modifiers
     modifiers = if (n &&& 2) != 0, do: [:alt | modifiers], else: modifiers

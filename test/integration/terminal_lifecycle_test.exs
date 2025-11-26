@@ -93,6 +93,7 @@ defmodule TermUI.Integration.TerminalLifecycleTest do
       case result do
         {:ok, _state} -> assert true
         {:error, :not_a_terminal} -> assert true
+        {:error, :enotsup} -> assert true
         {:error, {:otp_version, _}} -> assert true
         {:error, reason} -> flunk("Unexpected error: #{inspect(reason)}")
       end

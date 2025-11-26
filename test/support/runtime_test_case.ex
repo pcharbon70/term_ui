@@ -31,9 +31,9 @@ defmodule TermUI.RuntimeTestCase do
     quote do
       use ExUnit.Case, async: false
 
-      alias TermUI.Runtime
-      alias TermUI.Event
       alias TermUI.Command
+      alias TermUI.Event
+      alias TermUI.Runtime
 
       @doc """
       Starts a runtime with the given component and automatic cleanup.

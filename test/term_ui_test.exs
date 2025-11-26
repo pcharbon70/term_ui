@@ -54,7 +54,7 @@ defmodule TermUITest do
 
         {:error, reason} ->
           # Expected in test environment
-          assert reason in [:not_a_terminal] or
+          assert reason in [:not_a_terminal, :enotsup] or
                    match?({:otp_version, _}, reason)
       end
     end

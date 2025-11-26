@@ -1,5 +1,6 @@
 defmodule TermUI.PerformanceTest do
-  use ExUnit.Case, async: true
+  # async: false because tests use shared ETS tables
+  use ExUnit.Case, async: false
 
   alias TermUI.Layout.Cache
   alias TermUI.Layout.Constraint

@@ -539,13 +539,14 @@ defmodule TermUI.Runtime do
   defp execute_commands(commands, state) do
     # Check for quit command first
     # Handle both Command struct and legacy atom :quit
-    quit_cmd = Enum.find(commands, fn {_component_id, cmd} ->
-      case cmd do
-        %{type: :quit} -> true
-        :quit -> true
-        _ -> false
-      end
-    end)
+    quit_cmd =
+      Enum.find(commands, fn {_component_id, cmd} ->
+        case cmd do
+          %{type: :quit} -> true
+          :quit -> true
+          _ -> false
+        end
+      end)
 
     if quit_cmd do
       # Quit command takes precedence - initiate shutdown
@@ -601,9 +602,7 @@ defmodule TermUI.Runtime do
 
   defp do_render(state) do
     # Skip rendering if terminal not available
-    if not state.terminal_started do
-      %{state | dirty: false}
-    else
+    if state.terminal_started do
       # Call view on root component with error handling
       %{module: module, state: component_state} = Map.get(state.components, :root)
 
@@ -637,6 +636,8 @@ defmodule TermUI.Runtime do
       # Swap buffers
       BufferManager.swap_buffers(state.buffer_manager)
 
+      %{state | dirty: false}
+    else
       %{state | dirty: false}
     end
   end
@@ -683,9 +684,7 @@ defmodule TermUI.Runtime do
 
   defp handle_resize(rows, cols, state) do
     # Skip if terminal not available
-    if not state.terminal_started do
-      state
-    else
+    if state.terminal_started do
       # Update dimensions in state
       new_dimensions = {cols, rows}
 
@@ -704,6 +703,8 @@ defmodule TermUI.Runtime do
       # Mark dirty and force immediate render
       state = %{state | dirty: true}
       do_render(state)
+    else
+      state
     end
   end
 

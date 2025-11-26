@@ -420,7 +420,8 @@ defmodule TermUI.Terminal do
               {:ok, original_settings}
 
             {:error, reason} ->
-              {:error, {:otp_version, "OTP 28+ required and stty fallback failed: #{inspect(reason)}"}}
+              {:error,
+               {:otp_version, "OTP 28+ required and stty fallback failed: #{inspect(reason)}"}}
           end
 
         e ->
@@ -612,13 +613,10 @@ defmodule TermUI.Terminal do
     cond do
       # Method 1: Check :io.getopts for terminal key
       io_has_terminal?() -> true
-
       # Method 2: Check if /dev/tty exists and is accessible (Unix/Linux/macOS)
       File.exists?("/dev/tty") -> true
-
       # Method 3: Check if stdout is a tty using test command
       check_tty() -> true
-
       # No terminal detected
       true -> false
     end

@@ -1,8 +1,8 @@
 defmodule TermUI.Runtime.ShutdownTest do
   use ExUnit.Case, async: false
 
-  alias TermUI.Runtime
   alias TermUI.Command
+  alias TermUI.Runtime
 
   # Simple test component that can return quit command
   defmodule QuitComponent do

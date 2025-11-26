@@ -121,23 +121,27 @@ defmodule TermUI.Integration.PropertyTest do
   # Event Generators
 
   defp key_event do
-    gen all key <- one_of([constant(:up), constant(:down), constant(:left), constant(:right)]) do
+    gen all(key <- one_of([constant(:up), constant(:down), constant(:left), constant(:right)])) do
       Event.key(key)
     end
   end
 
   defp mouse_event do
-    gen all x <- integer(0..79),
-            y <- integer(0..23),
-            action <- one_of([constant(:press), constant(:release)]),
-            button <- one_of([constant(:left), constant(:right)]) do
+    gen all(
+          x <- integer(0..79),
+          y <- integer(0..23),
+          action <- one_of([constant(:press), constant(:release)]),
+          button <- one_of([constant(:left), constant(:right)])
+        ) do
       Event.mouse(action, button, x, y)
     end
   end
 
   defp resize_event do
-    gen all width <- integer(40..200),
-            height <- integer(20..60) do
+    gen all(
+          width <- integer(40..200),
+          height <- integer(20..60)
+        ) do
       Event.resize(width, height)
     end
   end
@@ -154,7 +158,7 @@ defmodule TermUI.Integration.PropertyTest do
 
   describe "runtime stability properties" do
     property "runtime survives any event sequence" do
-      check all events <- event_sequence(30) do
+      check all(events <- event_sequence(30)) do
         runtime = start_test_runtime(PropertyCounter)
 
         # Send all events
@@ -175,7 +179,7 @@ defmodule TermUI.Integration.PropertyTest do
     end
 
     property "all events are processed" do
-      check all events <- event_sequence(20) do
+      check all(events <- event_sequence(20)) do
         runtime = start_test_runtime(PropertyCounter)
 
         # Send events
@@ -204,7 +208,7 @@ defmodule TermUI.Integration.PropertyTest do
 
   describe "state consistency properties" do
     property "counter reflects up/down balance" do
-      check all events <- event_sequence(20) do
+      check all(events <- event_sequence(20)) do
         runtime = start_test_runtime(PropertyCounter)
 
         for event <- events do
@@ -225,7 +229,7 @@ defmodule TermUI.Integration.PropertyTest do
     end
 
     property "state fields remain valid types" do
-      check all events <- event_sequence(30) do
+      check all(events <- event_sequence(30)) do
         runtime = start_test_runtime(PropertyCounter)
 
         for event <- events do
@@ -246,7 +250,7 @@ defmodule TermUI.Integration.PropertyTest do
 
   describe "multi-component focus properties" do
     property "focus is always valid" do
-      check all events <- event_sequence(20) do
+      check all(events <- event_sequence(20)) do
         runtime = start_test_runtime(PropertyMultiRoot)
 
         for event <- events do
@@ -263,7 +267,7 @@ defmodule TermUI.Integration.PropertyTest do
     end
 
     property "component counts are non-negative" do
-      check all events <- event_sequence(25) do
+      check all(events <- event_sequence(25)) do
         runtime = start_test_runtime(PropertyMultiRoot)
 
         for event <- events do
@@ -281,7 +285,7 @@ defmodule TermUI.Integration.PropertyTest do
     end
 
     property "total increments match up key presses" do
-      check all events <- event_sequence(20) do
+      check all(events <- event_sequence(20)) do
         runtime = start_test_runtime(PropertyMultiRoot)
 
         for event <- events do
@@ -304,7 +308,7 @@ defmodule TermUI.Integration.PropertyTest do
 
   describe "cleanup properties" do
     property "runtime shuts down cleanly after any event sequence" do
-      check all events <- event_sequence(15) do
+      check all(events <- event_sequence(15)) do
         {:ok, runtime} = Runtime.start_link(root: PropertyCounter, skip_terminal: true)
         ref = Process.monitor(runtime)
 

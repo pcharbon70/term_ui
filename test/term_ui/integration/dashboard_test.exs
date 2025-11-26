@@ -236,6 +236,7 @@ defmodule TermUI.Integration.DashboardTest do
       for _ <- 1..10 do
         Runtime.send_event(runtime, Event.key("t"))
       end
+
       Runtime.sync(runtime)
 
       state = Runtime.get_state(runtime)
@@ -264,6 +265,7 @@ defmodule TermUI.Integration.DashboardTest do
       for _ <- 1..50 do
         Runtime.send_event(runtime, Event.key(:down))
       end
+
       Runtime.sync(runtime)
 
       state = Runtime.get_state(runtime)

@@ -34,6 +34,11 @@ defmodule TermUI.Renderer.IntegrationTest do
             new_buffer = SequenceBuffer.append!(buffer, text)
             new_optimizer = CursorOptimizer.advance(optimizer, String.length(text))
             {new_buffer, new_optimizer}
+
+          :reset ->
+            # Reset style - append SGR reset sequence
+            new_buffer = SequenceBuffer.append!(buffer, "\e[0m")
+            {new_buffer, optimizer}
         end
       end)
 

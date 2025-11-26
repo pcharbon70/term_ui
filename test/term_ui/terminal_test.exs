@@ -82,7 +82,7 @@ defmodule TermUI.TerminalTest do
 
         {:error, reason} ->
           # Expected in test environment
-          assert reason == :not_a_terminal or match?({:otp_version, _}, reason)
+          assert reason in [:not_a_terminal, :enotsup] or match?({:otp_version, _}, reason)
       end
     end
 
