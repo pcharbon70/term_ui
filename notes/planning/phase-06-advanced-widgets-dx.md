@@ -472,6 +472,271 @@ We test the testing framework itself, ensuring test utilities work correctly.
 
 ---
 
+## 6.9 Advanced Input Widgets
+
+- [ ] **Section 6.9 Complete**
+
+Advanced input widgets provide structured data collection and power-user command interfaces. FormBuilder handles complex forms with validation. CommandPalette provides VS Code-style command discovery and execution.
+
+### 6.9.1 FormBuilder Widget
+
+- [ ] **Task 6.9.1 Complete**
+
+FormBuilder renders structured forms with multiple field types, validation, and navigation. It handles complex data entry scenarios with conditional fields and grouping.
+
+- [ ] 6.9.1.1 Define field types: text, password, checkbox, radio, select, multi-select
+- [ ] 6.9.1.2 Implement field rendering with labels and error display
+- [ ] 6.9.1.3 Implement Tab navigation between fields
+- [ ] 6.9.1.4 Implement validation with error messages
+- [ ] 6.9.1.5 Implement conditional fields (show/hide based on values)
+- [ ] 6.9.1.6 Implement field grouping with collapsible sections
+- [ ] 6.9.1.7 Implement `on_submit` and `on_change` callbacks
+
+### 6.9.2 CommandPalette Widget
+
+- [ ] **Task 6.9.2 Complete**
+
+CommandPalette provides VS Code-style command interface with fuzzy search. It enables power users to quickly discover and execute commands without memorizing shortcuts.
+
+- [ ] 6.9.2.1 Implement modal overlay with search input
+- [ ] 6.9.2.2 Implement fuzzy search with scoring algorithm
+- [ ] 6.9.2.3 Implement command categories with prefixes (>, @, #, :)
+- [ ] 6.9.2.4 Implement recent commands tracking
+- [ ] 6.9.2.5 Implement keyboard shortcut hints display
+- [ ] 6.9.2.6 Implement nested command menus
+- [ ] 6.9.2.7 Implement async command loading for dynamic sources
+
+### Unit Tests - Section 6.9
+
+- [ ] **Unit Tests 6.9 Complete**
+- [ ] Test form renders all field types correctly
+- [ ] Test Tab navigation moves between fields
+- [ ] Test validation displays error messages
+- [ ] Test command palette fuzzy search ranks results
+- [ ] Test command execution triggers callbacks
+
+---
+
+## 6.10 Layout Widgets
+
+- [ ] **Section 6.10 Complete**
+
+Layout widgets provide advanced content organization. TreeView displays hierarchical data with expand/collapse. SplitPane enables resizable multi-pane layouts for IDE-style interfaces.
+
+### 6.10.1 TreeView Widget
+
+- [ ] **Task 6.10.1 Complete**
+
+TreeView renders hierarchical data with expand/collapse functionality. It supports lazy loading for large trees and provides rich navigation and selection.
+
+- [ ] 6.10.1.1 Define tree node structure with children and metadata
+- [ ] 6.10.1.2 Implement tree rendering with indentation
+- [ ] 6.10.1.3 Implement expand/collapse with persistence
+- [ ] 6.10.1.4 Implement lazy loading of children (on_expand callback)
+- [ ] 6.10.1.5 Implement keyboard navigation (arrows, Enter to toggle)
+- [ ] 6.10.1.6 Implement multi-select with Shift/Ctrl modifiers
+- [ ] 6.10.1.7 Implement search/filter with path highlighting
+- [ ] 6.10.1.8 Implement custom node icons
+
+### 6.10.2 SplitPane Widget
+
+- [ ] **Task 6.10.2 Complete**
+
+SplitPane divides space between two or more panes with draggable dividers. It enables complex layouts like IDE editors with sidebars and bottom panels.
+
+- [ ] 6.10.2.1 Implement horizontal split with two panes
+- [ ] 6.10.2.2 Implement vertical split with two panes
+- [ ] 6.10.2.3 Implement draggable divider (keyboard and mouse)
+- [ ] 6.10.2.4 Implement min/max size constraints per pane
+- [ ] 6.10.2.5 Implement collapse to zero (hide pane)
+- [ ] 6.10.2.6 Implement nested splits for complex layouts
+- [ ] 6.10.2.7 Implement layout state persistence
+
+### Unit Tests - Section 6.10
+
+- [ ] **Unit Tests 6.10 Complete**
+- [ ] Test tree renders nodes with correct indentation
+- [ ] Test expand/collapse updates visible nodes
+- [ ] Test lazy loading fetches children on expand
+- [ ] Test split pane divider drag updates sizes
+- [ ] Test min/max constraints are enforced
+
+---
+
+## 6.11 Data Streaming Widgets
+
+- [ ] **Section 6.11 Complete**
+
+Data streaming widgets handle real-time data display efficiently. LogViewer displays logs with virtual scrolling for millions of lines. StreamWidget integrates with GenStage for backpressure-aware data streaming.
+
+### 6.11.1 LogViewer Widget
+
+- [ ] **Task 6.11.1 Complete**
+
+LogViewer displays real-time logs with virtual scrolling, search, and filtering. It handles millions of lines efficiently and provides tail mode for live log monitoring.
+
+- [ ] 6.11.1.1 Implement virtual scrolling for millions of lines
+- [ ] 6.11.1.2 Implement tail mode (auto-scroll to bottom)
+- [ ] 6.11.1.3 Implement search with regex support and highlighting
+- [ ] 6.11.1.4 Implement syntax highlighting (log levels, timestamps)
+- [ ] 6.11.1.5 Implement filter by level/source/pattern
+- [ ] 6.11.1.6 Implement line bookmarking
+- [ ] 6.11.1.7 Implement selection and copy to clipboard
+- [ ] 6.11.1.8 Implement wrap/truncate toggle for long lines
+
+### 6.11.2 StreamWidget
+
+- [ ] **Task 6.11.2 Complete**
+
+StreamWidget integrates with GenStage for backpressure-aware data streaming. It manages demand-based data flow and provides controls for stream management.
+
+- [ ] 6.11.2.1 Implement GenStage consumer for data source
+- [ ] 6.11.2.2 Implement backpressure handling (demand-based)
+- [ ] 6.11.2.3 Implement buffer management with overflow strategies
+- [ ] 6.11.2.4 Implement pause/resume stream control
+- [ ] 6.11.2.5 Implement rate limiting for rendering
+- [ ] 6.11.2.6 Implement stream statistics display (items/sec)
+
+### Unit Tests - Section 6.11
+
+- [ ] **Unit Tests 6.11 Complete**
+- [ ] Test log viewer renders visible lines only
+- [ ] Test tail mode scrolls on new content
+- [ ] Test search highlights matching lines
+- [ ] Test stream widget handles backpressure
+- [ ] Test pause/resume controls stream flow
+
+---
+
+## 6.12 BEAM Introspection Widgets
+
+- [ ] **Section 6.12 Complete**
+
+BEAM introspection widgets leverage Erlang's runtime introspection for live system visualization. These widgets differentiate TermUI by providing tools unique to the BEAM ecosystem—process monitoring, supervision tree visualization, ETS inspection, and cluster management.
+
+### 6.12.1 ProcessMonitor Widget
+
+- [ ] **Task 6.12.1 Complete**
+
+ProcessMonitor displays live process information including reductions, memory, and message queues. It provides controls for process management and debugging.
+
+- [ ] 6.12.1.1 Implement process list with PID, name, reductions, memory
+- [ ] 6.12.1.2 Implement live stats updates (configurable interval)
+- [ ] 6.12.1.3 Implement message queue depth display and warnings
+- [ ] 6.12.1.4 Implement process links/monitors visualization
+- [ ] 6.12.1.5 Implement stack trace display on selection
+- [ ] 6.12.1.6 Implement process actions (kill, suspend, resume)
+- [ ] 6.12.1.7 Implement sorting by reductions/memory/queue
+- [ ] 6.12.1.8 Implement process filtering by name/module
+
+### 6.12.2 SupervisionTreeViewer Widget
+
+- [ ] **Task 6.12.2 Complete**
+
+SupervisionTreeViewer displays the supervision hierarchy with live status indicators. It shows restart counts and provides controls for supervisor management.
+
+- [ ] 6.12.2.1 Implement tree view of supervision hierarchy
+- [ ] 6.12.2.2 Implement live status indicators (running, restarting, terminated)
+- [ ] 6.12.2.3 Implement restart count and history display
+- [ ] 6.12.2.4 Implement supervisor strategy display
+- [ ] 6.12.2.5 Implement click to inspect child process state
+- [ ] 6.12.2.6 Implement restart/terminate controls with confirmation
+- [ ] 6.12.2.7 Implement auto-refresh on supervision tree changes
+
+### 6.12.3 ETSBrowser Widget
+
+- [ ] **Task 6.12.3 Complete**
+
+ETSBrowser provides inspection and manipulation of ETS/DETS tables. It displays table metadata, supports queries with match specs, and enables record editing.
+
+- [ ] 6.12.3.1 Implement ETS/DETS table listing with metadata
+- [ ] 6.12.3.2 Implement table schema detection
+- [ ] 6.12.3.3 Implement record browser with pagination
+- [ ] 6.12.3.4 Implement query interface with match specs
+- [ ] 6.12.3.5 Implement record editing (insert, update, delete)
+- [ ] 6.12.3.6 Implement memory usage and size statistics
+- [ ] 6.12.3.7 Implement table creation wizard
+
+### 6.12.4 ClusterDashboard Widget
+
+- [ ] **Task 6.12.4 Complete**
+
+ClusterDashboard visualizes distributed Erlang clusters with node status, health metrics, and cross-node process information.
+
+- [ ] 6.12.4.1 Implement connected nodes list with status
+- [ ] 6.12.4.2 Implement node health metrics (CPU, memory, load)
+- [ ] 6.12.4.3 Implement cross-node process registry display
+- [ ] 6.12.4.4 Implement pg group membership visualization
+- [ ] 6.12.4.5 Implement network partition detection and alerts
+- [ ] 6.12.4.6 Implement node connection/disconnection events
+- [ ] 6.12.4.7 Implement RPC interface for remote inspection
+
+### Unit Tests - Section 6.12
+
+- [ ] **Unit Tests 6.12 Complete**
+- [ ] Test process monitor displays correct process info
+- [ ] Test supervision tree reflects actual hierarchy
+- [ ] Test ETS browser lists tables correctly
+- [ ] Test cluster dashboard shows connected nodes
+- [ ] Test live updates reflect system changes
+
+---
+
+## 6.13 Architectural Patterns
+
+- [ ] **Section 6.13 Complete**
+
+Architectural patterns provide reusable infrastructure for advanced widgets. VirtualScrolling enables efficient handling of large datasets. AsyncDataSource manages background data fetching. LiveBinding connects widgets to PubSub for real-time updates.
+
+### 6.13.1 VirtualScrolling Engine
+
+- [ ] **Task 6.13.1 Complete**
+
+VirtualScrolling provides a shared implementation for efficient rendering of large datasets. It calculates visible ranges and handles smooth scrolling.
+
+- [ ] 6.13.1.1 Implement visible range calculation from offset and viewport
+- [ ] 6.13.1.2 Implement buffer zone for smooth scrolling
+- [ ] 6.13.1.3 Implement variable height item support
+- [ ] 6.13.1.4 Implement scroll position preservation on data change
+- [ ] 6.13.1.5 Implement momentum scrolling for mouse wheel
+- [ ] 6.13.1.6 Implement scroll-to-item API
+
+### 6.13.2 AsyncDataSource
+
+- [ ] **Task 6.13.2 Complete**
+
+AsyncDataSource provides background data fetching leveraging BEAM concurrency. It manages loading states, errors, and caching.
+
+- [ ] 6.13.2.1 Implement async fetch with Task supervision
+- [ ] 6.13.2.2 Implement loading state management
+- [ ] 6.13.2.3 Implement error handling with retry logic
+- [ ] 6.13.2.4 Implement cancelation on unmount
+- [ ] 6.13.2.5 Implement caching layer with TTL
+- [ ] 6.13.2.6 Implement pagination support
+
+### 6.13.3 LiveBinding
+
+- [ ] **Task 6.13.3 Complete**
+
+LiveBinding connects widgets to Phoenix PubSub for automatic real-time updates. It manages subscriptions and batches rapid updates.
+
+- [ ] 6.13.3.1 Implement PubSub subscription on mount
+- [ ] 6.13.3.2 Implement automatic state update on message
+- [ ] 6.13.3.3 Implement transform function for incoming data
+- [ ] 6.13.3.4 Implement batching for rapid updates
+- [ ] 6.13.3.5 Implement unsubscribe on unmount
+- [ ] 6.13.3.6 Implement reconnection handling
+
+### Unit Tests - Section 6.13
+
+- [ ] **Unit Tests 6.13 Complete**
+- [ ] Test virtual scrolling calculates visible range correctly
+- [ ] Test async data source handles loading/error states
+- [ ] Test live binding updates state on PubSub messages
+- [ ] Test batching coalesces rapid updates
+
+---
+
 ## Success Criteria
 
 1. **Advanced Widgets**: Table, Tabs, Menu, Dialog, Chart, Viewport, Canvas fully functional
@@ -480,6 +745,10 @@ We test the testing framework itself, ensuring test utilities work correctly.
 4. **Testing Framework**: Complete testing utilities for component testing
 5. **Documentation**: All widgets documented with examples
 6. **Test Coverage**: 85% test coverage with comprehensive unit and integration tests
+7. **Advanced Input Widgets**: FormBuilder and CommandPalette fully functional
+8. **Layout Widgets**: TreeView and SplitPane fully functional
+9. **Data Streaming**: LogViewer handles 1M+ lines, StreamWidget handles backpressure
+10. **BEAM Introspection**: ProcessMonitor, SupervisionTreeViewer, ETSBrowser, ClusterDashboard provide live system insights
 
 ## Provides Foundation
 
@@ -488,6 +757,7 @@ This phase completes the framework, providing:
 - Developer tools for productive development
 - Testing utilities for maintainable applications
 - Production-ready framework for terminal UIs
+- BEAM-specific introspection tools unique to the Elixir ecosystem
 
 ## Key Outputs
 
@@ -501,3 +771,8 @@ This phase completes the framework, providing:
 - Testing framework with test renderer, simulation, assertions
 - Comprehensive test suite covering all advanced features
 - API documentation for all widgets and tools
+- Advanced input widgets (FormBuilder, CommandPalette)
+- Layout widgets (TreeView, SplitPane)
+- Data streaming widgets (LogViewer, StreamWidget)
+- BEAM introspection widgets (ProcessMonitor, SupervisionTreeViewer, ETSBrowser, ClusterDashboard)
+- Architectural patterns (VirtualScrolling, AsyncDataSource, LiveBinding)
