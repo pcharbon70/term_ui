@@ -480,17 +480,17 @@ Advanced input widgets provide structured data collection and power-user command
 
 ### 6.9.1 FormBuilder Widget
 
-- [ ] **Task 6.9.1 Complete**
+- [x] **Task 6.9.1 Complete**
 
 FormBuilder renders structured forms with multiple field types, validation, and navigation. It handles complex data entry scenarios with conditional fields and grouping.
 
-- [ ] 6.9.1.1 Define field types: text, password, checkbox, radio, select, multi-select
-- [ ] 6.9.1.2 Implement field rendering with labels and error display
-- [ ] 6.9.1.3 Implement Tab navigation between fields
-- [ ] 6.9.1.4 Implement validation with error messages
-- [ ] 6.9.1.5 Implement conditional fields (show/hide based on values)
-- [ ] 6.9.1.6 Implement field grouping with collapsible sections
-- [ ] 6.9.1.7 Implement `on_submit` and `on_change` callbacks
+- [x] 6.9.1.1 Define field types: text, password, checkbox, radio, select, multi-select
+- [x] 6.9.1.2 Implement field rendering with labels and error display
+- [x] 6.9.1.3 Implement Tab navigation between fields
+- [x] 6.9.1.4 Implement validation with error messages
+- [x] 6.9.1.5 Implement conditional fields (show/hide based on values)
+- [x] 6.9.1.6 Implement field grouping with collapsible sections
+- [x] 6.9.1.7 Implement `on_submit` and `on_change` callbacks
 
 ### 6.9.2 CommandPalette Widget
 
@@ -509,9 +509,9 @@ CommandPalette provides VS Code-style command interface with fuzzy search. It en
 ### Unit Tests - Section 6.9
 
 - [ ] **Unit Tests 6.9 Complete**
-- [ ] Test form renders all field types correctly
-- [ ] Test Tab navigation moves between fields
-- [ ] Test validation displays error messages
+- [x] Test form renders all field types correctly
+- [x] Test Tab navigation moves between fields
+- [x] Test validation displays error messages
 - [ ] Test command palette fuzzy search ranks results
 - [ ] Test command execution triggers callbacks
 
