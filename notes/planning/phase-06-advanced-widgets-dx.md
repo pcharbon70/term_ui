@@ -93,15 +93,15 @@ Navigation widgets provide patterns for organizing content and actions. Tabs dis
 
 ### 6.2.1 Tabs Widget
 
-- [ ] **Task 6.2.1 Complete**
+- [x] **Task 6.2.1 Complete**
 
 Tabs organize content into switchable panels. A tab bar displays tab labels; clicking a tab shows its content panel. Tabs support dynamic addition/removal, disabled tabs, and closeable tabs.
 
-- [ ] 6.2.1.1 Implement tab bar rendering with tab labels
-- [ ] 6.2.1.2 Implement content panel switching on tab selection
-- [ ] 6.2.1.3 Implement keyboard navigation: Left/Right for tabs, Enter to select
-- [ ] 6.2.1.4 Implement disabled and closeable tab variants
-- [ ] 6.2.1.5 Implement `on_change` callback for tab switches
+- [x] 6.2.1.1 Implement tab bar rendering with tab labels
+- [x] 6.2.1.2 Implement content panel switching on tab selection
+- [x] 6.2.1.3 Implement keyboard navigation: Left/Right for tabs, Enter to select
+- [x] 6.2.1.4 Implement disabled and closeable tab variants
+- [x] 6.2.1.5 Implement `on_change` callback for tab switches
 
 ### 6.2.2 Menu Widget
 
@@ -129,9 +129,9 @@ Context menu appears at cursor position on right-click or shortcut key. It uses 
 ### Unit Tests - Section 6.2
 
 - [ ] **Unit Tests 6.2 Complete**
-- [ ] Test tabs render tab bar with labels
-- [ ] Test tab selection shows correct content panel
-- [ ] Test keyboard navigation moves between tabs
+- [x] Test tabs render tab bar with labels
+- [x] Test tab selection shows correct content panel
+- [x] Test keyboard navigation moves between tabs
 - [ ] Test menu renders items with correct hierarchy
 - [ ] Test menu selection triggers action
 - [ ] Test context menu appears at click position
