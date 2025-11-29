@@ -87,7 +87,7 @@ Sorting reorders rows by column values. Clicking column header toggles sort dire
 
 ## 6.2 Navigation Widgets
 
-- [ ] **Section 6.2 Complete**
+- [x] **Section 6.2 Complete**
 
 Navigation widgets provide patterns for organizing content and actions. Tabs display multiple panels with tab bar for switching. Menu displays hierarchical actions with keyboard navigation. These widgets are essential for any non-trivial application.
 
@@ -117,25 +117,25 @@ Menu displays a hierarchical list of actions. Items can be selectable actions, s
 
 ### 6.2.3 Context Menu
 
-- [ ] **Task 6.2.3 Complete**
+- [x] **Task 6.2.3 Complete**
 
 Context menu appears at cursor position on right-click or shortcut key. It uses the Menu widget rendered as a floating overlay. Context menu closes on selection, Escape, or click outside.
 
-- [ ] 6.2.3.1 Implement context menu trigger on right-click or shortcut
-- [ ] 6.2.3.2 Implement floating overlay positioning at click location
-- [ ] 6.2.3.3 Implement close on selection, Escape, or outside click
-- [ ] 6.2.3.4 Implement z-order ensuring context menu above other content
+- [x] 6.2.3.1 Implement context menu trigger on right-click or shortcut
+- [x] 6.2.3.2 Implement floating overlay positioning at click location
+- [x] 6.2.3.3 Implement close on selection, Escape, or outside click
+- [x] 6.2.3.4 Implement z-order ensuring context menu above other content
 
 ### Unit Tests - Section 6.2
 
-- [ ] **Unit Tests 6.2 Complete**
+- [x] **Unit Tests 6.2 Complete**
 - [x] Test tabs render tab bar with labels
 - [x] Test tab selection shows correct content panel
 - [x] Test keyboard navigation moves between tabs
 - [x] Test menu renders items with correct hierarchy
 - [x] Test menu selection triggers action
-- [ ] Test context menu appears at click position
-- [ ] Test context menu closes on selection
+- [x] Test context menu appears at click position
+- [x] Test context menu closes on selection
 
 ---
 
