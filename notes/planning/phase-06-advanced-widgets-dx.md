@@ -105,15 +105,15 @@ Tabs organize content into switchable panels. A tab bar displays tab labels; cli
 
 ### 6.2.2 Menu Widget
 
-- [ ] **Task 6.2.2 Complete**
+- [x] **Task 6.2.2 Complete**
 
 Menu displays a hierarchical list of actions. Items can be selectable actions, submenus, separators, or checkboxes. Menu supports keyboard navigation, mnemonics, and shortcuts display.
 
-- [ ] 6.2.2.1 Implement menu item types: action, submenu, separator, checkbox
-- [ ] 6.2.2.2 Implement menu rendering with indentation for hierarchy
-- [ ] 6.2.2.3 Implement keyboard navigation: arrows to move, Enter to select
-- [ ] 6.2.2.4 Implement submenu expansion showing nested items
-- [ ] 6.2.2.5 Implement shortcut display aligned right
+- [x] 6.2.2.1 Implement menu item types: action, submenu, separator, checkbox
+- [x] 6.2.2.2 Implement menu rendering with indentation for hierarchy
+- [x] 6.2.2.3 Implement keyboard navigation: arrows to move, Enter to select
+- [x] 6.2.2.4 Implement submenu expansion showing nested items
+- [x] 6.2.2.5 Implement shortcut display aligned right
 
 ### 6.2.3 Context Menu
 
@@ -132,8 +132,8 @@ Context menu appears at cursor position on right-click or shortcut key. It uses 
 - [x] Test tabs render tab bar with labels
 - [x] Test tab selection shows correct content panel
 - [x] Test keyboard navigation moves between tabs
-- [ ] Test menu renders items with correct hierarchy
-- [ ] Test menu selection triggers action
+- [x] Test menu renders items with correct hierarchy
+- [x] Test menu selection triggers action
 - [ ] Test context menu appears at click position
 - [ ] Test context menu closes on selection
 
