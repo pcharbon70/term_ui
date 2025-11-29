@@ -147,16 +147,16 @@ Overlay widgets display content above the normal component tree—modals, dialog
 
 ### 6.3.1 Dialog Widget
 
-- [ ] **Task 6.3.1 Complete**
+- [x] **Task 6.3.1 Complete**
 
 Dialog is a modal overlay for user interaction—confirmations, forms, messages. It appears centered over the application with a backdrop. Dialog traps focus and handles Escape for cancellation.
 
-- [ ] 6.3.1.1 Implement dialog container with title bar and content area
-- [ ] 6.3.1.2 Implement centering within terminal window
-- [ ] 6.3.1.3 Implement backdrop rendering behind dialog
-- [ ] 6.3.1.4 Implement focus trapping preventing Tab escape
-- [ ] 6.3.1.5 Implement Escape handling for dialog close
-- [ ] 6.3.1.6 Implement `on_close` and `on_confirm` callbacks
+- [x] 6.3.1.1 Implement dialog container with title bar and content area
+- [x] 6.3.1.2 Implement centering within terminal window
+- [x] 6.3.1.3 Implement backdrop rendering behind dialog
+- [x] 6.3.1.4 Implement focus trapping preventing Tab escape
+- [x] 6.3.1.5 Implement Escape handling for dialog close
+- [x] 6.3.1.6 Implement `on_close` and `on_confirm` callbacks
 
 ### 6.3.2 Alert Dialog
 
@@ -183,9 +183,9 @@ Toast notifications display brief messages that auto-dismiss. They appear at scr
 ### Unit Tests - Section 6.3
 
 - [ ] **Unit Tests 6.3 Complete**
-- [ ] Test dialog renders centered with backdrop
-- [ ] Test dialog traps focus within content
-- [ ] Test Escape closes dialog
+- [x] Test dialog renders centered with backdrop
+- [x] Test dialog traps focus within content
+- [x] Test Escape closes dialog
 - [ ] Test alert shows correct buttons for type
 - [ ] Test toast appears at correct position
 - [ ] Test toast auto-dismisses after duration
