@@ -20,6 +20,7 @@ defmodule TermUI.Widgets.Sparkline do
   """
 
   import TermUI.Component.RenderNode
+  alias TermUI.Widgets.VisualizationHelper, as: VizHelper
 
   # Unicode block elements for sparkline (bottom to top)
   @bars ["▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"]
@@ -38,18 +39,23 @@ defmodule TermUI.Widgets.Sparkline do
   """
   @spec render(keyword()) :: TermUI.Component.RenderNode.t()
   def render(opts) do
-    values = Keyword.fetch!(opts, :values)
+    values = Keyword.get(opts, :values, [])
 
-    if Enum.empty?(values) do
-      empty()
-    else
-      do_render(values, opts)
+    case VizHelper.validate_number_list(values) do
+      :ok when values == [] ->
+        empty()
+
+      :ok ->
+        do_render(values, opts)
+
+      {:error, _msg} ->
+        # Return empty for invalid data
+        empty()
     end
   end
 
   defp do_render(values, opts) do
-    min = Keyword.get(opts, :min, Enum.min(values))
-    max = Keyword.get(opts, :max, Enum.max(values))
+    {min, max} = VizHelper.calculate_range(values, opts)
     style = Keyword.get(opts, :style)
     color_ranges = Keyword.get(opts, :color_ranges, [])
 
@@ -66,7 +72,7 @@ defmodule TermUI.Widgets.Sparkline do
         render_colored(chars, color_ranges)
       end
 
-    apply_style(result, style)
+    VizHelper.maybe_style(result, style)
   end
 
   defp render_simple(chars) do
@@ -85,14 +91,10 @@ defmodule TermUI.Widgets.Sparkline do
   end
 
   defp style_char_with_color(char, value, color_ranges) do
-    case find_color_for_value(value, color_ranges) do
-      nil -> text(char)
-      color -> styled(text(char), color)
-    end
+    color = VizHelper.find_zone(value, color_ranges)
+    node = text(char)
+    VizHelper.maybe_style(node, color)
   end
-
-  defp apply_style(result, nil), do: result
-  defp apply_style(result, style), do: styled(result, style)
 
   @doc """
   Converts a single value to its sparkline bar character.
@@ -109,18 +111,22 @@ defmodule TermUI.Widgets.Sparkline do
       "▁"
   """
   @spec value_to_bar(number(), number(), number()) :: String.t()
-  def value_to_bar(value, min, max) when max > min do
-    # Normalize value to 0-1 range
-    normalized = (value - min) / (max - min)
-    normalized = max(0, min(1, normalized))
+  def value_to_bar(value, min, max) when is_number(value) and is_number(min) and is_number(max) do
+    if max > min do
+      # Normalize value to 0-1 range
+      normalized = VizHelper.normalize(value, min, max)
 
-    # Map to bar index (0 to @bar_count - 1)
-    index = round(normalized * (@bar_count - 1))
-    Enum.at(@bars, index)
+      # Map to bar index (0 to @bar_count - 1)
+      index = round(normalized * (@bar_count - 1))
+      Enum.at(@bars, index)
+    else
+      # When min == max, return middle bar
+      Enum.at(@bars, div(@bar_count, 2))
+    end
   end
 
   def value_to_bar(_value, _min, _max) do
-    # When min == max, return middle bar
+    # Invalid input, return middle bar
     Enum.at(@bars, div(@bar_count, 2))
   end
 
@@ -140,26 +146,28 @@ defmodule TermUI.Widgets.Sparkline do
   - `:min` - Minimum value (default: auto)
   - `:max` - Maximum value (default: auto)
   """
+  @spec to_sparkline([number()], keyword()) :: String.t()
+  def to_sparkline(values, opts \\ [])
+
+  def to_sparkline([], _opts), do: ""
+
+  def to_sparkline(values, opts) when is_list(values) do
+    case VizHelper.validate_number_list(values) do
+      :ok ->
+        {min, max} = VizHelper.calculate_range(values, opts)
+        Enum.map_join(values, "", &value_to_bar(&1, min, max))
+
+      {:error, _} ->
+        ""
+    end
+  end
+
+  def to_sparkline(_, _), do: ""
+
+  # Keep old name for backward compatibility
+  @doc false
   @spec to_string([number()], keyword()) :: String.t()
-  def to_string(values, opts \\ [])
-
-  def to_string([], _opts), do: ""
-
-  def to_string(values, opts) do
-    min = Keyword.get(opts, :min, Enum.min(values))
-    max = Keyword.get(opts, :max, Enum.max(values))
-
-    Enum.map_join(values, "", &value_to_bar(&1, min, max))
-  end
-
-  defp find_color_for_value(value, color_ranges) do
-    # Find the first range where value >= threshold
-    color_ranges
-    |> Enum.sort_by(fn {threshold, _color} -> -threshold end)
-    |> Enum.find_value(fn {threshold, color} ->
-      if value >= threshold, do: color
-    end)
-  end
+  def to_string(values, opts \\ []), do: to_sparkline(values, opts)
 
   @doc """
   Renders a labeled sparkline with min/max indicators.
@@ -172,44 +180,47 @@ defmodule TermUI.Widgets.Sparkline do
   """
   @spec render_labeled(keyword()) :: TermUI.Component.RenderNode.t()
   def render_labeled(opts) do
-    values = Keyword.fetch!(opts, :values)
+    values = Keyword.get(opts, :values, [])
     label = Keyword.get(opts, :label, "")
     show_range = Keyword.get(opts, :show_range, true)
 
-    if Enum.empty?(values) do
-      empty()
-    else
-      min = Enum.min(values)
-      max = Enum.max(values)
+    case VizHelper.validate_number_list(values) do
+      :ok when values == [] ->
+        empty()
 
-      sparkline = to_string(values, min: min, max: max)
+      :ok ->
+        {min, max} = VizHelper.calculate_range(values)
+        sparkline = to_sparkline(values, min: min, max: max)
 
-      parts = []
+        parts = []
 
-      parts =
-        if label != "" do
-          [text(label <> " ") | parts]
-        else
-          parts
-        end
+        parts =
+          if label != "" do
+            [text(label <> " ") | parts]
+          else
+            parts
+          end
 
-      parts =
-        if show_range do
-          [text("#{min} ") | parts]
-        else
-          parts
-        end
+        parts =
+          if show_range do
+            [text(VizHelper.format_number(min) <> " ") | parts]
+          else
+            parts
+          end
 
-      parts = [text(sparkline) | parts]
+        parts = [text(sparkline) | parts]
 
-      parts =
-        if show_range do
-          [text(" #{max}") | parts]
-        else
-          parts
-        end
+        parts =
+          if show_range do
+            [text(" " <> VizHelper.format_number(max)) | parts]
+          else
+            parts
+          end
 
-      stack(:horizontal, Enum.reverse(parts))
+        stack(:horizontal, Enum.reverse(parts))
+
+      {:error, _} ->
+        empty()
     end
   end
 end

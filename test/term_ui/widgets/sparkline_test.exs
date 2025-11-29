@@ -154,4 +154,47 @@ defmodule TermUI.Widgets.SparklineTest do
       assert result.type == :stack
     end
   end
+
+  describe "to_sparkline/2" do
+    test "converts values to sparkline string" do
+      result = Sparkline.to_sparkline([1, 5, 10], min: 0, max: 10)
+
+      assert is_binary(result)
+      assert String.length(result) == 3
+    end
+
+    test "returns empty string for empty values" do
+      result = Sparkline.to_sparkline([])
+
+      assert result == ""
+    end
+
+    test "auto-scales when min/max not provided" do
+      result = Sparkline.to_sparkline([10, 20, 30])
+
+      assert String.length(result) == 3
+    end
+  end
+
+  describe "input validation" do
+    test "returns empty for non-numeric values in list" do
+      result = Sparkline.render(values: [1, "two", 3])
+      assert result.type == :empty
+    end
+
+    test "returns empty for non-list values" do
+      result = Sparkline.render(values: "not a list")
+      assert result.type == :empty
+    end
+
+    test "handles nil values gracefully" do
+      result = Sparkline.render(values: nil)
+      assert result.type == :empty
+    end
+
+    test "to_sparkline returns empty string for invalid data" do
+      assert Sparkline.to_sparkline([1, "two", 3]) == ""
+      assert Sparkline.to_sparkline("not a list") == ""
+    end
+  end
 end

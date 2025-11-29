@@ -202,4 +202,49 @@ defmodule TermUI.Widgets.BarChartTest do
       assert String.contains?(first.content, "3.1")
     end
   end
+
+  describe "input validation" do
+    test "returns empty for missing label" do
+      result = BarChart.render(data: [%{value: 10}])
+      assert result.type == :empty
+    end
+
+    test "returns empty for missing value" do
+      result = BarChart.render(data: [%{label: "A"}])
+      assert result.type == :empty
+    end
+
+    test "returns empty for non-numeric value" do
+      result = BarChart.render(data: [%{label: "A", value: "ten"}])
+      assert result.type == :empty
+    end
+
+    test "returns empty for non-string label" do
+      result = BarChart.render(data: [%{label: 123, value: 10}])
+      assert result.type == :empty
+    end
+
+    test "returns empty for non-list data" do
+      result = BarChart.render(data: "not a list")
+      assert result.type == :empty
+    end
+  end
+
+  describe "bounds checking" do
+    test "clamps excessive width" do
+      result = BarChart.render(data: @test_data, width: 10000)
+      assert result.type == :stack
+    end
+
+    test "handles negative width" do
+      result = BarChart.render(data: @test_data, width: -10)
+      assert result.type == :stack
+    end
+
+    test "truncates very long labels" do
+      data = [%{label: String.duplicate("A", 100), value: 10}]
+      result = BarChart.render(data: data, width: 60, show_labels: true)
+      assert result.type == :stack
+    end
+  end
 end

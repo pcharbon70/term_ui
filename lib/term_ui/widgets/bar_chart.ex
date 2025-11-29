@@ -22,8 +22,8 @@ defmodule TermUI.Widgets.BarChart do
 
   - `:data` - List of data points with label and value
   - `:direction` - :horizontal or :vertical (default: :horizontal)
-  - `:width` - Chart width in characters
-  - `:height` - Chart height (for vertical charts)
+  - `:width` - Chart width in characters (max: #{TermUI.Widgets.VisualizationHelper.max_width()})
+  - `:height` - Chart height for vertical charts (max: #{TermUI.Widgets.VisualizationHelper.max_height()})
   - `:show_values` - Display value labels (default: true)
   - `:show_labels` - Display bar labels (default: true)
   - `:bar_char` - Character for bars (default: "█")
@@ -32,9 +32,11 @@ defmodule TermUI.Widgets.BarChart do
   """
 
   import TermUI.Component.RenderNode
+  alias TermUI.Widgets.VisualizationHelper, as: VizHelper
 
   @bar_char "█"
   @empty_char " "
+  @max_label_length 50
 
   @doc """
   Renders a bar chart.
@@ -43,8 +45,8 @@ defmodule TermUI.Widgets.BarChart do
 
   - `:data` - List of `%{label: String.t(), value: number()}` (required)
   - `:direction` - :horizontal or :vertical (default: :horizontal)
-  - `:width` - Chart width (default: 40)
-  - `:height` - Chart height for vertical (default: 10)
+  - `:width` - Chart width (default: 40, max: #{VizHelper.max_width()})
+  - `:height` - Chart height for vertical (default: 10, max: #{VizHelper.max_height()})
   - `:show_values` - Show value labels (default: true)
   - `:show_labels` - Show bar labels (default: true)
   - `:bar_char` - Bar character (default: "█")
@@ -53,112 +55,105 @@ defmodule TermUI.Widgets.BarChart do
   """
   @spec render(keyword()) :: TermUI.Component.RenderNode.t()
   def render(opts) do
-    data = Keyword.fetch!(opts, :data)
-    direction = Keyword.get(opts, :direction, :horizontal)
-    width = Keyword.get(opts, :width, 40)
-    height = Keyword.get(opts, :height, 10)
-    show_values = Keyword.get(opts, :show_values, true)
-    show_labels = Keyword.get(opts, :show_labels, true)
-    bar_char = Keyword.get(opts, :bar_char, @bar_char)
-    colors = Keyword.get(opts, :colors, [])
-    style = Keyword.get(opts, :style)
+    data = Keyword.get(opts, :data, [])
 
-    case direction do
-      :horizontal ->
-        render_horizontal(data, width, show_values, show_labels, bar_char, colors, style)
+    case VizHelper.validate_bar_data(data) do
+      :ok when data == [] ->
+        empty()
 
-      :vertical ->
-        render_vertical(data, width, height, show_values, show_labels, bar_char, colors, style)
+      :ok ->
+        direction = Keyword.get(opts, :direction, :horizontal)
+        width = opts |> Keyword.get(:width, 40) |> VizHelper.clamp_width()
+        height = opts |> Keyword.get(:height, 10) |> VizHelper.clamp_height()
+        show_values = Keyword.get(opts, :show_values, true)
+        show_labels = Keyword.get(opts, :show_labels, true)
+        bar_char = Keyword.get(opts, :bar_char, @bar_char)
+        colors = Keyword.get(opts, :colors, [])
+        style = Keyword.get(opts, :style)
+
+        case direction do
+          :horizontal ->
+            render_horizontal(data, width, show_values, show_labels, bar_char, colors, style)
+
+          :vertical ->
+            render_vertical(data, width, height, show_values, show_labels, bar_char, colors, style)
+
+          _ ->
+            render_horizontal(data, width, show_values, show_labels, bar_char, colors, style)
+        end
+
+      {:error, _msg} ->
+        # Return empty for invalid data rather than crashing
+        empty()
     end
   end
 
   defp render_horizontal(data, width, show_values, show_labels, bar_char, colors, style) do
-    return_empty_if_no_data(data) ||
-      do_render_horizontal(data, width, show_values, show_labels, bar_char, colors, style)
-  end
-
-  defp do_render_horizontal(data, width, show_values, show_labels, bar_char, colors, style) do
-    max_value = data |> Enum.map(& &1.value) |> Enum.max()
+    values = Enum.map(data, & &1.value)
+    max_value = Enum.max(values, fn -> 0 end)
 
     max_label_len =
       if show_labels do
-        data |> Enum.map(&String.length(&1.label)) |> Enum.max()
+        data
+        |> Enum.map(&String.length(&1.label))
+        |> Enum.max(fn -> 0 end)
+        |> min(@max_label_length)
       else
         0
       end
 
-    # Calculate bar width
+    # Calculate bar width with bounds checking
     value_width = if show_values, do: 8, else: 0
-    bar_width = width - max_label_len - value_width - 2
+    bar_width = max(1, width - max_label_len - value_width - 2)
 
     rows =
       data
       |> Enum.with_index()
       |> Enum.map(fn {item, index} ->
-        # Label
+        # Label (truncated if needed)
         label =
           if show_labels do
-            String.pad_trailing(item.label, max_label_len) <> " "
+            truncated = String.slice(item.label, 0, @max_label_length)
+            String.pad_trailing(truncated, max_label_len) <> " "
           else
             ""
           end
 
         # Bar
-        bar_length =
-          if max_value > 0 do
-            round(item.value / max_value * bar_width)
-          else
-            0
-          end
+        bar_length = VizHelper.normalize_and_scale(item.value, 0, max_value, bar_width)
+        bar_length = min(bar_length, bar_width)
 
-        bar = String.duplicate(bar_char, bar_length)
-        empty = String.duplicate(@empty_char, bar_width - bar_length)
+        bar = VizHelper.safe_duplicate(bar_char, bar_length)
+        empty_part = VizHelper.safe_duplicate(@empty_char, bar_width - bar_length)
 
         # Value
         value_str =
           if show_values do
-            " " <> format_value(item.value)
+            " " <> VizHelper.format_number(item.value)
           else
             ""
           end
 
-        line = label <> bar <> empty <> value_str
+        line = label <> bar <> empty_part <> value_str
 
         # Apply color if specified
-        color = Enum.at(colors, rem(index, max(1, length(colors))))
-
-        if color do
-          styled(text(line), color)
-        else
-          text(line)
-        end
+        color = VizHelper.cycle_color(colors, index)
+        node = text(line)
+        VizHelper.maybe_style(node, color)
       end)
 
     result = stack(:vertical, rows)
-
-    if style do
-      styled(result, style)
-    else
-      result
-    end
+    VizHelper.maybe_style(result, style)
   end
 
-  defp render_vertical(data, width, height, show_values, show_labels, bar_char, colors, style) do
-    return_empty_if_no_data(data) ||
-      do_render_vertical(data, width, height, show_values, show_labels, bar_char, colors, style)
-  end
-
-  defp do_render_vertical(data, _width, height, show_values, show_labels, bar_char, colors, style) do
-    max_value = data |> Enum.map(& &1.value) |> Enum.max()
+  defp render_vertical(data, _width, height, show_values, show_labels, bar_char, colors, style) do
+    values = Enum.map(data, & &1.value)
+    max_value = Enum.max(values, fn -> 0 end)
 
     # Calculate bar heights
     bar_heights =
       Enum.map(data, fn item ->
-        if max_value > 0 do
-          round(item.value / max_value * height)
-        else
-          0
-        end
+        VizHelper.normalize_and_scale(item.value, 0, max_value, height)
       end)
 
     # Build rows from top to bottom
@@ -181,12 +176,12 @@ defmodule TermUI.Widgets.BarChart do
     # Add value labels
     value_row =
       if show_values do
-        values =
+        value_strs =
           Enum.map(data, fn item ->
-            format_value(item.value) |> String.pad_leading(3)
+            VizHelper.format_number(item.value) |> String.pad_leading(3)
           end)
 
-        [text(Enum.join(values, " "))]
+        [text(Enum.join(value_strs, " "))]
       else
         []
       end
@@ -205,29 +200,11 @@ defmodule TermUI.Widgets.BarChart do
       end
 
     result = stack(:vertical, rows ++ value_row ++ label_row)
-
-    if style do
-      styled(result, style)
-    else
-      result
-    end
+    VizHelper.maybe_style(result, style)
   end
-
-  defp return_empty_if_no_data([]), do: empty()
-  defp return_empty_if_no_data(_), do: nil
-
-  defp format_value(value) when is_float(value) do
-    :erlang.float_to_binary(value, decimals: 1)
-  end
-
-  defp format_value(value) when is_integer(value) do
-    Integer.to_string(value)
-  end
-
-  defp format_value(value), do: inspect(value)
 
   defp build_bar_char(row, bar_height, index, bar_char, colors) when row < bar_height do
-    color = Enum.at(colors, rem(index, max(1, length(colors))))
+    color = VizHelper.cycle_color(colors, index)
     {bar_char, color}
   end
 
@@ -237,12 +214,8 @@ defmodule TermUI.Widgets.BarChart do
 
   defp style_bar_char({char, color}) do
     padded = " " <> char <> " "
-
-    if color do
-      styled(text(padded), color)
-    else
-      text(padded)
-    end
+    node = text(padded)
+    VizHelper.maybe_style(node, color)
   end
 
   @doc """
@@ -252,28 +225,29 @@ defmodule TermUI.Widgets.BarChart do
 
   - `:value` - Current value (required)
   - `:max` - Maximum value (required)
-  - `:width` - Bar width (default: 20)
+  - `:width` - Bar width (default: 20, max: #{VizHelper.max_width()})
   - `:bar_char` - Bar character (default: "█")
   - `:empty_char` - Empty character (default: "░")
   """
   @spec bar(keyword()) :: TermUI.Component.RenderNode.t()
   def bar(opts) do
-    value = Keyword.fetch!(opts, :value)
-    max = Keyword.fetch!(opts, :max)
-    width = Keyword.get(opts, :width, 20)
+    value = Keyword.get(opts, :value, 0)
+    max = Keyword.get(opts, :max, 100)
+    width = opts |> Keyword.get(:width, 20) |> VizHelper.clamp_width()
     bar_char = Keyword.get(opts, :bar_char, @bar_char)
     empty_char = Keyword.get(opts, :empty_char, "░")
 
-    filled =
-      if max > 0 do
-        round(value / max * width)
-      else
-        0
-      end
+    case {VizHelper.validate_number(value), VizHelper.validate_number(max)} do
+      {:ok, :ok} ->
+        filled = VizHelper.normalize_and_scale(value, 0, max, width)
+        filled = min(filled, width)
+        empty_count = width - filled
 
-    filled = min(filled, width)
-    empty = width - filled
+        text(VizHelper.safe_duplicate(bar_char, filled) <> VizHelper.safe_duplicate(empty_char, empty_count))
 
-    text(String.duplicate(bar_char, filled) <> String.duplicate(empty_char, empty))
+      _ ->
+        # Invalid input, return empty bar
+        text(VizHelper.safe_duplicate(empty_char, width))
+    end
   end
 end

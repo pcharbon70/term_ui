@@ -29,6 +29,7 @@ defmodule TermUI.Widgets.LineChart do
   """
 
   import TermUI.Component.RenderNode
+  alias TermUI.Widgets.VisualizationHelper, as: VizHelper
 
   # Braille base character
   @braille_base 0x2800
@@ -60,8 +61,8 @@ defmodule TermUI.Widgets.LineChart do
 
   - `:series` - List of series with data and optional color
   - `:data` - Single series data (alternative to :series)
-  - `:width` - Chart width in characters (default: 40)
-  - `:height` - Chart height in characters (default: 10)
+  - `:width` - Chart width in characters (default: 40, max: #{VizHelper.max_width()})
+  - `:height` - Chart height in characters (default: 10, max: #{VizHelper.max_height()})
   - `:min` - Minimum Y value (default: auto)
   - `:max` - Maximum Y value (default: auto)
   - `:show_axis` - Show axis lines (default: false)
@@ -70,15 +71,30 @@ defmodule TermUI.Widgets.LineChart do
   @spec render(keyword()) :: TermUI.Component.RenderNode.t()
   def render(opts) do
     series = get_series(opts)
-    width = Keyword.get(opts, :width, 40)
-    height = Keyword.get(opts, :height, 10)
+    width = opts |> Keyword.get(:width, 40) |> VizHelper.clamp_width()
+    height = opts |> Keyword.get(:height, 10) |> VizHelper.clamp_height()
     show_axis = Keyword.get(opts, :show_axis, false)
     style = Keyword.get(opts, :style)
 
-    if Enum.empty?(series) || Enum.all?(series, fn s -> Enum.empty?(s.data) end) do
-      empty()
-    else
-      do_render(series, width, height, show_axis, style, opts)
+    cond do
+      Enum.empty?(series) ->
+        empty()
+
+      true ->
+        # Validate series data BEFORE accessing s.data to avoid crashes
+        case VizHelper.validate_series_data(series) do
+          :ok ->
+            # Now safe to check if all data is empty
+            if Enum.all?(series, fn s -> Enum.empty?(s.data) end) do
+              empty()
+            else
+              do_render(series, width, height, show_axis, style, opts)
+            end
+
+          {:error, _msg} ->
+            # Return empty for invalid data rather than crashing
+            empty()
+        end
     end
   end
 
@@ -87,71 +103,81 @@ defmodule TermUI.Widgets.LineChart do
       nil ->
         case Keyword.get(opts, :data) do
           nil -> []
-          data -> [%{data: data, color: nil}]
+          data when is_list(data) -> [%{data: data, color: nil}]
+          _ -> []
         end
 
-      series ->
+      series when is_list(series) ->
         series
+
+      _ ->
+        []
     end
   end
 
   defp do_render(series, width, height, show_axis, style, opts) do
     # Get all values for scaling
     all_values = series |> Enum.flat_map(& &1.data)
-    min = Keyword.get(opts, :min, Enum.min(all_values))
-    max = Keyword.get(opts, :max, Enum.max(all_values))
+    {min, max} = VizHelper.calculate_range(all_values, opts)
 
     # Create canvas (width * 2 dots, height * 4 dots)
     canvas_width = width * 2
     canvas_height = height * 4
 
-    # Initialize empty canvas
-    canvas = :ets.new(:braille_canvas, [:set])
+    # Initialize empty canvas with private table (avoids name conflicts)
+    canvas = :ets.new(:canvas, [:set, :private])
 
-    # Draw each series
-    Enum.each(series, fn s ->
-      draw_series(canvas, s.data, canvas_width, canvas_height, min, max)
-    end)
+    try do
+      # Draw each series
+      Enum.each(series, fn s ->
+        draw_series(canvas, s.data, canvas_width, canvas_height, min, max)
+      end)
 
-    # Convert canvas to braille characters
-    rows =
-      for y <- 0..(height - 1) do
-        chars =
-          for x <- 0..(width - 1) do
-            pattern = get_cell_pattern(canvas, x, y)
-            <<@braille_base + pattern::utf8>>
-          end
+      # Convert canvas to braille characters
+      rows =
+        for y <- 0..(height - 1) do
+          chars =
+            for x <- 0..(width - 1) do
+              pattern = get_cell_pattern(canvas, x, y)
+              <<@braille_base + pattern::utf8>>
+            end
 
-        Enum.join(chars)
-      end
+          Enum.join(chars)
+        end
 
-    :ets.delete(canvas)
+      # Build render tree
+      row_nodes = Enum.map(rows, &text/1)
 
-    # Build render tree
-    row_nodes = Enum.map(rows, &text/1)
+      result =
+        if show_axis do
+          # Add axis
+          axis_row = text("└" <> VizHelper.safe_duplicate("─", width - 1))
+          stack(:vertical, row_nodes ++ [axis_row])
+        else
+          stack(:vertical, row_nodes)
+        end
 
-    result =
-      if show_axis do
-        # Add axis
-        axis_row = text("└" <> String.duplicate("─", width - 1))
-        stack(:vertical, row_nodes ++ [axis_row])
-      else
-        stack(:vertical, row_nodes)
-      end
-
-    if style do
-      styled(result, style)
-    else
-      result
+      VizHelper.maybe_style(result, style)
+    after
+      # Always clean up ETS table, even if an exception occurs
+      :ets.delete(canvas)
     end
   end
 
   defp draw_series(canvas, data, canvas_width, canvas_height, min, max) do
+    data_len = length(data)
+
     points =
       data
       |> Enum.with_index()
       |> Enum.map(fn {value, index} ->
-        x = round(index / max(1, length(data) - 1) * (canvas_width - 1))
+        x =
+          if data_len > 1 do
+            round(index / (data_len - 1) * (canvas_width - 1))
+          else
+            div(canvas_width, 2)
+          end
+
         y = value_to_y(value, min, max, canvas_height)
         {x, y}
       end)
@@ -169,14 +195,10 @@ defmodule TermUI.Widgets.LineChart do
     end)
   end
 
-  defp value_to_y(value, min, max, canvas_height) when max > min do
-    normalized = (value - min) / (max - min)
+  defp value_to_y(value, min, max, canvas_height) do
+    normalized = VizHelper.normalize(value, min, max)
     # Invert Y (0 is top)
     round((1 - normalized) * (canvas_height - 1))
-  end
-
-  defp value_to_y(_value, _min, _max, canvas_height) do
-    div(canvas_height, 2)
   end
 
   defp draw_line(canvas, x1, y1, x2, y2) do
