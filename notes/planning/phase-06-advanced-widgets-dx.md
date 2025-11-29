@@ -201,14 +201,14 @@ Visualization widgets display data graphically using text characters. Charts use
 
 ### 6.4.1 Bar Chart
 
-- [ ] **Task 6.4.1 Complete**
+- [x] **Task 6.4.1 Complete**
 
 Bar chart displays data as horizontal or vertical bars. Bars scale to data values within available space. Labels show data values. Colors differentiate series.
 
-- [ ] 6.4.1.1 Implement horizontal bar chart with value-proportional bars
-- [ ] 6.4.1.2 Implement vertical bar chart with value-proportional bars
-- [ ] 6.4.1.3 Implement axis labels and value display
-- [ ] 6.4.1.4 Implement multiple series with different colors
+- [x] 6.4.1.1 Implement horizontal bar chart with value-proportional bars
+- [x] 6.4.1.2 Implement vertical bar chart with value-proportional bars
+- [x] 6.4.1.3 Implement axis labels and value display
+- [x] 6.4.1.4 Implement multiple series with different colors
 
 ### 6.4.2 Sparkline
 
@@ -246,7 +246,7 @@ Gauge displays a single value in context of its range—like a speedometer. Uses
 ### Unit Tests - Section 6.4
 
 - [ ] **Unit Tests 6.4 Complete**
-- [ ] Test bar chart renders bars proportional to values
+- [x] Test bar chart renders bars proportional to values
 - [ ] Test sparkline maps values to correct bar characters
 - [ ] Test Braille chart calculates dot patterns correctly
 - [ ] Test line chart draws lines between points
