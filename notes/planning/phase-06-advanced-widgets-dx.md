@@ -212,14 +212,14 @@ Bar chart displays data as horizontal or vertical bars. Bars scale to data value
 
 ### 6.4.2 Sparkline
 
-- [ ] **Task 6.4.2 Complete**
+- [x] **Task 6.4.2 Complete**
 
 Sparkline is a compact inline chart showing trends. It uses vertical bar characters (▁▂▃▄▅▆▇█) to display values in minimal space. Sparklines fit within text lines for inline data display.
 
-- [ ] 6.4.2.1 Implement value to bar character mapping
-- [ ] 6.4.2.2 Implement automatic value scaling to available range
-- [ ] 6.4.2.3 Implement horizontal sparkline rendering
-- [ ] 6.4.2.4 Implement color coding for value ranges
+- [x] 6.4.2.1 Implement value to bar character mapping
+- [x] 6.4.2.2 Implement automatic value scaling to available range
+- [x] 6.4.2.3 Implement horizontal sparkline rendering
+- [x] 6.4.2.4 Implement color coding for value ranges
 
 ### 6.4.3 Line Chart (Braille)
 
@@ -247,7 +247,7 @@ Gauge displays a single value in context of its range—like a speedometer. Uses
 
 - [ ] **Unit Tests 6.4 Complete**
 - [x] Test bar chart renders bars proportional to values
-- [ ] Test sparkline maps values to correct bar characters
+- [x] Test sparkline maps values to correct bar characters
 - [ ] Test Braille chart calculates dot patterns correctly
 - [ ] Test line chart draws lines between points
 - [ ] Test gauge displays value within range
