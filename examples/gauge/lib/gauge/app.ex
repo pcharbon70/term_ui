@@ -33,12 +33,12 @@ defmodule Gauge.App do
 
   We store:
   - value: Current gauge value (0-100)
-  - style_type: :bar or :arc display style
+  - gauge_type: :bar or :arc display style
   """
   def init(_opts) do
     %{
       value: 50,
-      style_type: :bar
+      gauge_type: :bar
     }
   end
 
@@ -68,8 +68,8 @@ defmodule Gauge.App do
 
   def update(:toggle_style, state) do
     # Toggle between :bar and :arc styles
-    new_style = if state.style_type == :bar, do: :arc, else: :bar
-    {%{state | style_type: new_style}, []}
+    new_style = if state.gauge_type == :bar, do: :arc, else: :bar
+    {%{state | gauge_type: new_style}, []}
   end
 
   def update(:quit, state) do
@@ -102,7 +102,7 @@ defmodule Gauge.App do
         min: 0,
         max: 100,
         width: 30,
-        style_type: state.style_type,
+        type: state.gauge_type,
         show_value: true,
         show_range: true,
         # Define color zones: green (0-59), yellow (60-79), red (80-100)
@@ -150,7 +150,7 @@ defmodule Gauge.App do
       text("│" <> String.pad_trailing("  S       Toggle bar/arc style", inner_width) <> "│", nil),
       text("│" <> String.pad_trailing("  Q       Quit", inner_width) <> "│", nil),
       text("│" <> String.pad_trailing("", inner_width) <> "│", nil),
-      text("│" <> String.pad_trailing("  Current style: #{state.style_type}", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  Current style: #{state.gauge_type}", inner_width) <> "│", nil),
       text(bottom_border, Style.new(fg: :yellow))
     ])
   end

@@ -19,13 +19,14 @@ defmodule TermUI.Widgets.Gauge do
         ]
       )
 
-  ## Display Styles
+  ## Display Types
 
   - `:bar` - Horizontal bar (default)
   - `:arc` - Semi-circular arc using block characters
   """
 
   import TermUI.Component.RenderNode
+  alias TermUI.Widgets.VisualizationHelper, as: VizHelper
 
   @bar_char "█"
   @empty_char "░"
@@ -38,8 +39,8 @@ defmodule TermUI.Widgets.Gauge do
   - `:value` - Current value (required)
   - `:min` - Minimum value (default: 0)
   - `:max` - Maximum value (default: 100)
-  - `:width` - Gauge width (default: 20)
-  - `:style_type` - :bar or :arc (default: :bar)
+  - `:width` - Gauge width (default: 40, max: #{VizHelper.max_width()})
+  - `:type` - :bar or :arc (default: :bar)
   - `:show_value` - Show numeric value (default: true)
   - `:show_range` - Show min/max labels (default: true)
   - `:zones` - List of {threshold, style} for color zones
@@ -49,11 +50,23 @@ defmodule TermUI.Widgets.Gauge do
   """
   @spec render(keyword()) :: TermUI.Component.RenderNode.t()
   def render(opts) do
-    value = Keyword.fetch!(opts, :value)
+    value = Keyword.get(opts, :value, 0)
+
+    case VizHelper.validate_number(value) do
+      :ok ->
+        do_render(value, opts)
+
+      {:error, _msg} ->
+        empty()
+    end
+  end
+
+  defp do_render(value, opts) do
     min = Keyword.get(opts, :min, 0)
     max = Keyword.get(opts, :max, 100)
-    width = Keyword.get(opts, :width, 20)
-    style_type = Keyword.get(opts, :style_type, :bar)
+    width = opts |> Keyword.get(:width, 40) |> VizHelper.clamp_width()
+    # Support both :type and :style_type for backward compatibility
+    gauge_type = Keyword.get(opts, :type, Keyword.get(opts, :style_type, :bar))
     show_value = Keyword.get(opts, :show_value, true)
     show_range = Keyword.get(opts, :show_range, true)
     zones = Keyword.get(opts, :zones, [])
@@ -61,7 +74,7 @@ defmodule TermUI.Widgets.Gauge do
     bar_char = Keyword.get(opts, :bar_char, @bar_char)
     empty_char = Keyword.get(opts, :empty_char, @empty_char)
 
-    case style_type do
+    case gauge_type do
       :bar ->
         bar_opts = %{
           value: value,
@@ -80,6 +93,23 @@ defmodule TermUI.Widgets.Gauge do
 
       :arc ->
         render_arc(value, min, max, width, show_value, zones, label)
+
+      _ ->
+        # Default to bar for unknown types
+        bar_opts = %{
+          value: value,
+          min: min,
+          max: max,
+          width: width,
+          show_value: show_value,
+          show_range: show_range,
+          zones: zones,
+          label: label,
+          bar_char: bar_char,
+          empty_char: empty_char
+        }
+
+        render_bar(bar_opts)
     end
   end
 
@@ -94,24 +124,22 @@ defmodule TermUI.Widgets.Gauge do
     label = opts.label
     bar_char = opts.bar_char
     empty_char = opts.empty_char
+
     # Calculate fill
-    normalized = normalize_value(value, min, max)
+    normalized = VizHelper.normalize(value, min, max)
     filled_width = round(normalized * width)
     empty_width = width - filled_width
 
-    # Build bar
-    filled = String.duplicate(bar_char, filled_width)
-    empty = String.duplicate(empty_char, empty_width)
+    # Build bar with safe duplicate
+    filled = VizHelper.safe_duplicate(bar_char, filled_width)
+    empty_part = VizHelper.safe_duplicate(empty_char, empty_width)
 
     # Apply zone color
-    zone_style = find_zone_style(value, zones)
+    zone_style = VizHelper.find_zone(value, zones)
 
     bar =
-      if zone_style do
-        styled(text(filled), zone_style)
-      else
-        text(filled)
-      end
+      text(filled)
+      |> VizHelper.maybe_style(zone_style)
 
     # Build components
     parts = []
@@ -125,7 +153,7 @@ defmodule TermUI.Widgets.Gauge do
       end
 
     # Bar row
-    bar_row = stack(:horizontal, [bar, text(empty)])
+    bar_row = stack(:horizontal, [bar, text(empty_part)])
     parts = [bar_row | parts]
 
     # Range/value row
@@ -133,33 +161,33 @@ defmodule TermUI.Widgets.Gauge do
 
     bottom_parts =
       if show_range do
-        [text(format_number(min)) | bottom_parts]
+        [text(VizHelper.format_number(min)) | bottom_parts]
       else
         bottom_parts
       end
 
     bottom_parts =
       if show_value do
-        value_str = format_number(value)
+        value_str = VizHelper.format_number(value)
         # Center the value
         padding =
           if show_range do
-            div(width - String.length(value_str), 2)
+            max(0, div(width - String.length(value_str), 2))
           else
             0
           end
 
-        [text(String.duplicate(" ", padding) <> value_str) | bottom_parts]
+        [text(VizHelper.safe_duplicate(" ", padding) <> value_str) | bottom_parts]
       else
         bottom_parts
       end
 
     bottom_parts =
       if show_range do
-        max_str = format_number(max)
+        max_str = VizHelper.format_number(max)
         padding = width - String.length(max_str)
         padding = if show_value, do: div(padding, 2), else: padding
-        [text(String.duplicate(" ", max(0, padding)) <> max_str) | bottom_parts]
+        [text(VizHelper.safe_duplicate(" ", max(0, padding)) <> max_str) | bottom_parts]
       else
         bottom_parts
       end
@@ -177,32 +205,34 @@ defmodule TermUI.Widgets.Gauge do
 
   defp render_arc(value, min, max, width, show_value, _zones, label) do
     # Simple arc using block characters
-    normalized = normalize_value(value, min, max)
+    normalized = VizHelper.normalize(value, min, max)
 
-    # Calculate position on arc
+    # Calculate position on arc with bounds checking
     arc_position = round(normalized * (width - 2))
+    arc_position = max(0, min(arc_position, width - 3))
 
-    # Build arc visualization
-    top = "╭" <> String.duplicate("─", width - 2) <> "╮"
+    # Build arc visualization with safe duplicate
+    top = "╭" <> VizHelper.safe_duplicate("─", width - 2) <> "╮"
 
     # Middle shows value position
+    right_padding = max(0, width - arc_position - 3)
     indicator_line =
-      String.duplicate(" ", arc_position) <>
+      VizHelper.safe_duplicate(" ", arc_position) <>
         "▼" <>
-        String.duplicate(" ", width - arc_position - 3)
+        VizHelper.safe_duplicate(" ", right_padding)
 
     middle = "│" <> indicator_line <> "│"
 
-    bottom = "╰" <> String.duplicate("─", width - 2) <> "╯"
+    bottom = "╰" <> VizHelper.safe_duplicate("─", width - 2) <> "╯"
 
     parts = [text(top), text(middle), text(bottom)]
 
     # Add value display
     parts =
       if show_value do
-        value_str = format_number(value)
-        padding = div(width - String.length(value_str), 2)
-        value_row = text(String.duplicate(" ", padding) <> value_str)
+        value_str = VizHelper.format_number(value)
+        padding = max(0, div(width - String.length(value_str), 2))
+        value_row = text(VizHelper.safe_duplicate(" ", padding) <> value_str)
         parts ++ [value_row]
       else
         parts
@@ -219,31 +249,6 @@ defmodule TermUI.Widgets.Gauge do
 
     stack(:vertical, parts)
   end
-
-  defp normalize_value(value, min, max) when max > min do
-    normalized = (value - min) / (max - min)
-    max(0, min(1, normalized))
-  end
-
-  defp normalize_value(_value, _min, _max), do: 0.5
-
-  defp find_zone_style(value, zones) do
-    zones
-    |> Enum.sort_by(fn {threshold, _style} -> -threshold end)
-    |> Enum.find_value(fn {threshold, style} ->
-      if value >= threshold, do: style
-    end)
-  end
-
-  defp format_number(value) when is_float(value) do
-    :erlang.float_to_binary(value, decimals: 1)
-  end
-
-  defp format_number(value) when is_integer(value) do
-    Integer.to_string(value)
-  end
-
-  defp format_number(value), do: inspect(value)
 
   @doc """
   Creates a simple percentage gauge.
@@ -277,14 +282,17 @@ defmodule TermUI.Widgets.Gauge do
   - `:value` - Current value (required)
   - `:warning` - Yellow zone threshold (default: 60)
   - `:danger` - Red zone threshold (default: 80)
+
+  Note: You need to provide actual Style structs for the zones to be visible.
   """
   @spec traffic_light(keyword()) :: TermUI.Component.RenderNode.t()
   def traffic_light(opts) do
-    _value = Keyword.fetch!(opts, :value)
+    value = Keyword.get(opts, :value, 0)
     warning = Keyword.get(opts, :warning, 60)
     danger = Keyword.get(opts, :danger, 80)
 
-    # Note: These would need actual Style structs in real usage
+    # Create zones - users should provide actual Style structs
+    # These nil values mean no styling will be applied by default
     zones = [
       # green zone (default)
       {0, nil},
@@ -294,7 +302,7 @@ defmodule TermUI.Widgets.Gauge do
       {danger, nil}
     ]
 
-    opts = Keyword.merge(opts, zones: zones)
+    opts = opts |> Keyword.put(:value, value) |> Keyword.merge(zones: zones)
     render(opts)
   end
 end

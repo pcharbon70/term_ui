@@ -179,4 +179,94 @@ defmodule TermUI.Widgets.LineChartTest do
       assert result.type == :empty
     end
   end
+
+  describe "input validation" do
+    test "returns empty for non-numeric data in series" do
+      result =
+        LineChart.render(
+          series: [%{data: [1, "two", 3]}],
+          width: 20,
+          height: 5
+        )
+
+      assert result.type == :empty
+    end
+
+    test "returns empty for series missing data key" do
+      result =
+        LineChart.render(
+          series: [%{color: :red}],
+          width: 20,
+          height: 5
+        )
+
+      assert result.type == :empty
+    end
+
+    test "returns empty for non-list data in series" do
+      result =
+        LineChart.render(
+          series: [%{data: "not a list"}],
+          width: 20,
+          height: 5
+        )
+
+      assert result.type == :empty
+    end
+  end
+
+  describe "bounds checking" do
+    test "clamps excessive width" do
+      result =
+        LineChart.render(
+          data: [1, 2, 3],
+          width: 10000,
+          height: 5
+        )
+
+      assert result.type == :stack
+    end
+
+    test "clamps excessive height" do
+      result =
+        LineChart.render(
+          data: [1, 2, 3],
+          width: 20,
+          height: 10000
+        )
+
+      assert result.type == :stack
+    end
+
+    test "handles negative dimensions" do
+      result =
+        LineChart.render(
+          data: [1, 2, 3],
+          width: -10,
+          height: -5
+        )
+
+      assert result.type == :stack
+    end
+  end
+
+  describe "ETS cleanup" do
+    test "does not leak ETS tables after multiple renders" do
+      # Get initial table count
+      initial_count = length(:ets.all())
+
+      # Render multiple charts
+      for _ <- 1..10 do
+        LineChart.render(
+          data: [1, 2, 3, 4, 5],
+          width: 20,
+          height: 5
+        )
+      end
+
+      # Table count should be same (or close, accounting for other processes)
+      final_count = length(:ets.all())
+      assert final_count <= initial_count + 2
+    end
+  end
 end

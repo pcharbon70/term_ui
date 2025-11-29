@@ -84,7 +84,20 @@ defmodule TermUI.Widgets.GaugeTest do
   end
 
   describe "render/1 arc style" do
-    test "renders arc gauge" do
+    test "renders arc gauge with :type option" do
+      result =
+        Gauge.render(
+          value: 50,
+          min: 0,
+          max: 100,
+          width: 20,
+          type: :arc
+        )
+
+      assert result.type == :stack
+    end
+
+    test "renders arc gauge with legacy :style_type option (backward compat)" do
       result =
         Gauge.render(
           value: 50,
@@ -104,7 +117,7 @@ defmodule TermUI.Widgets.GaugeTest do
           min: 0,
           max: 100,
           width: 20,
-          style_type: :arc,
+          type: :arc,
           show_value: true
         )
 
@@ -240,6 +253,37 @@ defmodule TermUI.Widgets.GaugeTest do
           show_range: false
         )
 
+      assert result.type == :stack
+    end
+  end
+
+  describe "input validation" do
+    test "returns empty for non-numeric value" do
+      result = Gauge.render(value: "not a number")
+      assert result.type == :empty
+    end
+
+    test "handles nil value gracefully" do
+      result = Gauge.render(value: nil)
+      assert result.type == :empty
+    end
+
+    test "handles atom value gracefully" do
+      result = Gauge.render(value: :invalid)
+      assert result.type == :empty
+    end
+  end
+
+  describe "bounds checking" do
+    test "clamps excessive width" do
+      # Should not crash with very large width
+      result = Gauge.render(value: 50, width: 10000)
+      assert result.type == :stack
+    end
+
+    test "handles negative width" do
+      # Should not crash with negative width
+      result = Gauge.render(value: 50, width: -10)
       assert result.type == :stack
     end
   end
