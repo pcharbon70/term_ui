@@ -223,14 +223,14 @@ Sparkline is a compact inline chart showing trends. It uses vertical bar charact
 
 ### 6.4.3 Line Chart (Braille)
 
-- [ ] **Task 6.4.3 Complete**
+- [x] **Task 6.4.3 Complete**
 
 Line chart uses Braille patterns for sub-character resolution. Each Braille cell is 2x4 pixels, enabling smooth lines in text mode. This provides detailed visualization for time series data.
 
-- [ ] 6.4.3.1 Implement Braille dot pattern calculation from coordinates
-- [ ] 6.4.3.2 Implement line drawing between data points
-- [ ] 6.4.3.3 Implement axis rendering with labels
-- [ ] 6.4.3.4 Implement multiple data series with colors
+- [x] 6.4.3.1 Implement Braille dot pattern calculation from coordinates
+- [x] 6.4.3.2 Implement line drawing between data points
+- [x] 6.4.3.3 Implement axis rendering with labels
+- [x] 6.4.3.4 Implement multiple data series with colors
 
 ### 6.4.4 Gauge Widget
 
@@ -248,8 +248,8 @@ Gauge displays a single value in context of its range—like a speedometer. Uses
 - [ ] **Unit Tests 6.4 Complete**
 - [x] Test bar chart renders bars proportional to values
 - [x] Test sparkline maps values to correct bar characters
-- [ ] Test Braille chart calculates dot patterns correctly
-- [ ] Test line chart draws lines between points
+- [x] Test Braille chart calculates dot patterns correctly
+- [x] Test line chart draws lines between points
 - [ ] Test gauge displays value within range
 
 ---
