@@ -160,14 +160,14 @@ Dialog is a modal overlay for user interaction—confirmations, forms, messages.
 
 ### 6.3.2 Alert Dialog
 
-- [ ] **Task 6.3.2 Complete**
+- [x] **Task 6.3.2 Complete**
 
 Alert dialog is a specialized dialog for confirmations and messages. It includes standard buttons (OK, Cancel, Yes/No) and icon indication for type (info, warning, error, success).
 
-- [ ] 6.3.2.1 Implement alert types: info, warning, error, success, confirm
-- [ ] 6.3.2.2 Implement standard button configurations: OK, OK/Cancel, Yes/No
-- [ ] 6.3.2.3 Implement icon display for alert type
-- [ ] 6.3.2.4 Implement default focus on appropriate button
+- [x] 6.3.2.1 Implement alert types: info, warning, error, success, confirm
+- [x] 6.3.2.2 Implement standard button configurations: OK, OK/Cancel, Yes/No
+- [x] 6.3.2.3 Implement icon display for alert type
+- [x] 6.3.2.4 Implement default focus on appropriate button
 
 ### 6.3.3 Toast Notifications
 
@@ -186,7 +186,7 @@ Toast notifications display brief messages that auto-dismiss. They appear at scr
 - [x] Test dialog renders centered with backdrop
 - [x] Test dialog traps focus within content
 - [x] Test Escape closes dialog
-- [ ] Test alert shows correct buttons for type
+- [x] Test alert shows correct buttons for type
 - [ ] Test toast appears at correct position
 - [ ] Test toast auto-dismisses after duration
 - [ ] Test multiple toasts stack
