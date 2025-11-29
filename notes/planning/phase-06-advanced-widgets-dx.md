@@ -256,54 +256,54 @@ Gauge displays a single value in context of its range—like a speedometer. Uses
 
 ## 6.5 Scrollable Content Widgets
 
-- [ ] **Section 6.5 Complete**
+- [x] **Section 6.5 Complete**
 
 Scrollable content widgets handle content larger than their display area. Viewport scrolls arbitrary content. Canvas provides direct drawing access for custom rendering. These widgets enable complex content patterns.
 
 ### 6.5.1 Viewport Widget
 
-- [ ] **Task 6.5.1 Complete**
+- [x] **Task 6.5.1 Complete**
 
 Viewport displays a scrollable view of larger content. It maintains scroll position and clips content to display area. Scroll bars indicate position and provide click-to-scroll.
 
-- [ ] 6.5.1.1 Implement content area larger than viewport
-- [ ] 6.5.1.2 Implement scroll position tracking
-- [ ] 6.5.1.3 Implement content clipping to viewport bounds
-- [ ] 6.5.1.4 Implement scroll bars (vertical and horizontal)
-- [ ] 6.5.1.5 Implement scroll bar interaction (click and drag)
+- [x] 6.5.1.1 Implement content area larger than viewport
+- [x] 6.5.1.2 Implement scroll position tracking
+- [x] 6.5.1.3 Implement content clipping to viewport bounds
+- [x] 6.5.1.4 Implement scroll bars (vertical and horizontal)
+- [x] 6.5.1.5 Implement scroll bar interaction (click and drag)
 
 ### 6.5.2 ScrollBar Widget
 
-- [ ] **Task 6.5.2 Complete**
+- [x] **Task 6.5.2 Complete**
 
 ScrollBar is a standalone widget for scroll indication and control. It shows position within content and allows drag to scroll. Used by Viewport and other scrollable widgets.
 
-- [ ] 6.5.2.1 Implement scroll bar rendering with track and thumb
-- [ ] 6.5.2.2 Implement thumb size proportional to visible fraction
-- [ ] 6.5.2.3 Implement drag scrolling moving content
-- [ ] 6.5.2.4 Implement track click scrolling by page
+- [x] 6.5.2.1 Implement scroll bar rendering with track and thumb
+- [x] 6.5.2.2 Implement thumb size proportional to visible fraction
+- [x] 6.5.2.3 Implement drag scrolling moving content
+- [x] 6.5.2.4 Implement track click scrolling by page
 
 ### 6.5.3 Canvas Widget
 
-- [ ] **Task 6.5.3 Complete**
+- [x] **Task 6.5.3 Complete**
 
 Canvas provides direct access to render buffer for custom drawing. Applications draw using graphics primitives (line, rectangle, text). Canvas enables custom widgets and visualizations not covered by standard widgets.
 
-- [ ] 6.5.3.1 Implement canvas with direct buffer access
-- [ ] 6.5.3.2 Implement drawing primitives: `draw_line`, `draw_rect`, `draw_text`
-- [ ] 6.5.3.3 Implement Braille drawing for sub-character graphics
-- [ ] 6.5.3.4 Implement clear and fill operations
-- [ ] 6.5.3.5 Implement custom render callback for application drawing
+- [x] 6.5.3.1 Implement canvas with direct buffer access
+- [x] 6.5.3.2 Implement drawing primitives: `draw_line`, `draw_rect`, `draw_text`
+- [x] 6.5.3.3 Implement Braille drawing for sub-character graphics
+- [x] 6.5.3.4 Implement clear and fill operations
+- [x] 6.5.3.5 Implement custom render callback for application drawing
 
 ### Unit Tests - Section 6.5
 
-- [ ] **Unit Tests 6.5 Complete**
-- [ ] Test viewport clips content to bounds
-- [ ] Test viewport scrolls with keyboard and mouse
-- [ ] Test scroll bar thumb size reflects content ratio
-- [ ] Test scroll bar drag updates scroll position
-- [ ] Test canvas draws primitives correctly
-- [ ] Test Braille drawing produces correct patterns
+- [x] **Unit Tests 6.5 Complete**
+- [x] Test viewport clips content to bounds
+- [x] Test viewport scrolls with keyboard and mouse
+- [x] Test scroll bar thumb size reflects content ratio
+- [x] Test scroll bar drag updates scroll position
+- [x] Test canvas draws primitives correctly
+- [x] Test Braille drawing produces correct patterns
 
 ---
 
