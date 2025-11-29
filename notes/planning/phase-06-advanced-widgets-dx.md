@@ -141,7 +141,7 @@ Context menu appears at cursor position on right-click or shortcut key. It uses 
 
 ## 6.3 Overlay Widgets
 
-- [ ] **Section 6.3 Complete**
+- [x] **Section 6.3 Complete**
 
 Overlay widgets display content above the normal component tree—modals, dialogs, and toasts. They use z-ordering to appear on top, focus trapping to keep interaction within the overlay, and backdrop to visually separate from background content.
 
@@ -171,25 +171,25 @@ Alert dialog is a specialized dialog for confirmations and messages. It includes
 
 ### 6.3.3 Toast Notifications
 
-- [ ] **Task 6.3.3 Complete**
+- [x] **Task 6.3.3 Complete**
 
 Toast notifications display brief messages that auto-dismiss. They appear at screen edge (typically bottom-right) and stack when multiple appear. Toasts don't capture focus or block interaction.
 
-- [ ] 6.3.3.1 Implement toast positioning at screen edge
-- [ ] 6.3.3.2 Implement auto-dismiss with configurable duration
-- [ ] 6.3.3.3 Implement toast stacking for multiple notifications
-- [ ] 6.3.3.4 Implement toast types: info, success, warning, error
+- [x] 6.3.3.1 Implement toast positioning at screen edge
+- [x] 6.3.3.2 Implement auto-dismiss with configurable duration
+- [x] 6.3.3.3 Implement toast stacking for multiple notifications
+- [x] 6.3.3.4 Implement toast types: info, success, warning, error
 
 ### Unit Tests - Section 6.3
 
-- [ ] **Unit Tests 6.3 Complete**
+- [x] **Unit Tests 6.3 Complete**
 - [x] Test dialog renders centered with backdrop
 - [x] Test dialog traps focus within content
 - [x] Test Escape closes dialog
 - [x] Test alert shows correct buttons for type
-- [ ] Test toast appears at correct position
-- [ ] Test toast auto-dismisses after duration
-- [ ] Test multiple toasts stack
+- [x] Test toast appears at correct position
+- [x] Test toast auto-dismisses after duration
+- [x] Test multiple toasts stack
 
 ---
 
