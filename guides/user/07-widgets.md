@@ -391,6 +391,7 @@ end
 
 ## Next Steps
 
+- [Advanced Widgets](10-advanced-widgets.md) - Navigation, visualization, streaming, and BEAM introspection widgets
 - [Styling](05-styling.md) - Customize widget appearance
 - [Layout](06-layout.md) - Position widgets
 - [Events](04-events.md) - Handle widget interactions

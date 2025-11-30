@@ -13,6 +13,7 @@ Welcome to the TermUI documentation. These guides cover everything you need to b
 7. **[Widgets](07-widgets.md)** - Using pre-built components
 8. **[Terminal](08-terminal.md)** - Terminal modes and capabilities
 9. **[Commands](09-commands.md)** - Side effects and async operations
+10. **[Advanced Widgets](10-advanced-widgets.md)** - Navigation, visualization, data streaming, and BEAM introspection widgets
 
 ## Quick Start
 
