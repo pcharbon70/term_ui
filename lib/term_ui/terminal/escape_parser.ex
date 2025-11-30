@@ -83,7 +83,8 @@ defmodule TermUI.Terminal.EscapeParser do
 
   # Regular printable ASCII
   defp parse_bytes(<<char, rest::binary>>, events) when char in 32..126 do
-    event = Event.key(<<char>>)
+    char_str = <<char>>
+    event = Event.key(char_str, char: char_str)
     parse_bytes(rest, [event | events])
   end
 
@@ -91,7 +92,8 @@ defmodule TermUI.Terminal.EscapeParser do
   defp parse_bytes(<<0b110::3, _::5, 0b10::2, _::6, _rest::binary>> = input, events) do
     case input do
       <<char::utf8, rest::binary>> ->
-        event = Event.key(<<char::utf8>>)
+        char_str = <<char::utf8>>
+        event = Event.key(char_str, char: char_str)
         parse_bytes(rest, [event | events])
 
       _ ->
@@ -104,7 +106,8 @@ defmodule TermUI.Terminal.EscapeParser do
   defp parse_bytes(<<0b1110::4, _::4, _rest::binary>> = input, events) do
     case input do
       <<char::utf8, rest::binary>> ->
-        event = Event.key(<<char::utf8>>)
+        char_str = <<char::utf8>>
+        event = Event.key(char_str, char: char_str)
         parse_bytes(rest, [event | events])
 
       _ ->
@@ -116,7 +119,8 @@ defmodule TermUI.Terminal.EscapeParser do
   defp parse_bytes(<<0b11110::5, _::3, _rest::binary>> = input, events) do
     case input do
       <<char::utf8, rest::binary>> ->
-        event = Event.key(<<char::utf8>>)
+        char_str = <<char::utf8>>
+        event = Event.key(char_str, char: char_str)
         parse_bytes(rest, [event | events])
 
       _ ->
@@ -146,7 +150,8 @@ defmodule TermUI.Terminal.EscapeParser do
 
   # Alt+key (ESC followed by printable character)
   defp parse_escape_sequence(<<char, rest::binary>>) when char in 32..126 do
-    event = Event.key(<<char>>, modifiers: [:alt])
+    char_str = <<char>>
+    event = Event.key(char_str, char: char_str, modifiers: [:alt])
     {:ok, event, rest}
   end
 
