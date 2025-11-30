@@ -55,7 +55,10 @@ defmodule TermUI.MixProject do
 
       # Testing
       {:excoveralls, "~> 0.18", only: :test},
-      {:stream_data, "~> 1.0", only: :test}
+      {:stream_data, "~> 1.0", only: :test},
+
+      # Streaming
+      {:gen_stage, "~> 1.2"}
     ]
   end
 
