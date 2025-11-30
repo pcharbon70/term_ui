@@ -473,11 +473,12 @@ defmodule TermUI.Widgets.SplitPane do
       end)
       |> Enum.map(fn {_, idx} -> idx end)
 
-    if length(flexible_indices) == 0 do
+    if flexible_indices == [] do
       sizes
     else
-      per_pane = div(remaining, length(flexible_indices))
-      leftover = rem(remaining, length(flexible_indices))
+      flexible_count = length(flexible_indices)
+      per_pane = div(remaining, flexible_count)
+      leftover = rem(remaining, flexible_count)
 
       sizes
       |> Enum.with_index()

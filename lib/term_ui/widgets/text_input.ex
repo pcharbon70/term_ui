@@ -306,6 +306,7 @@ defmodule TermUI.Widgets.TextInput do
       state.cursor_row > 0 ->
         prev_row = state.cursor_row - 1
         prev_line_len = String.length(Enum.at(state.lines, prev_row, ""))
+
         %{state | cursor_row: prev_row, cursor_col: prev_line_len}
         |> adjust_scroll()
 
@@ -699,7 +700,8 @@ defmodule TermUI.Widgets.TextInput do
         end
 
       if indicator do
-        text(" #{indicator} #{state.scroll_offset + 1}-#{state.scroll_offset + visible_count}/#{total_lines}",
+        text(
+          " #{indicator} #{state.scroll_offset + 1}-#{state.scroll_offset + visible_count}/#{total_lines}",
           Style.new(fg: :bright_black)
         )
       else

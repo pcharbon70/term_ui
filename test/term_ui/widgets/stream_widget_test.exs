@@ -1,8 +1,8 @@
 defmodule TermUI.Widgets.StreamWidgetTest do
   use ExUnit.Case, async: true
 
-  alias TermUI.Widgets.StreamWidget
   alias TermUI.Event
+  alias TermUI.Widgets.StreamWidget
 
   @area %{x: 0, y: 0, width: 80, height: 24}
 
@@ -464,9 +464,9 @@ defmodule TermUI.Widgets.StreamWidgetTest do
       result = StreamWidget.render(state, %{@area | width: 50})
 
       texts =
-        result.children
-        |> Enum.filter(&(&1.type == :text))
-        |> Enum.filter(&String.contains?(&1.content, "x"))
+        Enum.filter(result.children, fn child ->
+          child.type == :text and String.contains?(child.content, "x")
+        end)
 
       [truncated_text | _] = texts
       assert String.length(truncated_text.content) <= 50

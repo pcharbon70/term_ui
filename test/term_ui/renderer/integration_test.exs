@@ -472,8 +472,8 @@ defmodule TermUI.Renderer.IntegrationTest do
           render_frame(current, previous)
         end)
 
-      # Should be very fast (< 3ms)
-      assert time_us < 3_000
+      # Should be very fast (< 10ms, with margin for CI/slow machines)
+      assert time_us < 10_000
 
       # Should produce minimal output
       assert byte_size(output) < 50

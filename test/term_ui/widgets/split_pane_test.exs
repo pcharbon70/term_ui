@@ -1,8 +1,8 @@
 defmodule TermUI.Widgets.SplitPaneTest do
   use ExUnit.Case, async: true
 
-  alias TermUI.Widgets.SplitPane
   alias TermUI.Event
+  alias TermUI.Widgets.SplitPane
 
   # Helper to create test area
   defp test_area(width, height) do

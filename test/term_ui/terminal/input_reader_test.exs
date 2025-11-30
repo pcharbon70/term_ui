@@ -3,7 +3,12 @@ defmodule TermUI.Terminal.InputReaderTest do
 
   alias TermUI.Terminal.InputReader
 
+  # All InputReader tests require a real terminal/TTY since the underlying
+  # Port driver uses `cat` to read from stdin which isn't available in
+  # non-interactive test environments.
+
   describe "start_link/1 and stop/1" do
+    @tag :requires_terminal
     test "starts and stops cleanly" do
       {:ok, reader} = InputReader.start_link(target: self())
       assert Process.alive?(reader)
@@ -12,12 +17,14 @@ defmodule TermUI.Terminal.InputReaderTest do
       refute Process.alive?(reader)
     end
 
+    @tag :requires_terminal
     test "requires target option" do
       assert_raise KeyError, fn ->
         InputReader.start_link([])
       end
     end
 
+    @tag :requires_terminal
     test "accepts name option" do
       {:ok, reader} = InputReader.start_link(target: self(), name: :test_reader)
       assert Process.whereis(:test_reader) == reader
@@ -34,6 +41,7 @@ defmodule TermUI.Terminal.InputReaderTest do
     # For full integration testing, see the dashboard example which
     # demonstrates real keyboard input handling.
 
+    @tag :requires_terminal
     test "reader process state has correct structure" do
       # Start InputReader, but it may fail in test environment if stdin isn't available
       case InputReader.start_link(target: self()) do
@@ -74,6 +82,7 @@ defmodule TermUI.Terminal.InputReaderTest do
     # 2. Set 50ms timer
     # 3. On timeout, emit ESC and any remaining keys
 
+    @tag :requires_terminal
     test "timeout constant is reasonable" do
       # The escape timeout should be fast enough to feel responsive
       # but slow enough to catch escape sequences
@@ -86,6 +95,7 @@ defmodule TermUI.Terminal.InputReaderTest do
   end
 
   describe "termination" do
+    @tag :requires_terminal
     test "closes port on termination" do
       {:ok, reader} = InputReader.start_link(target: self())
 
@@ -96,6 +106,7 @@ defmodule TermUI.Terminal.InputReaderTest do
       refute Process.alive?(reader)
     end
 
+    @tag :requires_terminal
     test "handles normal shutdown" do
       {:ok, reader} = InputReader.start_link(target: self())
 

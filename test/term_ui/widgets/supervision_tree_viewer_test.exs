@@ -1,8 +1,8 @@
 defmodule TermUI.Widgets.SupervisionTreeViewerTest do
   use ExUnit.Case, async: false
 
-  alias TermUI.Widgets.SupervisionTreeViewer
   alias TermUI.Event
+  alias TermUI.Widgets.SupervisionTreeViewer
 
   @area %{x: 0, y: 0, width: 100, height: 30}
 
@@ -153,7 +153,7 @@ defmodule TermUI.Widgets.SupervisionTreeViewerTest do
         {:ok, state} = SupervisionTreeViewer.init(props)
 
         worker_nodes = Enum.filter(state.flattened, &(&1.type == :worker))
-        assert length(worker_nodes) == 0
+        assert Enum.empty?(worker_nodes)
       after
         Supervisor.stop(sup)
       end

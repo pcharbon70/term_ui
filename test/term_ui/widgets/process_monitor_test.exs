@@ -1,8 +1,8 @@
 defmodule TermUI.Widgets.ProcessMonitorTest do
   use ExUnit.Case, async: true
 
-  alias TermUI.Widgets.ProcessMonitor
   alias TermUI.Event
+  alias TermUI.Widgets.ProcessMonitor
 
   @area %{x: 0, y: 0, width: 100, height: 30}
 

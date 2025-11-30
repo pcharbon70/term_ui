@@ -1,8 +1,8 @@
 defmodule TermUI.Widgets.LogViewerTest do
   use ExUnit.Case, async: true
 
-  alias TermUI.Widgets.LogViewer
   alias TermUI.Event
+  alias TermUI.Widgets.LogViewer
 
   # Helper to create test area
   defp test_area(width, height) do

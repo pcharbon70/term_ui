@@ -1,8 +1,8 @@
 defmodule TermUI.Widgets.TreeViewTest do
   use ExUnit.Case, async: true
 
-  alias TermUI.Widgets.TreeView
   alias TermUI.Event
+  alias TermUI.Widgets.TreeView
 
   @default_area %{x: 0, y: 0, width: 80, height: 24}
 

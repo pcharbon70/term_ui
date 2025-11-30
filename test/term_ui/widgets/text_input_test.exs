@@ -433,7 +433,7 @@ defmodule TermUI.Widgets.TextInputTest do
   describe "scrolling" do
     test "scroll_offset adjusts when cursor moves below visible area" do
       # Create 10 lines
-      lines = Enum.map(0..9, fn i -> "Line #{i}" end) |> Enum.join("\n")
+      lines = Enum.map_join(0..9, "\n", fn i -> "Line #{i}" end)
       props = TextInput.new(value: lines, multiline: true, max_visible_lines: 5)
       {:ok, state} = TextInput.init(props)
 
@@ -450,7 +450,7 @@ defmodule TermUI.Widgets.TextInputTest do
     end
 
     test "scroll_offset adjusts when cursor moves above visible area" do
-      lines = Enum.map(0..9, fn i -> "Line #{i}" end) |> Enum.join("\n")
+      lines = Enum.map_join(0..9, "\n", fn i -> "Line #{i}" end)
       props = TextInput.new(value: lines, multiline: true, max_visible_lines: 5)
       {:ok, state} = TextInput.init(props)
 

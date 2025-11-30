@@ -215,7 +215,7 @@ defmodule TermUI.Widget.PickListTest do
       assert length(cells) > 0
 
       # Check title is rendered
-      all_chars = Enum.map(cells, & &1.cell.char) |> Enum.join()
+      all_chars = Enum.map_join(cells, "", & &1.cell.char)
       assert String.contains?(all_chars, "Select Item")
     end
 
@@ -226,7 +226,7 @@ defmodule TermUI.Widget.PickListTest do
 
       assert %RenderNode{type: :cells, cells: cells} = result
 
-      all_chars = Enum.map(cells, & &1.cell.char) |> Enum.join()
+      all_chars = Enum.map_join(cells, "", & &1.cell.char)
       assert String.contains?(all_chars, "Apple")
     end
 
@@ -237,7 +237,7 @@ defmodule TermUI.Widget.PickListTest do
 
       assert %RenderNode{type: :cells, cells: cells} = result
 
-      all_chars = Enum.map(cells, & &1.cell.char) |> Enum.join()
+      all_chars = Enum.map_join(cells, "", & &1.cell.char)
       assert String.contains?(all_chars, "Item 1 of 7")
     end
 
@@ -248,7 +248,7 @@ defmodule TermUI.Widget.PickListTest do
 
       assert %RenderNode{type: :cells, cells: cells} = result
 
-      all_chars = Enum.map(cells, & &1.cell.char) |> Enum.join()
+      all_chars = Enum.map_join(cells, "", & &1.cell.char)
       assert String.contains?(all_chars, "No items")
     end
 
@@ -260,7 +260,7 @@ defmodule TermUI.Widget.PickListTest do
 
       assert %RenderNode{type: :cells, cells: cells} = result
 
-      all_chars = Enum.map(cells, & &1.cell.char) |> Enum.join()
+      all_chars = Enum.map_join(cells, "", & &1.cell.char)
       assert String.contains?(all_chars, "Filter: ap")
     end
 
