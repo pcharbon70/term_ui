@@ -616,36 +616,38 @@ BEAM introspection widgets leverage Erlang's runtime introspection for live syst
 
 ### 6.12.1 ProcessMonitor Widget
 
-- [ ] **Task 6.12.1 Complete**
+- [x] **Task 6.12.1 Complete**
 
 ProcessMonitor displays live process information including reductions, memory, and message queues. It provides controls for process management and debugging.
 
-- [ ] 6.12.1.1 Implement process list with PID, name, reductions, memory
-- [ ] 6.12.1.2 Implement live stats updates (configurable interval)
-- [ ] 6.12.1.3 Implement message queue depth display and warnings
-- [ ] 6.12.1.4 Implement process links/monitors visualization
-- [ ] 6.12.1.5 Implement stack trace display on selection
-- [ ] 6.12.1.6 Implement process actions (kill, suspend, resume)
-- [ ] 6.12.1.7 Implement sorting by reductions/memory/queue
-- [ ] 6.12.1.8 Implement process filtering by name/module
+- [x] 6.12.1.1 Implement process list with PID, name, reductions, memory
+- [x] 6.12.1.2 Implement live stats updates (configurable interval)
+- [x] 6.12.1.3 Implement message queue depth display and warnings
+- [x] 6.12.1.4 Implement process links/monitors visualization
+- [x] 6.12.1.5 Implement stack trace display on selection
+- [x] 6.12.1.6 Implement process actions (kill, suspend, resume)
+- [x] 6.12.1.7 Implement sorting by reductions/memory/queue
+- [x] 6.12.1.8 Implement process filtering by name/module
 
 ### 6.12.2 SupervisionTreeViewer Widget
 
-- [ ] **Task 6.12.2 Complete**
+- [x] **Task 6.12.2 Complete**
 
 SupervisionTreeViewer displays the supervision hierarchy with live status indicators. It shows restart counts and provides controls for supervisor management.
 
-- [ ] 6.12.2.1 Implement tree view of supervision hierarchy
-- [ ] 6.12.2.2 Implement live status indicators (running, restarting, terminated)
-- [ ] 6.12.2.3 Implement restart count and history display
-- [ ] 6.12.2.4 Implement supervisor strategy display
-- [ ] 6.12.2.5 Implement click to inspect child process state
-- [ ] 6.12.2.6 Implement restart/terminate controls with confirmation
-- [ ] 6.12.2.7 Implement auto-refresh on supervision tree changes
+- [x] 6.12.2.1 Implement tree view of supervision hierarchy
+- [x] 6.12.2.2 Implement live status indicators (running, restarting, terminated)
+- [x] 6.12.2.3 Implement restart count and history display
+- [x] 6.12.2.4 Implement supervisor strategy display
+- [x] 6.12.2.5 Implement click to inspect child process state
+- [x] 6.12.2.6 Implement restart/terminate controls with confirmation
+- [x] 6.12.2.7 Implement auto-refresh on supervision tree changes
 
 ### 6.12.3 ETSBrowser Widget
 
-- [ ] **Task 6.12.3 Complete**
+- [x] **Task 6.12.3 Skipped**
+
+> **Note:** This widget is being skipped for now. The ProcessMonitor and SupervisionTreeViewer widgets provide sufficient BEAM introspection capabilities for the initial release. ETSBrowser can be revisited in a future phase if needed.
 
 ETSBrowser provides inspection and manipulation of ETS/DETS tables. It displays table metadata, supports queries with match specs, and enables record editing.
 
@@ -659,26 +661,26 @@ ETSBrowser provides inspection and manipulation of ETS/DETS tables. It displays 
 
 ### 6.12.4 ClusterDashboard Widget
 
-- [ ] **Task 6.12.4 Complete**
+- [x] **Task 6.12.4 Complete**
 
 ClusterDashboard visualizes distributed Erlang clusters with node status, health metrics, and cross-node process information.
 
-- [ ] 6.12.4.1 Implement connected nodes list with status
-- [ ] 6.12.4.2 Implement node health metrics (CPU, memory, load)
-- [ ] 6.12.4.3 Implement cross-node process registry display
-- [ ] 6.12.4.4 Implement pg group membership visualization
-- [ ] 6.12.4.5 Implement network partition detection and alerts
-- [ ] 6.12.4.6 Implement node connection/disconnection events
-- [ ] 6.12.4.7 Implement RPC interface for remote inspection
+- [x] 6.12.4.1 Implement connected nodes list with status
+- [x] 6.12.4.2 Implement node health metrics (CPU, memory, load)
+- [x] 6.12.4.3 Implement cross-node process registry display
+- [x] 6.12.4.4 Implement pg group membership visualization
+- [x] 6.12.4.5 Implement network partition detection and alerts
+- [x] 6.12.4.6 Implement node connection/disconnection events
+- [x] 6.12.4.7 Implement RPC interface for remote inspection
 
 ### Unit Tests - Section 6.12
 
-- [ ] **Unit Tests 6.12 Complete**
-- [ ] Test process monitor displays correct process info
-- [ ] Test supervision tree reflects actual hierarchy
-- [ ] Test ETS browser lists tables correctly
-- [ ] Test cluster dashboard shows connected nodes
-- [ ] Test live updates reflect system changes
+- [x] **Unit Tests 6.12 Complete**
+- [x] Test process monitor displays correct process info
+- [x] Test supervision tree reflects actual hierarchy
+- [ ] Test ETS browser lists tables correctly (Skipped - ETSBrowser skipped)
+- [x] Test cluster dashboard shows connected nodes
+- [x] Test live updates reflect system changes
 
 ---
 
