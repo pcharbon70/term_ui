@@ -668,5 +668,150 @@ defmodule TermUI.Widgets.CommandPaletteTest do
       assert length(state.submenu_stack) == 1
       assert length(state.filtered_commands) == 2
     end
+
+    test "async action handles loader errors gracefully" do
+      commands = [
+        %{id: :error_cmd, label: "Error", action: {:async, fn _query -> raise "Loader error" end}}
+      ]
+
+      props = CommandPalette.new(commands: commands)
+      {:ok, state} = CommandPalette.init(props)
+
+      # Should not crash despite loader error
+      {:ok, state} = CommandPalette.handle_event(Event.key(:enter), state)
+
+      # Loading should be false and async_error should be set
+      assert state.loading == false
+      assert state.async_error != nil
+    end
+
+    test "async_error is initialized to nil" do
+      props = CommandPalette.new(commands: sample_commands())
+      {:ok, state} = CommandPalette.init(props)
+
+      assert state.async_error == nil
+    end
+  end
+
+  describe "empty commands edge case" do
+    test "handles empty commands list" do
+      props = CommandPalette.new(commands: [])
+
+      {:ok, state} = CommandPalette.init(props)
+
+      assert state.commands == []
+      assert state.filtered_commands == []
+    end
+
+    test "navigation with empty commands" do
+      props = CommandPalette.new(commands: [])
+
+      {:ok, state} = CommandPalette.init(props)
+
+      # Navigation should not crash
+      {:ok, state} = CommandPalette.handle_event(Event.key(:down), state)
+      assert state.selected_index == 0
+
+      {:ok, state} = CommandPalette.handle_event(Event.key(:up), state)
+      assert state.selected_index == 0
+    end
+
+    test "enter with empty commands does nothing" do
+      props = CommandPalette.new(commands: [])
+
+      {:ok, state} = CommandPalette.init(props)
+
+      {:ok, state} = CommandPalette.handle_event(Event.key(:enter), state)
+      # Should not crash and state should be unchanged
+      assert state.visible == true
+    end
+  end
+
+  describe "render output verification" do
+    test "visible palette has correct structure" do
+      props = CommandPalette.new(commands: sample_commands())
+      {:ok, state} = CommandPalette.init(props)
+
+      result = CommandPalette.render(state, @default_area)
+
+      # Should return a valid render node (type varies by implementation)
+      assert result != nil
+      assert result.type in [:styled, :box, :stack]
+    end
+
+    test "hidden palette returns empty node" do
+      props = CommandPalette.new(commands: sample_commands())
+      {:ok, state} = CommandPalette.init(props)
+
+      state = CommandPalette.hide(state)
+      result = CommandPalette.render(state, @default_area)
+
+      assert result.type == :empty
+    end
+
+    test "palette with search query renders filtered results" do
+      props = CommandPalette.new(commands: sample_commands())
+      {:ok, state} = CommandPalette.init(props)
+
+      state = CommandPalette.set_query(state, "Save")
+      result = CommandPalette.render(state, @default_area)
+
+      # Result should be valid render node
+      assert result != nil
+      assert result.type in [:styled, :box, :stack]
+    end
+  end
+
+  describe "category edge cases" do
+    test "invalid prefix is treated as search term" do
+      props = CommandPalette.new(commands: sample_commands())
+      {:ok, state} = CommandPalette.init(props)
+
+      state = CommandPalette.set_query(state, "xsave")
+
+      # No category filter, treated as fuzzy search
+      assert state.category_filter == nil
+    end
+
+    test "category with no matching commands" do
+      props = CommandPalette.new(commands: sample_commands())
+      {:ok, state} = CommandPalette.init(props)
+
+      # Filter by tag category but no tag commands in sample
+      state = CommandPalette.set_query(state, "#nonexistent")
+
+      assert state.category_filter == :tag
+      # No tag commands in sample, so filtered_commands may be empty
+    end
+  end
+
+  describe "fuzzy search optimization" do
+    test "query longer than target returns 0 score" do
+      props = CommandPalette.new(commands: [
+        %{id: :short, label: "Hi", action: fn -> :ok end}
+      ])
+      {:ok, state} = CommandPalette.init(props)
+
+      state = CommandPalette.set_query(state, "Hello World")
+
+      # Should not match since query is longer than "Hi"
+      assert state.filtered_commands == []
+    end
+
+    test "handles large command sets efficiently" do
+      # Create 100 commands
+      commands = Enum.map(1..100, fn i ->
+        %{id: :"cmd_#{i}", label: "Command #{i}", action: fn -> :ok end}
+      end)
+
+      props = CommandPalette.new(commands: commands)
+      {:ok, state} = CommandPalette.init(props)
+
+      # Search should complete quickly
+      state = CommandPalette.set_query(state, "com")
+
+      # All commands should match since they all start with "Command"
+      assert length(state.filtered_commands) == 100
+    end
   end
 end

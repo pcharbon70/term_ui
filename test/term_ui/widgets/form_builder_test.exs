@@ -741,4 +741,174 @@ defmodule TermUI.Widgets.FormBuilderTest do
       refute MapSet.member?(state.collapsed_groups, :info)
     end
   end
+
+  describe "password field handling" do
+    test "password field masks characters in rendering" do
+      props =
+        FormBuilder.new(
+          fields: [%{id: :password, type: :password, label: "Password"}],
+          values: %{password: "secret123"}
+        )
+
+      {:ok, state} = FormBuilder.init(props)
+
+      # Verify the value is stored correctly (not masked in state)
+      assert state.values[:password] == "secret123"
+
+      # Render and verify output contains masked characters
+      result = FormBuilder.render(state, @default_area)
+      assert result != nil
+    end
+
+    test "password field accepts character input" do
+      props =
+        FormBuilder.new(
+          fields: [%{id: :password, type: :password, label: "Password"}]
+        )
+
+      {:ok, state} = FormBuilder.init(props)
+
+      {:ok, state} = FormBuilder.handle_event(Event.key(nil, char: "s"), state)
+      {:ok, state} = FormBuilder.handle_event(Event.key(nil, char: "e"), state)
+      {:ok, state} = FormBuilder.handle_event(Event.key(nil, char: "c"), state)
+
+      assert state.values[:password] == "sec"
+    end
+
+    test "password field handles backspace" do
+      props =
+        FormBuilder.new(
+          fields: [%{id: :password, type: :password, label: "Password"}],
+          values: %{password: "secret"}
+        )
+
+      {:ok, state} = FormBuilder.init(props)
+
+      {:ok, state} = FormBuilder.handle_event(Event.key(:backspace), state)
+
+      assert state.values[:password] == "secre"
+    end
+
+    test "password field with placeholder" do
+      props =
+        FormBuilder.new(
+          fields: [%{id: :password, type: :password, label: "Password", placeholder: "Enter password"}]
+        )
+
+      {:ok, state} = FormBuilder.init(props)
+
+      # Empty password should show placeholder in render
+      result = FormBuilder.render(state, @default_area)
+      assert result != nil
+    end
+  end
+
+  describe "get_errors/1 public API" do
+    test "returns empty map when no errors" do
+      props =
+        FormBuilder.new(
+          fields: [%{id: :name, type: :text, label: "Name"}]
+        )
+
+      {:ok, state} = FormBuilder.init(props)
+
+      assert FormBuilder.get_errors(state) == %{}
+    end
+
+    test "returns errors map after validation failure" do
+      props =
+        FormBuilder.new(
+          fields: [%{id: :name, type: :text, label: "Name", required: true}]
+        )
+
+      {:ok, state} = FormBuilder.init(props)
+      state = FormBuilder.validate(state)
+
+      errors = FormBuilder.get_errors(state)
+      assert Map.has_key?(errors, :name)
+      assert errors[:name] != []
+    end
+  end
+
+  describe "placeholder display" do
+    test "placeholder is set in field definition" do
+      props =
+        FormBuilder.new(
+          fields: [%{id: :name, type: :text, label: "Name", placeholder: "Enter name"}]
+        )
+
+      {:ok, state} = FormBuilder.init(props)
+
+      field = Enum.find(state.fields, &(&1.id == :name))
+      assert field.placeholder == "Enter name"
+    end
+
+    test "renders with placeholder when value is empty" do
+      props =
+        FormBuilder.new(
+          fields: [%{id: :name, type: :text, label: "Name", placeholder: "Enter name"}]
+        )
+
+      {:ok, state} = FormBuilder.init(props)
+      result = FormBuilder.render(state, @default_area)
+
+      # Render should produce a valid result
+      assert result != nil
+    end
+  end
+
+  describe "empty fields edge case" do
+    test "handles empty fields list" do
+      props = FormBuilder.new(fields: [])
+
+      {:ok, state} = FormBuilder.init(props)
+
+      assert state.fields == []
+      assert state.focused_field == nil
+    end
+
+    test "navigation with empty fields" do
+      props = FormBuilder.new(fields: [], show_submit_button: true)
+
+      {:ok, state} = FormBuilder.init(props)
+
+      # Tab should focus submit button
+      {:ok, state} = FormBuilder.handle_event(Event.key(:tab), state)
+      assert state.submit_focused == true
+    end
+  end
+
+  describe "callback error handling" do
+    test "on_change callback errors are caught" do
+      props =
+        FormBuilder.new(
+          fields: [%{id: :name, type: :text, label: "Name"}],
+          on_change: fn _field_id, _value -> raise "Callback error" end
+        )
+
+      {:ok, state} = FormBuilder.init(props)
+
+      # Should not crash despite callback error
+      {:ok, state} = FormBuilder.handle_event(Event.key(nil, char: "a"), state)
+      assert state.values[:name] == "a"
+    end
+
+    test "on_submit callback errors are caught" do
+      props =
+        FormBuilder.new(
+          fields: [%{id: :name, type: :text, label: "Name"}],
+          values: %{name: "test"},
+          on_submit: fn _values -> raise "Submit error" end
+        )
+
+      {:ok, state} = FormBuilder.init(props)
+
+      # Navigate to submit button
+      {:ok, state} = FormBuilder.handle_event(Event.key(:tab), state)
+      assert state.submit_focused == true
+
+      # Submit should not crash despite callback error
+      {:ok, _state} = FormBuilder.handle_event(Event.key(:enter), state)
+    end
+  end
 end

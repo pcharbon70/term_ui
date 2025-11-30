@@ -40,6 +40,7 @@ defmodule TermUI.Widgets.FormBuilder do
   use TermUI.StatefulComponent
 
   alias TermUI.Event
+  alias TermUI.Widgets.WidgetHelpers, as: Helpers
 
   @type field_type :: :text | :password | :checkbox | :radio | :select | :multi_select
 
@@ -145,6 +146,26 @@ defmodule TermUI.Widgets.FormBuilder do
       editing_text: nil,
       submit_focused: false
     }
+
+    {:ok, state}
+  end
+
+  @impl true
+  def update(new_props, state) do
+    # Update fields and groups from new props
+    state =
+      state
+      |> Map.put(:fields, normalize_fields(new_props.fields))
+      |> Map.put(:groups, new_props.groups)
+      |> Map.put(:show_submit_button, new_props.show_submit_button)
+      |> Map.put(:submit_label, new_props.submit_label)
+      |> Map.put(:label_width, new_props.label_width)
+      |> Map.put(:field_width, new_props.field_width)
+
+    # Update values with any new initial values, keeping existing values
+    initial_values = new_props.initial_values || %{}
+    values = Map.merge(initial_values, state.values)
+    state = %{state | values: values}
 
     {:ok, state}
   end
@@ -335,9 +356,8 @@ defmodule TermUI.Widgets.FormBuilder do
     if new_focus == :__submit__ do
       %{state | submit_focused: true, focused_option: 0}
     else
-      field = get_field(state, new_focus)
-      initial_option = if field && field.type in [:radio, :select, :multi_select], do: 0, else: 0
-      %{state | focused_field: new_focus, submit_focused: false, focused_option: initial_option}
+      # Reset focused_option to 0 when navigating to a new field
+      %{state | focused_field: new_focus, submit_focused: false, focused_option: 0}
     end
   end
 
@@ -410,9 +430,15 @@ defmodule TermUI.Widgets.FormBuilder do
   defp update_value(state, field_id, value) do
     state = %{state | values: Map.put(state.values, field_id, value)}
 
-    # Call on_change callback
+    # Call on_change callback with error handling
     if state.on_change do
-      state.on_change.(field_id, value)
+      try do
+        state.on_change.(field_id, value)
+      rescue
+        e ->
+          require Logger
+          Logger.error("FormBuilder on_change callback error for field #{field_id}: #{inspect(e)}")
+      end
     end
 
     state
@@ -480,8 +506,15 @@ defmodule TermUI.Widgets.FormBuilder do
     if has_errors?(state) do
       {:ok, state}
     else
+      # Call on_submit callback with error handling
       if state.on_submit do
-        state.on_submit.(state.values)
+        try do
+          state.on_submit.(state.values)
+        rescue
+          e ->
+            require Logger
+            Logger.error("FormBuilder on_submit callback error: #{inspect(e)}")
+        end
       end
 
       {:ok, state}
@@ -556,10 +589,7 @@ defmodule TermUI.Widgets.FormBuilder do
     _field_width = state.field_width
 
     # Build label
-    label_text =
-      field.label
-      |> String.pad_trailing(label_width)
-      |> String.slice(0, label_width)
+    label_text = Helpers.pad_and_truncate(field.label, label_width)
 
     required_marker = if field.required, do: "*", else: " "
     label = "#{label_text}#{required_marker} "
@@ -567,12 +597,9 @@ defmodule TermUI.Widgets.FormBuilder do
     # Build field content based on type
     field_content = render_field_content(field, value, state, focused)
 
-    # Build focus indicator
-    focus_indicator = if focused, do: "> ", else: "  "
-
     # Combine into row
     row = stack(:horizontal, [
-      text(focus_indicator),
+      text(Helpers.focus_indicator(focused)),
       text(label),
       field_content
     ])
@@ -621,16 +648,8 @@ defmodule TermUI.Widgets.FormBuilder do
         value
       end
 
-    padded = String.pad_trailing(display_value, width)
-    truncated = String.slice(padded, 0, width)
-
-    content = "[#{truncated}]"
-
-    if focused do
-      styled(text(content), Style.new(attrs: [:reverse]))
-    else
-      text(content)
-    end
+    content = "[#{Helpers.pad_and_truncate(display_value, width)}]"
+    Helpers.text_focused(content, focused)
   end
 
   defp render_password_field(field, value, width, focused) do
@@ -643,26 +662,13 @@ defmodule TermUI.Widgets.FormBuilder do
         masked
       end
 
-    padded = String.pad_trailing(display_value, width)
-    truncated = String.slice(padded, 0, width)
-
-    content = "[#{truncated}]"
-
-    if focused do
-      styled(text(content), Style.new(attrs: [:reverse]))
-    else
-      text(content)
-    end
+    content = "[#{Helpers.pad_and_truncate(display_value, width)}]"
+    Helpers.text_focused(content, focused)
   end
 
   defp render_checkbox_field(value, focused) do
     checkbox = if value, do: "[x]", else: "[ ]"
-
-    if focused do
-      styled(text(checkbox), Style.new(attrs: [:reverse]))
-    else
-      text(checkbox)
-    end
+    Helpers.text_focused(checkbox, focused)
   end
 
   defp render_radio_field(field, selected_value, focused_option, focused) do
@@ -676,11 +682,7 @@ defmodule TermUI.Widgets.FormBuilder do
         indicator = if selected, do: "(o)", else: "( )"
         content = "#{indicator} #{label}"
 
-        if option_focused do
-          styled(text(content), Style.new(attrs: [:reverse]))
-        else
-          text(content)
-        end
+        Helpers.text_focused(content, option_focused)
       end)
 
     stack(:horizontal, Enum.intersperse(options, text("  ")))
@@ -706,11 +708,7 @@ defmodule TermUI.Widgets.FormBuilder do
           prefix = if selected, do: "* ", else: "  "
           content = "#{prefix}#{label}"
 
-          if option_focused do
-            styled(text(content), Style.new(attrs: [:reverse]))
-          else
-            text(content)
-          end
+          Helpers.text_focused(content, option_focused)
         end)
 
       stack(:vertical, options)
@@ -732,11 +730,7 @@ defmodule TermUI.Widgets.FormBuilder do
         checkbox = if selected, do: "[x]", else: "[ ]"
         content = "#{checkbox} #{label}"
 
-        if option_focused do
-          styled(text(content), Style.new(attrs: [:reverse]))
-        else
-          text(content)
-        end
+        Helpers.text_focused(content, option_focused)
       end)
 
     stack(:vertical, options)
@@ -744,14 +738,7 @@ defmodule TermUI.Widgets.FormBuilder do
 
   defp render_submit_button(state) do
     label = "[ #{state.submit_label} ]"
-
-    content =
-      if state.submit_focused do
-        styled(text(label), Style.new(attrs: [:reverse]))
-      else
-        text(label)
-      end
-
+    content = Helpers.text_focused(label, state.submit_focused)
     padding = String.duplicate(" ", state.label_width + 3)
 
     stack(:vertical, [
