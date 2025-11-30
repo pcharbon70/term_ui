@@ -151,8 +151,13 @@ defmodule TermUI.Elm do
     quote do
       @behaviour TermUI.Elm
 
-      import TermUI.Elm.Helpers
+      # Import Component.Helpers for RenderNode-based view building
+      # (text/1, text/2, box/1, box/2, stack/2, stack/3, styled/2, empty/0)
       import TermUI.Component.Helpers
+
+      # Import Elm.Helpers for macros that don't conflict
+      # Exclude text, styled, box which are provided by Component.Helpers
+      import TermUI.Elm.Helpers, except: [text: 1, styled: 2, box: 1, box: 2]
 
       # Default implementations
 
