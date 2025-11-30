@@ -58,7 +58,10 @@ defmodule TermUI.MixProject do
       {:stream_data, "~> 1.0", only: :test},
 
       # Streaming
-      {:gen_stage, "~> 1.2"}
+      {:gen_stage, "~> 1.2"},
+
+      # LLM usage rules
+      {:usage_rules, "~> 0.1", only: :dev, runtime: false}
     ]
   end
 
