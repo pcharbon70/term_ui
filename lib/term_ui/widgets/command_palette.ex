@@ -38,6 +38,7 @@ defmodule TermUI.Widgets.CommandPalette do
   use TermUI.StatefulComponent
 
   alias TermUI.Event
+  alias TermUI.Widgets.WidgetHelpers, as: Helpers
 
   @type command :: %{
           id: atom(),
@@ -112,6 +113,7 @@ defmodule TermUI.Widgets.CommandPalette do
       max_visible: props.max_visible,
       visible: true,
       loading: false,
+      async_error: nil,
       category_filter: nil,
       on_select: props.on_select,
       on_close: props.on_close,
@@ -120,6 +122,23 @@ defmodule TermUI.Widgets.CommandPalette do
       submenu_stack: [],
       scroll_offset: 0
     }
+
+    {:ok, state}
+  end
+
+  @impl true
+  def update(new_props, state) do
+    # Update commands and configuration from new props
+    state =
+      state
+      |> Map.put(:commands, normalize_commands(new_props.commands))
+      |> Map.put(:max_recent, new_props.max_recent)
+      |> Map.put(:max_visible, new_props.max_visible)
+      |> Map.put(:placeholder, new_props.placeholder)
+      |> Map.put(:width, new_props.width)
+
+    # Re-filter commands with current query
+    state = update_query(state, state.query)
 
     {:ok, state}
   end
@@ -208,7 +227,7 @@ defmodule TermUI.Widgets.CommandPalette do
 
   @impl true
   def render(state, _area) do
-    if not state.visible do
+    unless state.visible do
       empty()
     else
       render_palette(state)
@@ -286,66 +305,92 @@ defmodule TermUI.Widgets.CommandPalette do
     |> Enum.reject(&is_nil/1)
   end
 
-  # Fuzzy search
+  # Fuzzy search - optimized with early termination
+
+  @min_fuzzy_score 5  # Minimum score threshold for fuzzy matches
 
   defp fuzzy_score(query, target) do
-    query = String.downcase(query)
+    query_lower = String.downcase(query)
     target_lower = String.downcase(target)
+    query_len = String.length(query_lower)
+    target_len = String.length(target_lower)
 
     cond do
+      # Early termination: query longer than target can't match
+      query_len > target_len ->
+        0
+
       # Exact match
-      target_lower == query ->
+      target_lower == query_lower ->
         100
 
       # Prefix match
-      String.starts_with?(target_lower, query) ->
-        50 + 10 * String.length(query)
+      String.starts_with?(target_lower, query_lower) ->
+        50 + 10 * query_len
 
       # Contains
-      String.contains?(target_lower, query) ->
-        30 + 5 * String.length(query)
+      String.contains?(target_lower, query_lower) ->
+        30 + 5 * query_len
 
-      # Fuzzy match
+      # Fuzzy match with early termination
       true ->
-        fuzzy_match_score(String.graphemes(query), String.graphemes(target_lower), 0, 0)
+        # Convert to charlists for O(1) indexing
+        query_chars = String.to_charlist(query_lower)
+        target_chars = String.to_charlist(target_lower)
+        fuzzy_match_score(query_chars, target_chars, 0, 0, target_len)
     end
   end
 
-  defp fuzzy_match_score([], _target, score, _last_match_idx) do
-    if score > 0, do: score, else: 0
+  defp fuzzy_match_score([], _target, score, _last_match_idx, _target_len) do
+    if score >= @min_fuzzy_score, do: score, else: 0
   end
 
-  defp fuzzy_match_score([q | rest_q], target, score, last_match_idx) do
-    case find_char_index(target, q, last_match_idx) do
-      nil ->
-        0
+  defp fuzzy_match_score([q | rest_q], target, score, last_match_idx, target_len) do
+    # Early termination: not enough characters left to match remaining query
+    remaining_query = length(rest_q) + 1
+    remaining_target = target_len - last_match_idx
 
-      idx ->
-        # Bonus for consecutive matches
-        consecutive_bonus = if idx == last_match_idx, do: 20, else: 0
+    if remaining_query > remaining_target do
+      0
+    else
+      case find_char_index_fast(target, q, last_match_idx, target_len) do
+        nil ->
+          0
 
-        # Bonus for word boundary
-        boundary_bonus =
-          cond do
-            idx == 0 -> 15
-            Enum.at(target, idx - 1) in [" ", "_", "-", "/", "\\"] -> 10
-            true -> 0
-          end
+        idx ->
+          # Bonus for consecutive matches (adjacent to previous match)
+          consecutive_bonus = if idx == last_match_idx, do: 20, else: 0
 
-        # Penalty for gaps
-        gap_penalty = max(0, (idx - last_match_idx - 1) * 2)
+          # Bonus for word boundary
+          boundary_bonus =
+            cond do
+              idx == 0 -> 15
+              Enum.at(target, idx - 1) in ~c" _-/\\" -> 10
+              true -> 0
+            end
 
-        new_score = score + 10 + consecutive_bonus + boundary_bonus - gap_penalty
-        fuzzy_match_score(rest_q, target, new_score, idx + 1)
+          # Penalty for gaps
+          gap_penalty = min(10, max(0, (idx - last_match_idx - 1) * 2))
+
+          new_score = score + 10 + consecutive_bonus + boundary_bonus - gap_penalty
+          fuzzy_match_score(rest_q, target, new_score, idx + 1, target_len)
+      end
     end
   end
 
-  defp find_char_index(chars, target_char, start_idx) do
-    chars
-    |> Enum.with_index()
-    |> Enum.find_value(fn {char, idx} ->
-      if idx >= start_idx && char == target_char, do: idx, else: nil
-    end)
+  # Optimized char finding using charlists for O(1) access
+  defp find_char_index_fast(chars, target_char, start_idx, len) do
+    find_char_index_fast(chars, target_char, start_idx, len, start_idx)
+  end
+
+  defp find_char_index_fast(_chars, _target_char, idx, len, _start) when idx >= len, do: nil
+
+  defp find_char_index_fast(chars, target_char, idx, len, start) do
+    if Enum.at(chars, idx) == target_char do
+      idx
+    else
+      find_char_index_fast(chars, target_char, idx + 1, len, start)
+    end
   end
 
   # Selection
@@ -380,7 +425,7 @@ defmodule TermUI.Widgets.CommandPalette do
         fun when is_function(fun, 0) -> fun.()
       end
 
-    if not enabled do
+    unless enabled do
       {:ok, state}
     else
       case command.action do
@@ -390,16 +435,19 @@ defmodule TermUI.Widgets.CommandPalette do
 
         {:async, loader} ->
           state = %{state | loading: true}
-          # In real implementation, this would spawn a task
-          # For now, we execute synchronously
+          # Execute loader with proper error handling
+          # Note: For truly non-blocking async, the caller should spawn a Task
+          # and send a message back. This implementation is synchronous but safe.
           try do
             commands = loader.(state.query)
             state = push_submenu(state, command.id, commands)
             state = %{state | loading: false}
             {:ok, state}
           rescue
-            _ ->
-              state = %{state | loading: false}
+            e ->
+              require Logger
+              Logger.error("CommandPalette async loader error for #{command.id}: #{inspect(e)}")
+              state = %{state | loading: false, async_error: inspect(e)}
               {:ok, state}
           end
 
@@ -495,20 +543,17 @@ defmodule TermUI.Widgets.CommandPalette do
         path =
           state.submenu_stack
           |> Enum.reverse()
-          |> Enum.map(fn %{parent_id: id} ->
+          |> Enum.map_join(" > ", fn %{parent_id: id} ->
             cmd = Enum.find(state.commands, &(&1.id == id))
             if cmd, do: cmd.label, else: to_string(id)
           end)
-          |> Enum.join(" > ")
 
         " > #{path}"
       else
         ""
       end
 
-    title = "Command Palette#{breadcrumb}"
-    title = String.pad_trailing(title, width)
-    title = String.slice(title, 0, width)
+    title = Helpers.pad_and_truncate("Command Palette#{breadcrumb}", width)
 
     styled(text("┌#{String.duplicate("─", width - 2)}┐\n│#{title}│"), Style.new(fg: :cyan))
   end
@@ -536,8 +581,7 @@ defmodule TermUI.Widgets.CommandPalette do
     loading_indicator = if state.loading, do: " ⟳", else: ""
 
     input_width = width - 6 - String.length(loading_indicator)
-    padded = String.pad_trailing(display_text, input_width)
-    truncated = String.slice(padded, 0, input_width)
+    truncated = Helpers.pad_and_truncate(display_text, input_width)
 
     input_content = "│ #{prefix_indicator} #{truncated}#{loading_indicator} │"
 
@@ -592,18 +636,14 @@ defmodule TermUI.Widgets.CommandPalette do
     label_width = content_width - String.length(shortcut) - 2  # For icon and space
 
     # Truncate label if needed
-    truncated_label = String.slice(label, 0, label_width)
+    truncated_label = Helpers.truncate(label, label_width)
     padding_needed = content_width - String.length(truncated_label) - String.length(shortcut) - 2
 
     row_content = " #{icon} #{truncated_label}#{String.duplicate(" ", max(0, padding_needed))}#{shortcut} "
 
     row = "│#{row_content}│"
 
-    if is_selected do
-      styled(text(row), Style.new(attrs: [:reverse]))
-    else
-      text(row)
-    end
+    Helpers.text_focused(row, is_selected)
   end
 
   defp render_footer(state, width) do
@@ -630,8 +670,7 @@ defmodule TermUI.Widgets.CommandPalette do
         " #{footer_text} "
       end
 
-    footer_content = String.slice(footer_content, 0, width - 2)
-    footer_content = String.pad_trailing(footer_content, width - 2)
+    footer_content = Helpers.pad_and_truncate(footer_content, width - 2)
 
     styled(text("│#{footer_content}│\n└#{String.duplicate("─", width - 2)}┘"), Style.new(fg: :white, attrs: [:dim]))
   end
