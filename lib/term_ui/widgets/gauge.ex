@@ -216,6 +216,7 @@ defmodule TermUI.Widgets.Gauge do
 
     # Middle shows value position
     right_padding = max(0, width - arc_position - 3)
+
     indicator_line =
       VizHelper.safe_duplicate(" ", arc_position) <>
         "▼" <>

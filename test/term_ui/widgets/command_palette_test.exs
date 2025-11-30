@@ -8,9 +8,27 @@ defmodule TermUI.Widgets.CommandPaletteTest do
 
   defp sample_commands do
     [
-      %{id: :save, label: "Save File", shortcut: "Ctrl+S", category: :command, action: fn -> :saved end},
-      %{id: :open, label: "Open File", shortcut: "Ctrl+O", category: :command, action: fn -> :opened end},
-      %{id: :close, label: "Close Tab", shortcut: "Ctrl+W", category: :command, action: fn -> :closed end},
+      %{
+        id: :save,
+        label: "Save File",
+        shortcut: "Ctrl+S",
+        category: :command,
+        action: fn -> :saved end
+      },
+      %{
+        id: :open,
+        label: "Open File",
+        shortcut: "Ctrl+O",
+        category: :command,
+        action: fn -> :opened end
+      },
+      %{
+        id: :close,
+        label: "Close Tab",
+        shortcut: "Ctrl+W",
+        category: :command,
+        action: fn -> :closed end
+      },
       %{id: :goto_line, label: "Go to Line", category: :goto, action: fn -> :goto end},
       %{id: :goto_symbol, label: "Go to Symbol", category: :symbol, action: fn -> :symbol end},
       %{id: :settings, label: "Open Settings", category: :command, action: fn -> :settings end},
@@ -210,10 +228,11 @@ defmodule TermUI.Widgets.CommandPaletteTest do
       {:ok, state} = CommandPalette.init(props)
 
       # Move all the way down
-      state = Enum.reduce(1..20, state, fn _, acc ->
-        {:ok, new_state} = CommandPalette.handle_event(Event.key(:down), acc)
-        new_state
-      end)
+      state =
+        Enum.reduce(1..20, state, fn _, acc ->
+          {:ok, new_state} = CommandPalette.handle_event(Event.key(:down), acc)
+          new_state
+        end)
 
       # Should be at last index
       assert state.selected_index == length(state.filtered_commands) - 1
@@ -232,10 +251,11 @@ defmodule TermUI.Widgets.CommandPaletteTest do
       {:ok, state} = CommandPalette.init(props)
 
       # First go down
-      state = Enum.reduce(1..5, state, fn _, acc ->
-        {:ok, new_state} = CommandPalette.handle_event(Event.key(:down), acc)
-        new_state
-      end)
+      state =
+        Enum.reduce(1..5, state, fn _, acc ->
+          {:ok, new_state} = CommandPalette.handle_event(Event.key(:down), acc)
+          new_state
+        end)
 
       {:ok, state} = CommandPalette.handle_event(Event.key(:page_up), state)
       assert state.selected_index == 2
@@ -330,7 +350,12 @@ defmodule TermUI.Widgets.CommandPaletteTest do
       test_pid = self()
 
       commands = [
-        %{id: :test, label: "Test", enabled: false, action: fn -> send(test_pid, {executed, :executed}) end}
+        %{
+          id: :test,
+          label: "Test",
+          enabled: false,
+          action: fn -> send(test_pid, {executed, :executed}) end
+        }
       ]
 
       props = CommandPalette.new(commands: commands)
@@ -345,7 +370,12 @@ defmodule TermUI.Widgets.CommandPaletteTest do
       test_pid = self()
 
       commands = [
-        %{id: :test, label: "Test", enabled: fn -> true end, action: fn -> send(test_pid, :executed) end}
+        %{
+          id: :test,
+          label: "Test",
+          enabled: fn -> true end,
+          action: fn -> send(test_pid, :executed) end
+        }
       ]
 
       props = CommandPalette.new(commands: commands)
@@ -375,9 +405,10 @@ defmodule TermUI.Widgets.CommandPaletteTest do
     end
 
     test "recent commands limited by max_recent" do
-      commands = Enum.map(1..10, fn i ->
-        %{id: :"cmd#{i}", label: "Command #{i}", action: fn -> :ok end}
-      end)
+      commands =
+        Enum.map(1..10, fn i ->
+          %{id: :"cmd#{i}", label: "Command #{i}", action: fn -> :ok end}
+        end)
 
       props = CommandPalette.new(commands: commands, max_recent: 3)
       {:ok, state} = CommandPalette.init(props)
@@ -787,9 +818,13 @@ defmodule TermUI.Widgets.CommandPaletteTest do
 
   describe "fuzzy search optimization" do
     test "query longer than target returns 0 score" do
-      props = CommandPalette.new(commands: [
-        %{id: :short, label: "Hi", action: fn -> :ok end}
-      ])
+      props =
+        CommandPalette.new(
+          commands: [
+            %{id: :short, label: "Hi", action: fn -> :ok end}
+          ]
+        )
+
       {:ok, state} = CommandPalette.init(props)
 
       state = CommandPalette.set_query(state, "Hello World")
@@ -800,9 +835,10 @@ defmodule TermUI.Widgets.CommandPaletteTest do
 
     test "handles large command sets efficiently" do
       # Create 100 commands
-      commands = Enum.map(1..100, fn i ->
-        %{id: :"cmd_#{i}", label: "Command #{i}", action: fn -> :ok end}
-      end)
+      commands =
+        Enum.map(1..100, fn i ->
+          %{id: :"cmd_#{i}", label: "Command #{i}", action: fn -> :ok end}
+        end)
 
       props = CommandPalette.new(commands: commands)
       {:ok, state} = CommandPalette.init(props)

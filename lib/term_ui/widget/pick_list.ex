@@ -213,20 +213,23 @@ defmodule TermUI.Widget.PickList do
       end
 
     # Render items
-    cells = cells ++ render_items(
-      state.filtered_items,
-      state.selected_index,
-      state.scroll_offset,
-      modal_x + 1,
-      content_start_y,
-      modal_width - 2,
-      content_height,
-      style,
-      highlight_style
-    )
+    cells =
+      cells ++
+        render_items(
+          state.filtered_items,
+          state.selected_index,
+          state.scroll_offset,
+          modal_x + 1,
+          content_start_y,
+          modal_width - 2,
+          content_height,
+          style,
+          highlight_style
+        )
 
     # Render status line
-    cells = cells ++ render_status_line(state, modal_x, modal_y + modal_height - 2, modal_width, style)
+    cells =
+      cells ++ render_status_line(state, modal_x, modal_y + modal_height - 2, modal_width, style)
 
     RenderNode.cells(cells)
   end
@@ -239,17 +242,19 @@ defmodule TermUI.Widget.PickList do
         state.original_items
       else
         filter_lower = String.downcase(filter_text)
+
         Enum.filter(state.original_items, fn item ->
           String.downcase(to_string(item)) |> String.contains?(filter_lower)
         end)
       end
 
     # Reset selection when filter changes
-    %{state |
-      filter_text: filter_text,
-      filtered_items: filtered,
-      selected_index: 0,
-      scroll_offset: 0
+    %{
+      state
+      | filter_text: filter_text,
+        filtered_items: filtered,
+        selected_index: 0,
+        scroll_offset: 0
     }
   end
 
@@ -284,34 +289,43 @@ defmodule TermUI.Widget.PickList do
 
     cells = cells ++ [positioned_cell(x, y, @border.tl, style)]
 
-    cells = cells ++ for(i <- 1..(title_start - 1), do: positioned_cell(x + i, y, @border.h, style))
+    cells =
+      cells ++ for(i <- 1..(title_start - 1), do: positioned_cell(x + i, y, @border.h, style))
 
-    cells = cells ++
-      (title_padded
-       |> String.graphemes()
-       |> Enum.with_index()
-       |> Enum.map(fn {char, i} ->
-         positioned_cell(x + title_start + i, y, char, style)
-       end))
+    cells =
+      cells ++
+        (title_padded
+         |> String.graphemes()
+         |> Enum.with_index()
+         |> Enum.map(fn {char, i} ->
+           positioned_cell(x + title_start + i, y, char, style)
+         end))
 
     title_end = title_start + String.length(title_padded)
-    cells = cells ++ for(i <- title_end..(width - 2), do: positioned_cell(x + i, y, @border.h, style))
+
+    cells =
+      cells ++ for(i <- title_end..(width - 2), do: positioned_cell(x + i, y, @border.h, style))
 
     cells = cells ++ [positioned_cell(x + width - 1, y, @border.tr, style)]
 
     # Side borders
-    cells = cells ++
-      for row <- 1..(height - 2) do
-        [
-          positioned_cell(x, y + row, @border.v, style),
-          positioned_cell(x + width - 1, y + row, @border.v, style)
-        ]
-      end
+    cells =
+      (cells ++
+         for row <- 1..(height - 2) do
+           [
+             positioned_cell(x, y + row, @border.v, style),
+             positioned_cell(x + width - 1, y + row, @border.v, style)
+           ]
+         end)
       |> List.flatten()
 
     # Bottom border
     cells = cells ++ [positioned_cell(x, y + height - 1, @border.bl, style)]
-    cells = cells ++ for(i <- 1..(width - 2), do: positioned_cell(x + i, y + height - 1, @border.h, style))
+
+    cells =
+      cells ++
+        for(i <- 1..(width - 2), do: positioned_cell(x + i, y + height - 1, @border.h, style))
+
     cells = cells ++ [positioned_cell(x + width - 1, y + height - 1, @border.br, style)]
 
     cells
@@ -331,7 +345,17 @@ defmodule TermUI.Widget.PickList do
     end)
   end
 
-  defp render_items(items, selected_index, scroll_offset, x, y, width, height, style, highlight_style) do
+  defp render_items(
+         items,
+         selected_index,
+         scroll_offset,
+         x,
+         y,
+         width,
+         height,
+         style,
+         highlight_style
+       ) do
     if items == [] do
       # Empty list message
       msg = "(No items)"
@@ -355,6 +379,7 @@ defmodule TermUI.Widget.PickList do
         item_style = if is_selected, do: highlight_style, else: style
 
         item_text = to_string(item)
+
         item_text =
           if String.length(item_text) > width do
             String.slice(item_text, 0, width - 1) <> "…"

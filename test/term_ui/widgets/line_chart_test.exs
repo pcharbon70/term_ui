@@ -220,7 +220,7 @@ defmodule TermUI.Widgets.LineChartTest do
       result =
         LineChart.render(
           data: [1, 2, 3],
-          width: 10000,
+          width: 10_000,
           height: 5
         )
 
@@ -232,7 +232,7 @@ defmodule TermUI.Widgets.LineChartTest do
         LineChart.render(
           data: [1, 2, 3],
           width: 20,
-          height: 10000
+          height: 10_000
         )
 
       assert result.type == :stack

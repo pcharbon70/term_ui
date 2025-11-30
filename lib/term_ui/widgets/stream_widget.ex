@@ -589,7 +589,7 @@ defmodule TermUI.Widgets.StreamWidget do
     # Update viewport dimensions
     state = %{
       state
-      | viewport_height: area.height - (if state.show_stats, do: 2, else: 0),
+      | viewport_height: area.height - if(state.show_stats, do: 2, else: 0),
         viewport_width: area.width,
         last_area: area
     }

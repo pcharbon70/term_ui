@@ -76,9 +76,7 @@ defmodule TermUI.Widgets.FormBuilderTest do
   describe "text field handling" do
     test "appends characters to text field" do
       props =
-        FormBuilder.new(
-          fields: [%{id: :name, type: :text, label: "Name"}]
-        )
+        FormBuilder.new(fields: [%{id: :name, type: :text, label: "Name"}])
 
       {:ok, state} = FormBuilder.init(props)
 
@@ -106,9 +104,7 @@ defmodule TermUI.Widgets.FormBuilderTest do
 
     test "handles empty backspace gracefully" do
       props =
-        FormBuilder.new(
-          fields: [%{id: :name, type: :text, label: "Name"}]
-        )
+        FormBuilder.new(fields: [%{id: :name, type: :text, label: "Name"}])
 
       {:ok, state} = FormBuilder.init(props)
 
@@ -120,9 +116,7 @@ defmodule TermUI.Widgets.FormBuilderTest do
   describe "checkbox field handling" do
     test "toggles checkbox with space" do
       props =
-        FormBuilder.new(
-          fields: [%{id: :agree, type: :checkbox, label: "Agree"}]
-        )
+        FormBuilder.new(fields: [%{id: :agree, type: :checkbox, label: "Agree"}])
 
       {:ok, state} = FormBuilder.init(props)
       assert state.values[:agree] == false
@@ -626,9 +620,7 @@ defmodule TermUI.Widgets.FormBuilderTest do
 
     test "set_value updates field value" do
       props =
-        FormBuilder.new(
-          fields: [%{id: :name, type: :text, label: "Name"}]
-        )
+        FormBuilder.new(fields: [%{id: :name, type: :text, label: "Name"}])
 
       {:ok, state} = FormBuilder.init(props)
 
@@ -669,9 +661,7 @@ defmodule TermUI.Widgets.FormBuilderTest do
 
     test "get_focused_field returns current focus" do
       props =
-        FormBuilder.new(
-          fields: [%{id: :name, type: :text, label: "Name"}]
-        )
+        FormBuilder.new(fields: [%{id: :name, type: :text, label: "Name"}])
 
       {:ok, state} = FormBuilder.init(props)
 
@@ -762,9 +752,7 @@ defmodule TermUI.Widgets.FormBuilderTest do
 
     test "password field accepts character input" do
       props =
-        FormBuilder.new(
-          fields: [%{id: :password, type: :password, label: "Password"}]
-        )
+        FormBuilder.new(fields: [%{id: :password, type: :password, label: "Password"}])
 
       {:ok, state} = FormBuilder.init(props)
 
@@ -792,7 +780,9 @@ defmodule TermUI.Widgets.FormBuilderTest do
     test "password field with placeholder" do
       props =
         FormBuilder.new(
-          fields: [%{id: :password, type: :password, label: "Password", placeholder: "Enter password"}]
+          fields: [
+            %{id: :password, type: :password, label: "Password", placeholder: "Enter password"}
+          ]
         )
 
       {:ok, state} = FormBuilder.init(props)
@@ -806,9 +796,7 @@ defmodule TermUI.Widgets.FormBuilderTest do
   describe "get_errors/1 public API" do
     test "returns empty map when no errors" do
       props =
-        FormBuilder.new(
-          fields: [%{id: :name, type: :text, label: "Name"}]
-        )
+        FormBuilder.new(fields: [%{id: :name, type: :text, label: "Name"}])
 
       {:ok, state} = FormBuilder.init(props)
 
@@ -817,9 +805,7 @@ defmodule TermUI.Widgets.FormBuilderTest do
 
     test "returns errors map after validation failure" do
       props =
-        FormBuilder.new(
-          fields: [%{id: :name, type: :text, label: "Name", required: true}]
-        )
+        FormBuilder.new(fields: [%{id: :name, type: :text, label: "Name", required: true}])
 
       {:ok, state} = FormBuilder.init(props)
       state = FormBuilder.validate(state)

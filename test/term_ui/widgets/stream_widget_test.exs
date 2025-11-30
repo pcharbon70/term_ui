@@ -96,9 +96,7 @@ defmodule TermUI.Widgets.StreamWidgetTest do
       test_pid = self()
 
       props =
-        StreamWidget.new(
-          on_item: fn item -> send(test_pid, {:item_received, item}) end
-        )
+        StreamWidget.new(on_item: fn item -> send(test_pid, {:item_received, item}) end)
 
       {:ok, state} = StreamWidget.init(props)
 

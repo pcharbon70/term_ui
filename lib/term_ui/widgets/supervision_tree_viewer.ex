@@ -447,7 +447,8 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
     max_idx = max(0, length(flattened) - 1)
     selected_idx = min(state.selected_idx, max_idx)
 
-    {:ok, %{state | root_pid: root_pid, tree: tree, flattened: flattened, selected_idx: selected_idx}}
+    {:ok,
+     %{state | root_pid: root_pid, tree: tree, flattened: flattened, selected_idx: selected_idx}}
   end
 
   @doc """
@@ -1002,7 +1003,10 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
             text("  PID: #{inspect(node.pid)}", nil),
             text("  Name: #{inspect(node.name)}", nil),
             text("  Type: #{node.type}", nil),
-            text("  Status: #{node.status}", Style.new(fg: Map.get(@status_colors, node.status, :white)))
+            text(
+              "  Status: #{node.status}",
+              Style.new(fg: Map.get(@status_colors, node.status, :white))
+            )
           ]
 
           lines =
@@ -1010,7 +1014,10 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
               lines ++
                 [
                   text("  Strategy: #{node.strategy || "unknown"}", nil),
-                  text("  Max restarts: #{node.max_restarts || "?"}/#{node.max_seconds || "?"}s", nil)
+                  text(
+                    "  Max restarts: #{node.max_restarts || "?"}/#{node.max_seconds || "?"}s",
+                    nil
+                  )
                 ]
             else
               lines

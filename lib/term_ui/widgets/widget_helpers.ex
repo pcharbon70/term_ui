@@ -45,13 +45,15 @@ defmodule TermUI.Widgets.WidgetHelpers do
       "     "
   """
   @spec pad_and_truncate(String.t(), non_neg_integer()) :: String.t()
-  def pad_and_truncate(string, width) when is_binary(string) and is_integer(width) and width >= 0 do
+  def pad_and_truncate(string, width)
+      when is_binary(string) and is_integer(width) and width >= 0 do
     string
     |> String.pad_trailing(width)
     |> String.slice(0, width)
   end
 
-  def pad_and_truncate(_, width) when is_integer(width) and width >= 0, do: String.duplicate(" ", width)
+  def pad_and_truncate(_, width) when is_integer(width) and width >= 0,
+    do: String.duplicate(" ", width)
 
   @doc """
   Renders an element with focused styling applied conditionally.
@@ -123,7 +125,8 @@ defmodule TermUI.Widgets.WidgetHelpers do
       "Hi"
   """
   @spec truncate(String.t(), non_neg_integer()) :: String.t()
-  def truncate(string, max_length) when is_binary(string) and is_integer(max_length) and max_length >= 0 do
+  def truncate(string, max_length)
+      when is_binary(string) and is_integer(max_length) and max_length >= 0 do
     String.slice(string, 0, max_length)
   end
 

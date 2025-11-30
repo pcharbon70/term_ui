@@ -437,7 +437,10 @@ defmodule TermUI.Widgets.FormBuilder do
       rescue
         e ->
           require Logger
-          Logger.error("FormBuilder on_change callback error for field #{field_id}: #{inspect(e)}")
+
+          Logger.error(
+            "FormBuilder on_change callback error for field #{field_id}: #{inspect(e)}"
+          )
       end
     end
 
@@ -598,11 +601,12 @@ defmodule TermUI.Widgets.FormBuilder do
     field_content = render_field_content(field, value, state, focused)
 
     # Combine into row
-    row = stack(:horizontal, [
-      text(Helpers.focus_indicator(focused)),
-      text(label),
-      field_content
-    ])
+    row =
+      stack(:horizontal, [
+        text(Helpers.focus_indicator(focused)),
+        text(label),
+        field_content
+      ])
 
     # Add error messages
     if errors != [] do
@@ -856,6 +860,12 @@ defmodule TermUI.Widgets.FormBuilder do
 
     first_field = get_first_visible_field(state.fields, initial_values)
 
-    %{state | values: initial_values, errors: %{}, focused_field: first_field, submit_focused: false}
+    %{
+      state
+      | values: initial_values,
+        errors: %{},
+        focused_field: first_field,
+        submit_focused: false
+    }
   end
 end

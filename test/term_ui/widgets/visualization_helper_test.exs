@@ -374,7 +374,7 @@ defmodule TermUI.Widgets.VisualizationHelperTest do
     end
 
     test "clamps to max width" do
-      result = VizHelper.safe_duplicate("█", 10000)
+      result = VizHelper.safe_duplicate("█", 10_000)
       assert String.length(result) == VizHelper.max_width()
     end
 

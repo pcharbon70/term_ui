@@ -571,7 +571,8 @@ defmodule TermUI.Widgets.TreeView do
     filter_lower = String.downcase(filter)
 
     # Find matching nodes and their ancestors
-    {matches, ancestors} = find_filter_matches(state.nodes, filter_lower, [], MapSet.new(), MapSet.new())
+    {matches, ancestors} =
+      find_filter_matches(state.nodes, filter_lower, [], MapSet.new(), MapSet.new())
 
     # Expand all ancestors of matches
     expanded = MapSet.union(state.expanded, ancestors)
@@ -593,7 +594,14 @@ defmodule TermUI.Widgets.TreeView do
 
     cursor = min(state.cursor, max(0, length(flat_nodes) - 1))
 
-    %{state | filter: filter, filter_matches: matches, flat_nodes: flat_nodes, expanded: expanded, cursor: cursor}
+    %{
+      state
+      | filter: filter,
+        filter_matches: matches,
+        flat_nodes: flat_nodes,
+        expanded: expanded,
+        cursor: cursor
+    }
   end
 
   defp find_filter_matches(nodes, filter, path, matches, ancestors) do

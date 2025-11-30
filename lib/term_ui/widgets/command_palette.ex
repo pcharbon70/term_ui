@@ -269,12 +269,13 @@ defmodule TermUI.Widgets.CommandPalette do
         |> Enum.map(fn {cmd, _score} -> cmd end)
       end
 
-    %{state |
-      query: new_query,
-      category_filter: category,
-      filtered_commands: filtered,
-      selected_index: 0,
-      scroll_offset: 0
+    %{
+      state
+      | query: new_query,
+        category_filter: category,
+        filtered_commands: filtered,
+        selected_index: 0,
+        scroll_offset: 0
     }
   end
 
@@ -307,7 +308,8 @@ defmodule TermUI.Widgets.CommandPalette do
 
   # Fuzzy search - optimized with early termination
 
-  @min_fuzzy_score 5  # Minimum score threshold for fuzzy matches
+  # Minimum score threshold for fuzzy matches
+  @min_fuzzy_score 5
 
   defp fuzzy_score(query, target) do
     query_lower = String.downcase(query)
@@ -485,11 +487,12 @@ defmodule TermUI.Widgets.CommandPalette do
   defp push_submenu(state, parent_id, commands) do
     entry = %{parent_id: parent_id, commands: normalize_commands(commands)}
 
-    state = %{state |
-      submenu_stack: [entry | state.submenu_stack],
-      query: "",
-      selected_index: 0,
-      scroll_offset: 0
+    state = %{
+      state
+      | submenu_stack: [entry | state.submenu_stack],
+        query: "",
+        selected_index: 0,
+        scroll_offset: 0
     }
 
     update_query(state, "")
@@ -501,12 +504,7 @@ defmodule TermUI.Widgets.CommandPalette do
         state
 
       [_ | rest] ->
-        state = %{state |
-          submenu_stack: rest,
-          query: "",
-          selected_index: 0,
-          scroll_offset: 0
-        }
+        state = %{state | submenu_stack: rest, query: "", selected_index: 0, scroll_offset: 0}
 
         update_query(state, "")
     end
@@ -524,13 +522,14 @@ defmodule TermUI.Widgets.CommandPalette do
     footer = render_footer(state, width)
 
     # Build palette
-    content = stack(:vertical, [
-      header,
-      search,
-      text(String.duplicate("─", width)),
-      results,
-      footer
-    ])
+    content =
+      stack(:vertical, [
+        header,
+        search,
+        text(String.duplicate("─", width)),
+        results,
+        footer
+      ])
 
     # Wrap in box
     styled(content, Style.new(attrs: [:bold]))
@@ -632,14 +631,17 @@ defmodule TermUI.Widgets.CommandPalette do
       end
 
     # Calculate available space
-    content_width = width - 4  # For borders and padding
-    label_width = content_width - String.length(shortcut) - 2  # For icon and space
+    # For borders and padding
+    content_width = width - 4
+    # For icon and space
+    label_width = content_width - String.length(shortcut) - 2
 
     # Truncate label if needed
     truncated_label = Helpers.truncate(label, label_width)
     padding_needed = content_width - String.length(truncated_label) - String.length(shortcut) - 2
 
-    row_content = " #{icon} #{truncated_label}#{String.duplicate(" ", max(0, padding_needed))}#{shortcut} "
+    row_content =
+      " #{icon} #{truncated_label}#{String.duplicate(" ", max(0, padding_needed))}#{shortcut} "
 
     row = "│#{row_content}│"
 
@@ -672,7 +674,10 @@ defmodule TermUI.Widgets.CommandPalette do
 
     footer_content = Helpers.pad_and_truncate(footer_content, width - 2)
 
-    styled(text("│#{footer_content}│\n└#{String.duplicate("─", width - 2)}┘"), Style.new(fg: :white, attrs: [:dim]))
+    styled(
+      text("│#{footer_content}│\n└#{String.duplicate("─", width - 2)}┘"),
+      Style.new(fg: :white, attrs: [:dim])
+    )
   end
 
   # Public API

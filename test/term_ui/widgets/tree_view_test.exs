@@ -82,10 +82,12 @@ defmodule TermUI.Widgets.TreeViewTest do
     end
 
     test "init/1 selects initially_selected nodes" do
-      props = TreeView.new(
-        nodes: [TreeView.leaf(:a, "A"), TreeView.leaf(:b, "B")],
-        initially_selected: [:b]
-      )
+      props =
+        TreeView.new(
+          nodes: [TreeView.leaf(:a, "A"), TreeView.leaf(:b, "B")],
+          initially_selected: [:b]
+        )
+
       {:ok, state} = TreeView.init(props)
 
       assert MapSet.member?(state.selected, :b)
@@ -555,10 +557,12 @@ defmodule TermUI.Widgets.TreeViewTest do
       test_pid = self()
       root = TreeView.lazy(:root, "Lazy Root")
 
-      props = TreeView.new(
-        nodes: [root],
-        on_expand: fn node -> send(test_pid, {:expanded, node.id}) end
-      )
+      props =
+        TreeView.new(
+          nodes: [root],
+          on_expand: fn node -> send(test_pid, {:expanded, node.id}) end
+        )
+
       {:ok, state} = TreeView.init(props)
 
       {:ok, _state} = TreeView.handle_event(%Event.Key{key: :right}, state)
@@ -758,11 +762,13 @@ defmodule TermUI.Widgets.TreeViewTest do
       test_pid = self()
       nodes = [TreeView.leaf(:a, "A")]
 
-      props = TreeView.new(
-        nodes: nodes,
-        selection_mode: :single,
-        on_select: fn node -> send(test_pid, {:selected, node.id}) end
-      )
+      props =
+        TreeView.new(
+          nodes: nodes,
+          selection_mode: :single,
+          on_select: fn node -> send(test_pid, {:selected, node.id}) end
+        )
+
       {:ok, state} = TreeView.init(props)
 
       {:ok, _state} = TreeView.handle_event(%Event.Key{key: :enter}, state)
@@ -775,10 +781,12 @@ defmodule TermUI.Widgets.TreeViewTest do
       child = TreeView.leaf(:child, "Child")
       root = TreeView.branch(:root, "Root", [child])
 
-      props = TreeView.new(
-        nodes: [root],
-        on_expand: fn node -> send(test_pid, {:expanded, node.id}) end
-      )
+      props =
+        TreeView.new(
+          nodes: [root],
+          on_expand: fn node -> send(test_pid, {:expanded, node.id}) end
+        )
+
       {:ok, state} = TreeView.init(props)
 
       {:ok, _state} = TreeView.handle_event(%Event.Key{key: :right}, state)
@@ -791,11 +799,13 @@ defmodule TermUI.Widgets.TreeViewTest do
       child = TreeView.leaf(:child, "Child")
       root = TreeView.branch(:root, "Root", [child])
 
-      props = TreeView.new(
-        nodes: [root],
-        initially_expanded: [:root],
-        on_collapse: fn node -> send(test_pid, {:collapsed, node.id}) end
-      )
+      props =
+        TreeView.new(
+          nodes: [root],
+          initially_expanded: [:root],
+          on_collapse: fn node -> send(test_pid, {:collapsed, node.id}) end
+        )
+
       {:ok, state} = TreeView.init(props)
 
       {:ok, _state} = TreeView.handle_event(%Event.Key{key: :left}, state)
@@ -823,9 +833,11 @@ defmodule TermUI.Widgets.TreeViewTest do
     test "handles deeply nested tree" do
       # Create 10-level deep tree
       deepest = TreeView.leaf(:level10, "Level 10")
-      tree = Enum.reduce(9..1//-1, deepest, fn level, child ->
-        TreeView.branch(:"level#{level}", "Level #{level}", [child])
-      end)
+
+      tree =
+        Enum.reduce(9..1//-1, deepest, fn level, child ->
+          TreeView.branch(:"level#{level}", "Level #{level}", [child])
+        end)
 
       props = TreeView.new(nodes: [tree])
       {:ok, state} = TreeView.init(props)

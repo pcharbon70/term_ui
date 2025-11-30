@@ -216,7 +216,8 @@ defmodule TermUI.Widgets.ProcessMonitor do
   end
 
   # Enter - toggle details
-  def handle_event(%Event.Key{key: :enter}, state) when state.filter_input == nil and state.pending_action == nil do
+  def handle_event(%Event.Key{key: :enter}, state)
+      when state.filter_input == nil and state.pending_action == nil do
     {:ok, %{state | show_details: not state.show_details, detail_mode: :info}}
   end
 
@@ -247,7 +248,8 @@ defmodule TermUI.Widgets.ProcessMonitor do
   end
 
   # k - kill process
-  def handle_event(%Event.Key{char: "k"}, state) when state.filter_input == nil and state.pending_action == nil do
+  def handle_event(%Event.Key{char: "k"}, state)
+      when state.filter_input == nil and state.pending_action == nil do
     if length(state.processes) > 0 do
       {:ok, %{state | pending_action: :kill}}
     else
@@ -256,7 +258,8 @@ defmodule TermUI.Widgets.ProcessMonitor do
   end
 
   # p - pause/suspend process
-  def handle_event(%Event.Key{char: "p"}, state) when state.filter_input == nil and state.pending_action == nil do
+  def handle_event(%Event.Key{char: "p"}, state)
+      when state.filter_input == nil and state.pending_action == nil do
     if length(state.processes) > 0 do
       process = Enum.at(state.processes, state.selected_idx)
 
@@ -329,7 +332,16 @@ defmodule TermUI.Widgets.ProcessMonitor do
   def handle_event(%Event.Key{key: :enter}, state) when state.filter_input != nil do
     filter = if state.filter_input == "", do: nil, else: state.filter_input
     processes = fetch_processes(%{state | filter: filter})
-    {:ok, %{state | filter: filter, filter_input: nil, processes: processes, selected_idx: 0, scroll_offset: 0}}
+
+    {:ok,
+     %{
+       state
+       | filter: filter,
+         filter_input: nil,
+         processes: processes,
+         selected_idx: 0,
+         scroll_offset: 0
+     }}
   end
 
   def handle_event(%Event.Key{key: :backspace}, state) when state.filter_input != nil do
@@ -337,7 +349,8 @@ defmodule TermUI.Widgets.ProcessMonitor do
     {:ok, %{state | filter_input: input}}
   end
 
-  def handle_event(%Event.Key{char: char}, state) when state.filter_input != nil and char != nil do
+  def handle_event(%Event.Key{char: char}, state)
+      when state.filter_input != nil and char != nil do
     {:ok, %{state | filter_input: state.filter_input <> char}}
   end
 
@@ -375,18 +388,19 @@ defmodule TermUI.Widgets.ProcessMonitor do
 
   defp get_process_info(pid) do
     try do
-      info = Process.info(pid, [
-        :registered_name,
-        :initial_call,
-        :current_function,
-        :reductions,
-        :memory,
-        :message_queue_len,
-        :status,
-        :links,
-        :monitors,
-        :monitored_by
-      ])
+      info =
+        Process.info(pid, [
+          :registered_name,
+          :initial_call,
+          :current_function,
+          :reductions,
+          :memory,
+          :message_queue_len,
+          :status,
+          :links,
+          :monitors,
+          :monitored_by
+        ])
 
       if info do
         %{
@@ -615,7 +629,8 @@ defmodule TermUI.Widgets.ProcessMonitor do
   Set sorting options.
   """
   @spec set_sort(map(), sort_field(), sort_direction()) :: {:ok, map()}
-  def set_sort(state, field, direction) when field in @sort_fields and direction in [:asc, :desc] do
+  def set_sort(state, field, direction)
+      when field in @sort_fields and direction in [:asc, :desc] do
     processes = sort_processes(state.processes, field, direction)
     {:ok, %{state | sort_field: field, sort_direction: direction, processes: processes}}
   end
@@ -668,6 +683,7 @@ defmodule TermUI.Widgets.ProcessMonitor do
   def render(state, area) do
     # Update viewport dimensions
     detail_height = if state.show_details, do: 8, else: 0
+
     state = %{
       state
       | viewport_height: area.height - 4 - detail_height,
@@ -734,7 +750,13 @@ defmodule TermUI.Widgets.ProcessMonitor do
       |> Enum.with_index()
       |> Enum.map(fn {process, idx} ->
         actual_idx = idx + state.scroll_offset
-        render_process_row(process, actual_idx, state, {pid_w, name_w, red_w, mem_w, queue_w, status_w})
+
+        render_process_row(
+          process,
+          actual_idx,
+          state,
+          {pid_w, name_w, red_w, mem_w, queue_w, status_w}
+        )
       end)
 
     # Pad with empty lines
@@ -809,7 +831,10 @@ defmodule TermUI.Widgets.ProcessMonitor do
       text("Current: #{format_mfa(process.current_function)}", nil),
       text("Initial: #{format_mfa(process.initial_call)}", nil),
       text("Status: #{process.status}", nil),
-      text("Links: #{length(process.links)} | Monitors: #{length(process.monitors)} | Monitored by: #{length(process.monitored_by)}", nil),
+      text(
+        "Links: #{length(process.links)} | Monitors: #{length(process.monitors)} | Monitored by: #{length(process.monitored_by)}",
+        nil
+      ),
       border
     ]
 
@@ -823,8 +848,7 @@ defmodule TermUI.Widgets.ProcessMonitor do
       if length(process.links) > 0 do
         process.links
         |> Enum.take(5)
-        |> Enum.map(&inspect/1)
-        |> Enum.join(", ")
+        |> Enum.map_join(", ", &inspect/1)
       else
         "(none)"
       end
@@ -833,8 +857,7 @@ defmodule TermUI.Widgets.ProcessMonitor do
       if length(process.monitors) > 0 do
         process.monitors
         |> Enum.take(5)
-        |> Enum.map(&inspect/1)
-        |> Enum.join(", ")
+        |> Enum.map_join(", ", &inspect/1)
       else
         "(none)"
       end
@@ -843,8 +866,7 @@ defmodule TermUI.Widgets.ProcessMonitor do
       if length(process.monitored_by) > 0 do
         process.monitored_by
         |> Enum.take(5)
-        |> Enum.map(&inspect/1)
-        |> Enum.join(", ")
+        |> Enum.map_join(", ", &inspect/1)
       else
         "(none)"
       end
@@ -890,7 +912,8 @@ defmodule TermUI.Widgets.ProcessMonitor do
         []
       end
 
-    help_text = "[↑↓] Select [Enter] Details [s/S] Sort [/] Filter [k] Kill [p] Pause [l] Links [t] Trace [r] Refresh"
+    help_text =
+      "[↑↓] Select [Enter] Details [s/S] Sort [/] Filter [k] Kill [p] Pause [l] Links [t] Trace [r] Refresh"
 
     input_line ++ [text(help_text, Style.new(fg: :white, attrs: [:dim]))]
   end
@@ -909,8 +932,10 @@ defmodule TermUI.Widgets.ProcessMonitor do
       if process do
         [
           text("", nil),
-          text("#{action_text} #{inspect(process.pid)} (#{process_name(process)})? [y/n]",
-            Style.new(fg: :red, attrs: [:bold]))
+          text(
+            "#{action_text} #{inspect(process.pid)} (#{process_name(process)})? [y/n]",
+            Style.new(fg: :red, attrs: [:bold])
+          )
         ]
       else
         []

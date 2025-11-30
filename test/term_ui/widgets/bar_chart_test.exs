@@ -232,7 +232,7 @@ defmodule TermUI.Widgets.BarChartTest do
 
   describe "bounds checking" do
     test "clamps excessive width" do
-      result = BarChart.render(data: @test_data, width: 10000)
+      result = BarChart.render(data: @test_data, width: 10_000)
       assert result.type == :stack
     end
 

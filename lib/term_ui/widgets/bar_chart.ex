@@ -76,7 +76,16 @@ defmodule TermUI.Widgets.BarChart do
             render_horizontal(data, width, show_values, show_labels, bar_char, colors, style)
 
           :vertical ->
-            render_vertical(data, width, height, show_values, show_labels, bar_char, colors, style)
+            render_vertical(
+              data,
+              width,
+              height,
+              show_values,
+              show_labels,
+              bar_char,
+              colors,
+              style
+            )
 
           _ ->
             render_horizontal(data, width, show_values, show_labels, bar_char, colors, style)
@@ -243,7 +252,10 @@ defmodule TermUI.Widgets.BarChart do
         filled = min(filled, width)
         empty_count = width - filled
 
-        text(VizHelper.safe_duplicate(bar_char, filled) <> VizHelper.safe_duplicate(empty_char, empty_count))
+        text(
+          VizHelper.safe_duplicate(bar_char, filled) <>
+            VizHelper.safe_duplicate(empty_char, empty_count)
+        )
 
       _ ->
         # Invalid input, return empty bar

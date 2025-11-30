@@ -194,7 +194,8 @@ defmodule TermUI.Widget.PickListTest do
       {:ok, state} = PickList.init(%{items: @items})
       state = %{state | filter_text: "b", filtered_items: ["Banana"]}
 
-      {:ok, new_state} = PickList.handle_info({:set_items, ["Blueberry", "Blackberry", "Apple"]}, state)
+      {:ok, new_state} =
+        PickList.handle_info({:set_items, ["Blueberry", "Blackberry", "Apple"]}, state)
 
       assert new_state.original_items == ["Blueberry", "Blackberry", "Apple"]
       # Filter "b" applied

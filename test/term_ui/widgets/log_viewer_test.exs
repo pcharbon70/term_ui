@@ -35,12 +35,14 @@ defmodule TermUI.Widgets.LogViewerTest do
     end
 
     test "creates props with custom options" do
-      props = LogViewer.new(
-        lines: sample_logs(),
-        max_lines: 1000,
-        tail_mode: false,
-        wrap_lines: true
-      )
+      props =
+        LogViewer.new(
+          lines: sample_logs(),
+          max_lines: 1000,
+          tail_mode: false,
+          wrap_lines: true
+        )
+
       assert length(props.lines) == 8
       assert props.max_lines == 1000
       assert props.tail_mode == false
@@ -317,6 +319,7 @@ defmodule TermUI.Widgets.LogViewerTest do
         pattern: nil,
         bookmarks_only: false
       }
+
       state = LogViewer.set_filter(state, filter)
 
       # Should only show ERROR and CRITICAL lines
@@ -330,6 +333,7 @@ defmodule TermUI.Widgets.LogViewerTest do
         pattern: nil,
         bookmarks_only: false
       }
+
       state = LogViewer.set_filter(state, filter)
       assert state.filter != nil
 

@@ -264,7 +264,9 @@ defmodule TermUI.Widgets.SplitPaneTest do
     test "shift+arrow moves by larger step", %{state: state} do
       _render = SplitPane.render(state, test_area(81, 24))
 
-      {:ok, new_state} = SplitPane.handle_event(%Event.Key{key: :right, modifiers: [:shift]}, state)
+      {:ok, new_state} =
+        SplitPane.handle_event(%Event.Key{key: :right, modifiers: [:shift]}, state)
+
       assert new_state != nil
     end
 

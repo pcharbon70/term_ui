@@ -277,7 +277,7 @@ defmodule TermUI.Widgets.GaugeTest do
   describe "bounds checking" do
     test "clamps excessive width" do
       # Should not crash with very large width
-      result = Gauge.render(value: 50, width: 10000)
+      result = Gauge.render(value: 50, width: 10_000)
       assert result.type == :stack
     end
 

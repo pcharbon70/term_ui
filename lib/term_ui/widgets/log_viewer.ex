@@ -180,7 +180,11 @@ defmodule TermUI.Widgets.LogViewer do
     # Start at bottom if tail mode
     state =
       if props.tail_mode and length(lines) > 0 do
-        %{state | cursor: length(lines) - 1, scroll_offset: max(0, length(lines) - state.viewport_height)}
+        %{
+          state
+          | cursor: length(lines) - 1,
+            scroll_offset: max(0, length(lines) - state.viewport_height)
+        }
       else
         state
       end
@@ -189,33 +193,40 @@ defmodule TermUI.Widgets.LogViewer do
   end
 
   @impl true
-  def handle_event(%Event.Key{key: :up}, state) when state.search_input == nil and state.filter_input == nil do
+  def handle_event(%Event.Key{key: :up}, state)
+      when state.search_input == nil and state.filter_input == nil do
     move_cursor(state, -1)
   end
 
-  def handle_event(%Event.Key{key: :down}, state) when state.search_input == nil and state.filter_input == nil do
+  def handle_event(%Event.Key{key: :down}, state)
+      when state.search_input == nil and state.filter_input == nil do
     move_cursor(state, 1)
   end
 
-  def handle_event(%Event.Key{key: :page_up}, state) when state.search_input == nil and state.filter_input == nil do
+  def handle_event(%Event.Key{key: :page_up}, state)
+      when state.search_input == nil and state.filter_input == nil do
     move_cursor(state, -@page_size)
   end
 
-  def handle_event(%Event.Key{key: :page_down}, state) when state.search_input == nil and state.filter_input == nil do
+  def handle_event(%Event.Key{key: :page_down}, state)
+      when state.search_input == nil and state.filter_input == nil do
     move_cursor(state, @page_size)
   end
 
-  def handle_event(%Event.Key{key: :home}, state) when state.search_input == nil and state.filter_input == nil do
+  def handle_event(%Event.Key{key: :home}, state)
+      when state.search_input == nil and state.filter_input == nil do
     goto_line(state, 0)
   end
 
-  def handle_event(%Event.Key{key: :end}, state) when state.search_input == nil and state.filter_input == nil do
+  def handle_event(%Event.Key{key: :end}, state)
+      when state.search_input == nil and state.filter_input == nil do
     visible_lines = get_visible_line_indices(state)
     goto_line(state, length(visible_lines) - 1)
   end
 
   # Start search
-  def handle_event(%Event.Key{char: "/"}, state) when state.search_input == nil and state.filter_input == nil do
+  def handle_event(%Event.Key{char: "/"}, state)
+      when state.search_input == nil and state.filter_input == nil do
     {:ok, %{state | search_input: ""}}
   end
 
@@ -233,7 +244,8 @@ defmodule TermUI.Widgets.LogViewer do
     {:ok, %{state | search_input: input}}
   end
 
-  def handle_event(%Event.Key{char: char}, state) when state.search_input != nil and char != nil do
+  def handle_event(%Event.Key{char: char}, state)
+      when state.search_input != nil and char != nil do
     {:ok, %{state | search_input: state.search_input <> char}}
   end
 
@@ -251,21 +263,25 @@ defmodule TermUI.Widgets.LogViewer do
     {:ok, %{state | filter_input: input}}
   end
 
-  def handle_event(%Event.Key{char: char}, state) when state.filter_input != nil and char != nil do
+  def handle_event(%Event.Key{char: char}, state)
+      when state.filter_input != nil and char != nil do
     {:ok, %{state | filter_input: state.filter_input <> char}}
   end
 
   # Next/previous search match
-  def handle_event(%Event.Key{char: "n"}, state) when state.search != nil and state.search_input == nil do
+  def handle_event(%Event.Key{char: "n"}, state)
+      when state.search != nil and state.search_input == nil do
     next_search_match(state, 1)
   end
 
-  def handle_event(%Event.Key{char: "N"}, state) when state.search != nil and state.search_input == nil do
+  def handle_event(%Event.Key{char: "N"}, state)
+      when state.search != nil and state.search_input == nil do
     next_search_match(state, -1)
   end
 
   # Toggle filter mode
-  def handle_event(%Event.Key{char: "f"}, state) when state.search_input == nil and state.filter_input == nil do
+  def handle_event(%Event.Key{char: "f"}, state)
+      when state.search_input == nil and state.filter_input == nil do
     if state.filter do
       # Clear filter
       {:ok, %{state | filter: nil, filtered_indices: nil}}
@@ -276,7 +292,8 @@ defmodule TermUI.Widgets.LogViewer do
   end
 
   # Toggle bookmark
-  def handle_event(%Event.Key{char: "b"}, state) when state.search_input == nil and state.filter_input == nil do
+  def handle_event(%Event.Key{char: "b"}, state)
+      when state.search_input == nil and state.filter_input == nil do
     line_idx = get_actual_line_index(state, state.cursor)
 
     bookmarks =
@@ -290,12 +307,14 @@ defmodule TermUI.Widgets.LogViewer do
   end
 
   # Jump to next bookmark
-  def handle_event(%Event.Key{char: "B"}, state) when state.search_input == nil and state.filter_input == nil do
+  def handle_event(%Event.Key{char: "B"}, state)
+      when state.search_input == nil and state.filter_input == nil do
     jump_to_next_bookmark(state)
   end
 
   # Toggle tail mode
-  def handle_event(%Event.Key{char: "t"}, state) when state.search_input == nil and state.filter_input == nil do
+  def handle_event(%Event.Key{char: "t"}, state)
+      when state.search_input == nil and state.filter_input == nil do
     state = %{state | tail_mode: not state.tail_mode}
 
     state =
@@ -303,7 +322,12 @@ defmodule TermUI.Widgets.LogViewer do
         # Jump to end when enabling tail mode
         visible_lines = get_visible_line_indices(state)
         last = max(0, length(visible_lines) - 1)
-        %{state | cursor: last, scroll_offset: max(0, length(visible_lines) - state.viewport_height)}
+
+        %{
+          state
+          | cursor: last,
+            scroll_offset: max(0, length(visible_lines) - state.viewport_height)
+        }
       else
         state
       end
@@ -312,12 +336,14 @@ defmodule TermUI.Widgets.LogViewer do
   end
 
   # Toggle wrap mode
-  def handle_event(%Event.Key{char: "w"}, state) when state.search_input == nil and state.filter_input == nil do
+  def handle_event(%Event.Key{char: "w"}, state)
+      when state.search_input == nil and state.filter_input == nil do
     {:ok, %{state | wrap_lines: not state.wrap_lines}}
   end
 
   # Selection with Space
-  def handle_event(%Event.Key{char: " "}, state) when state.search_input == nil and state.filter_input == nil do
+  def handle_event(%Event.Key{char: " "}, state)
+      when state.search_input == nil and state.filter_input == nil do
     line_idx = get_actual_line_index(state, state.cursor)
 
     state =
@@ -335,7 +361,8 @@ defmodule TermUI.Widgets.LogViewer do
   end
 
   # Copy with 'y'
-  def handle_event(%Event.Key{char: "y"}, state) when state.search_input == nil and state.filter_input == nil do
+  def handle_event(%Event.Key{char: "y"}, state)
+      when state.search_input == nil and state.filter_input == nil do
     if state.selection_start != nil and state.on_copy do
       text = get_selected_text(state)
       state.on_copy.(text)
@@ -345,7 +372,8 @@ defmodule TermUI.Widgets.LogViewer do
   end
 
   # Clear search/filter/selection with Escape
-  def handle_event(%Event.Key{key: :escape}, state) when state.search_input == nil and state.filter_input == nil do
+  def handle_event(%Event.Key{key: :escape}, state)
+      when state.search_input == nil and state.filter_input == nil do
     state =
       cond do
         state.selection_start != nil ->
@@ -371,7 +399,12 @@ defmodule TermUI.Widgets.LogViewer do
   @impl true
   def render(state, area) do
     # Update viewport dimensions
-    state = %{state | viewport_height: area.height - 2, viewport_width: area.width, last_area: area}
+    state = %{
+      state
+      | viewport_height: area.height - 2,
+        viewport_width: area.width,
+        last_area: area
+    }
 
     visible_lines = get_visible_line_indices(state)
     total_lines = length(visible_lines)
@@ -467,7 +500,16 @@ defmodule TermUI.Widgets.LogViewer do
   """
   @spec clear(map()) :: map()
   def clear(state) do
-    %{state | lines: [], cursor: 0, scroll_offset: 0, selection_start: nil, selection_end: nil, search: nil, filtered_indices: nil}
+    %{
+      state
+      | lines: [],
+        cursor: 0,
+        scroll_offset: 0,
+        selection_start: nil,
+        selection_end: nil,
+        search: nil,
+        filtered_indices: nil
+    }
   end
 
   @doc """
@@ -481,8 +523,7 @@ defmodule TermUI.Widgets.LogViewer do
 
       state.lines
       |> Enum.slice(start_idx..end_idx)
-      |> Enum.map(& &1.raw)
-      |> Enum.join("\n")
+      |> Enum.map_join("\n", & &1.raw)
     else
       ""
     end
@@ -662,7 +703,12 @@ defmodule TermUI.Widgets.LogViewer do
         first_match = hd(matches)
         visible_lines = get_visible_line_indices(state)
         visible_idx = Enum.find_index(visible_lines, &(&1 == first_match)) || 0
-        %{state | cursor: visible_idx, scroll_offset: max(0, visible_idx - div(state.viewport_height, 2))}
+
+        %{
+          state
+          | cursor: visible_idx,
+            scroll_offset: max(0, visible_idx - div(state.viewport_height, 2))
+        }
       else
         state
       end
@@ -681,7 +727,10 @@ defmodule TermUI.Widgets.LogViewer do
       visible_idx = Enum.find_index(visible_lines, &(&1 == match_line)) || 0
 
       search = %{state.search | current_match: next_idx}
-      {:ok, %{state | search: search, cursor: visible_idx, scroll_offset: max(0, visible_idx - div(state.viewport_height, 2)), tail_mode: false}}
+      new_scroll = max(0, visible_idx - div(state.viewport_height, 2))
+
+      {:ok,
+       %{state | search: search, cursor: visible_idx, scroll_offset: new_scroll, tail_mode: false}}
     else
       {:ok, state}
     end
@@ -711,7 +760,16 @@ defmodule TermUI.Widgets.LogViewer do
     }
 
     filtered = filter_lines(state.lines, filter, state.bookmarks)
-    {:ok, %{state | filter: filter, filtered_indices: filtered, filter_input: nil, cursor: 0, scroll_offset: 0}}
+
+    {:ok,
+     %{
+       state
+       | filter: filter,
+         filtered_indices: filtered,
+         filter_input: nil,
+         cursor: 0,
+         scroll_offset: 0
+     }}
   end
 
   defp filter_lines(lines, filter, bookmarks) do
@@ -760,8 +818,9 @@ defmodule TermUI.Widgets.LogViewer do
 
       visible_lines = get_visible_line_indices(state)
       visible_idx = Enum.find_index(visible_lines, &(&1 == next)) || state.cursor
+      new_scroll = max(0, visible_idx - div(state.viewport_height, 2))
 
-      {:ok, %{state | cursor: visible_idx, scroll_offset: max(0, visible_idx - div(state.viewport_height, 2)), tail_mode: false}}
+      {:ok, %{state | cursor: visible_idx, scroll_offset: new_scroll, tail_mode: false}}
     end
   end
 

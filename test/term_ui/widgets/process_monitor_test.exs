@@ -420,9 +420,7 @@ defmodule TermUI.Widgets.ProcessMonitorTest do
       test_pid = self()
 
       props =
-        ProcessMonitor.new(
-          on_select: fn process -> send(test_pid, {:selected, process.pid}) end
-        )
+        ProcessMonitor.new(on_select: fn process -> send(test_pid, {:selected, process.pid}) end)
 
       {:ok, state} = ProcessMonitor.init(props)
 
@@ -438,9 +436,7 @@ defmodule TermUI.Widgets.ProcessMonitorTest do
       {:ok, victim_pid} = Agent.start(fn -> :test end)
 
       props =
-        ProcessMonitor.new(
-          on_action: fn action -> send(test_pid, {:action, action}) end
-        )
+        ProcessMonitor.new(on_action: fn action -> send(test_pid, {:action, action}) end)
 
       {:ok, state} = ProcessMonitor.init(props)
 
