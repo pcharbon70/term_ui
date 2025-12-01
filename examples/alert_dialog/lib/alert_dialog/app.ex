@@ -32,6 +32,7 @@ defmodule AlertDialog.App do
 
   alias TermUI.Event
   alias TermUI.Renderer.Style
+  alias TermUI.Widgets.AlertDialog
 
   # ----------------------------------------------------------------------------
   # Component Callbacks
@@ -42,13 +43,8 @@ defmodule AlertDialog.App do
   """
   def init(_opts) do
     %{
-      # Alert state
-      alert_visible: false,
-      alert_type: nil,
-      alert_title: "",
-      alert_message: "",
-      alert_buttons: [],
-      focused_button: 0,
+      # Current alert dialog state (nil when no alert visible)
+      alert: nil,
       # Result tracking
       last_result: nil,
       last_alert_type: nil
@@ -58,28 +54,16 @@ defmodule AlertDialog.App do
   @doc """
   Convert keyboard events to messages.
   """
-  def event_to_msg(%Event.Key{key: "1"}, state) when not state.alert_visible, do: {:msg, :show_info}
-  def event_to_msg(%Event.Key{key: "2"}, state) when not state.alert_visible, do: {:msg, :show_success}
-  def event_to_msg(%Event.Key{key: "3"}, state) when not state.alert_visible, do: {:msg, :show_warning}
-  def event_to_msg(%Event.Key{key: "4"}, state) when not state.alert_visible, do: {:msg, :show_error}
-  def event_to_msg(%Event.Key{key: "5"}, state) when not state.alert_visible, do: {:msg, :show_confirm}
-  def event_to_msg(%Event.Key{key: "6"}, state) when not state.alert_visible, do: {:msg, :show_ok_cancel}
+  # When no alert is visible, number keys show alerts
+  def event_to_msg(%Event.Key{key: "1"}, %{alert: nil}), do: {:msg, :show_info}
+  def event_to_msg(%Event.Key{key: "2"}, %{alert: nil}), do: {:msg, :show_success}
+  def event_to_msg(%Event.Key{key: "3"}, %{alert: nil}), do: {:msg, :show_warning}
+  def event_to_msg(%Event.Key{key: "4"}, %{alert: nil}), do: {:msg, :show_error}
+  def event_to_msg(%Event.Key{key: "5"}, %{alert: nil}), do: {:msg, :show_confirm}
+  def event_to_msg(%Event.Key{key: "6"}, %{alert: nil}), do: {:msg, :show_ok_cancel}
 
-  # Alert controls
-  def event_to_msg(%Event.Key{key: :escape}, state) when state.alert_visible, do: {:msg, :cancel_alert}
-  def event_to_msg(%Event.Key{key: :tab}, state) when state.alert_visible, do: {:msg, :next_button}
-  def event_to_msg(%Event.Key{key: :left}, state) when state.alert_visible, do: {:msg, :prev_button}
-  def event_to_msg(%Event.Key{key: :right}, state) when state.alert_visible, do: {:msg, :next_button}
-  def event_to_msg(%Event.Key{key: :enter}, state) when state.alert_visible, do: {:msg, :select_button}
-  def event_to_msg(%Event.Key{key: " "}, state) when state.alert_visible, do: {:msg, :select_button}
-
-  # Y/N shortcuts for confirm dialog
-  def event_to_msg(%Event.Key{key: "y"}, state) when state.alert_visible and state.alert_type == :confirm do
-    {:msg, {:select_result, :yes}}
-  end
-  def event_to_msg(%Event.Key{key: "n"}, state) when state.alert_visible and state.alert_type == :confirm do
-    {:msg, {:select_result, :no}}
-  end
+  # When alert is visible, forward events to the alert widget
+  def event_to_msg(event, %{alert: alert}) when alert != nil, do: {:msg, {:alert_event, event}}
 
   def event_to_msg(%Event.Key{key: key}, _state) when key in ["q", "Q"], do: {:msg, :quit}
   def event_to_msg(_event, _state), do: :ignore
@@ -87,99 +71,36 @@ defmodule AlertDialog.App do
   @doc """
   Update state based on messages.
   """
-  def update(:show_info, state) do
-    {%{state |
-      alert_visible: true,
-      alert_type: :info,
-      alert_title: "Information",
-      alert_message: "This is an informational message.",
-      alert_buttons: [{:ok, "OK"}],
-      focused_button: 0
-    }, []}
-  end
+  def update(:show_info, state), do: {show_alert(state, :info, "Information", "This is an informational message."), []}
+  def update(:show_success, state), do: {show_alert(state, :success, "Success", "Operation completed successfully!"), []}
+  def update(:show_warning, state), do: {show_alert(state, :warning, "Warning", "Please proceed with caution."), []}
+  def update(:show_error, state), do: {show_alert(state, :error, "Error", "An error occurred during the operation."), []}
+  def update(:show_confirm, state), do: {show_alert(state, :confirm, "Confirm Action", "Are you sure you want to proceed?"), []}
+  def update(:show_ok_cancel, state), do: {show_alert(state, :ok_cancel, "Save Changes", "Do you want to save your changes?"), []}
 
-  def update(:show_success, state) do
-    {%{state |
-      alert_visible: true,
-      alert_type: :success,
-      alert_title: "Success",
-      alert_message: "Operation completed successfully!",
-      alert_buttons: [{:ok, "OK"}],
-      focused_button: 0
-    }, []}
-  end
-
-  def update(:show_warning, state) do
-    {%{state |
-      alert_visible: true,
-      alert_type: :warning,
-      alert_title: "Warning",
-      alert_message: "Please proceed with caution.",
-      alert_buttons: [{:ok, "OK"}],
-      focused_button: 0
-    }, []}
-  end
-
-  def update(:show_error, state) do
-    {%{state |
-      alert_visible: true,
-      alert_type: :error,
-      alert_title: "Error",
-      alert_message: "An error occurred during the operation.",
-      alert_buttons: [{:ok, "OK"}],
-      focused_button: 0
-    }, []}
-  end
-
-  def update(:show_confirm, state) do
-    {%{state |
-      alert_visible: true,
-      alert_type: :confirm,
-      alert_title: "Confirm Action",
-      alert_message: "Are you sure you want to proceed?",
-      alert_buttons: [{:no, "No"}, {:yes, "Yes"}],
-      focused_button: 1
-    }, []}
-  end
-
-  def update(:show_ok_cancel, state) do
-    {%{state |
-      alert_visible: true,
-      alert_type: :ok_cancel,
-      alert_title: "Save Changes",
-      alert_message: "Do you want to save your changes?",
-      alert_buttons: [{:cancel, "Cancel"}, {:ok, "OK"}],
-      focused_button: 1
-    }, []}
-  end
-
-  def update(:cancel_alert, state) do
-    result = if state.alert_type == :confirm, do: :no, else: :cancel
-    {%{state | alert_visible: false, last_result: result, last_alert_type: state.alert_type}, []}
-  end
-
-  def update(:next_button, state) do
-    max_idx = length(state.alert_buttons) - 1
-    new_idx = min(state.focused_button + 1, max_idx)
-    {%{state | focused_button: new_idx}, []}
-  end
-
-  def update(:prev_button, state) do
-    new_idx = max(state.focused_button - 1, 0)
-    {%{state | focused_button: new_idx}, []}
-  end
-
-  def update(:select_button, state) do
-    {result, _label} = Enum.at(state.alert_buttons, state.focused_button)
-    {%{state | alert_visible: false, last_result: result, last_alert_type: state.alert_type}, []}
-  end
-
-  def update({:select_result, result}, state) do
-    {%{state | alert_visible: false, last_result: result, last_alert_type: state.alert_type}, []}
+  def update({:alert_event, event}, state) do
+    case AlertDialog.handle_event(event, state.alert) do
+      {:ok, new_alert} ->
+        if AlertDialog.visible?(new_alert) do
+          {%{state | alert: new_alert}, []}
+        else
+          # Alert was closed - capture result
+          result = AlertDialog.get_focused_button(new_alert)
+          alert_type = AlertDialog.get_type(new_alert)
+          {%{state | alert: nil, last_result: result, last_alert_type: alert_type}, []}
+        end
+    end
   end
 
   def update(:quit, state) do
     {state, [:quit]}
+  end
+
+  # Helper to create and initialize an alert dialog
+  defp show_alert(state, type, title, message) do
+    props = AlertDialog.new(type: type, title: title, message: message)
+    {:ok, alert} = AlertDialog.init(props)
+    %{state | alert: alert}
   end
 
   @doc """
@@ -188,11 +109,11 @@ defmodule AlertDialog.App do
   def view(state) do
     main_content = render_main_content(state)
 
-    if state.alert_visible do
+    if state.alert != nil do
       stack(:vertical, [
         main_content,
         text("", nil),
-        render_alert(state)
+        AlertDialog.render(state.alert, %{width: 80, height: 24})
       ])
     else
       main_content
@@ -251,88 +172,6 @@ defmodule AlertDialog.App do
 
   defp format_result(nil, _type), do: "(none)"
   defp format_result(result, type), do: "#{type} -> #{result}"
-
-  defp render_alert(state) do
-    width = 50
-
-    # Get icon and style based on alert type
-    {icon, title_style} = get_alert_icon_and_style(state.alert_type)
-
-    # Build alert
-    stack(:vertical, [
-      # Top border
-      text("┌" <> String.duplicate("─", width - 2) <> "┐", nil),
-
-      # Title with icon
-      render_alert_title(state.alert_title, icon, width, title_style),
-
-      # Separator
-      text("├" <> String.duplicate("─", width - 2) <> "┤", nil),
-
-      # Message
-      render_alert_message(state.alert_message, width),
-
-      # Separator
-      text("├" <> String.duplicate("─", width - 2) <> "┤", nil),
-
-      # Buttons
-      render_alert_buttons(state, width),
-
-      # Bottom border
-      text("└" <> String.duplicate("─", width - 2) <> "┘", nil)
-    ])
-  end
-
-  defp get_alert_icon_and_style(:info), do: {"ℹ", Style.new(fg: :cyan)}
-  defp get_alert_icon_and_style(:success), do: {"✓", Style.new(fg: :green)}
-  defp get_alert_icon_and_style(:warning), do: {"⚠", Style.new(fg: :yellow)}
-  defp get_alert_icon_and_style(:error), do: {"✗", Style.new(fg: :red)}
-  defp get_alert_icon_and_style(:confirm), do: {"?", Style.new(fg: :blue)}
-  defp get_alert_icon_and_style(:ok_cancel), do: {"?", Style.new(fg: :blue)}
-  defp get_alert_icon_and_style(_), do: {"", Style.new(fg: :white)}
-
-  defp render_alert_title(title, icon, width, style) do
-    title_with_icon = if icon != "", do: "#{icon} #{title}", else: title
-    inner_width = width - 4
-    padded = String.pad_trailing(title_with_icon, inner_width)
-    truncated = String.slice(padded, 0, inner_width)
-    line = "│ " <> truncated <> " │"
-    text(line, style)
-  end
-
-  defp render_alert_message(message, width) do
-    inner_width = width - 4
-    padded = String.pad_trailing(message, inner_width)
-    truncated = String.slice(padded, 0, inner_width)
-    text("│ " <> truncated <> " │", nil)
-  end
-
-  defp render_alert_buttons(state, width) do
-    button_texts =
-      state.alert_buttons
-      |> Enum.with_index()
-      |> Enum.map(fn {{_id, label}, idx} ->
-        if idx == state.focused_button do
-          "[ " <> label <> " ]"
-        else
-          "  " <> label <> "  "
-        end
-      end)
-
-    buttons_line = Enum.join(button_texts, " ")
-
-    # Center the buttons
-    inner_width = width - 4
-    padding = max(0, inner_width - String.length(buttons_line))
-    left_pad = div(padding, 2)
-
-    line = "│ " <>
-           String.duplicate(" ", left_pad) <>
-           buttons_line <>
-           String.duplicate(" ", inner_width - left_pad - String.length(buttons_line)) <> " │"
-
-    text(line, nil)
-  end
 
   # ----------------------------------------------------------------------------
   # Public API
