@@ -1,0 +1,1 @@
+CommandPalette.App.run()
