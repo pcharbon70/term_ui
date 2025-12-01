@@ -255,7 +255,7 @@ defmodule TermUI.Widgets.DialogTest do
       result = Dialog.render(state, area)
 
       # Centered: (80 - 40) / 2 = 20
-      assert result.dialog_x == 20
+      assert result.x == 20
     end
   end
 end
