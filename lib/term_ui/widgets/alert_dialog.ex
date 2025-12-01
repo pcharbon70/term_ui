@@ -250,7 +250,15 @@ defmodule TermUI.Widgets.AlertDialog do
   end
 
   defp render_title(state, width) do
-    title_text = state.title
+    # Include icon in title if present
+    # Extra space after icon to account for unicode width variations
+    title_text =
+      if state.icon != "" do
+        state.icon <> "  " <> state.title
+      else
+        state.title
+      end
+
     padding = width - String.length(title_text) - 4
     left_pad = div(padding, 2)
     right_pad = padding - left_pad
@@ -265,20 +273,12 @@ defmodule TermUI.Widgets.AlertDialog do
   end
 
   defp render_content(state, width) do
-    # Icon + message
-    icon = state.icon
+    # Message only (icon is now in title)
     message = state.message
-
-    content_text =
-      if icon != "" do
-        icon <> "  " <> message
-      else
-        message
-      end
 
     # Pad to width
     inner_width = width - 4
-    padded = String.pad_trailing(content_text, inner_width)
+    padded = String.pad_trailing(message, inner_width)
     padded = String.slice(padded, 0, inner_width)
 
     line = "│ " <> padded <> " │"
