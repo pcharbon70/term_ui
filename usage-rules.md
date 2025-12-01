@@ -166,82 +166,183 @@ combined = Style.merge(base_style, override_style)
 
 **Valid attributes:** `:bold`, `:dim`, `:italic`, `:underline`, `:blink`, `:reverse`, `:hidden`, `:strikethrough`
 
-## Widget Usage Rules
+## Widget Types
 
-### Rule 6: Widgets Use render/1 or StatefulComponent Pattern
+### Rule 6: Know the Two Widget Types
 
-**Simple widgets** use `Widget.render(opts)`:
+TermUI has two types of widgets:
+
+1. **Simple Widgets** - Stateless, call `Widget.render(keyword_opts)` directly in view
+2. **Stateful Widgets** - Use the StatefulComponent pattern: `new/init/handle_event/render`
+
+**Simple Widgets (render with keyword options):**
+- `Gauge` - Progress bars
+- `Sparkline` - Inline trend graphs
+- `BarChart` - Bar charts
+- `LineChart` - Line charts
+
+**Stateful Widgets (use StatefulComponent pattern):**
+- `Table` - Data tables
+- `Menu` - Menus with submenus
+- `TextInput` - Text input fields
+- `Dialog` - Modal dialogs
+- `AlertDialog` - Alert dialogs
+- `FormBuilder` - Forms with validation
+- `TreeView` - Hierarchical trees
+- `Tabs` - Tabbed interfaces
+- `LogViewer` - Log display
+- `ProcessMonitor` - BEAM process viewer
+- `SupervisionTreeViewer` - Supervision tree viewer
+- `ClusterDashboard` - Cluster dashboard
+- `CommandPalette` - Command palette
+- `SplitPane` - Resizable split layouts
+- `Viewport` - Scrollable viewports
+- `Toast` - Toast notifications
+- `ContextMenu` - Context menus
+
+### Rule 7: Simple Widget Usage
+
+Simple widgets render directly with keyword options:
 
 ```elixir
 alias TermUI.Widgets.Gauge
 alias TermUI.Widgets.Sparkline
-alias TermUI.Widgets.Table
-alias TermUI.Widgets.Menu
 
-# Gauge - progress bar
-Gauge.render(value: 75, width: 30, show_value: true)
+# In view/1 - call render directly
+def view(state) do
+  stack(:vertical, [
+    # Gauge - progress bar
+    Gauge.render(value: state.cpu_percent, width: 30, show_value: true),
 
-# Sparkline - inline trend graph
-Sparkline.render(values: [10, 25, 40, 30, 50])
-
-# Table - data grid
-Table.render(
-  data: [%{name: "Alice", age: 30}, %{name: "Bob", age: 25}],
-  columns: [
-    %{key: :name, header: "Name", width: 15},
-    %{key: :age, header: "Age", width: 5}
-  ],
-  selected: state.selected_row,
-  height: 10
-)
-
-# Menu - selectable list
-Menu.render(
-  items: ["File", "Edit", "View"],
-  selected: state.menu_index,
-  direction: :vertical
-)
+    # Sparkline - inline trend graph
+    Sparkline.render(values: state.cpu_history, style: Style.new(fg: :cyan))
+  ])
+end
 ```
 
-**Stateful widgets** use the `new/1`, `init/1`, `handle_event/2`, `render/2` pattern:
+### Rule 8: Stateful Widget Usage (CRITICAL)
+
+Stateful widgets MUST follow the StatefulComponent pattern:
 
 ```elixir
-alias TermUI.Widgets.TextInput
-alias TermUI.Widgets.FormBuilder
+# 1. Widget.new(opts) - Create props map
+# 2. Widget.init(props) - Initialize state, returns {:ok, state}
+# 3. Widget.handle_event(event, state) - Handle events, returns {:ok, new_state}
+# 4. Widget.render(state, area) - Render to nodes
+```
 
-# In init/1 - create widget state
-def init(_opts) do
-  props = TextInput.new(
-    placeholder: "Enter text...",
-    width: 40,
-    multiline: true,
-    on_change: fn value -> send(self(), {:text_changed, value}) end
-  )
-  {:ok, input_state} = TextInput.init(props)
+**Complete Example with TextInput:**
 
-  %{text_input: input_state}
-end
+```elixir
+defmodule MyApp do
+  use TermUI.Elm
 
-# In event_to_msg/2 - forward events to widget
-def event_to_msg(event, state) do
-  {:msg, {:input_event, event}}
-end
+  alias TermUI.Event
+  alias TermUI.Widgets.TextInput
 
-# In update/2 - handle widget events
-def update({:input_event, event}, state) do
-  {:ok, new_input} = TextInput.handle_event(event, state.text_input)
-  {%{state | text_input: new_input}, []}
-end
+  # 1. Initialize widget in init/1
+  def init(_opts) do
+    props = TextInput.new(
+      placeholder: "Enter your name...",
+      width: 40
+    )
+    {:ok, input_state} = TextInput.init(props)
 
-# In view/1 - render widget
-def view(state) do
-  TextInput.render(state.text_input, %{width: 80, height: 24})
+    %{
+      input: TextInput.set_focused(input_state, true),
+      submitted_value: nil
+    }
+  end
+
+  # 2. Route events to widget in event_to_msg/2
+  def event_to_msg(%Event.Key{key: "q"}, state) do
+    # Only quit if input is empty
+    if TextInput.get_value(state.input) == "" do
+      {:msg, :quit}
+    else
+      {:msg, {:input_event, %Event.Key{key: "q", char: "q"}}}
+    end
+  end
+
+  def event_to_msg(%Event.Key{key: :enter}, state) do
+    {:msg, {:submit, TextInput.get_value(state.input)}}
+  end
+
+  def event_to_msg(event, _state) do
+    {:msg, {:input_event, event}}
+  end
+
+  # 3. Handle widget events in update/2
+  def update(:quit, state), do: {state, [:quit]}
+
+  def update({:submit, value}, state) do
+    {%{state | submitted_value: value}, []}
+  end
+
+  def update({:input_event, event}, state) do
+    {:ok, new_input} = TextInput.handle_event(event, state.input)
+    {%{state | input: new_input}, []}
+  end
+
+  # 4. Render widget in view/1
+  def view(state) do
+    stack(:vertical, [
+      text("Name:", Style.new(fg: :cyan)),
+      TextInput.render(state.input, %{width: 50, height: 1}),
+      text(""),
+      if state.submitted_value do
+        text("Hello, #{state.submitted_value}!", Style.new(fg: :green))
+      else
+        text("Press Enter to submit", Style.new(fg: :bright_black))
+      end
+    ])
+  end
 end
 ```
 
-### Rule 7: Common Widget Configurations
+### Rule 9: Stateful Widget Helper Functions
 
-**TextInput** - Single or multi-line text input:
+Stateful widgets provide helper functions to query and modify state:
+
+**TextInput helpers:**
+```elixir
+# Get current value
+value = TextInput.get_value(input_state)
+
+# Get cursor position {row, col}
+{row, col} = TextInput.get_cursor(input_state)
+
+# Get number of lines
+count = TextInput.get_line_count(input_state)
+
+# Set focus state
+input_state = TextInput.set_focused(input_state, true)
+
+# Clear the input
+input_state = TextInput.clear(input_state)
+```
+
+**FormBuilder helpers:**
+```elixir
+# Get all form values as a map
+values = FormBuilder.get_values(form_state)
+
+# Check if form is valid
+valid? = FormBuilder.valid?(form_state)
+```
+
+**Table helpers:**
+```elixir
+# Get selected rows
+selected = Table.get_selected(table_state)
+
+# Update data
+table_state = Table.set_data(table_state, new_data)
+```
+
+### Rule 10: Common Stateful Widget Configurations
+
+**TextInput:**
 ```elixir
 TextInput.new(
   value: "",                    # Initial text
@@ -249,13 +350,59 @@ TextInput.new(
   width: 40,                    # Character width
   multiline: false,             # Enable multi-line
   max_visible_lines: 5,         # Lines before scrolling
-  enter_submits: false,         # Enter submits vs newline
-  on_change: fn(value) -> ... end,
-  on_submit: fn(value) -> ... end
+  enter_submits: false          # Enter submits vs newline
 )
 ```
 
-**FormBuilder** - Structured forms:
+**Table:**
+```elixir
+alias TermUI.Widgets.Table
+alias TermUI.Widgets.Table.Column
+
+Table.new(
+  columns: [
+    Column.new(:name, "Name"),
+    Column.new(:age, "Age", width: 10, align: :right)
+  ],
+  data: [
+    %{name: "Alice", age: 30},
+    %{name: "Bob", age: 25}
+  ],
+  selection_mode: :single,  # :none, :single, :multi
+  sortable: true
+)
+```
+
+**Menu:**
+```elixir
+Menu.new(
+  items: [
+    Menu.action(:new, "New File", shortcut: "Ctrl+N"),
+    Menu.action(:open, "Open...", shortcut: "Ctrl+O"),
+    Menu.separator(),
+    Menu.submenu(:recent, "Recent Files", [
+      Menu.action(:file1, "doc.txt"),
+      Menu.action(:file2, "notes.md")
+    ]),
+    Menu.checkbox(:autosave, "Auto Save", checked: true)
+  ]
+)
+```
+
+**Dialog:**
+```elixir
+Dialog.new(
+  title: "Confirm Delete",
+  content: text("Are you sure?"),
+  buttons: [
+    %{id: :cancel, label: "Cancel"},
+    %{id: :confirm, label: "Delete"}
+  ],
+  width: 50
+)
+```
+
+**FormBuilder:**
 ```elixir
 FormBuilder.new(
   fields: [
@@ -267,73 +414,27 @@ FormBuilder.new(
     %{id: :theme, type: :radio, label: "Theme",
       options: [{"light", "Light"}, {"dark", "Dark"}]}
   ],
-  on_submit: fn(values) -> ... end,
-  validate_on_blur: true
+  submit_label: "Register",
+  label_width: 15,
+  field_width: 30
 )
 ```
 
-**Dialog/AlertDialog** - Modal dialogs:
+**ProcessMonitor:**
 ```elixir
-Dialog.render(
-  title: "Confirm",
-  content: "Are you sure?",
-  buttons: ["Cancel", "OK"],
-  selected_button: 0,
-  width: 40
+ProcessMonitor.new(
+  update_interval: 1000,
+  show_system_processes: false,
+  thresholds: %{
+    queue_warning: 1000,
+    memory_warning: 50_000_000
+  }
 )
-
-AlertDialog.render(
-  type: :confirm,  # :info, :warning, :error, :success, :confirm
-  title: "Delete",
-  message: "Delete this item?",
-  buttons: :yes_no,  # :ok, :ok_cancel, :yes_no, or list
-  selected_button: 0
-)
-```
-
-**Tabs** - Tabbed interface:
-```elixir
-Tabs.render(
-  tabs: ["Overview", "Details", "Settings"],
-  selected: state.active_tab,
-  content: render_tab_content(state)
-)
-```
-
-**TreeView** - Hierarchical data:
-```elixir
-TreeView.render(
-  data: [
-    %{id: 1, label: "Root", children: [
-      %{id: 2, label: "Child 1"},
-      %{id: 3, label: "Child 2"}
-    ]}
-  ],
-  expanded: MapSet.new([1]),
-  selected: state.selected_node
-)
-```
-
-**LogViewer** - Scrollable log display:
-```elixir
-LogViewer.render(
-  lines: state.log_lines,  # List of %{timestamp, level, message}
-  height: 20,
-  tail_mode: true,         # Auto-scroll to bottom
-  show_line_numbers: true
-)
-```
-
-**ProcessMonitor** - BEAM process inspection:
-```elixir
-props = ProcessMonitor.new(update_interval: 1000)
-{:ok, monitor_state} = ProcessMonitor.init(props)
-ProcessMonitor.render(monitor_state, %{width: 100, height: 30})
 ```
 
 ## Layout Rules
 
-### Rule 8: Use Stack for Layout
+### Rule 11: Use Stack for Layout
 
 Primary layout is via `stack/2` and `stack/3`:
 
@@ -366,7 +467,7 @@ stack(:vertical, [
 ])
 ```
 
-### Rule 9: Constraint Types
+### Rule 12: Constraint Types
 
 ```elixir
 alias TermUI.Layout.Constraint
@@ -384,7 +485,7 @@ Constraint.percentage(50)
 
 ## Common Patterns
 
-### Rule 10: Loading States
+### Rule 13: Loading States
 
 ```elixir
 def init(_opts) do
@@ -412,38 +513,53 @@ def view(state) do
 end
 ```
 
-### Rule 11: Modal/Dialog Pattern
+### Rule 14: Modal/Dialog Pattern with Stateful Widget
 
 ```elixir
 def init(_opts) do
-  %{items: [], confirm_delete: nil}
+  %{items: [], show_dialog: false, dialog: nil}
 end
 
 def update({:request_delete, item}, state) do
-  {%{state | confirm_delete: item}, []}
+  props = Dialog.new(
+    title: "Confirm Delete",
+    content: text("Delete #{item.name}?"),
+    buttons: [
+      %{id: :cancel, label: "Cancel"},
+      %{id: :confirm, label: "Delete"}
+    ]
+  )
+  {:ok, dialog_state} = Dialog.init(props)
+
+  {%{state | show_dialog: true, dialog: dialog_state, deleting: item}, []}
 end
 
-def update(:confirm_delete, state) do
-  items = Enum.reject(state.items, &(&1.id == state.confirm_delete.id))
-  {%{state | items: items, confirm_delete: nil}, []}
+def event_to_msg(event, %{show_dialog: true} = state) do
+  {:msg, {:dialog_event, event}}
 end
 
-def update(:cancel_delete, state) do
-  {%{state | confirm_delete: nil}, []}
+def update({:dialog_event, %Event.Key{key: :enter}}, state) do
+  # Check which button is focused and handle accordingly
+  if state.dialog.focused_button == 1 do  # Confirm button
+    items = Enum.reject(state.items, &(&1.id == state.deleting.id))
+    {%{state | items: items, show_dialog: false, dialog: nil}, []}
+  else
+    {%{state | show_dialog: false, dialog: nil}, []}
+  end
+end
+
+def update({:dialog_event, event}, state) do
+  {:ok, dialog} = Dialog.handle_event(event, state.dialog)
+  {%{state | dialog: dialog}, []}
 end
 
 def view(state) do
   base_view = render_items(state.items)
 
-  if state.confirm_delete do
+  if state.show_dialog do
     stack(:vertical, [
       base_view,
-      Dialog.render(
-        title: "Confirm Delete",
-        content: "Delete #{state.confirm_delete.name}?",
-        buttons: ["Cancel", "Delete"],
-        selected_button: 0
-      )
+      Dialog.render(state.dialog, %{width: 80, height: 24})
     ])
   else
     base_view
@@ -451,43 +567,64 @@ def view(state) do
 end
 ```
 
-### Rule 12: Focus Management
+### Rule 15: Focus Management with Multiple Widgets
 
 ```elixir
 def init(_opts) do
-  %{focused: :input1, input1: "", input2: ""}
+  {:ok, input1} = TextInput.init(TextInput.new(placeholder: "Name"))
+  {:ok, input2} = TextInput.init(TextInput.new(placeholder: "Email"))
+
+  %{
+    focused: :input1,
+    input1: TextInput.set_focused(input1, true),
+    input2: input2
+  }
 end
 
 def event_to_msg(%Event.Key{key: :tab}, _state), do: {:msg, :next_focus}
-def event_to_msg(%Event.Key{key: :tab, modifiers: [:shift]}, _state), do: {:msg, :prev_focus}
 
 def update(:next_focus, state) do
-  next = case state.focused do
-    :input1 -> :input2
-    :input2 -> :button
-    :button -> :input1
+  case state.focused do
+    :input1 ->
+      {%{state |
+        focused: :input2,
+        input1: TextInput.set_focused(state.input1, false),
+        input2: TextInput.set_focused(state.input2, true)
+      }, []}
+    :input2 ->
+      {%{state |
+        focused: :input1,
+        input1: TextInput.set_focused(state.input1, true),
+        input2: TextInput.set_focused(state.input2, false)
+      }, []}
   end
-  {%{state | focused: next}, []}
+end
+
+def event_to_msg(event, state) do
+  {:msg, {:input_event, state.focused, event}}
+end
+
+def update({:input_event, :input1, event}, state) do
+  {:ok, input} = TextInput.handle_event(event, state.input1)
+  {%{state | input1: input}, []}
+end
+
+def update({:input_event, :input2, event}, state) do
+  {:ok, input} = TextInput.handle_event(event, state.input2)
+  {%{state | input2: input}, []}
 end
 
 def view(state) do
   stack(:vertical, [
-    text("Name:", style_for_focus(state, :input1)),
-    text("Email:", style_for_focus(state, :input2)),
-    text("[Submit]", style_for_focus(state, :button))
+    text("Name:"),
+    TextInput.render(state.input1, %{width: 40, height: 1}),
+    text("Email:"),
+    TextInput.render(state.input2, %{width: 40, height: 1})
   ])
-end
-
-defp style_for_focus(state, field) do
-  if state.focused == field do
-    Style.new(fg: :black, bg: :cyan)
-  else
-    Style.new()
-  end
 end
 ```
 
-### Rule 13: Polling/Animation
+### Rule 16: Polling/Animation
 
 ```elixir
 # Polling pattern
@@ -520,7 +657,7 @@ end
 
 ## Testing Rules
 
-### Rule 14: Test Components in Isolation
+### Rule 17: Test Components in Isolation
 
 ```elixir
 defmodule MyAppTest do
@@ -567,27 +704,27 @@ def update(:save, state) do
 end
 
 def update(:do_save, state) do
-  # This runs async, results come back as messages
-  spawn(fn ->
-    File.write!("data.json", Jason.encode!(state.data))
-    send(self(), :save_complete)
-  end)
-  {state, []}
+  File.write!("data.json", Jason.encode!(state.data))
+  {%{state | saving: false, saved: true}, []}
 end
 ```
 
-### Never Mutate State
+### Never Forget to Initialize Stateful Widgets
 
 ```elixir
-# BAD - mutating state
-def update(:add_item, state) do
-  state.items = [new_item | state.items]  # NO!
-  {state, []}
+# BAD - using stateful widget without init
+def view(state) do
+  TextInput.render(%{value: "hello"}, %{width: 40, height: 1})  # NO!
 end
 
-# GOOD - return new state
-def update(:add_item, state) do
-  {%{state | items: [new_item | state.items]}, []}
+# GOOD - properly initialize in init/1
+def init(_opts) do
+  {:ok, input} = TextInput.init(TextInput.new(value: "hello"))
+  %{input: input}
+end
+
+def view(state) do
+  TextInput.render(state.input, %{width: 40, height: 1})
 end
 ```
 
@@ -612,7 +749,7 @@ TermUI.Runtime.run(root: MyApp)
 # Common imports
 alias TermUI.Event
 alias TermUI.Renderer.Style
-alias TermUI.Widgets.{Gauge, Table, Menu, TextInput, Dialog}
+alias TermUI.Widgets.{Gauge, Sparkline, Table, Menu, TextInput, Dialog, FormBuilder}
 
 # Layout
 stack(:vertical, [child1, child2])
@@ -633,4 +770,14 @@ Style.new() |> Style.fg(:green) |> Style.bold()
 {state, [:quit]}
 {state, [Command.timer(1000, :tick)]}
 {state, []}
+
+# Simple widgets (call in view)
+Gauge.render(value: 75, width: 30)
+Sparkline.render(values: [1, 2, 3, 4, 5])
+
+# Stateful widgets (init in init/1, handle in update/2, render in view/1)
+props = TextInput.new(placeholder: "Enter...")
+{:ok, input_state} = TextInput.init(props)
+{:ok, input_state} = TextInput.handle_event(event, input_state)
+TextInput.render(input_state, %{width: 40, height: 1})
 ```
