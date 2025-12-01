@@ -97,6 +97,25 @@ defmodule TermUI.Runtime.NodeRenderer do
     render_viewport(content, buffer, row, col, style, scroll_x, scroll_y, width, height)
   end
 
+  # Handle overlay nodes (from AlertDialog, Dialog, ContextMenu, Toast widgets)
+  # Overlay renders content at an absolute position on screen
+  defp render_node(
+         %{
+           type: :overlay,
+           content: content,
+           x: x,
+           y: y
+         },
+         buffer,
+         _row,
+         _col,
+         style
+       ) do
+    # Overlay uses absolute positioning - x and y are 0-indexed screen coordinates
+    # Convert to 1-indexed buffer coordinates
+    render_node(content, buffer, y + 1, x + 1, style)
+  end
+
   # Handle tuple-based render nodes from Elm.Helpers
   defp render_node({:text, content}, buffer, row, col, style) do
     render_text(content, buffer, row, col, style)

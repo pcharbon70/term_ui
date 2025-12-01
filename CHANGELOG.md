@@ -32,6 +32,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Automatic backend selection based on terminal capabilities
   - Character set selection (Unicode/ASCII) with graceful degradation
 
+- **Rendering**
+  - Overlay node support in NodeRenderer for absolute-positioned widgets (AlertDialog, Dialog, ContextMenu, Toast)
+
 - **Documentation**
   - Advanced widgets user guide
   - Updated widget examples with run.exs entry points
