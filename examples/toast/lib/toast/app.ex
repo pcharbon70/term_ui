@@ -150,7 +150,7 @@ defmodule Toast.App do
   def view(state) do
     stack(:vertical, [
       render_main_content(state),
-      render_toasts(state)
+      ToastManager.render(state.toast_manager, %{width: 80, height: 24, x: 0, y: 0})
     ])
   end
 
@@ -211,62 +211,6 @@ defmodule Toast.App do
       text("Toasts auto-dismiss after 3 seconds. Click or Escape to dismiss early.", Style.new(fg: :white, attrs: [:dim]))
     ])
   end
-
-  defp render_toasts(state) do
-    # Get all visible toasts and render them
-    toasts = ToastManager.get_toasts(state.toast_manager)
-
-    if Enum.empty?(toasts) do
-      empty()
-    else
-      # Render each toast manually with stacking offset
-      position = state.current_position
-      spacing = 1
-
-      toast_rows =
-        toasts
-        |> Enum.with_index()
-        |> Enum.map(fn {toast, index} ->
-          render_single_toast(toast, position, index, spacing)
-        end)
-
-      stack(:vertical, toast_rows)
-    end
-  end
-
-  defp render_single_toast(toast, _position, _index, _spacing) do
-    width = toast.width
-    icon = toast.icon
-    message = toast.message
-
-    content_text =
-      if icon != "" do
-        icon <> " " <> message
-      else
-        message
-      end
-
-    # Truncate if too long
-    inner_width = width - 4
-    content_text = String.slice(content_text, 0, inner_width)
-    padded = String.pad_trailing(content_text, inner_width)
-
-    # Get style based on type
-    style = get_style_for_type(toast.toast_type)
-
-    # Build toast box
-    stack(:vertical, [
-      text("┌" <> String.duplicate("─", width - 2) <> "┐", style),
-      text("│ " <> padded <> " │", style),
-      text("└" <> String.duplicate("─", width - 2) <> "┘", style)
-    ])
-  end
-
-  defp get_style_for_type(:info), do: Style.new(fg: :cyan)
-  defp get_style_for_type(:success), do: Style.new(fg: :green)
-  defp get_style_for_type(:warning), do: Style.new(fg: :yellow)
-  defp get_style_for_type(:error), do: Style.new(fg: :red)
-  defp get_style_for_type(_), do: Style.new(fg: :white)
 
   # ----------------------------------------------------------------------------
   # Public API

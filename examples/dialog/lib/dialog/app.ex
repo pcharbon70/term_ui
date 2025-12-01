@@ -26,6 +26,7 @@ defmodule Dialog.App do
 
   alias TermUI.Event
   alias TermUI.Renderer.Style
+  alias TermUI.Widgets.Dialog
 
   # ----------------------------------------------------------------------------
   # Component Callbacks
@@ -36,13 +37,8 @@ defmodule Dialog.App do
   """
   def init(_opts) do
     %{
-      # Dialog state
-      dialog_visible: false,
-      dialog_type: nil,
-      dialog_title: "",
-      dialog_content: "",
-      dialog_buttons: [],
-      focused_button: 0,
+      # Current dialog state (nil when no dialog visible)
+      dialog: nil,
       # Result tracking
       last_result: nil
     }
@@ -51,17 +47,13 @@ defmodule Dialog.App do
   @doc """
   Convert keyboard events to messages.
   """
-  def event_to_msg(%Event.Key{key: "1"}, state) when not state.dialog_visible, do: {:msg, :show_info}
-  def event_to_msg(%Event.Key{key: "2"}, state) when not state.dialog_visible, do: {:msg, :show_confirm}
-  def event_to_msg(%Event.Key{key: "3"}, state) when not state.dialog_visible, do: {:msg, :show_warning}
+  # When no dialog is visible, number keys show dialogs
+  def event_to_msg(%Event.Key{key: "1"}, %{dialog: nil}), do: {:msg, :show_info}
+  def event_to_msg(%Event.Key{key: "2"}, %{dialog: nil}), do: {:msg, :show_confirm}
+  def event_to_msg(%Event.Key{key: "3"}, %{dialog: nil}), do: {:msg, :show_warning}
 
-  # Dialog controls
-  def event_to_msg(%Event.Key{key: :escape}, state) when state.dialog_visible, do: {:msg, :close_dialog}
-  def event_to_msg(%Event.Key{key: :tab}, state) when state.dialog_visible, do: {:msg, :next_button}
-  def event_to_msg(%Event.Key{key: :left}, state) when state.dialog_visible, do: {:msg, :prev_button}
-  def event_to_msg(%Event.Key{key: :right}, state) when state.dialog_visible, do: {:msg, :next_button}
-  def event_to_msg(%Event.Key{key: :enter}, state) when state.dialog_visible, do: {:msg, :select_button}
-  def event_to_msg(%Event.Key{key: " "}, state) when state.dialog_visible, do: {:msg, :select_button}
+  # When dialog is visible, forward events to the dialog widget
+  def event_to_msg(event, %{dialog: dialog}) when dialog != nil, do: {:msg, {:dialog_event, event}}
 
   def event_to_msg(%Event.Key{key: key}, _state) when key in ["q", "Q"], do: {:msg, :quit}
   def event_to_msg(_event, _state), do: :ignore
@@ -70,61 +62,57 @@ defmodule Dialog.App do
   Update state based on messages.
   """
   def update(:show_info, state) do
-    {%{state |
-      dialog_visible: true,
-      dialog_type: :info,
-      dialog_title: "Information",
-      dialog_content: "This is an informational message.\nPress OK to continue.",
-      dialog_buttons: ["OK"],
-      focused_button: 0
-    }, []}
+    {show_dialog(state, "Information", "This is an informational message.\nPress OK to continue.", [
+      %{id: :ok, label: "OK"}
+    ]), []}
   end
 
   def update(:show_confirm, state) do
-    {%{state |
-      dialog_visible: true,
-      dialog_type: :confirm,
-      dialog_title: "Confirm Action",
-      dialog_content: "Are you sure you want to proceed?\nThis action cannot be undone.",
-      dialog_buttons: ["Cancel", "Confirm"],
-      focused_button: 0
-    }, []}
+    {show_dialog(state, "Confirm Action", "Are you sure you want to proceed?\nThis action cannot be undone.", [
+      %{id: :cancel, label: "Cancel"},
+      %{id: :confirm, label: "Confirm"}
+    ]), []}
   end
 
   def update(:show_warning, state) do
-    {%{state |
-      dialog_visible: true,
-      dialog_type: :warning,
-      dialog_title: "Warning",
-      dialog_content: "Unsaved changes will be lost!\nDo you want to save before closing?",
-      dialog_buttons: ["Don't Save", "Cancel", "Save"],
-      focused_button: 2
-    }, []}
+    {show_dialog(state, "Warning", "Unsaved changes will be lost!\nDo you want to save before closing?", [
+      %{id: :dont_save, label: "Don't Save"},
+      %{id: :cancel, label: "Cancel"},
+      %{id: :save, label: "Save", default: true}
+    ]), []}
   end
 
-  def update(:close_dialog, state) do
-    {%{state | dialog_visible: false, last_result: "Cancelled"}, []}
-  end
-
-  def update(:next_button, state) do
-    max_idx = length(state.dialog_buttons) - 1
-    new_idx = min(state.focused_button + 1, max_idx)
-    {%{state | focused_button: new_idx}, []}
-  end
-
-  def update(:prev_button, state) do
-    new_idx = max(state.focused_button - 1, 0)
-    {%{state | focused_button: new_idx}, []}
-  end
-
-  def update(:select_button, state) do
-    selected = Enum.at(state.dialog_buttons, state.focused_button)
-    {%{state | dialog_visible: false, last_result: "Selected: #{selected}"}, []}
+  def update({:dialog_event, event}, state) do
+    case Dialog.handle_event(event, state.dialog) do
+      {:ok, new_dialog} ->
+        if Dialog.visible?(new_dialog) do
+          {%{state | dialog: new_dialog}, []}
+        else
+          # Dialog was closed - capture result
+          result = Dialog.get_focused_button(new_dialog)
+          {%{state | dialog: nil, last_result: format_result(result)}, []}
+        end
+    end
   end
 
   def update(:quit, state) do
     {state, [:quit]}
   end
+
+  # Helper to create and initialize a dialog
+  defp show_dialog(state, title, content, buttons) do
+    props = Dialog.new(
+      title: title,
+      content: text(content, nil),
+      buttons: buttons,
+      width: 45
+    )
+    {:ok, dialog} = Dialog.init(props)
+    %{state | dialog: dialog}
+  end
+
+  defp format_result(nil), do: "Cancelled"
+  defp format_result(result), do: "Selected: #{result}"
 
   @doc """
   Render the current state to a render tree.
@@ -132,11 +120,11 @@ defmodule Dialog.App do
   def view(state) do
     main_content = render_main_content(state)
 
-    if state.dialog_visible do
+    if state.dialog != nil do
       stack(:vertical, [
         main_content,
         text("", nil),
-        render_dialog(state)
+        Dialog.render(state.dialog, %{width: 80, height: 24})
       ])
     else
       main_content
@@ -187,82 +175,6 @@ defmodule Dialog.App do
       text("│" <> String.pad_trailing("  Last result: #{state.last_result || "(none)"}", inner_width) <> "│", nil),
       text(bottom_border, Style.new(fg: :yellow))
     ])
-  end
-
-  defp render_dialog(state) do
-    width = 45
-
-    # Get title style based on dialog type
-    title_style =
-      case state.dialog_type do
-        :info -> Style.new(fg: :cyan)
-        :confirm -> Style.new(fg: :blue)
-        :warning -> Style.new(fg: :yellow)
-        _ -> Style.new(fg: :white)
-      end
-
-    # Build dialog
-    stack(:vertical, [
-      # Top border
-      text("┌" <> String.duplicate("─", width - 2) <> "┐", nil),
-
-      # Title
-      text("│ " <> String.pad_trailing(state.dialog_title, width - 4) <> " │", title_style),
-
-      # Separator
-      text("├" <> String.duplicate("─", width - 2) <> "┤", nil),
-
-      # Content
-      render_dialog_content(state.dialog_content, width),
-
-      # Separator
-      text("├" <> String.duplicate("─", width - 2) <> "┤", nil),
-
-      # Buttons
-      render_buttons(state, width),
-
-      # Bottom border
-      text("└" <> String.duplicate("─", width - 2) <> "┘", nil)
-    ])
-  end
-
-  defp render_dialog_content(content, width) do
-    lines = String.split(content, "\n")
-
-    rows =
-      Enum.map(lines, fn line ->
-        padded = String.pad_trailing(line, width - 4)
-        truncated = String.slice(padded, 0, width - 4)
-        text("│ " <> truncated <> " │", nil)
-      end)
-
-    stack(:vertical, rows)
-  end
-
-  defp render_buttons(state, width) do
-    button_texts =
-      state.dialog_buttons
-      |> Enum.with_index()
-      |> Enum.map(fn {label, idx} ->
-        if idx == state.focused_button do
-          "[ " <> label <> " ]"
-        else
-          "  " <> label <> "  "
-        end
-      end)
-
-    buttons_line = Enum.join(button_texts, " ")
-
-    # Center the buttons
-    inner_width = width - 4
-    padding = max(0, inner_width - String.length(buttons_line))
-    left_pad = div(padding, 2)
-
-    line = "│ " <> String.duplicate(" ", left_pad) <>
-           buttons_line <>
-           String.duplicate(" ", inner_width - left_pad - String.length(buttons_line)) <> " │"
-
-    text(line, nil)
   end
 
   # ----------------------------------------------------------------------------
