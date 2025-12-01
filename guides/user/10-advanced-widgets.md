@@ -2,6 +2,22 @@
 
 TermUI includes advanced widgets for complex UI patterns including navigation, overlays, visualization, data streaming, and BEAM introspection. This guide covers these widgets and how to use them.
 
+All advanced widgets use the StatefulComponent pattern:
+
+```elixir
+# 1. Create props with Widget.new(opts)
+props = Widget.new(option: value)
+
+# 2. Initialize state with Widget.init(props)
+{:ok, widget_state} = Widget.init(props)
+
+# 3. Handle events with Widget.handle_event(event, state)
+{:ok, widget_state} = Widget.handle_event(event, widget_state)
+
+# 4. Render with Widget.render(state, area)
+node = Widget.render(widget_state, %{width: 80, height: 24})
+```
+
 ## Navigation Widgets
 
 ### Tabs
@@ -11,11 +27,16 @@ Tabbed interface for organizing content into switchable panels.
 ```elixir
 alias TermUI.Widgets.Tabs
 
-Tabs.render(
+# Create props
+props = Tabs.new(
   tabs: ["Overview", "Details", "Settings"],
-  selected: state.active_tab,
-  content: render_tab_content(state)
+  on_change: fn index -> handle_tab_change(index) end
 )
+
+# Initialize and use
+{:ok, tabs_state} = Tabs.init(props)
+{:ok, tabs_state} = Tabs.handle_event(event, tabs_state)
+Tabs.render(tabs_state, %{width: 60, height: 1})
 ```
 
 **Options:**
@@ -23,17 +44,10 @@ Tabs.render(
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `tabs` | list | required | Tab labels |
-| `selected` | integer | 0 | Selected tab index |
-| `content` | node | `nil` | Content for selected tab |
+| `on_change` | function | `nil` | Tab change callback |
 | `style` | Style | default | Tab bar style |
 | `selected_style` | Style | reverse | Selected tab style |
 | `closeable` | boolean | `false` | Show close buttons |
-
-**Example Output:**
-```
-┌─Overview─┬─Details─┬─Settings─┐
-│ Tab content here...           │
-```
 
 ### Context Menu
 
@@ -42,30 +56,24 @@ Right-click context menu that appears at cursor position.
 ```elixir
 alias TermUI.Widgets.ContextMenu
 
-# In your view, conditionally render
-if state.show_context_menu do
-  ContextMenu.render(
-    items: [
-      %{label: "Cut", shortcut: "Ctrl+X", action: :cut},
-      %{label: "Copy", shortcut: "Ctrl+C", action: :copy},
-      %{label: "Paste", shortcut: "Ctrl+V", action: :paste},
-      :separator,
-      %{label: "Delete", action: :delete}
-    ],
-    selected: state.menu_selection,
-    position: state.menu_position
-  )
-end
+# Create props
+props = ContextMenu.new(
+  items: [
+    %{label: "Cut", shortcut: "Ctrl+X", action: :cut},
+    %{label: "Copy", shortcut: "Ctrl+C", action: :copy},
+    %{label: "Paste", shortcut: "Ctrl+V", action: :paste},
+    :separator,
+    %{label: "Delete", action: :delete}
+  ],
+  position: {10, 5},
+  on_select: fn action -> handle_menu_action(action) end
+)
+
+# Initialize and use
+{:ok, menu_state} = ContextMenu.init(props)
+{:ok, menu_state} = ContextMenu.handle_event(event, menu_state)
+ContextMenu.render(menu_state, %{width: 30, height: 10})
 ```
-
-**Options:**
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `items` | list | required | Menu items or `:separator` |
-| `selected` | integer | 0 | Selected item index |
-| `position` | tuple | `{0, 0}` | `{x, y}` position |
-| `style` | Style | default | Menu style |
 
 **Item Structure:**
 ```elixir
@@ -86,22 +94,19 @@ Modal dialog for confirmations and messages with standard button configurations.
 ```elixir
 alias TermUI.Widgets.AlertDialog
 
-# Confirmation dialog
-AlertDialog.render(
+# Create props
+props = AlertDialog.new(
   type: :confirm,
   title: "Delete File",
   message: "Are you sure you want to delete this file?",
   buttons: :yes_no,
-  selected_button: state.selected_button
+  on_result: fn result -> handle_result(result) end
 )
 
-# Error alert
-AlertDialog.render(
-  type: :error,
-  title: "Connection Failed",
-  message: "Could not connect to server.",
-  buttons: :ok
-)
+# Initialize and use
+{:ok, dialog_state} = AlertDialog.init(props)
+{:ok, dialog_state} = AlertDialog.handle_event(event, dialog_state)
+AlertDialog.render(dialog_state, %{width: 80, height: 24})
 ```
 
 **Options:**
@@ -112,8 +117,7 @@ AlertDialog.render(
 | `title` | string | `""` | Dialog title |
 | `message` | string | required | Dialog message |
 | `buttons` | atom/list | `:ok` | `:ok`, `:ok_cancel`, `:yes_no`, or custom list |
-| `selected_button` | integer | 0 | Selected button index |
-| `width` | integer | 50 | Dialog width |
+| `on_result` | function | `nil` | Result callback |
 
 **Type Icons:**
 - `:info` - ℹ (blue)
@@ -129,7 +133,18 @@ Non-blocking notification that auto-dismisses.
 ```elixir
 alias TermUI.Widgets.Toast
 
-# Add toast to your state
+# Create props
+props = Toast.new(
+  toasts: state.toasts,
+  position: :bottom_right,
+  max_visible: 5
+)
+
+# Initialize and use
+{:ok, toast_state} = Toast.init(props)
+Toast.render(toast_state, %{width: 80, height: 24})
+
+# Add a toast to your state
 def update(:save_success, state) do
   toast = %{
     id: System.unique_integer(),
@@ -137,25 +152,9 @@ def update(:save_success, state) do
     message: "File saved successfully",
     duration: 3000
   }
-  {:ok, %{state | toasts: [toast | state.toasts]}}
-end
-
-# Render toasts
-def view(state) do
-  stack(:vertical, [
-    main_content(state),
-    Toast.render(toasts: state.toasts, position: :bottom_right)
-  ])
+  {%{state | toasts: [toast | state.toasts]}, []}
 end
 ```
-
-**Options:**
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `toasts` | list | `[]` | List of toast maps |
-| `position` | atom | `:bottom_right` | `:top_right`, `:bottom_right`, etc. |
-| `max_visible` | integer | 5 | Maximum visible toasts |
 
 **Toast Structure:**
 ```elixir
@@ -176,7 +175,7 @@ Horizontal or vertical bar chart for categorical data.
 ```elixir
 alias TermUI.Widgets.BarChart
 
-# Horizontal bar chart
+# Render directly (simple widget)
 BarChart.render(
   data: [
     %{label: "Sales", value: 150},
@@ -187,17 +186,6 @@ BarChart.render(
   show_values: true,
   show_labels: true
 )
-
-# Vertical bar chart
-BarChart.render(
-  data: data,
-  direction: :vertical,
-  width: 30,
-  height: 10
-)
-
-# Simple progress bar
-BarChart.bar(value: 75, max: 100, width: 20)
 ```
 
 **Options:**
@@ -210,8 +198,6 @@ BarChart.bar(value: 75, max: 100, width: 20)
 | `height` | integer | 10 | Chart height (vertical only) |
 | `show_values` | boolean | `true` | Display values |
 | `show_labels` | boolean | `true` | Display labels |
-| `bar_char` | string | `"█"` | Character for filled portion |
-| `empty_char` | string | `"░"` | Character for empty portion |
 
 **Example Output:**
 ```
@@ -237,14 +223,13 @@ LineChart.render(
 # Multiple series
 LineChart.render(
   series: [
-    %{data: cpu_history, color: :green},
-    %{data: mem_history, color: :yellow}
+    %{data: cpu_history, style: Style.new(fg: :green)},
+    %{data: mem_history, style: Style.new(fg: :yellow)}
   ],
   width: 60,
   height: 10,
   min: 0,
-  max: 100,
-  show_axis: true
+  max: 100
 )
 ```
 
@@ -253,16 +238,11 @@ LineChart.render(
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `data` | list | - | Single series data |
-| `series` | list | - | Multiple series with colors |
+| `series` | list | - | Multiple series with styles |
 | `width` | integer | 40 | Chart width |
 | `height` | integer | 8 | Chart height |
 | `min` | number | auto | Y-axis minimum |
 | `max` | number | auto | Y-axis maximum |
-| `show_axis` | boolean | `false` | Show axis labels |
-
-**Braille Resolution:**
-
-Each character cell provides 2x4 dot resolution using Unicode Braille patterns (U+2800-U+28FF), enabling smooth line rendering in text mode.
 
 ### Canvas
 
@@ -271,17 +251,21 @@ Direct drawing surface for custom visualizations.
 ```elixir
 alias TermUI.Widgets.Canvas
 
-Canvas.render(
+# Create canvas props
+props = Canvas.new(
   width: 60,
-  height: 20,
-  draw: fn canvas ->
-    canvas
-    |> Canvas.draw_rect(0, 0, 59, 19, style: border_style)
-    |> Canvas.draw_line(0, 10, 59, 10)
-    |> Canvas.draw_text(25, 0, "Title", title_style)
-    |> Canvas.draw_braille_line(5, 5, 55, 15)
-  end
+  height: 20
 )
+
+{:ok, canvas_state} = Canvas.init(props)
+
+# Draw on canvas
+canvas_state = canvas_state
+  |> Canvas.draw_rect(0, 0, 59, 19)
+  |> Canvas.draw_line(0, 10, 59, 10)
+  |> Canvas.draw_text(25, 0, "Title", Style.new(fg: :cyan))
+
+Canvas.render(canvas_state, %{width: 60, height: 20})
 ```
 
 **Drawing Functions:**
@@ -291,7 +275,6 @@ Canvas.render(
 | `draw_text(x, y, text, style)` | Draw text at position |
 | `draw_line(x1, y1, x2, y2)` | Draw line between points |
 | `draw_rect(x, y, w, h, opts)` | Draw rectangle |
-| `draw_braille_line(x1, y1, x2, y2)` | High-resolution Braille line |
 | `fill_rect(x, y, w, h, char)` | Fill rectangle with character |
 | `clear()` | Clear canvas |
 
@@ -304,26 +287,17 @@ Scrollable view of content larger than the display area.
 ```elixir
 alias TermUI.Widgets.Viewport
 
-Viewport.render(
-  content: large_content_node,
-  width: 60,
-  height: 20,
-  scroll_x: state.scroll_x,
-  scroll_y: state.scroll_y,
+# Create props
+props = Viewport.new(
+  content_width: 200,
+  content_height: 100,
   show_scrollbars: true
 )
+
+{:ok, viewport_state} = Viewport.init(props)
+{:ok, viewport_state} = Viewport.handle_event(scroll_event, viewport_state)
+Viewport.render(viewport_state, %{width: 60, height: 20})
 ```
-
-**Options:**
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `content` | node | required | Content to scroll |
-| `width` | integer | required | Viewport width |
-| `height` | integer | required | Viewport height |
-| `scroll_x` | integer | 0 | Horizontal scroll offset |
-| `scroll_y` | integer | 0 | Vertical scroll offset |
-| `show_scrollbars` | boolean | `true` | Show scroll indicators |
 
 ### Split Pane
 
@@ -332,23 +306,18 @@ Resizable split layout for IDE-style interfaces.
 ```elixir
 alias TermUI.Widgets.SplitPane
 
-# Horizontal split (left/right)
-SplitPane.render(
+# Create props
+props = SplitPane.new(
   direction: :horizontal,
-  first: sidebar_content,
-  second: main_content,
-  split_position: state.split_pos,  # 0.0 to 1.0
+  initial_ratio: 0.3,
   min_size: 10,
-  max_size: 50
+  max_size: 50,
+  on_resize: fn ratio -> handle_resize(ratio) end
 )
 
-# Vertical split (top/bottom)
-SplitPane.render(
-  direction: :vertical,
-  first: editor_content,
-  second: terminal_content,
-  split_position: 0.7
-)
+{:ok, pane_state} = SplitPane.init(props)
+{:ok, pane_state} = SplitPane.handle_event(event, pane_state)
+SplitPane.render(pane_state, %{width: 100, height: 30})
 ```
 
 **Options:**
@@ -356,9 +325,7 @@ SplitPane.render(
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `direction` | atom | `:horizontal` | `:horizontal` or `:vertical` |
-| `first` | node | required | First pane content |
-| `second` | node | required | Second pane content |
-| `split_position` | float | 0.5 | Split ratio (0.0-1.0) |
+| `initial_ratio` | float | 0.5 | Split ratio (0.0-1.0) |
 | `min_size` | integer | 5 | Minimum pane size |
 | `max_size` | integer | `nil` | Maximum pane size |
 | `draggable` | boolean | `true` | Allow resize |
@@ -370,37 +337,32 @@ Hierarchical data with expand/collapse.
 ```elixir
 alias TermUI.Widgets.TreeView
 
-TreeView.render(
+# Create props
+props = TreeView.new(
   data: [
     %{
+      id: :src,
       label: "src",
       icon: "📁",
       children: [
-        %{label: "main.ex", icon: "📄"},
-        %{label: "utils.ex", icon: "📄"}
+        %{id: :main, label: "main.ex", icon: "📄"},
+        %{id: :utils, label: "utils.ex", icon: "📄"}
       ]
     },
-    %{label: "README.md", icon: "📄"}
+    %{id: :readme, label: "README.md", icon: "📄"}
   ],
-  expanded: state.expanded_nodes,
-  selected: state.selected_node
+  on_select: fn node_id -> handle_select(node_id) end
 )
+
+{:ok, tree_state} = TreeView.init(props)
+{:ok, tree_state} = TreeView.handle_event(event, tree_state)
+TreeView.render(tree_state, %{width: 40, height: 20})
 ```
-
-**Options:**
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `data` | list | required | Tree node list |
-| `expanded` | MapSet | `MapSet.new()` | Expanded node IDs |
-| `selected` | term | `nil` | Selected node ID |
-| `indent` | integer | 2 | Indentation per level |
-| `show_icons` | boolean | `true` | Display node icons |
 
 **Node Structure:**
 ```elixir
 %{
-  id: unique_id,       # Optional, auto-generated if missing
+  id: unique_id,       # Required
   label: "Node Name",
   icon: "📁",          # Optional icon
   children: [...]      # Optional child nodes
@@ -416,20 +378,33 @@ Structured forms with validation and multiple field types.
 ```elixir
 alias TermUI.Widgets.FormBuilder
 
-FormBuilder.render(
+# Create props
+props = FormBuilder.new(
   fields: [
-    %{name: :username, type: :text, label: "Username", required: true},
-    %{name: :password, type: :password, label: "Password", required: true},
-    %{name: :role, type: :select, label: "Role",
-      options: ["Admin", "User", "Guest"]},
-    %{name: :notifications, type: :checkbox, label: "Email notifications"},
-    %{name: :theme, type: :radio, label: "Theme",
-      options: ["Light", "Dark", "System"]}
+    %{id: :username, type: :text, label: "Username", required: true},
+    %{id: :password, type: :password, label: "Password", required: true,
+      validators: [&validate_password/1]},
+    %{id: :role, type: :select, label: "Role",
+      options: [{"admin", "Admin"}, {"user", "User"}]},
+    %{id: :notifications, type: :checkbox, label: "Email notifications"},
+    %{id: :theme, type: :radio, label: "Theme",
+      options: [{"light", "Light"}, {"dark", "Dark"}]}
   ],
-  values: state.form_values,
-  errors: state.form_errors,
-  focused_field: state.focused_field
+  submit_label: "Register",
+  label_width: 15,
+  field_width: 30
 )
+
+{:ok, form_state} = FormBuilder.init(props)
+
+# Handle events
+{:ok, form_state} = FormBuilder.handle_event(event, form_state)
+
+# Get form values
+values = FormBuilder.get_values(form_state)
+
+# Render
+FormBuilder.render(form_state, %{width: 60, height: 20})
 ```
 
 **Field Types:**
@@ -446,13 +421,13 @@ FormBuilder.render(
 **Field Options:**
 ```elixir
 %{
-  name: :field_name,
+  id: :field_name,
   type: :text,
   label: "Field Label",
   required: true,
   placeholder: "Enter value...",
-  validation: &String.length(&1) >= 3,
-  error_message: "Must be at least 3 characters"
+  validators: [&custom_validator/1],
+  visible_when: fn values -> values[:other_field] == true end
 }
 ```
 
@@ -463,29 +438,23 @@ VS Code-style command interface with fuzzy search.
 ```elixir
 alias TermUI.Widgets.CommandPalette
 
-CommandPalette.render(
+# Create props
+props = CommandPalette.new(
   commands: [
-    %{id: :save, label: "Save File", shortcut: "Ctrl+S", category: "File"},
-    %{id: :open, label: "Open File", shortcut: "Ctrl+O", category: "File"},
-    %{id: :find, label: "Find", shortcut: "Ctrl+F", category: "Edit"},
-    %{id: :replace, label: "Find and Replace", shortcut: "Ctrl+H", category: "Edit"}
+    %{id: :save, label: "Save File", shortcut: "Ctrl+S", category: :file},
+    %{id: :open, label: "Open File", shortcut: "Ctrl+O", category: :file},
+    %{id: :find, label: "Find", shortcut: "Ctrl+F", category: :edit},
+    %{id: :replace, label: "Find and Replace", shortcut: "Ctrl+H", category: :edit}
   ],
-  query: state.palette_query,
-  selected: state.palette_selection,
-  visible: state.palette_open
+  on_select: fn command_id -> execute_command(command_id) end,
+  on_close: fn -> hide_palette() end,
+  placeholder: "Type a command..."
 )
+
+{:ok, palette_state} = CommandPalette.init(props)
+{:ok, palette_state} = CommandPalette.handle_event(event, palette_state)
+CommandPalette.render(palette_state, %{width: 80, height: 24})
 ```
-
-**Options:**
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `commands` | list | required | Available commands |
-| `query` | string | `""` | Search query |
-| `selected` | integer | 0 | Selected result index |
-| `visible` | boolean | `false` | Show/hide palette |
-| `max_results` | integer | 10 | Maximum visible results |
-| `show_recent` | boolean | `true` | Show recent commands |
 
 **Command Structure:**
 ```elixir
@@ -493,16 +462,10 @@ CommandPalette.render(
   id: :command_id,
   label: "Command Label",
   shortcut: "Ctrl+K",      # Optional
-  category: "Category",     # Optional, for grouping
-  description: "Details"    # Optional
+  category: :file,         # Optional, for grouping
+  description: "Details"   # Optional
 }
 ```
-
-**Category Prefixes:**
-- `>` - Commands (default)
-- `@` - Symbols/functions
-- `#` - Tags/labels
-- `:` - Line numbers
 
 ## Data Streaming Widgets
 
@@ -513,30 +476,28 @@ High-performance log viewer with virtual scrolling, search, and filtering.
 ```elixir
 alias TermUI.Widgets.LogViewer
 
-LogViewer.render(
-  lines: state.log_lines,
-  width: 80,
-  height: 20,
-  scroll_offset: state.scroll_offset,
-  tail_mode: state.tail_mode,
-  search: state.search_query,
-  filter: state.log_filter
+# Create props
+props = LogViewer.new(
+  max_lines: 10000,
+  wrap_lines: false,
+  show_line_numbers: true,
+  show_timestamps: true
 )
+
+{:ok, viewer_state} = LogViewer.init(props)
+
+# Add log lines
+viewer_state = LogViewer.append_line(viewer_state, %{
+  timestamp: DateTime.utc_now(),
+  level: :info,
+  message: "Application started",
+  source: "MyApp"
+})
+
+# Handle events and render
+{:ok, viewer_state} = LogViewer.handle_event(event, viewer_state)
+LogViewer.render(viewer_state, %{width: 100, height: 30})
 ```
-
-**Options:**
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `lines` | list | required | Log lines |
-| `width` | integer | 80 | Viewer width |
-| `height` | integer | 20 | Viewer height |
-| `scroll_offset` | integer | 0 | Current scroll position |
-| `tail_mode` | boolean | `true` | Auto-scroll to bottom |
-| `search` | string | `nil` | Search/highlight pattern |
-| `filter` | term | `nil` | Log level filter |
-| `wrap_lines` | boolean | `false` | Wrap long lines |
-| `show_line_numbers` | boolean | `true` | Show line numbers |
 
 **Log Line Structure:**
 ```elixir
@@ -564,25 +525,29 @@ GenStage-integrated widget for real-time data streams with backpressure.
 ```elixir
 alias TermUI.Widgets.StreamWidget
 
-# In your application, set up the stream
-StreamWidget.render(
-  source: MyApp.DataProducer,
+# Create props
+props = StreamWidget.new(
   buffer_size: 1000,
   rate_limit: 60,  # updates per second
-  paused: state.stream_paused,
-  stats: state.show_stats
+  overflow: :drop_oldest
 )
+
+{:ok, stream_state} = StreamWidget.init(props)
+
+# Push data to stream
+stream_state = StreamWidget.push(stream_state, data_item)
+
+# Handle events and render
+{:ok, stream_state} = StreamWidget.handle_event(event, stream_state)
+StreamWidget.render(stream_state, %{width: 80, height: 20})
 ```
 
 **Options:**
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `source` | module/pid | required | GenStage producer |
 | `buffer_size` | integer | 1000 | Maximum buffered items |
 | `rate_limit` | integer | 60 | Max renders per second |
-| `paused` | boolean | `false` | Pause stream |
-| `stats` | boolean | `false` | Show throughput stats |
 | `overflow` | atom | `:drop_oldest` | `:drop_oldest`, `:drop_newest` |
 
 ## BEAM Introspection Widgets
@@ -609,19 +574,13 @@ props = ProcessMonitor.new(
 
 {:ok, monitor_state} = ProcessMonitor.init(props)
 
-# In view
+# Handle timer messages for auto-refresh
+{:ok, monitor_state} = ProcessMonitor.handle_info(:refresh, monitor_state)
+
+# Handle events and render
+{:ok, monitor_state} = ProcessMonitor.handle_event(event, monitor_state)
 ProcessMonitor.render(monitor_state, %{width: 100, height: 30})
 ```
-
-**Options:**
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `update_interval` | integer | 1000 | Refresh interval (ms) |
-| `show_system_processes` | boolean | `false` | Include system processes |
-| `thresholds` | map | defaults | Warning thresholds |
-| `on_select` | function | `nil` | Selection callback |
-| `on_action` | function | `nil` | Action callback |
 
 **Keyboard Controls:**
 - `↑/↓` - Navigate processes
@@ -629,9 +588,6 @@ ProcessMonitor.render(monitor_state, %{width: 100, height: 30})
 - `s/S` - Cycle sort field / Toggle direction
 - `/` - Filter by name
 - `k` - Kill process (with confirmation)
-- `p` - Pause/resume process
-- `l` - Show links/monitors
-- `t` - Show stack trace
 - `r` - Refresh
 
 **Display Columns:**
@@ -658,19 +614,13 @@ props = SupervisionTreeViewer.new(
 
 {:ok, tree_state} = SupervisionTreeViewer.init(props)
 
-# In view
+# Handle timer messages for auto-refresh
+{:ok, tree_state} = SupervisionTreeViewer.handle_info(:refresh, tree_state)
+
+# Handle events and render
+{:ok, tree_state} = SupervisionTreeViewer.handle_event(event, tree_state)
 SupervisionTreeViewer.render(tree_state, %{width: 80, height: 25})
 ```
-
-**Options:**
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `root` | pid/atom | required | Root supervisor |
-| `update_interval` | integer | 2000 | Refresh interval (ms) |
-| `show_pids` | boolean | `true` | Display PIDs |
-| `expand_all` | boolean | `false` | Start expanded |
-| `on_select` | function | `nil` | Selection callback |
 
 **Keyboard Controls:**
 - `↑/↓` - Navigate tree
@@ -678,7 +628,6 @@ SupervisionTreeViewer.render(tree_state, %{width: 80, height: 25})
 - `e/c` - Expand/collapse all
 - `i` - Inspect process state
 - `r` - Restart process (with confirmation)
-- `t` - Terminate process (with confirmation)
 - `/` - Filter tree
 - `Escape` - Clear filter
 
@@ -692,7 +641,6 @@ SupervisionTreeViewer.render(tree_state, %{width: 80, height: 25})
 - `1:1` - one_for_one
 - `1:*` - one_for_all
 - `1:→` - rest_for_one
-- `1:1+` - simple_one_for_one
 
 ### Cluster Dashboard
 
@@ -710,19 +658,13 @@ props = ClusterDashboard.new(
 
 {:ok, dashboard_state} = ClusterDashboard.init(props)
 
-# In view
+# Handle timer messages for auto-refresh
+{:ok, dashboard_state} = ClusterDashboard.handle_info(:refresh, dashboard_state)
+
+# Handle events and render
+{:ok, dashboard_state} = ClusterDashboard.handle_event(event, dashboard_state)
 ClusterDashboard.render(dashboard_state, %{width: 100, height: 30})
 ```
-
-**Options:**
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `update_interval` | integer | 2000 | Refresh interval (ms) |
-| `show_health_metrics` | boolean | `true` | Fetch node metrics |
-| `show_pg_groups` | boolean | `true` | Show :pg groups |
-| `show_global_names` | boolean | `true` | Show :global names |
-| `on_node_select` | function | `nil` | Selection callback |
 
 **View Modes:**
 - **Nodes** - Connected nodes with status and metrics
@@ -737,60 +679,68 @@ ClusterDashboard.render(dashboard_state, %{width: 100, height: 30})
 - `g` - Globals view
 - `p` - PG groups view
 - `e` - Events view
-- `i` - Inspect selected node
 - `r` - Refresh
 
 **Features:**
 - Network partition detection
 - Node health metrics (memory, processes, schedulers)
 - Connection event history
-- RPC interface for remote inspection
 
-## StatefulComponent Pattern
-
-Advanced widgets use the `StatefulComponent` behavior for managing internal state. Here's the pattern:
+## Full Example: Using BEAM Introspection Widgets
 
 ```elixir
-# Initialize
-props = Widget.new(option: value)
-{:ok, widget_state} = Widget.init(props)
-
-# Handle events
-{:ok, widget_state} = Widget.handle_event(event, widget_state)
-
-# Handle messages (for timers, etc.)
-{:ok, widget_state} = Widget.handle_info(message, widget_state)
-
-# Render
-node = Widget.render(widget_state, area)
-```
-
-**Integration with Elm:**
-
-```elixir
-defmodule MyApp do
+defmodule MyApp.SystemMonitor do
   use TermUI.Elm
+
+  alias TermUI.Event
   alias TermUI.Widgets.ProcessMonitor
+  alias TermUI.Renderer.Style
 
-  def init(_args) do
-    props = ProcessMonitor.new(update_interval: 1000)
+  def init(_opts) do
+    props = ProcessMonitor.new(
+      update_interval: 1000,
+      show_system_processes: false
+    )
     {:ok, monitor_state} = ProcessMonitor.init(props)
-    {:ok, %{monitor: monitor_state}}
+
+    %{
+      monitor: monitor_state,
+      last_refresh: DateTime.utc_now()
+    }
   end
 
-  def update({:key, key_event}, state) do
-    event = %TermUI.Event.Key{key: key_event.key, char: key_event.char}
-    {:ok, monitor_state} = ProcessMonitor.handle_event(event, state.monitor)
-    {:ok, %{state | monitor: monitor_state}}
-  end
+  def event_to_msg(%Event.Key{key: "q"}, _state), do: {:msg, :quit}
+  def event_to_msg(%Event.Key{key: "r"}, _state), do: {:msg, :refresh}
+  def event_to_msg(event, _state), do: {:msg, {:monitor_event, event}}
+
+  def update(:quit, state), do: {state, [:quit]}
 
   def update(:refresh, state) do
-    {:ok, monitor_state} = ProcessMonitor.handle_info(:refresh, state.monitor)
-    {:ok, %{state | monitor: monitor_state}}
+    {:ok, monitor} = ProcessMonitor.handle_info(:refresh, state.monitor)
+    {%{state | monitor: monitor, last_refresh: DateTime.utc_now()}, []}
+  end
+
+  def update({:monitor_event, event}, state) do
+    {:ok, monitor} = ProcessMonitor.handle_event(event, state.monitor)
+    {%{state | monitor: monitor}, []}
+  end
+
+  # Auto-refresh timer
+  def handle_info(:tick, state) do
+    {:ok, monitor} = ProcessMonitor.handle_info(:refresh, state.monitor)
+    {%{state | monitor: monitor, last_refresh: DateTime.utc_now()},
+     [Command.timer(1000, :tick)]}
   end
 
   def view(state) do
-    ProcessMonitor.render(state.monitor, %{width: 100, height: 30})
+    stack(:vertical, [
+      text("System Monitor", Style.new(fg: :cyan, attrs: [:bold])),
+      text("Last refresh: #{state.last_refresh}", Style.new(fg: :bright_black)),
+      text(""),
+      ProcessMonitor.render(state.monitor, %{width: 100, height: 25}),
+      text(""),
+      text("[R] Refresh  [Q] Quit", Style.new(fg: :bright_black))
+    ])
   end
 end
 ```

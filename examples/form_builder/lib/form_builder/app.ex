@@ -80,8 +80,6 @@ defmodule FormBuilder.App do
               {"travel", "Travel"}
             ]}
         ],
-        on_submit: fn values -> send(self(), {:form_submitted, values}) end,
-        on_change: fn _field_id, _value -> :ok end,
         submit_label: "Register",
         label_width: 18,
         field_width: 25
@@ -123,6 +121,15 @@ defmodule FormBuilder.App do
     {:msg, :quit}
   end
 
+  def event_to_msg(%Event.Key{key: :enter} = event, state) do
+    # Check if submit button is focused - if so, this is a form submission
+    if state.form.submit_focused do
+      {:msg, :submit_form}
+    else
+      {:msg, {:form_event, event}}
+    end
+  end
+
   def event_to_msg(event, _state) do
     # Pass all other events to the form
     {:msg, {:form_event, event}}
@@ -135,27 +142,29 @@ defmodule FormBuilder.App do
     {state, [:quit]}
   end
 
+  def update(:submit_form, state) do
+    # Let the form handle the enter key (which runs validation)
+    {:ok, new_form} = FormBuilder.handle_event(%Event.Key{key: :enter}, state.form)
+
+    # Check if there are validation errors
+    has_errors = Enum.any?(new_form.errors, fn {_field_id, errors} -> errors != [] end)
+
+    if has_errors do
+      # Form has errors, just update the form state
+      {%{state | form: new_form, message: "Please fix the errors above"}, []}
+    else
+      # Form is valid, get the values and mark as submitted
+      values = FormBuilder.get_values(new_form)
+      {%{state | form: new_form, submitted_data: values, message: "Form submitted successfully!"}, []}
+    end
+  end
+
   def update({:form_event, event}, state) do
     {:ok, new_form} = FormBuilder.handle_event(event, state.form)
     {%{state | form: new_form}, []}
   end
 
-  def update({:form_submitted, values}, state) do
-    {%{state | submitted_data: values, message: "Form submitted successfully!"}, []}
-  end
-
   def update(_msg, state) do
-    {state, []}
-  end
-
-  @doc """
-  Handle info messages (for form submission callback).
-  """
-  def handle_info({:form_submitted, values}, state) do
-    {%{state | submitted_data: values, message: "Form submitted successfully!"}, []}
-  end
-
-  def handle_info(_msg, state) do
     {state, []}
   end
 
@@ -240,7 +249,9 @@ defmodule FormBuilder.App do
   defp render_message(state) do
     case state.message do
       nil -> empty()
-      msg -> text(msg, Style.new(fg: :green, attrs: [:bold]))
+      msg ->
+        style = if String.contains?(msg, "error"), do: Style.new(fg: :red), else: Style.new(fg: :green, attrs: [:bold])
+        text(msg, style)
     end
   end
 

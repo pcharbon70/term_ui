@@ -2,7 +2,16 @@
 
 TermUI includes pre-built widgets for common UI patterns. This guide covers the available widgets and how to use them.
 
-## Gauge
+## Widget Types
+
+TermUI has two types of widgets:
+
+1. **Simple Widgets** - Stateless, render with keyword options (Gauge, Sparkline)
+2. **Stateful Widgets** - Use the StatefulComponent pattern with `new/init/handle_event/render`
+
+## Simple Widgets
+
+### Gauge
 
 Displays a value as a progress bar with optional color zones.
 
@@ -49,7 +58,7 @@ Gauge.render(
 [████████████░░░░░░░░] 60%
 ```
 
-## Sparkline
+### Sparkline
 
 Compact inline graph showing trends.
 
@@ -84,191 +93,239 @@ Sparkline.render(
 
 Uses Unicode block characters (▁▂▃▄▅▆▇█) to show 8 levels of height.
 
-## Table
+## Stateful Widgets
 
-Scrollable data table with selection.
+Stateful widgets follow the StatefulComponent pattern:
+
+```elixir
+# 1. Create props with Widget.new(opts)
+props = Widget.new(option: value)
+
+# 2. Initialize state with Widget.init(props)
+{:ok, widget_state} = Widget.init(props)
+
+# 3. Handle events with Widget.handle_event(event, state)
+{:ok, widget_state} = Widget.handle_event(event, widget_state)
+
+# 4. Render with Widget.render(state, area)
+node = Widget.render(widget_state, %{width: 80, height: 24})
+```
+
+### Table
+
+Scrollable data table with selection and sorting.
 
 ```elixir
 alias TermUI.Widgets.Table
+alias TermUI.Widgets.Table.Column
 
-data = [
-  %{name: "Alice", age: 30, city: "NYC"},
-  %{name: "Bob", age: 25, city: "LA"},
-  %{name: "Carol", age: 35, city: "Chicago"}
-]
-
-Table.render(
-  data: data,
+# Create props
+props = Table.new(
   columns: [
-    %{key: :name, header: "Name", width: 15},
-    %{key: :age, header: "Age", width: 5},
-    %{key: :city, header: "City", width: 12}
+    Column.new(:name, "Name"),
+    Column.new(:age, "Age", width: 10, align: :right),
+    Column.new(:city, "City", width: 15)
   ],
-  selected: state.selected_row,
-  height: 10
+  data: [
+    %{name: "Alice", age: 30, city: "NYC"},
+    %{name: "Bob", age: 25, city: "LA"},
+    %{name: "Carol", age: 35, city: "Chicago"}
+  ],
+  selection_mode: :single,
+  on_select: fn row -> IO.inspect(row) end
 )
+
+# Initialize
+{:ok, table_state} = Table.init(props)
+
+# In your component's event handler
+def update({:table_event, event}, state) do
+  {:ok, new_table} = Table.handle_event(event, state.table)
+  {%{state | table: new_table}, []}
+end
+
+# In your view
+def view(state) do
+  Table.render(state.table, %{width: 60, height: 15})
+end
 ```
 
 **Options:**
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `data` | list | required | List of row maps |
 | `columns` | list | required | Column definitions |
-| `selected` | integer | `nil` | Selected row index |
-| `height` | integer | 10 | Visible rows |
-| `header_style` | Style | bold | Header row style |
-| `row_style` | Style | default | Normal row style |
+| `data` | list | required | List of row maps |
+| `selection_mode` | atom | `:single` | `:none`, `:single`, or `:multi` |
+| `sortable` | boolean | `true` | Enable column sorting |
+| `on_select` | function | `nil` | Selection callback |
+| `header_style` | Style | default | Header row style |
 | `selected_style` | Style | reverse | Selected row style |
 
-**Column Definition:**
+**Keyboard Navigation:**
+- Arrow keys: Move selection
+- Page Up/Down: Scroll by page
+- Home/End: Jump to first/last row
+- Enter: Confirm selection
+- Space: Toggle selection (multi mode)
 
-```elixir
-%{
-  key: :field_name,        # Key in data map
-  header: "Display Name",  # Column header text
-  width: 15,               # Column width
-  align: :left             # :left, :center, :right
-}
-```
+### Menu
 
-## Menu
-
-Vertical or horizontal menu selection.
+Hierarchical menu with submenus and keyboard navigation.
 
 ```elixir
 alias TermUI.Widgets.Menu
 
-Menu.render(
-  items: ["File", "Edit", "View", "Help"],
-  selected: state.selected_index,
-  direction: :vertical
+# Create props with item constructors
+props = Menu.new(
+  items: [
+    Menu.action(:new, "New File", shortcut: "Ctrl+N"),
+    Menu.action(:open, "Open...", shortcut: "Ctrl+O"),
+    Menu.separator(),
+    Menu.submenu(:recent, "Recent Files", [
+      Menu.action(:file1, "document.txt"),
+      Menu.action(:file2, "notes.md")
+    ]),
+    Menu.separator(),
+    Menu.checkbox(:autosave, "Auto Save", checked: true),
+    Menu.action(:exit, "Exit", shortcut: "Ctrl+Q")
+  ],
+  on_select: fn id -> handle_menu_action(id) end
 )
+
+# Initialize
+{:ok, menu_state} = Menu.init(props)
+
+# Handle events and render
+{:ok, menu_state} = Menu.handle_event(event, menu_state)
+Menu.render(menu_state, %{width: 30, height: 20})
 ```
 
-**Options:**
+**Item Types:**
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `items` | list | required | Menu item labels |
-| `selected` | integer | 0 | Selected item index |
-| `direction` | atom | `:vertical` | `:vertical` or `:horizontal` |
-| `style` | Style | default | Normal item style |
-| `selected_style` | Style | reverse | Selected item style |
+| Constructor | Description |
+|------------|-------------|
+| `Menu.action(id, label, opts)` | Selectable menu item |
+| `Menu.submenu(id, label, children)` | Item with nested menu |
+| `Menu.separator()` | Visual divider |
+| `Menu.checkbox(id, label, opts)` | Toggleable item |
 
-## TextInput
+**Keyboard Navigation:**
+- Up/Down: Move between items
+- Enter/Space: Select or expand submenu
+- Left: Collapse submenu
+- Right: Expand submenu
+- Escape: Close menu
 
-Single-line text input field.
+### TextInput
+
+Single-line and multi-line text input with cursor movement.
 
 ```elixir
 alias TermUI.Widgets.TextInput
 
-TextInput.render(
-  value: state.input_text,
-  cursor_position: state.cursor_pos,
-  width: 30,
-  placeholder: "Enter name..."
+# Create props
+props = TextInput.new(
+  placeholder: "Enter your name...",
+  width: 40,
+  multiline: false
 )
+
+# Initialize
+{:ok, input_state} = TextInput.init(props)
+
+# Handle events
+{:ok, input_state} = TextInput.handle_event(event, input_state)
+
+# Get current value
+value = TextInput.get_value(input_state)
+
+# Render
+TextInput.render(input_state, %{width: 50, height: 1})
 ```
 
 **Options:**
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `value` | string | `""` | Current text value |
-| `cursor_position` | integer | 0 | Cursor position |
-| `width` | integer | 20 | Field width |
+| `value` | string | `""` | Initial text value |
 | `placeholder` | string | `""` | Placeholder text |
-| `style` | Style | default | Text style |
-| `focused` | boolean | `false` | Show cursor |
+| `width` | integer | 40 | Field width |
+| `multiline` | boolean | `false` | Enable multi-line mode |
+| `max_visible_lines` | integer | 5 | Lines before scrolling |
+| `enter_submits` | boolean | `false` | Enter submits vs newline |
+| `on_change` | function | `nil` | Value change callback |
+| `on_submit` | function | `nil` | Submit callback |
 
-**Handling Input:**
+**Keyboard Controls:**
+- Left/Right: Move cursor
+- Up/Down: Move between lines (multiline)
+- Home/End: Start/end of line
+- Ctrl+Home/End: Start/end of text
+- Backspace/Delete: Delete characters
+- Ctrl+Enter: Insert newline (multiline)
+- Enter: Submit or newline
 
-```elixir
-def event_to_msg(%Event.Key{key: :left}, state) do
-  {:msg, :cursor_left}
-end
-
-def event_to_msg(%Event.Key{key: :right}, state) do
-  {:msg, :cursor_right}
-end
-
-def event_to_msg(%Event.Key{key: :backspace}, state) do
-  {:msg, :backspace}
-end
-
-def event_to_msg(%Event.Key{char: char}, state) when is_binary(char) do
-  {:msg, {:insert, char}}
-end
-
-def update(:cursor_left, state) do
-  pos = max(0, state.cursor_pos - 1)
-  {%{state | cursor_pos: pos}, []}
-end
-
-def update({:insert, char}, state) do
-  {before, after} = String.split_at(state.input, state.cursor_pos)
-  new_input = before <> char <> after
-  {%{state | input: new_input, cursor_pos: state.cursor_pos + 1}, []}
-end
-```
-
-## Progress
-
-Progress indicator with bar or spinner mode.
+**Helper Functions:**
 
 ```elixir
-alias TermUI.Widgets.Progress
+# Get current value
+TextInput.get_value(state) # => "current text"
 
-# Progress bar
-Progress.render(
-  mode: :bar,
-  value: 0.75,
-  width: 30
-)
+# Get cursor position
+TextInput.get_cursor(state) # => {row, col}
 
-# Spinner (indeterminate)
-Progress.render(
-  mode: :spinner,
-  frame: state.spinner_frame
-)
+# Get line count
+TextInput.get_line_count(state) # => 3
+
+# Set focus
+state = TextInput.set_focused(state, true)
+
+# Clear input
+state = TextInput.clear(state)
 ```
 
-**Options:**
+### Dialog
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `mode` | atom | `:bar` | `:bar` or `:spinner` |
-| `value` | float | 0.0 | Progress 0.0-1.0 (bar mode) |
-| `frame` | integer | 0 | Animation frame (spinner) |
-| `width` | integer | 20 | Bar width |
-| `style` | Style | default | Color style |
-
-## Dialog
-
-Modal dialog box.
+Modal dialog with buttons.
 
 ```elixir
 alias TermUI.Widgets.Dialog
 
-Dialog.render(
-  title: "Confirm",
-  content: "Are you sure you want to delete?",
-  buttons: ["Cancel", "Delete"],
-  selected_button: state.selected_button,
-  width: 40
+# Create props
+props = Dialog.new(
+  title: "Confirm Delete",
+  content: text("Are you sure you want to delete this file?"),
+  buttons: [
+    %{id: :cancel, label: "Cancel"},
+    %{id: :confirm, label: "Delete", style: :danger}
+  ],
+  width: 50,
+  on_confirm: fn button_id -> handle_action(button_id) end
 )
+
+# Initialize and use
+{:ok, dialog_state} = Dialog.init(props)
+{:ok, dialog_state} = Dialog.handle_event(event, dialog_state)
+Dialog.render(dialog_state, %{width: 80, height: 24})
 ```
 
 **Options:**
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `title` | string | `""` | Dialog title |
-| `content` | string | `""` | Dialog body text |
-| `buttons` | list | `["OK"]` | Button labels |
-| `selected_button` | integer | 0 | Selected button index |
+| `title` | string | required | Dialog title |
+| `content` | node | `nil` | Dialog body content |
+| `buttons` | list | `[{id: :ok, label: "OK"}]` | Button definitions |
 | `width` | integer | 40 | Dialog width |
+| `closeable` | boolean | `true` | Escape closes dialog |
+| `on_close` | function | `nil` | Close callback |
+| `on_confirm` | function | `nil` | Button activation callback |
+
+**Keyboard Navigation:**
+- Tab/Shift+Tab: Move between buttons
+- Enter/Space: Activate focused button
+- Escape: Close dialog
 
 ## Building Custom Widgets
 
@@ -276,6 +333,7 @@ Create reusable widgets as functions:
 
 ```elixir
 defmodule MyApp.Widgets do
+  import TermUI.Component.Helpers
   alias TermUI.Renderer.Style
 
   @doc """
@@ -297,7 +355,6 @@ defmodule MyApp.Widgets do
   def box(title, content, opts \\ []) do
     width = Keyword.get(opts, :width, 40)
     border_style = Keyword.get(opts, :border_style, Style.new(fg: :cyan))
-    title_style = Keyword.get(opts, :title_style, Style.new(fg: :cyan, attrs: [:bold]))
 
     inner_width = width - 4
     top_border = "┌─ " <> title <> " " <> String.duplicate("─", inner_width - String.length(title) - 1) <> "┐"
@@ -358,6 +415,8 @@ end
 Combine widgets for complex UIs:
 
 ```elixir
+alias TermUI.Widgets.{Gauge, Sparkline, Table}
+
 def view(state) do
   stack(:vertical, [
     # Header with gauges
@@ -378,14 +437,78 @@ def view(state) do
       ])
     ])),
 
-    # Process table
-    box("Processes", Table.render(
-      data: state.processes,
-      columns: @process_columns,
-      selected: state.selected_process,
-      height: 10
-    ))
+    # Process table (stateful widget)
+    Table.render(state.table, %{width: 60, height: 10})
   ])
+end
+```
+
+## Full Example: Component with TextInput
+
+```elixir
+defmodule MyApp.SearchForm do
+  use TermUI.Elm
+
+  alias TermUI.Event
+  alias TermUI.Widgets.TextInput
+
+  def init(_opts) do
+    props = TextInput.new(
+      placeholder: "Search...",
+      width: 40
+    )
+    {:ok, input_state} = TextInput.init(props)
+
+    %{
+      input: TextInput.set_focused(input_state, true),
+      results: []
+    }
+  end
+
+  def event_to_msg(%Event.Key{key: :enter}, state) do
+    query = TextInput.get_value(state.input)
+    {:msg, {:search, query}}
+  end
+
+  def event_to_msg(%Event.Key{key: "q"}, %{input: input}) do
+    # Only quit if input is empty
+    if TextInput.get_value(input) == "" do
+      {:msg, :quit}
+    else
+      {:msg, {:input_event, %Event.Key{key: "q", char: "q"}}}
+    end
+  end
+
+  def event_to_msg(event, _state) do
+    {:msg, {:input_event, event}}
+  end
+
+  def update(:quit, state), do: {state, [:quit]}
+
+  def update({:input_event, event}, state) do
+    {:ok, new_input} = TextInput.handle_event(event, state.input)
+    {%{state | input: new_input}, []}
+  end
+
+  def update({:search, query}, state) do
+    results = perform_search(query)
+    {%{state | results: results}, []}
+  end
+
+  def view(state) do
+    stack(:vertical, [
+      text("Search:", Style.new(fg: :cyan)),
+      TextInput.render(state.input, %{width: 50, height: 1}),
+      text(""),
+      render_results(state.results)
+    ])
+  end
+
+  defp perform_search(query), do: []
+  defp render_results([]), do: text("No results")
+  defp render_results(results) do
+    stack(:vertical, Enum.map(results, &text(&1)))
+  end
 end
 ```
 

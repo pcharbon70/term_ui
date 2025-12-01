@@ -90,11 +90,13 @@ def update({:set_name, name}, state) do
 end
 
 def update(:save, state) do
-  # Return a command to perform side effect
-  {state, [Command.file_write("data.txt", state.data, :save_complete)]}
+  # Use timer with 0 delay to perform side effect on next tick
+  {state, [Command.timer(0, :do_save)]}
 end
 
-def update({:save_complete, :ok}, state) do
+def update(:do_save, state) do
+  # Perform the file write synchronously
+  File.write("data.txt", state.data)
   {%{state | saved: true}, []}
 end
 ```
@@ -231,15 +233,18 @@ def init(_opts) do
 end
 
 def update(:load, state) do
-  {%{state | status: :loading}, [Command.http_get(url, :data_loaded)]}
+  # Use timer to trigger loading on next tick
+  {%{state | status: :loading}, [Command.timer(0, :do_load)]}
 end
 
-def update({:data_loaded, {:ok, data}}, state) do
-  {%{state | status: :ready, data: data}, []}
-end
-
-def update({:data_loaded, {:error, reason}}, state) do
-  {%{state | status: :error, error: reason}, []}
+def update(:do_load, state) do
+  # Perform the fetch synchronously (or spawn a Task for async)
+  case fetch_data() do
+    {:ok, data} ->
+      {%{state | status: :ready, data: data}, []}
+    {:error, reason} ->
+      {%{state | status: :error, error: reason}, []}
+  end
 end
 
 def view(state) do

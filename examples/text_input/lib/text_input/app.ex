@@ -12,7 +12,7 @@ defmodule TextInput.App do
   - Scrollable area after max_visible_lines
   - Placeholder text
   - Focus states
-  - on_change and on_submit callbacks
+  - Reading current value with get_value/1
 
   Controls:
   - Arrow keys: Move cursor
@@ -44,9 +44,7 @@ defmodule TextInput.App do
     single_props =
       TI.new(
         placeholder: "Enter your name...",
-        width: 40,
-        on_change: fn value -> send(self(), {:single_changed, value}) end,
-        on_submit: fn value -> send(self(), {:single_submitted, value}) end
+        width: 40
       )
 
     {:ok, single_state} = TI.init(single_props)
@@ -57,9 +55,7 @@ defmodule TextInput.App do
         placeholder: "Enter your message...",
         width: 50,
         multiline: true,
-        max_visible_lines: 5,
-        on_change: fn value -> send(self(), {:multi_changed, value}) end,
-        on_submit: fn _value -> :ok end
+        max_visible_lines: 5
       )
 
     {:ok, multi_state} = TI.init(multi_props)
@@ -71,9 +67,7 @@ defmodule TextInput.App do
         width: 50,
         multiline: true,
         max_visible_lines: 3,
-        enter_submits: true,
-        on_change: fn _value -> :ok end,
-        on_submit: fn value -> send(self(), {:chat_submitted, value}) end
+        enter_submits: true
       )
 
     {:ok, chat_state} = TI.init(chat_props)
@@ -87,9 +81,7 @@ defmodule TextInput.App do
       # Track which input is focused
       focused_input: :single,
 
-      # Display values
-      single_value: "",
-      multi_value: "",
+      # Chat messages history
       chat_messages: [],
       last_action: "Ready"
     }
@@ -98,12 +90,32 @@ defmodule TextInput.App do
   @doc """
   Convert keyboard events to messages.
   """
-  def event_to_msg(%Event.Key{key: key}, _state) when key in ["q", "Q"] do
+  def event_to_msg(%Event.Key{key: key}, %{focused_input: nil}) when key in ["q", "Q"] do
     {:msg, :quit}
+  end
+
+  def event_to_msg(%Event.Key{key: key}, %{focused_input: :single}) when key in ["q", "Q"] do
+    # Only quit if input is empty
+    {:msg, :check_quit_single}
+  end
+
+  def event_to_msg(%Event.Key{key: key}, _state) when key in ["q", "Q"] do
+    # In multi/chat, Q is just a character
+    {:msg, {:input_event, %Event.Key{key: key, char: key}}}
   end
 
   def event_to_msg(%Event.Key{key: :tab}, _state) do
     {:msg, :next_input}
+  end
+
+  def event_to_msg(%Event.Key{key: :enter}, %{focused_input: :single} = state) do
+    # Submit single-line input
+    {:msg, {:submit_single, TI.get_value(state.single_input)}}
+  end
+
+  def event_to_msg(%Event.Key{key: :enter}, %{focused_input: :chat} = state) do
+    # Submit chat message (enter_submits is true)
+    {:msg, {:submit_chat, TI.get_value(state.chat_input)}}
   end
 
   def event_to_msg(event, _state) do
@@ -115,6 +127,17 @@ defmodule TextInput.App do
   """
   def update(:quit, state) do
     {state, [:quit]}
+  end
+
+  def update(:check_quit_single, state) do
+    # Only quit if single input is empty, otherwise treat as character
+    if TI.get_value(state.single_input) == "" do
+      {state, [:quit]}
+    else
+      # Pass Q as a character to the input
+      {:ok, new_input} = TI.handle_event(%Event.Key{key: "q", char: "q"}, state.single_input)
+      {%{state | single_input: new_input, last_action: "Typing..."}, []}
+    end
   end
 
   def update(:next_input, state) do
@@ -149,44 +172,18 @@ defmodule TextInput.App do
     {%{state | focused_input: next_focused, last_action: "Switched to #{next_focused} input"}, []}
   end
 
-  def update({:input_event, event}, state) do
-    # Route event to focused input
-    case state.focused_input do
-      :single ->
-        {:ok, new_input} = TI.handle_event(event, state.single_input)
-        {%{state | single_input: new_input}, []}
+  def update({:submit_single, value}, state) do
+    action =
+      if value == "" do
+        "Single input: (empty - nothing to submit)"
+      else
+        "Submitted: \"#{value}\""
+      end
 
-      :multi ->
-        {:ok, new_input} = TI.handle_event(event, state.multi_input)
-        {%{state | multi_input: new_input}, []}
-
-      :chat ->
-        {:ok, new_input} = TI.handle_event(event, state.chat_input)
-        {%{state | chat_input: new_input}, []}
-    end
+    {%{state | last_action: action}, []}
   end
 
-  def update(_msg, state) do
-    {state, []}
-  end
-
-  @doc """
-  Handle info messages (for callbacks).
-  """
-  def handle_info({:single_changed, value}, state) do
-    {%{state | single_value: value, last_action: "Single input changed"}, []}
-  end
-
-  def handle_info({:single_submitted, value}, state) do
-    {%{state | last_action: "Single input submitted: #{value}"}, []}
-  end
-
-  def handle_info({:multi_changed, value}, state) do
-    lines = String.split(value, "\n") |> length()
-    {%{state | multi_value: value, last_action: "Multi input changed (#{lines} lines)"}, []}
-  end
-
-  def handle_info({:chat_submitted, value}, state) do
+  def update({:submit_chat, value}, state) do
     if String.trim(value) != "" do
       messages = state.chat_messages ++ [value]
       # Clear the chat input
@@ -199,11 +196,28 @@ defmodule TextInput.App do
            last_action: "Message sent: #{String.slice(value, 0, 20)}..."
        }, []}
     else
-      {state, []}
+      {%{state | last_action: "Chat: (empty - nothing to send)"}, []}
     end
   end
 
-  def handle_info(_msg, state) do
+  def update({:input_event, event}, state) do
+    # Route event to focused input
+    case state.focused_input do
+      :single ->
+        {:ok, new_input} = TI.handle_event(event, state.single_input)
+        {%{state | single_input: new_input, last_action: "Typing..."}, []}
+
+      :multi ->
+        {:ok, new_input} = TI.handle_event(event, state.multi_input)
+        {%{state | multi_input: new_input, last_action: "Typing..."}, []}
+
+      :chat ->
+        {:ok, new_input} = TI.handle_event(event, state.chat_input)
+        {%{state | chat_input: new_input, last_action: "Typing..."}, []}
+    end
+  end
+
+  def update(_msg, state) do
     {state, []}
   end
 
@@ -249,9 +263,9 @@ defmodule TextInput.App do
       text("  Ctrl+Home/End    Move to start/end of text"),
       text("  Backspace/Del    Delete characters"),
       text("  Ctrl+Enter       Insert newline (multiline)"),
-      text("  Enter            Submit (single) or newline (multi)"),
+      text("  Enter            Submit (single/chat) or newline (multi)"),
       text("  Tab              Switch between inputs"),
-      text("  Q                Quit")
+      text("  Q                Quit (when single input is empty)")
     ])
   end
 
@@ -261,10 +275,12 @@ defmodule TextInput.App do
         do: Style.new(fg: :green, attrs: [:bold]),
         else: Style.new(fg: :white)
 
+    current_value = TI.get_value(state.single_input)
+
     stack(:vertical, [
       text("Single-line Input (press Enter to submit):", focused_style),
       TI.render(state.single_input, %{width: 50, height: 1}),
-      text("  Value: \"#{state.single_value}\"", Style.new(fg: :bright_black))
+      text("  Value: \"#{current_value}\"", Style.new(fg: :bright_black))
     ])
   end
 
