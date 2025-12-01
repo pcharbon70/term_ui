@@ -10,8 +10,11 @@ defmodule Dashboard.App do
 
   alias Dashboard.Data.Metrics
   alias TermUI.Event
+  alias TermUI.Layout.Constraint
   alias TermUI.Renderer.Style
+  alias TermUI.Widgets.Gauge
   alias TermUI.Widgets.Sparkline
+  alias TermUI.Widgets.Table.Column
 
   # Elm callbacks
 
@@ -107,20 +110,31 @@ defmodule Dashboard.App do
 
   defp render_cpu_gauge(cpu_value, theme) do
     gauge_width = 12
-    # Inner content: 1 space + gauge (12) + 1 space = 14
     inner_width = gauge_width + 2
 
-    # Title "─ CPU ─" is 7 chars, remaining is inner_width - 7
     top_border = "┌─ CPU " <> String.duplicate("─", inner_width - 7) <> "─┐"
     bottom_border = "└" <> String.duplicate("─", inner_width) <> "┘"
 
-    filled = round(cpu_value / 100 * gauge_width)
-    empty = gauge_width - filled
-
     stack(:vertical, [
       text(top_border, theme.border),
+      stack(:horizontal, [
+        text("│ ", theme.border),
+        Gauge.render(
+          value: cpu_value,
+          min: 0,
+          max: 100,
+          width: gauge_width,
+          show_value: false,
+          show_range: false,
+          zones: [
+            {0, Style.new(fg: :green)},
+            {60, Style.new(fg: :yellow)},
+            {80, Style.new(fg: :red)}
+          ]
+        ),
+        text(" │", theme.border)
+      ]),
       text("│" <> String.pad_trailing(format_percent(cpu_value), inner_width) <> "│", theme.text),
-      text("│ " <> String.duplicate("█", filled) <> String.duplicate("░", empty) <> " │", get_gauge_style(cpu_value, theme)),
       text(bottom_border, theme.border)
     ])
   end
@@ -129,35 +143,31 @@ defmodule Dashboard.App do
     gauge_width = 12
     inner_width = gauge_width + 2
 
-    # Title "─ Memory ─" is 10 chars, remaining is inner_width - 10
     top_border = "┌─ Memory " <> String.duplicate("─", inner_width - 10) <> "─┐"
     bottom_border = "└" <> String.duplicate("─", inner_width) <> "┘"
 
-    filled = round(memory_value / 100 * gauge_width)
-    empty = gauge_width - filled
-
     stack(:vertical, [
       text(top_border, theme.border),
+      stack(:horizontal, [
+        text("│ ", theme.border),
+        Gauge.render(
+          value: memory_value,
+          min: 0,
+          max: 100,
+          width: gauge_width,
+          show_value: false,
+          show_range: false,
+          zones: [
+            {0, Style.new(fg: :green)},
+            {70, Style.new(fg: :yellow)},
+            {85, Style.new(fg: :red)}
+          ]
+        ),
+        text(" │", theme.border)
+      ]),
       text("│" <> String.pad_trailing(format_percent(memory_value), inner_width) <> "│", theme.text),
-      text("│ " <> String.duplicate("█", filled) <> String.duplicate("░", empty) <> " │", get_memory_style(memory_value, theme)),
       text(bottom_border, theme.border)
     ])
-  end
-
-  defp get_gauge_style(value, _theme) do
-    cond do
-      value >= 80 -> Style.new(fg: :red)
-      value >= 60 -> Style.new(fg: :yellow)
-      true -> Style.new(fg: :green)
-    end
-  end
-
-  defp get_memory_style(value, _theme) do
-    cond do
-      value >= 85 -> Style.new(fg: :red)
-      value >= 70 -> Style.new(fg: :yellow)
-      true -> Style.new(fg: :green)
-    end
   end
 
   defp render_system_info(theme) do
@@ -227,18 +237,40 @@ defmodule Dashboard.App do
   end
 
   defp render_processes(processes, selected, theme) do
-    header = "  PID      Name                  CPU%      Memory"
-    separator = "  ───────  ────────────────────  ────────  ────────────"
+    # Define columns using the Table.Column helpers
+    columns = [
+      Column.new(:pid, "PID", width: Constraint.length(7)),
+      Column.new(:name, "Name", width: Constraint.length(20)),
+      Column.new(:cpu, "CPU%", width: Constraint.length(8), align: :right, render: &format_cpu/1),
+      Column.new(:memory, "Memory", width: Constraint.length(12), align: :right, render: &format_memory/1)
+    ]
 
+    # Render header using Column alignment
+    header_text =
+      Enum.map_join(columns, "  ", fn col ->
+        Column.align_text(col.header, get_column_width(col), col.align)
+      end)
+
+    header = "  " <> header_text
+
+    # Build separator based on column widths
+    separator =
+      "  " <>
+        Enum.map_join(columns, "  ", fn col ->
+          String.duplicate("─", get_column_width(col))
+        end)
+
+    # Render rows using Column.render_cell
     rows =
       processes
       |> Enum.with_index()
       |> Enum.map(fn {proc, idx} ->
         row_text =
-          "  #{String.pad_trailing(to_string(proc.pid), 7)} " <>
-            "#{String.pad_trailing(proc.name, 20)} " <>
-            "#{String.pad_leading(format_cpu(proc.cpu), 8)} " <>
-            "#{String.pad_leading(format_memory(proc.memory), 12)}"
+          "  " <>
+            Enum.map_join(columns, "  ", fn col ->
+              cell_value = Column.render_cell(col, proc)
+              Column.align_text(cell_value, get_column_width(col), col.align)
+            end)
 
         if idx == selected do
           text(row_text, theme.table_selected)
@@ -254,6 +286,10 @@ defmodule Dashboard.App do
       | rows
     ] ++ [text("└────────────────────────────────────────────────────────┘", theme.border)])
   end
+
+  # Helper to extract column width from constraint
+  defp get_column_width(%Column{width: %Constraint.Length{value: v}}), do: v
+  defp get_column_width(_), do: 10
 
   defp render_help(theme) do
     controls = " [Q] Quit  [R] Refresh  [T] Theme  [↑/↓] Navigate"
@@ -285,9 +321,10 @@ defmodule Dashboard.App do
   end
 
   defp format_memory(mb) do
-    cond do
-      mb >= 1024 -> "#{Float.round(mb / 1024, 1)} GB"
-      true -> "#{mb} MB"
+    if mb >= 1024 do
+      "#{Float.round(mb / 1024, 1)} GB"
+    else
+      "#{mb} MB"
     end
   end
 
