@@ -78,6 +78,25 @@ defmodule TermUI.Runtime.NodeRenderer do
     render_positioned_cells(cells, buffer, row, col, parent_style)
   end
 
+  # Handle viewport nodes (from Viewport widget)
+  # Viewport clips content to a region and applies scroll offsets
+  defp render_node(
+         %{
+           type: :viewport,
+           content: content,
+           scroll_x: scroll_x,
+           scroll_y: scroll_y,
+           width: width,
+           height: height
+         },
+         buffer,
+         row,
+         col,
+         style
+       ) do
+    render_viewport(content, buffer, row, col, style, scroll_x, scroll_y, width, height)
+  end
+
   # Handle tuple-based render nodes from Elm.Helpers
   defp render_node({:text, content}, buffer, row, col, style) do
     render_text(content, buffer, row, col, style)
@@ -184,6 +203,58 @@ defmodule TermUI.Runtime.NodeRenderer do
       end)
 
     {max_x, max_y}
+  end
+
+  # Viewport rendering - clips content to a region with scroll offsets
+  # Creates a temporary buffer to render content, then copies visible portion
+  defp render_viewport(
+         content,
+         buffer,
+         dest_row,
+         dest_col,
+         style,
+         scroll_x,
+         scroll_y,
+         vp_width,
+         vp_height
+       ) do
+    # Estimate content size - we need a buffer large enough to hold the content
+    # Use a reasonable maximum to avoid excessive memory usage
+    content_width = scroll_x + vp_width + 100
+    content_height = scroll_y + vp_height + 100
+
+    # Cap at reasonable limits
+    content_width = min(content_width, Buffer.max_cols())
+    content_height = min(content_height, Buffer.max_rows())
+
+    # Create temporary buffer for content
+    case Buffer.new(content_height, content_width) do
+      {:ok, temp_buffer} ->
+        # Render content to temporary buffer
+        render_node(content, temp_buffer, 1, 1, style)
+
+        # Copy visible region to destination buffer
+        # Source region starts at (scroll_y + 1, scroll_x + 1) in temp buffer (1-indexed)
+        # Destination starts at (dest_row, dest_col) in main buffer
+        for dy <- 0..(vp_height - 1), dx <- 0..(vp_width - 1) do
+          src_row = scroll_y + 1 + dy
+          src_col = scroll_x + 1 + dx
+
+          cell = Buffer.get_cell(temp_buffer, src_row, src_col)
+
+          # Only copy non-empty cells (or copy all for consistent background)
+          Buffer.set_cell(buffer, dest_row + dy, dest_col + dx, cell)
+        end
+
+        # Clean up temporary buffer
+        Buffer.destroy(temp_buffer)
+
+        {vp_width, vp_height}
+
+      {:error, _reason} ->
+        # If we can't create a buffer, just return the viewport dimensions
+        {vp_width, vp_height}
+    end
   end
 
   # Cell creation

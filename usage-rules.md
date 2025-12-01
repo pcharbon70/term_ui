@@ -432,6 +432,42 @@ ProcessMonitor.new(
 )
 ```
 
+**Viewport:**
+```elixir
+Viewport.new(
+  content: my_render_tree,     # The content to scroll (render node)
+  content_width: 200,          # Total width of content
+  content_height: 100,         # Total height of content
+  width: 60,                   # Viewport width
+  height: 20,                  # Viewport height
+  scroll_x: 0,                 # Initial horizontal scroll
+  scroll_y: 0,                 # Initial vertical scroll
+  scroll_bars: :both           # :none, :vertical, :horizontal, or :both
+)
+```
+
+Viewport helper functions:
+```elixir
+# Get current scroll position
+{x, y} = Viewport.get_scroll(state)
+
+# Set scroll position (clamped to valid range)
+state = Viewport.set_scroll(state, 50, 100)
+
+# Scroll to make a position visible
+state = Viewport.scroll_into_view(state, target_x, target_y)
+
+# Update content
+state = Viewport.set_content(state, new_content)
+
+# Update content dimensions
+state = Viewport.set_content_size(state, new_width, new_height)
+
+# Check if scrollable
+Viewport.can_scroll_vertical?(state)    # true/false
+Viewport.can_scroll_horizontal?(state)  # true/false
+```
+
 ## Layout Rules
 
 ### Rule 11: Use Stack for Layout
@@ -624,7 +660,84 @@ def view(state) do
 end
 ```
 
-### Rule 16: Polling/Animation
+### Rule 16: Scrollable Content with Viewport
+
+Use the Viewport widget when you have content larger than the display area:
+
+```elixir
+defmodule ScrollableLogViewer do
+  use TermUI.Elm
+
+  alias TermUI.Event
+  alias TermUI.Renderer.Style
+  alias TermUI.Widgets.Viewport
+
+  def init(_opts) do
+    # Generate large content
+    content = generate_log_content()
+
+    props = Viewport.new(
+      content: content,
+      content_width: 120,        # Content is 120 chars wide
+      content_height: 500,       # Content is 500 lines
+      width: 80,                 # Viewport shows 80 chars
+      height: 20,                # Viewport shows 20 lines
+      scroll_bars: :both
+    )
+
+    {:ok, viewport} = Viewport.init(props)
+    %{viewport: viewport}
+  end
+
+  # Route events to viewport
+  def event_to_msg(%Event.Key{key: "q"}, _state), do: {:msg, :quit}
+  def event_to_msg(event, _state), do: {:msg, {:viewport_event, event}}
+
+  def update(:quit, state), do: {state, [:quit]}
+
+  def update({:viewport_event, event}, state) do
+    {:ok, viewport} = Viewport.handle_event(event, state.viewport)
+    {%{state | viewport: viewport}, []}
+  end
+
+  def view(state) do
+    stack(:vertical, [
+      text("Log Viewer (Arrow keys to scroll, Q to quit)", Style.new(fg: :cyan)),
+      text(""),
+      Viewport.render(state.viewport, %{width: 80, height: 20}),
+      text(""),
+      render_scroll_info(state.viewport)
+    ])
+  end
+
+  defp render_scroll_info(viewport) do
+    {x, y} = Viewport.get_scroll(viewport)
+    text("Scroll position: (#{x}, #{y})", Style.new(fg: :bright_black))
+  end
+
+  defp generate_log_content do
+    lines = for i <- 1..500 do
+      {:text, "[#{timestamp(i)}] Log entry ##{i}: Some log message here with details"}
+    end
+    stack(:vertical, lines)
+  end
+
+  defp timestamp(i), do: "2024-01-01 12:#{rem(i, 60) |> Integer.to_string() |> String.pad_leading(2, "0")}:00"
+end
+```
+
+**Viewport Keyboard Navigation (built-in):**
+- Arrow keys: Scroll by one line/column
+- Page Up/Down: Scroll by viewport height
+- Home/End: Scroll to top/bottom
+- Ctrl+Home/End: Scroll to top-left/bottom-right
+
+**Viewport Mouse Support (built-in):**
+- Mouse wheel: Scroll vertically
+- Click on scroll bar track: Page scroll
+- Drag scroll bar thumb: Direct positioning
+
+### Rule 17: Polling/Animation
 
 ```elixir
 # Polling pattern
@@ -749,7 +862,7 @@ TermUI.Runtime.run(root: MyApp)
 # Common imports
 alias TermUI.Event
 alias TermUI.Renderer.Style
-alias TermUI.Widgets.{Gauge, Sparkline, Table, Menu, TextInput, Dialog, FormBuilder}
+alias TermUI.Widgets.{Gauge, Sparkline, Table, Menu, TextInput, Dialog, FormBuilder, Viewport}
 
 # Layout
 stack(:vertical, [child1, child2])
@@ -780,4 +893,12 @@ props = TextInput.new(placeholder: "Enter...")
 {:ok, input_state} = TextInput.init(props)
 {:ok, input_state} = TextInput.handle_event(event, input_state)
 TextInput.render(input_state, %{width: 40, height: 1})
+
+# Viewport for scrollable content
+props = Viewport.new(content: my_content, content_width: 200, content_height: 100, width: 60, height: 20)
+{:ok, viewport_state} = Viewport.init(props)
+{:ok, viewport_state} = Viewport.handle_event(event, viewport_state)
+Viewport.render(viewport_state, %{width: 60, height: 20})
+{x, y} = Viewport.get_scroll(viewport_state)
+viewport_state = Viewport.scroll_into_view(viewport_state, target_x, target_y)
 ```

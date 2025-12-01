@@ -282,21 +282,106 @@ Canvas.render(canvas_state, %{width: 60, height: 20})
 
 ### Viewport
 
-Scrollable view of content larger than the display area.
+Scrollable view of content larger than the display area. The Viewport widget clips content to a visible region and supports both keyboard and mouse scrolling.
 
 ```elixir
 alias TermUI.Widgets.Viewport
 
 # Create props
 props = Viewport.new(
-  content_width: 200,
-  content_height: 100,
-  show_scrollbars: true
+  content: my_large_content(),    # The content to scroll (render node)
+  content_width: 200,             # Total width of content
+  content_height: 100,            # Total height of content
+  width: 60,                      # Viewport width
+  height: 20,                     # Viewport height
+  scroll_x: 0,                    # Initial horizontal scroll
+  scroll_y: 0,                    # Initial vertical scroll
+  scroll_bars: :both              # :none, :vertical, :horizontal, or :both
 )
 
 {:ok, viewport_state} = Viewport.init(props)
 {:ok, viewport_state} = Viewport.handle_event(scroll_event, viewport_state)
 Viewport.render(viewport_state, %{width: 60, height: 20})
+```
+
+**Keyboard Navigation:**
+- Arrow keys: Scroll by one line/column
+- Page Up/Down: Scroll by viewport height
+- Home/End: Scroll to top/bottom
+- Ctrl+Home/End: Scroll to top-left/bottom-right
+
+**Mouse Support:**
+- Mouse wheel: Scroll vertically
+- Click on scroll bar track: Page scroll
+- Drag scroll bar thumb: Direct scroll positioning
+
+**Helper Functions:**
+
+```elixir
+# Get current scroll position
+{x, y} = Viewport.get_scroll(state)
+
+# Set scroll position (clamped to valid range)
+state = Viewport.set_scroll(state, 50, 100)
+
+# Scroll to make a position visible
+state = Viewport.scroll_into_view(state, target_x, target_y)
+
+# Update content
+state = Viewport.set_content(state, new_content)
+
+# Update content dimensions
+state = Viewport.set_content_size(state, new_width, new_height)
+
+# Check if scrollable
+Viewport.can_scroll_vertical?(state)    # true/false
+Viewport.can_scroll_horizontal?(state)  # true/false
+```
+
+**Complete Example:**
+
+```elixir
+defmodule MyApp do
+  use TermUI.Elm
+  alias TermUI.Widgets.Viewport
+
+  def init(_opts) do
+    # Create large scrollable content
+    content = generate_large_content()
+
+    props = Viewport.new(
+      content: content,
+      content_width: 200,
+      content_height: 500,
+      width: 60,
+      height: 20,
+      scroll_bars: :both
+    )
+
+    {:ok, viewport} = Viewport.init(props)
+    %{viewport: viewport}
+  end
+
+  def event_to_msg(event, _state) do
+    {:msg, {:viewport_event, event}}
+  end
+
+  def update({:viewport_event, event}, state) do
+    {:ok, new_viewport} = Viewport.handle_event(event, state.viewport)
+    {%{state | viewport: new_viewport}, []}
+  end
+
+  def view(state) do
+    Viewport.render(state.viewport, %{width: 60, height: 20})
+  end
+
+  defp generate_large_content do
+    lines = for i <- 1..500 do
+      {:text, "Line #{i}: Lorem ipsum dolor sit amet, consectetur adipiscing elit"}
+    end
+    stack(:vertical, lines)
+  end
+end
 ```
 
 ### Split Pane

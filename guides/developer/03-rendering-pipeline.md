@@ -66,6 +66,16 @@ The tree consists of tuples describing content:
 
 # Raw cells
 {:cells, [%Cell{}, %Cell{}, ...]}
+
+# Viewport (scrollable clipped region)
+%{
+  type: :viewport,
+  content: child_node,      # Content to render
+  scroll_x: 0,              # Horizontal scroll offset
+  scroll_y: 0,              # Vertical scroll offset
+  width: 40,                # Viewport width
+  height: 20                # Viewport height
+}
 ```
 
 ## Stage 2: Rasterize
@@ -117,6 +127,39 @@ defp render_node({:stack, :horizontal, children}, row, col, buffer) do
   end)
 end
 ```
+
+### Viewport Rendering
+
+Viewport nodes clip content to a visible region with scroll offsets:
+
+```elixir
+defp render_viewport(content, buffer, dest_row, dest_col, style,
+                     scroll_x, scroll_y, vp_width, vp_height) do
+  # 1. Create temporary buffer for full content
+  {:ok, temp_buffer} = Buffer.new(content_height, content_width)
+
+  # 2. Render content to temporary buffer
+  render_node(content, temp_buffer, 1, 1, style)
+
+  # 3. Copy visible region to destination buffer
+  for dy <- 0..(vp_height - 1), dx <- 0..(vp_width - 1) do
+    src_row = scroll_y + 1 + dy
+    src_col = scroll_x + 1 + dx
+    cell = Buffer.get_cell(temp_buffer, src_row, src_col)
+    Buffer.set_cell(buffer, dest_row + dy, dest_col + dx, cell)
+  end
+
+  # 4. Clean up temporary buffer
+  Buffer.destroy(temp_buffer)
+
+  {vp_width, vp_height}
+end
+```
+
+This approach:
+- Renders full content to an off-screen buffer
+- Copies only the visible portion based on scroll offsets
+- Clips content automatically to viewport dimensions
 
 ## Stage 3: Diff
 
