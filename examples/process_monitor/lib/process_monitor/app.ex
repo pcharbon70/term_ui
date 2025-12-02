@@ -29,9 +29,17 @@ defmodule ProcessMonitorExample.App do
 
   use TermUI.Elm
 
+  alias TermUI.Event
   alias TermUI.Widgets.ProcessMonitor
   alias TermUI.Renderer.Style
 
+  # ----------------------------------------------------------------------------
+  # Component Callbacks
+  # ----------------------------------------------------------------------------
+
+  @doc """
+  Initialize the component state.
+  """
   @impl true
   def init(_args) do
     props =
@@ -42,134 +50,161 @@ defmodule ProcessMonitorExample.App do
 
     {:ok, monitor_state} = ProcessMonitor.init(props)
 
-    model = %{
+    %{
       monitor_state: monitor_state,
       message: "ProcessMonitor Example - Press w to spawn test workers",
       worker_pids: []
     }
-
-    {:ok, model}
   end
 
+  @doc """
+  Convert events to messages.
+  """
   @impl true
-  def update(msg, model) do
-    case msg do
-      # Navigation
-      {:key, %{key: key}} when key in [:up, :down, :page_up, :page_down, :home, :end] ->
-        event = %TermUI.Event.Key{key: key}
-        {:ok, monitor_state} = ProcessMonitor.handle_event(event, model.monitor_state)
-        {:ok, %{model | monitor_state: monitor_state}}
-
-      # Enter - toggle details
-      {:key, %{key: :enter}} ->
-        event = %TermUI.Event.Key{key: :enter}
-        {:ok, monitor_state} = ProcessMonitor.handle_event(event, model.monitor_state)
-        {:ok, %{model | monitor_state: monitor_state}}
-
-      # Refresh
-      {:key, %{char: "r"}} ->
-        {:ok, monitor_state} = ProcessMonitor.refresh(model.monitor_state)
-        {:ok, %{model | monitor_state: monitor_state, message: "Refreshed"}}
-
-      # Sorting
-      {:key, %{char: "s"}} ->
-        event = %TermUI.Event.Key{char: "s"}
-        {:ok, monitor_state} = ProcessMonitor.handle_event(event, model.monitor_state)
-        {:ok, %{model | monitor_state: monitor_state, message: "Sort: #{monitor_state.sort_field}"}}
-
-      {:key, %{char: "S"}} ->
-        event = %TermUI.Event.Key{char: "S"}
-        {:ok, monitor_state} = ProcessMonitor.handle_event(event, model.monitor_state)
-        dir = if monitor_state.sort_direction == :asc, do: "ascending", else: "descending"
-        {:ok, %{model | monitor_state: monitor_state, message: "Sort direction: #{dir}"}}
-
-      # Filter
-      {:key, %{char: "/"}} ->
-        event = %TermUI.Event.Key{char: "/"}
-        {:ok, monitor_state} = ProcessMonitor.handle_event(event, model.monitor_state)
-        {:ok, %{model | monitor_state: monitor_state}}
-
-      # Detail modes
-      {:key, %{char: "l"}} ->
-        event = %TermUI.Event.Key{char: "l"}
-        {:ok, monitor_state} = ProcessMonitor.handle_event(event, model.monitor_state)
-        {:ok, %{model | monitor_state: monitor_state, message: "Showing links/monitors"}}
-
-      {:key, %{char: "t"}} ->
-        event = %TermUI.Event.Key{char: "t"}
-        {:ok, monitor_state} = ProcessMonitor.handle_event(event, model.monitor_state)
-        {:ok, %{model | monitor_state: monitor_state, message: "Showing stack trace"}}
-
-      # Process actions
-      {:key, %{char: "k"}} ->
-        event = %TermUI.Event.Key{char: "k"}
-        {:ok, monitor_state} = ProcessMonitor.handle_event(event, model.monitor_state)
-        {:ok, %{model | monitor_state: monitor_state}}
-
-      {:key, %{char: "p"}} ->
-        event = %TermUI.Event.Key{char: "p"}
-        {:ok, monitor_state} = ProcessMonitor.handle_event(event, model.monitor_state)
-        {:ok, %{model | monitor_state: monitor_state}}
-
-      {:key, %{char: "y"}} ->
-        event = %TermUI.Event.Key{char: "y"}
-        {:ok, monitor_state} = ProcessMonitor.handle_event(event, model.monitor_state)
-        {:ok, %{model | monitor_state: monitor_state, message: "Action confirmed"}}
-
-      {:key, %{char: "n"}} ->
-        event = %TermUI.Event.Key{char: "n"}
-        {:ok, monitor_state} = ProcessMonitor.handle_event(event, model.monitor_state)
-        {:ok, %{model | monitor_state: monitor_state, message: "Action cancelled"}}
-
-      # Escape
-      {:key, %{key: :escape}} ->
-        event = %TermUI.Event.Key{key: :escape}
-        {:ok, monitor_state} = ProcessMonitor.handle_event(event, model.monitor_state)
-        {:ok, %{model | monitor_state: monitor_state}}
-
-      # Spawn test workers
-      {:key, %{char: "w"}} ->
-        new_pids = spawn_workers(5)
-        {:ok, monitor_state} = ProcessMonitor.refresh(model.monitor_state)
-
-        {:ok,
-         %{
-           model
-           | monitor_state: monitor_state,
-             worker_pids: model.worker_pids ++ new_pids,
-             message: "Spawned 5 test workers (filter 'Worker' to see them)"
-         }}
-
-      # Forward character input for filter
-      {:key, %{char: char}} when char != nil and model.monitor_state.filter_input != nil ->
-        event = %TermUI.Event.Key{char: char}
-        {:ok, monitor_state} = ProcessMonitor.handle_event(event, model.monitor_state)
-        {:ok, %{model | monitor_state: monitor_state}}
-
-      {:key, %{key: :backspace}} when model.monitor_state.filter_input != nil ->
-        event = %TermUI.Event.Key{key: :backspace}
-        {:ok, monitor_state} = ProcessMonitor.handle_event(event, model.monitor_state)
-        {:ok, %{model | monitor_state: monitor_state}}
-
-      # Quit
-      {:key, %{char: "q"}} when model.monitor_state.filter_input == nil ->
-        # Cleanup workers
-        Enum.each(model.worker_pids, fn pid ->
-          if Process.alive?(pid), do: Process.exit(pid, :shutdown)
-        end)
-
-        {:stop, :normal}
-
-      # Refresh timer
-      :refresh ->
-        {:ok, monitor_state} = ProcessMonitor.handle_info(:refresh, model.monitor_state)
-        {:ok, %{model | monitor_state: monitor_state}}
-
-      _ ->
-        {:ok, model}
-    end
+  def event_to_msg(%Event.Key{char: "q"}, %{monitor_state: %{filter_input: nil}}) do
+    {:msg, :quit}
   end
 
+  def event_to_msg(%Event.Key{key: key}, _state)
+      when key in [:up, :down, :page_up, :page_down, :home, :end] do
+    {:msg, {:monitor_event, %Event.Key{key: key}}}
+  end
+
+  def event_to_msg(%Event.Key{key: :enter}, _state) do
+    {:msg, {:monitor_event, %Event.Key{key: :enter}}}
+  end
+
+  def event_to_msg(%Event.Key{char: "r"}, _state) do
+    {:msg, :refresh_monitor}
+  end
+
+  def event_to_msg(%Event.Key{char: "s"}, _state) do
+    {:msg, {:monitor_event, %Event.Key{char: "s"}}}
+  end
+
+  def event_to_msg(%Event.Key{char: "S"}, _state) do
+    {:msg, {:monitor_event, %Event.Key{char: "S"}}}
+  end
+
+  def event_to_msg(%Event.Key{char: "/"}, _state) do
+    {:msg, {:monitor_event, %Event.Key{char: "/"}}}
+  end
+
+  def event_to_msg(%Event.Key{char: "l"}, _state) do
+    {:msg, {:monitor_event, %Event.Key{char: "l"}}}
+  end
+
+  def event_to_msg(%Event.Key{char: "t"}, _state) do
+    {:msg, {:monitor_event, %Event.Key{char: "t"}}}
+  end
+
+  def event_to_msg(%Event.Key{char: "k"}, _state) do
+    {:msg, {:monitor_event, %Event.Key{char: "k"}}}
+  end
+
+  def event_to_msg(%Event.Key{char: "p"}, _state) do
+    {:msg, {:monitor_event, %Event.Key{char: "p"}}}
+  end
+
+  def event_to_msg(%Event.Key{char: "y"}, _state) do
+    {:msg, {:monitor_event, %Event.Key{char: "y"}}}
+  end
+
+  def event_to_msg(%Event.Key{char: "n"}, _state) do
+    {:msg, {:monitor_event, %Event.Key{char: "n"}}}
+  end
+
+  def event_to_msg(%Event.Key{key: :escape}, _state) do
+    {:msg, {:monitor_event, %Event.Key{key: :escape}}}
+  end
+
+  def event_to_msg(%Event.Key{char: "w"}, _state) do
+    {:msg, :spawn_workers}
+  end
+
+  def event_to_msg(%Event.Key{char: char}, %{monitor_state: %{filter_input: input}})
+      when input != nil and char != nil do
+    {:msg, {:monitor_event, %Event.Key{char: char}}}
+  end
+
+  def event_to_msg(%Event.Key{key: :backspace}, %{monitor_state: %{filter_input: input}})
+      when input != nil do
+    {:msg, {:monitor_event, %Event.Key{key: :backspace}}}
+  end
+
+  def event_to_msg(_event, _state) do
+    :ignore
+  end
+
+  @doc """
+  Update state based on messages.
+  """
+  @impl true
+  def update(:quit, model) do
+    # Cleanup workers
+    Enum.each(model.worker_pids, fn pid ->
+      if Process.alive?(pid), do: Process.exit(pid, :shutdown)
+    end)
+
+    {model, [:quit]}
+  end
+
+  def update(:refresh_monitor, model) do
+    {:ok, monitor_state} = ProcessMonitor.refresh(model.monitor_state)
+    {%{model | monitor_state: monitor_state, message: "Refreshed"}, []}
+  end
+
+  def update(:spawn_workers, model) do
+    new_pids = spawn_workers(5)
+    {:ok, monitor_state} = ProcessMonitor.refresh(model.monitor_state)
+
+    {%{
+       model
+       | monitor_state: monitor_state,
+         worker_pids: model.worker_pids ++ new_pids,
+         message: "Spawned 5 test workers (filter 'Worker' to see them)"
+     }, []}
+  end
+
+  def update({:monitor_event, event}, model) do
+    {:ok, monitor_state} = ProcessMonitor.handle_event(event, model.monitor_state)
+
+    # Update message based on event
+    message =
+      case event do
+        %Event.Key{char: "s"} ->
+          "Sort: #{monitor_state.sort_field}"
+
+        %Event.Key{char: "S"} ->
+          dir = if monitor_state.sort_direction == :asc, do: "ascending", else: "descending"
+          "Sort direction: #{dir}"
+
+        %Event.Key{char: "l"} ->
+          "Showing links/monitors"
+
+        %Event.Key{char: "t"} ->
+          "Showing stack trace"
+
+        %Event.Key{char: "y"} ->
+          "Action confirmed"
+
+        %Event.Key{char: "n"} ->
+          "Action cancelled"
+
+        _ ->
+          model.message
+      end
+
+    {%{model | monitor_state: monitor_state, message: message}, []}
+  end
+
+  def update(_msg, model) do
+    {model, []}
+  end
+
+  @doc """
+  Render the application view.
+  """
   @impl true
   def view(model) do
     area = %{x: 0, y: 0, width: 100, height: 25}
@@ -184,6 +219,10 @@ defmodule ProcessMonitorExample.App do
       text("[w] Spawn workers | [q] Quit", Style.new(fg: :white, attrs: [:dim]))
     ])
   end
+
+  # ----------------------------------------------------------------------------
+  # Helpers
+  # ----------------------------------------------------------------------------
 
   # Spawn some test worker processes
   defp spawn_workers(count) do
@@ -228,5 +267,16 @@ defmodule ProcessMonitorExample.App do
     after
       0 -> :ok
     end
+  end
+
+  # ----------------------------------------------------------------------------
+  # Run
+  # ----------------------------------------------------------------------------
+
+  @doc """
+  Run the process monitor example application.
+  """
+  def run do
+    TermUI.Runtime.run(root: __MODULE__)
   end
 end
