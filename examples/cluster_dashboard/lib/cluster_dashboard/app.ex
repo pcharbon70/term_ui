@@ -45,16 +45,25 @@ defmodule ClusterDashboardExample.App do
   - e: Show events view
   - i: Inspect selected node (in nodes view)
   - Escape: Close details / clear alerts
+  - G: Register a test global process
+  - P: Join a test PG group
   - q: Quit
   """
 
   use TermUI.Elm
 
-  alias TermUI.Widgets.ClusterDashboard
+  alias TermUI.Event
   alias TermUI.Renderer.Style
+  alias TermUI.Widgets.ClusterDashboard
 
-  @impl true
-  def init(_args) do
+  # ----------------------------------------------------------------------------
+  # Component Callbacks
+  # ----------------------------------------------------------------------------
+
+  @doc """
+  Initialize the component state.
+  """
+  def init(_opts) do
     props =
       ClusterDashboard.new(
         update_interval: 2000,
@@ -65,121 +74,144 @@ defmodule ClusterDashboardExample.App do
 
     {:ok, dashboard_state} = ClusterDashboard.init(props)
 
-    model = %{
-      dashboard_state: dashboard_state,
+    %{
+      dashboard: dashboard_state,
       message: "ClusterDashboard Example - Views: [n]odes [g]lobals [p]g [e]vents"
     }
-
-    {:ok, model}
   end
 
-  @impl true
-  def update(msg, model) do
-    case msg do
-      # Navigation
-      {:key, %{key: key}} when key in [:up, :down, :page_up, :page_down, :home, :end] ->
-        event = %TermUI.Event.Key{key: key}
-        {:ok, dashboard_state} = ClusterDashboard.handle_event(event, model.dashboard_state)
-        {:ok, %{model | dashboard_state: dashboard_state}}
+  @doc """
+  Convert events to messages.
+  """
+  # Navigation keys - forward to dashboard
+  def event_to_msg(%Event.Key{key: key}, _state)
+      when key in [:up, :down, :page_up, :page_down, :home, :end, :enter, :escape] do
+    {:msg, {:dashboard_event, %Event.Key{key: key}}}
+  end
 
-      # Enter - toggle details
-      {:key, %{key: :enter}} ->
-        event = %TermUI.Event.Key{key: :enter}
-        {:ok, dashboard_state} = ClusterDashboard.handle_event(event, model.dashboard_state)
-        {:ok, %{model | dashboard_state: dashboard_state}}
+  # View mode switches
+  def event_to_msg(%Event.Key{key: "n"}, _state), do: {:msg, {:view_mode, :nodes}}
+  def event_to_msg(%Event.Key{key: "g"}, _state), do: {:msg, {:view_mode, :globals}}
+  def event_to_msg(%Event.Key{key: "p"}, _state), do: {:msg, {:view_mode, :pg}}
+  def event_to_msg(%Event.Key{key: "e"}, _state), do: {:msg, {:view_mode, :events}}
+  def event_to_msg(%Event.Key{key: "i"}, _state), do: {:msg, :inspect_node}
+  def event_to_msg(%Event.Key{key: "r"}, _state), do: {:msg, :refresh}
 
-      # Escape
-      {:key, %{key: :escape}} ->
-        event = %TermUI.Event.Key{key: :escape}
-        {:ok, dashboard_state} = ClusterDashboard.handle_event(event, model.dashboard_state)
-        {:ok, %{model | dashboard_state: dashboard_state}}
+  # Test actions
+  def event_to_msg(%Event.Key{key: "G"}, _state), do: {:msg, :spawn_global}
+  def event_to_msg(%Event.Key{key: "P"}, _state), do: {:msg, :join_pg}
 
-      # View mode switches
-      {:key, %{char: "n"}} ->
-        event = %TermUI.Event.Key{char: "n"}
-        {:ok, dashboard_state} = ClusterDashboard.handle_event(event, model.dashboard_state)
-        {:ok, %{model | dashboard_state: dashboard_state, message: "Nodes view"}}
+  # Quit
+  def event_to_msg(%Event.Key{key: key}, _state) when key in ["q", "Q"], do: {:msg, :quit}
 
-      {:key, %{char: "g"}} ->
-        event = %TermUI.Event.Key{char: "g"}
-        {:ok, dashboard_state} = ClusterDashboard.handle_event(event, model.dashboard_state)
-        {:ok, %{model | dashboard_state: dashboard_state, message: "Global names view"}}
+  # Tick for auto-refresh
+  def event_to_msg(%Event.Tick{}, _state), do: {:msg, :tick}
 
-      {:key, %{char: "p"}} ->
-        event = %TermUI.Event.Key{char: "p"}
-        {:ok, dashboard_state} = ClusterDashboard.handle_event(event, model.dashboard_state)
-        {:ok, %{model | dashboard_state: dashboard_state, message: "PG groups view"}}
+  def event_to_msg(_event, _state), do: :ignore
 
-      {:key, %{char: "e"}} ->
-        event = %TermUI.Event.Key{char: "e"}
-        {:ok, dashboard_state} = ClusterDashboard.handle_event(event, model.dashboard_state)
-        {:ok, %{model | dashboard_state: dashboard_state, message: "Events view"}}
+  @doc """
+  Update state based on messages.
+  """
+  def update({:dashboard_event, event}, state) do
+    {:ok, dashboard} = ClusterDashboard.handle_event(event, state.dashboard)
+    {%{state | dashboard: dashboard}, []}
+  end
 
-      # Inspect node
-      {:key, %{char: "i"}} ->
-        event = %TermUI.Event.Key{char: "i"}
-        {:ok, dashboard_state} = ClusterDashboard.handle_event(event, model.dashboard_state)
-        {:ok, %{model | dashboard_state: dashboard_state, message: "Inspecting node..."}}
-
-      # Refresh
-      {:key, %{char: "r"}} ->
-        {:ok, dashboard_state} = ClusterDashboard.refresh(model.dashboard_state)
-        {:ok, %{model | dashboard_state: dashboard_state, message: "Refreshed"}}
-
-      # Spawn test global name
-      {:key, %{char: "G"}} ->
-        spawn_global_process()
-        {:ok, dashboard_state} = ClusterDashboard.refresh(model.dashboard_state)
-        {:ok, %{model | dashboard_state: dashboard_state, message: "Registered global process"}}
-
-      # Join a PG group
-      {:key, %{char: "P"}} ->
-        join_pg_group()
-        {:ok, dashboard_state} = ClusterDashboard.refresh(model.dashboard_state)
-        {:ok, %{model | dashboard_state: dashboard_state, message: "Joined :pg group"}}
-
-      # Quit
-      {:key, %{char: "q"}} ->
-        {:stop, :normal}
-
-      # Refresh timer from dashboard
-      :refresh ->
-        {:ok, dashboard_state} = ClusterDashboard.handle_info(:refresh, model.dashboard_state)
-        {:ok, %{model | dashboard_state: dashboard_state}}
-
-      # Node events
-      {:nodeup, node} ->
-        {:ok, dashboard_state} =
-          ClusterDashboard.handle_info({:nodeup, node}, model.dashboard_state)
-
-        {:ok, %{model | dashboard_state: dashboard_state, message: "Node connected: #{node}"}}
-
-      {:nodedown, node} ->
-        {:ok, dashboard_state} =
-          ClusterDashboard.handle_info({:nodedown, node}, model.dashboard_state)
-
-        {:ok, %{model | dashboard_state: dashboard_state, message: "Node disconnected: #{node}"}}
-
-      _ ->
-        {:ok, model}
+  def update({:view_mode, mode}, state) do
+    # Create a key event to switch view mode
+    key = case mode do
+      :nodes -> "n"
+      :globals -> "g"
+      :pg -> "p"
+      :events -> "e"
     end
+    event = %Event.Key{key: key}
+    {:ok, dashboard} = ClusterDashboard.handle_event(event, state.dashboard)
+    message = case mode do
+      :nodes -> "Nodes view"
+      :globals -> "Global names view"
+      :pg -> "PG groups view"
+      :events -> "Events view"
+    end
+    {%{state | dashboard: dashboard, message: message}, []}
   end
 
-  @impl true
-  def view(model) do
+  def update(:inspect_node, state) do
+    event = %Event.Key{key: "i"}
+    {:ok, dashboard} = ClusterDashboard.handle_event(event, state.dashboard)
+    {%{state | dashboard: dashboard, message: "Inspecting node..."}, []}
+  end
+
+  def update(:refresh, state) do
+    {:ok, dashboard} = ClusterDashboard.refresh(state.dashboard)
+    {%{state | dashboard: dashboard, message: "Refreshed"}, []}
+  end
+
+  def update(:spawn_global, state) do
+    spawn_global_process()
+    {:ok, dashboard} = ClusterDashboard.refresh(state.dashboard)
+    {%{state | dashboard: dashboard, message: "Registered global process"}, []}
+  end
+
+  def update(:join_pg, state) do
+    join_pg_group()
+    {:ok, dashboard} = ClusterDashboard.refresh(state.dashboard)
+    {%{state | dashboard: dashboard, message: "Joined :pg group"}, []}
+  end
+
+  def update(:tick, state) do
+    # Check if dashboard needs refresh based on its update interval
+    {:ok, dashboard} = ClusterDashboard.handle_info(:refresh, state.dashboard)
+    {%{state | dashboard: dashboard}, []}
+  end
+
+  def update(:quit, state) do
+    {state, [:quit]}
+  end
+
+  @doc """
+  Render the current state to a render tree.
+  """
+  def view(state) do
     area = %{x: 0, y: 0, width: 100, height: 25}
-    dashboard_view = ClusterDashboard.render(model.dashboard_state, area)
+    dashboard_view = ClusterDashboard.render(state.dashboard, area)
+
+    # Pad message to ensure full display (avoid truncation)
+    padded_message = String.pad_trailing(state.message, 120)
 
     stack(:vertical, [
       text("ClusterDashboard Widget Example", Style.new(fg: :cyan, attrs: [:bold])),
-      text(model.message, Style.new(fg: :yellow)),
+      text(padded_message, Style.new(fg: :yellow)),
       text("", nil),
       dashboard_view,
       text("", nil),
-      text(
-        "[G] Register global | [P] Join PG group | [q] Quit",
-        Style.new(fg: :white, attrs: [:dim])
-      )
+      render_controls()
+    ])
+  end
+
+  # ----------------------------------------------------------------------------
+  # Private Helpers
+  # ----------------------------------------------------------------------------
+
+  defp render_controls do
+    box_width = 55
+    inner_width = box_width - 2
+
+    top_border = "┌─ Controls " <> String.duplicate("─", inner_width - 12) <> "─┐"
+    bottom_border = "└" <> String.duplicate("─", inner_width) <> "┘"
+
+    stack(:vertical, [
+      text(top_border, Style.new(fg: :yellow)),
+      text("│" <> String.pad_trailing("  n/g/p/e  Switch views", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  Up/Down  Navigate list", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  Enter    Toggle details panel", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  i        Inspect selected node", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  r        Refresh now", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  G        Register test global process", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  P        Join test PG group", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  Escape   Close details / clear alerts", inner_width) <> "│", nil),
+      text("│" <> String.pad_trailing("  q        Quit", inner_width) <> "│", nil),
+      text(bottom_border, Style.new(fg: :yellow))
     ])
   end
 
@@ -227,6 +259,10 @@ defmodule ClusterDashboardExample.App do
     _, _ -> :error
   end
 
+  # ----------------------------------------------------------------------------
+  # Public API
+  # ----------------------------------------------------------------------------
+
   @doc """
   Run the example application.
 
@@ -237,6 +273,6 @@ defmodule ClusterDashboardExample.App do
 
   """
   def run do
-    TermUI.Elm.run(__MODULE__)
+    TermUI.Runtime.run(root: __MODULE__)
   end
 end

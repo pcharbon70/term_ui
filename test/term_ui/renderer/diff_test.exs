@@ -215,9 +215,9 @@ defmodule TermUI.Renderer.DiffTest do
     end
   end
 
-  describe "merge_spans/1" do
+  describe "merge_spans/2" do
     test "returns empty for empty input" do
-      assert Diff.merge_spans([]) == []
+      assert Diff.merge_spans([], %{}) == []
     end
 
     test "returns single span unchanged" do
@@ -228,27 +228,33 @@ defmodule TermUI.Renderer.DiffTest do
         cells: [Cell.new("A"), Cell.new("B"), Cell.new("C")]
       }
 
-      assert Diff.merge_spans([span]) == [span]
+      assert Diff.merge_spans([span], %{}) == [span]
     end
 
-    test "merges spans with small gap" do
+    test "merges spans with small gap using actual cells" do
       span1 = %{row: 1, start_col: 1, end_col: 2, cells: [Cell.new("A"), Cell.new("B")]}
-      span2 = %{row: 1, start_col: 4, end_col: 5, cells: [Cell.new("C"), Cell.new("D")]}
+      span2 = %{row: 1, start_col: 4, end_col: 5, cells: [Cell.new("D"), Cell.new("E")]}
 
-      merged = Diff.merge_spans([span1, span2])
+      # Provide the actual cell for column 3 (the gap)
+      current_cells_map = %{1 => Cell.new("A"), 2 => Cell.new("B"), 3 => Cell.new("C"), 4 => Cell.new("D"), 5 => Cell.new("E")}
+
+      merged = Diff.merge_spans([span1, span2], current_cells_map)
 
       # Gap of 1 should be merged (< threshold of 3)
       assert length(merged) == 1
       [result] = merged
       assert result.start_col == 1
       assert result.end_col == 5
+      # Check that the gap cell is the actual cell from current buffer
+      assert length(result.cells) == 5
+      assert Enum.at(result.cells, 2).char == "C"
     end
 
     test "keeps spans with large gap separate" do
       span1 = %{row: 1, start_col: 1, end_col: 2, cells: [Cell.new("A"), Cell.new("B")]}
       span2 = %{row: 1, start_col: 10, end_col: 11, cells: [Cell.new("C"), Cell.new("D")]}
 
-      merged = Diff.merge_spans([span1, span2])
+      merged = Diff.merge_spans([span1, span2], %{})
 
       # Gap of 7 should not be merged
       assert length(merged) == 2

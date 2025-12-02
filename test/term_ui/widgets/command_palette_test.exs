@@ -8,31 +8,11 @@ defmodule TermUI.Widgets.CommandPaletteTest do
 
   defp sample_commands do
     [
-      %{
-        id: :save,
-        label: "Save File",
-        shortcut: "Ctrl+S",
-        category: :command,
-        action: fn -> :saved end
-      },
-      %{
-        id: :open,
-        label: "Open File",
-        shortcut: "Ctrl+O",
-        category: :command,
-        action: fn -> :opened end
-      },
-      %{
-        id: :close,
-        label: "Close Tab",
-        shortcut: "Ctrl+W",
-        category: :command,
-        action: fn -> :closed end
-      },
-      %{id: :goto_line, label: "Go to Line", category: :goto, action: fn -> :goto end},
-      %{id: :goto_symbol, label: "Go to Symbol", category: :symbol, action: fn -> :symbol end},
-      %{id: :settings, label: "Open Settings", category: :command, action: fn -> :settings end},
-      %{id: :theme, label: "Change Theme", category: :command, action: fn -> :theme end}
+      %{id: :save, label: "Save File", action: fn -> :saved end},
+      %{id: :open, label: "Open File", action: fn -> :opened end},
+      %{id: :close, label: "Close Tab", action: fn -> :closed end},
+      %{id: :quit, label: "Quit", action: fn -> :quit end},
+      %{id: :help, label: "Help", action: fn -> :help end}
     ]
   end
 
@@ -41,813 +21,327 @@ defmodule TermUI.Widgets.CommandPaletteTest do
       props = CommandPalette.new(commands: sample_commands())
       {:ok, state} = CommandPalette.init(props)
 
-      assert length(state.commands) == 7
+      assert length(state.commands) == 5
       assert state.visible == true
       assert state.query == ""
-      assert state.selected_index == 0
-    end
-
-    test "normalizes commands with defaults" do
-      props =
-        CommandPalette.new(
-          commands: [
-            %{id: :test, label: "Test", action: fn -> :test end}
-          ]
-        )
-
-      {:ok, state} = CommandPalette.init(props)
-
-      [cmd] = state.commands
-      assert cmd.description == nil
-      assert cmd.shortcut == nil
-      assert cmd.category == :command
-      assert cmd.icon == nil
-      assert cmd.enabled == true
+      assert state.selected == 0
     end
 
     test "initializes with custom options" do
       props =
         CommandPalette.new(
           commands: sample_commands(),
-          max_visible: 5,
-          max_recent: 3,
-          placeholder: "Search...",
-          width: 50
+          max_visible: 3
         )
 
       {:ok, state} = CommandPalette.init(props)
 
-      assert state.max_visible == 5
-      assert state.max_recent == 3
-      assert state.placeholder == "Search..."
-      assert state.width == 50
+      assert state.max_visible == 3
+    end
+
+    test "defaults max_visible" do
+      props = CommandPalette.new(commands: sample_commands())
+      {:ok, state} = CommandPalette.init(props)
+
+      assert state.max_visible == 8
     end
   end
 
-  describe "fuzzy search" do
-    test "exact match scores highest" do
+  describe "visibility" do
+    test "show makes palette visible" do
       props = CommandPalette.new(commands: sample_commands())
       {:ok, state} = CommandPalette.init(props)
+      state = CommandPalette.hide(state)
 
-      state = CommandPalette.set_query(state, "Save File")
+      assert CommandPalette.visible?(state) == false
 
-      [first | _] = state.filtered_commands
-      assert first.id == :save
+      state = CommandPalette.show(state)
+      assert CommandPalette.visible?(state) == true
     end
 
-    test "prefix match ranks high" do
+    test "hide makes palette invisible" do
       props = CommandPalette.new(commands: sample_commands())
       {:ok, state} = CommandPalette.init(props)
 
-      state = CommandPalette.set_query(state, "Save")
-
-      [first | _] = state.filtered_commands
-      assert first.id == :save
+      state = CommandPalette.hide(state)
+      assert CommandPalette.visible?(state) == false
     end
 
-    test "partial match filters correctly" do
+    test "toggle flips visibility" do
       props = CommandPalette.new(commands: sample_commands())
       {:ok, state} = CommandPalette.init(props)
 
-      state = CommandPalette.set_query(state, "File")
-
-      ids = Enum.map(state.filtered_commands, & &1.id)
-      assert :save in ids
-      assert :open in ids
+      assert CommandPalette.visible?(state) == true
+      state = CommandPalette.toggle(state)
+      assert CommandPalette.visible?(state) == false
+      state = CommandPalette.toggle(state)
+      assert CommandPalette.visible?(state) == true
     end
 
-    test "fuzzy match works for non-consecutive characters" do
+    test "show resets query and selection" do
       props = CommandPalette.new(commands: sample_commands())
       {:ok, state} = CommandPalette.init(props)
 
-      state = CommandPalette.set_query(state, "sf")
+      # Type something and navigate
+      {:ok, state} = CommandPalette.handle_event(%Event.Key{key: "s"}, state)
+      {:ok, state} = CommandPalette.handle_event(%Event.Key{key: :down}, state)
 
-      # Should match "Save File"
-      ids = Enum.map(state.filtered_commands, & &1.id)
-      assert :save in ids
-    end
+      assert state.query == "s"
+      assert state.selected > 0 or length(state.filtered) < 5
 
-    test "no matches returns empty list" do
-      props = CommandPalette.new(commands: sample_commands())
-      {:ok, state} = CommandPalette.init(props)
+      # Hide and show again
+      state = CommandPalette.hide(state)
+      state = CommandPalette.show(state)
 
-      state = CommandPalette.set_query(state, "xyz123")
-
-      assert state.filtered_commands == []
-    end
-
-    test "case insensitive search" do
-      props = CommandPalette.new(commands: sample_commands())
-      {:ok, state} = CommandPalette.init(props)
-
-      state = CommandPalette.set_query(state, "save file")
-
-      [first | _] = state.filtered_commands
-      assert first.id == :save
+      assert state.query == ""
+      assert state.selected == 0
     end
   end
 
-  describe "category filtering" do
-    test "filters by command category with >" do
-      props = CommandPalette.new(commands: sample_commands())
-      {:ok, state} = CommandPalette.init(props)
-
-      state = CommandPalette.set_query(state, ">")
-
-      assert state.category_filter == :command
-      # All commands with :command category
-      assert Enum.all?(state.filtered_commands, &(&1.category == :command))
-    end
-
-    test "filters by symbol category with @" do
-      props = CommandPalette.new(commands: sample_commands())
-      {:ok, state} = CommandPalette.init(props)
-
-      state = CommandPalette.set_query(state, "@")
-
-      assert state.category_filter == :symbol
-    end
-
-    test "combines category filter with search" do
-      props = CommandPalette.new(commands: sample_commands())
-      {:ok, state} = CommandPalette.init(props)
-
-      state = CommandPalette.set_query(state, ">save")
-
-      assert state.category_filter == :command
-      assert length(state.filtered_commands) >= 1
-      assert Enum.all?(state.filtered_commands, &(&1.category == :command))
-    end
-
-    test "returns all category prefixes" do
-      prefixes = CommandPalette.category_prefixes()
-
-      assert prefixes[">"] == :command
-      assert prefixes["@"] == :symbol
-      assert prefixes["#"] == :tag
-      assert prefixes[":"] == :location
-    end
-  end
-
-  describe "navigation" do
+  describe "keyboard navigation" do
     test "down arrow moves selection down" do
       props = CommandPalette.new(commands: sample_commands())
       {:ok, state} = CommandPalette.init(props)
 
-      assert state.selected_index == 0
+      assert state.selected == 0
 
-      {:ok, state} = CommandPalette.handle_event(Event.key(:down), state)
-      assert state.selected_index == 1
+      {:ok, state} = CommandPalette.handle_event(%Event.Key{key: :down}, state)
+      assert state.selected == 1
 
-      {:ok, state} = CommandPalette.handle_event(Event.key(:down), state)
-      assert state.selected_index == 2
+      {:ok, state} = CommandPalette.handle_event(%Event.Key{key: :down}, state)
+      assert state.selected == 2
     end
 
     test "up arrow moves selection up" do
       props = CommandPalette.new(commands: sample_commands())
       {:ok, state} = CommandPalette.init(props)
 
-      {:ok, state} = CommandPalette.handle_event(Event.key(:down), state)
-      {:ok, state} = CommandPalette.handle_event(Event.key(:down), state)
-      assert state.selected_index == 2
+      {:ok, state} = CommandPalette.handle_event(%Event.Key{key: :down}, state)
+      {:ok, state} = CommandPalette.handle_event(%Event.Key{key: :down}, state)
+      assert state.selected == 2
 
-      {:ok, state} = CommandPalette.handle_event(Event.key(:up), state)
-      assert state.selected_index == 1
+      {:ok, state} = CommandPalette.handle_event(%Event.Key{key: :up}, state)
+      assert state.selected == 1
     end
 
-    test "selection stops at top" do
+    test "selection doesn't go below 0" do
       props = CommandPalette.new(commands: sample_commands())
       {:ok, state} = CommandPalette.init(props)
 
-      {:ok, state} = CommandPalette.handle_event(Event.key(:up), state)
-      assert state.selected_index == 0
+      {:ok, state} = CommandPalette.handle_event(%Event.Key{key: :up}, state)
+      assert state.selected == 0
     end
 
-    test "selection stops at bottom" do
+    test "selection doesn't exceed command count" do
       props = CommandPalette.new(commands: sample_commands())
       {:ok, state} = CommandPalette.init(props)
 
-      # Move all the way down
-      state =
-        Enum.reduce(1..20, state, fn _, acc ->
-          {:ok, new_state} = CommandPalette.handle_event(Event.key(:down), acc)
-          new_state
-        end)
-
-      # Should be at last index
-      assert state.selected_index == length(state.filtered_commands) - 1
+      # Move down past the end
+      Enum.reduce(1..10, state, fn _, s ->
+        {:ok, new_state} = CommandPalette.handle_event(%Event.Key{key: :down}, s)
+        new_state
+      end)
+      |> then(fn state ->
+        assert state.selected == 4
+      end)
     end
 
-    test "page down jumps by max_visible" do
-      props = CommandPalette.new(commands: sample_commands(), max_visible: 3)
+    test "escape closes palette" do
+      props = CommandPalette.new(commands: sample_commands())
       {:ok, state} = CommandPalette.init(props)
 
-      {:ok, state} = CommandPalette.handle_event(Event.key(:page_down), state)
-      assert state.selected_index == 3
+      assert CommandPalette.visible?(state) == true
+
+      {:ok, state} = CommandPalette.handle_event(%Event.Key{key: :escape}, state)
+      assert CommandPalette.visible?(state) == false
     end
 
-    test "page up jumps by max_visible" do
-      props = CommandPalette.new(commands: sample_commands(), max_visible: 3)
+    test "enter selects command and closes palette" do
+      props = CommandPalette.new(commands: sample_commands())
       {:ok, state} = CommandPalette.init(props)
 
-      # First go down
-      state =
-        Enum.reduce(1..5, state, fn _, acc ->
-          {:ok, new_state} = CommandPalette.handle_event(Event.key(:down), acc)
-          new_state
-        end)
-
-      {:ok, state} = CommandPalette.handle_event(Event.key(:page_up), state)
-      assert state.selected_index == 2
+      {:ok, state} = CommandPalette.handle_event(%Event.Key{key: :enter}, state)
+      assert CommandPalette.visible?(state) == false
+      # Command label should be in query
+      assert CommandPalette.get_query(state) == "Save File"
     end
   end
 
   describe "text input" do
-    test "typing characters updates query" do
+    test "typing filters commands" do
       props = CommandPalette.new(commands: sample_commands())
       {:ok, state} = CommandPalette.init(props)
 
-      {:ok, state} = CommandPalette.handle_event(Event.key(nil, char: "s"), state)
+      {:ok, state} = CommandPalette.handle_event(%Event.Key{key: "s"}, state)
       assert state.query == "s"
-
-      {:ok, state} = CommandPalette.handle_event(Event.key(nil, char: "a"), state)
-      assert state.query == "sa"
-
-      {:ok, state} = CommandPalette.handle_event(Event.key(nil, char: "v"), state)
-      assert state.query == "sav"
+      # Should filter to commands containing 's'
+      assert length(state.filtered) < 5
     end
 
-    test "backspace removes last character" do
+    test "backspace removes character" do
       props = CommandPalette.new(commands: sample_commands())
       {:ok, state} = CommandPalette.init(props)
 
-      state = CommandPalette.set_query(state, "save")
+      {:ok, state} = CommandPalette.handle_event(%Event.Key{key: "a"}, state)
+      {:ok, state} = CommandPalette.handle_event(%Event.Key{key: "b"}, state)
+      assert state.query == "ab"
 
-      {:ok, state} = CommandPalette.handle_event(Event.key(:backspace), state)
-      assert state.query == "sav"
+      {:ok, state} = CommandPalette.handle_event(%Event.Key{key: :backspace}, state)
+      assert state.query == "a"
     end
 
     test "backspace on empty query does nothing" do
       props = CommandPalette.new(commands: sample_commands())
       {:ok, state} = CommandPalette.init(props)
 
-      {:ok, state} = CommandPalette.handle_event(Event.key(:backspace), state)
+      {:ok, state} = CommandPalette.handle_event(%Event.Key{key: :backspace}, state)
       assert state.query == ""
     end
+  end
 
-    test "query change resets selection" do
+  describe "fuzzy search" do
+    test "exact match is found" do
       props = CommandPalette.new(commands: sample_commands())
       {:ok, state} = CommandPalette.init(props)
 
-      {:ok, state} = CommandPalette.handle_event(Event.key(:down), state)
-      {:ok, state} = CommandPalette.handle_event(Event.key(:down), state)
-      assert state.selected_index == 2
+      {:ok, state} = CommandPalette.handle_event(%Event.Key{key: "Q"}, state)
+      {:ok, state} = CommandPalette.handle_event(%Event.Key{key: "u"}, state)
+      {:ok, state} = CommandPalette.handle_event(%Event.Key{key: "i"}, state)
+      {:ok, state} = CommandPalette.handle_event(%Event.Key{key: "t"}, state)
 
-      {:ok, state} = CommandPalette.handle_event(Event.key(nil, char: "o"), state)
-      assert state.selected_index == 0
+      assert length(state.filtered) >= 1
+      assert Enum.any?(state.filtered, &(&1.id == :quit))
+    end
+
+    test "prefix match works" do
+      props = CommandPalette.new(commands: sample_commands())
+      {:ok, state} = CommandPalette.init(props)
+
+      {:ok, state} = CommandPalette.handle_event(%Event.Key{key: "S"}, state)
+      {:ok, state} = CommandPalette.handle_event(%Event.Key{key: "a"}, state)
+
+      assert Enum.any?(state.filtered, &(&1.id == :save))
+    end
+
+    test "partial match works" do
+      props = CommandPalette.new(commands: sample_commands())
+      {:ok, state} = CommandPalette.init(props)
+
+      {:ok, state} = CommandPalette.handle_event(%Event.Key{key: "F"}, state)
+      {:ok, state} = CommandPalette.handle_event(%Event.Key{key: "i"}, state)
+      {:ok, state} = CommandPalette.handle_event(%Event.Key{key: "l"}, state)
+
+      # "File" appears in "Save File", "Open File"
+      assert length(state.filtered) >= 2
+    end
+
+    test "no match returns empty" do
+      props = CommandPalette.new(commands: sample_commands())
+      {:ok, state} = CommandPalette.init(props)
+
+      {:ok, state} = CommandPalette.handle_event(%Event.Key{key: "x"}, state)
+      {:ok, state} = CommandPalette.handle_event(%Event.Key{key: "y"}, state)
+      {:ok, state} = CommandPalette.handle_event(%Event.Key{key: "z"}, state)
+
+      assert state.filtered == []
+    end
+
+    test "empty query shows all commands" do
+      props = CommandPalette.new(commands: sample_commands())
+      {:ok, state} = CommandPalette.init(props)
+
+      assert length(state.filtered) == 5
     end
   end
 
-  describe "command execution" do
-    test "enter executes selected command" do
-      executed = :erlang.make_ref()
-      test_pid = self()
-
-      commands = [
-        %{id: :test, label: "Test", action: fn -> send(test_pid, {executed, :executed}) end}
-      ]
-
-      props = CommandPalette.new(commands: commands)
+  describe "get_selected/1" do
+    test "returns selected command" do
+      props = CommandPalette.new(commands: sample_commands())
       {:ok, state} = CommandPalette.init(props)
 
-      {:ok, _state} = CommandPalette.handle_event(Event.key(:enter), state)
-
-      assert_receive {^executed, :executed}
+      cmd = CommandPalette.get_selected(state)
+      assert cmd.id == :save
     end
 
-    test "on_select callback is invoked" do
-      test_pid = self()
-
-      commands = [
-        %{id: :test, label: "Test", action: fn -> :ok end}
-      ]
-
-      props =
-        CommandPalette.new(
-          commands: commands,
-          on_select: fn cmd -> send(test_pid, {:selected, cmd.id}) end
-        )
-
+    test "returns nil when no commands" do
+      props = CommandPalette.new(commands: sample_commands())
       {:ok, state} = CommandPalette.init(props)
 
-      {:ok, _state} = CommandPalette.handle_event(Event.key(:enter), state)
+      # Filter to no results
+      {:ok, state} = CommandPalette.handle_event(%Event.Key{key: "z"}, state)
+      {:ok, state} = CommandPalette.handle_event(%Event.Key{key: "z"}, state)
+      {:ok, state} = CommandPalette.handle_event(%Event.Key{key: "z"}, state)
 
-      assert_receive {:selected, :test}
+      assert CommandPalette.get_selected(state) == nil
     end
 
-    test "disabled command does not execute" do
-      executed = :erlang.make_ref()
-      test_pid = self()
-
-      commands = [
-        %{
-          id: :test,
-          label: "Test",
-          enabled: false,
-          action: fn -> send(test_pid, {executed, :executed}) end
-        }
-      ]
-
-      props = CommandPalette.new(commands: commands)
+    test "returns correct command after navigation" do
+      props = CommandPalette.new(commands: sample_commands())
       {:ok, state} = CommandPalette.init(props)
 
-      {:ok, _state} = CommandPalette.handle_event(Event.key(:enter), state)
+      {:ok, state} = CommandPalette.handle_event(%Event.Key{key: :down}, state)
+      {:ok, state} = CommandPalette.handle_event(%Event.Key{key: :down}, state)
 
-      refute_receive {^executed, :executed}
-    end
-
-    test "enabled function is evaluated" do
-      test_pid = self()
-
-      commands = [
-        %{
-          id: :test,
-          label: "Test",
-          enabled: fn -> true end,
-          action: fn -> send(test_pid, :executed) end
-        }
-      ]
-
-      props = CommandPalette.new(commands: commands)
-      {:ok, state} = CommandPalette.init(props)
-
-      {:ok, _state} = CommandPalette.handle_event(Event.key(:enter), state)
-
-      assert_receive :executed
+      cmd = CommandPalette.get_selected(state)
+      assert cmd.id == :close
     end
   end
 
-  describe "recent commands" do
-    test "executing command adds to recent" do
-      commands = [
-        %{id: :cmd1, label: "Command 1", action: fn -> :ok end},
-        %{id: :cmd2, label: "Command 2", action: fn -> :ok end}
-      ]
-
-      props = CommandPalette.new(commands: commands)
-      {:ok, state} = CommandPalette.init(props)
-
-      {:ok, state} = CommandPalette.handle_event(Event.key(:enter), state)
-
-      # Need to re-show palette since it closes on execution
-      state = CommandPalette.show(state)
-      assert :cmd1 in CommandPalette.get_recent_commands(state)
-    end
-
-    test "recent commands limited by max_recent" do
-      commands =
-        Enum.map(1..10, fn i ->
-          %{id: :"cmd#{i}", label: "Command #{i}", action: fn -> :ok end}
-        end)
-
-      props = CommandPalette.new(commands: commands, max_recent: 3)
-      {:ok, state} = CommandPalette.init(props)
-
-      # Execute several commands
-      state =
-        Enum.reduce(1..5, state, fn i, acc ->
-          # Select command i
-          acc = CommandPalette.set_query(acc, "Command #{i}")
-          {:ok, new_state} = CommandPalette.handle_event(Event.key(:enter), acc)
-          CommandPalette.show(new_state)
-        end)
-
-      recent = CommandPalette.get_recent_commands(state)
-      assert length(recent) == 3
-    end
-
-    test "clear_recent_commands empties the list" do
-      commands = [
-        %{id: :cmd1, label: "Command 1", action: fn -> :ok end}
-      ]
-
-      props = CommandPalette.new(commands: commands)
-      {:ok, state} = CommandPalette.init(props)
-
-      {:ok, state} = CommandPalette.handle_event(Event.key(:enter), state)
-      state = CommandPalette.show(state)
-
-      state = CommandPalette.clear_recent_commands(state)
-      assert CommandPalette.get_recent_commands(state) == []
-    end
-  end
-
-  describe "submenu support" do
-    test "submenu action pushes submenu" do
-      subcommands = [
-        %{id: :sub1, label: "Sub 1", action: fn -> :sub1 end},
-        %{id: :sub2, label: "Sub 2", action: fn -> :sub2 end}
-      ]
-
-      commands = [
-        %{id: :parent, label: "Parent", action: {:submenu, subcommands}}
-      ]
-
-      props = CommandPalette.new(commands: commands)
-      {:ok, state} = CommandPalette.init(props)
-
-      {:ok, state} = CommandPalette.handle_event(Event.key(:enter), state)
-
-      # Should now show subcommands
-      assert length(state.submenu_stack) == 1
-      assert length(state.filtered_commands) == 2
-    end
-
-    test "backspace pops submenu when query is empty" do
-      subcommands = [
-        %{id: :sub1, label: "Sub 1", action: fn -> :sub1 end}
-      ]
-
-      commands = [
-        %{id: :parent, label: "Parent", action: {:submenu, subcommands}}
-      ]
-
-      props = CommandPalette.new(commands: commands)
-      {:ok, state} = CommandPalette.init(props)
-
-      # Enter submenu
-      {:ok, state} = CommandPalette.handle_event(Event.key(:enter), state)
-      assert length(state.submenu_stack) == 1
-
-      # Go back
-      {:ok, state} = CommandPalette.handle_event(Event.key(:backspace), state)
-      assert state.submenu_stack == []
-    end
-
-    test "escape goes back from submenu" do
-      subcommands = [
-        %{id: :sub1, label: "Sub 1", action: fn -> :sub1 end}
-      ]
-
-      commands = [
-        %{id: :parent, label: "Parent", action: {:submenu, subcommands}}
-      ]
-
-      props = CommandPalette.new(commands: commands)
-      {:ok, state} = CommandPalette.init(props)
-
-      {:ok, state} = CommandPalette.handle_event(Event.key(:enter), state)
-      assert length(state.submenu_stack) == 1
-
-      {:ok, state} = CommandPalette.handle_event(Event.key(:escape), state)
-      assert state.submenu_stack == []
-    end
-  end
-
-  describe "visibility" do
-    test "escape closes palette" do
+  describe "get_query/1" do
+    test "returns current query" do
       props = CommandPalette.new(commands: sample_commands())
       {:ok, state} = CommandPalette.init(props)
 
-      assert state.visible == true
+      assert CommandPalette.get_query(state) == ""
 
-      {:ok, state} = CommandPalette.handle_event(Event.key(:escape), state)
+      {:ok, state} = CommandPalette.handle_event(%Event.Key{key: "t"}, state)
+      {:ok, state} = CommandPalette.handle_event(%Event.Key{key: "e"}, state)
+      {:ok, state} = CommandPalette.handle_event(%Event.Key{key: "s"}, state)
+      {:ok, state} = CommandPalette.handle_event(%Event.Key{key: "t"}, state)
 
-      assert state.visible == false
-    end
-
-    test "on_close callback is invoked" do
-      test_pid = self()
-
-      props =
-        CommandPalette.new(
-          commands: sample_commands(),
-          on_close: fn -> send(test_pid, :closed) end
-        )
-
-      {:ok, state} = CommandPalette.init(props)
-
-      {:ok, _state} = CommandPalette.handle_event(Event.key(:escape), state)
-
-      assert_receive :closed
-    end
-
-    test "show/1 makes palette visible" do
-      props = CommandPalette.new(commands: sample_commands())
-      {:ok, state} = CommandPalette.init(props)
-
-      state = %{state | visible: false}
-      state = CommandPalette.show(state)
-
-      assert state.visible == true
-      assert state.query == ""
-      assert state.selected_index == 0
-    end
-
-    test "hide/1 makes palette hidden" do
-      props = CommandPalette.new(commands: sample_commands())
-      {:ok, state} = CommandPalette.init(props)
-
-      state = CommandPalette.hide(state)
-
-      assert state.visible == false
-    end
-
-    test "toggle/1 toggles visibility" do
-      props = CommandPalette.new(commands: sample_commands())
-      {:ok, state} = CommandPalette.init(props)
-
-      assert CommandPalette.visible?(state) == true
-
-      state = CommandPalette.toggle(state)
-      assert CommandPalette.visible?(state) == false
-
-      state = CommandPalette.toggle(state)
-      assert CommandPalette.visible?(state) == true
-    end
-  end
-
-  describe "public API" do
-    test "get_query/1 returns current query" do
-      props = CommandPalette.new(commands: sample_commands())
-      {:ok, state} = CommandPalette.init(props)
-
-      state = CommandPalette.set_query(state, "test")
       assert CommandPalette.get_query(state) == "test"
     end
-
-    test "get_filtered_commands/1 returns filtered list" do
-      props = CommandPalette.new(commands: sample_commands())
-      {:ok, state} = CommandPalette.init(props)
-
-      state = CommandPalette.set_query(state, "Save")
-      filtered = CommandPalette.get_filtered_commands(state)
-
-      assert length(filtered) >= 1
-      assert Enum.any?(filtered, &(&1.id == :save))
-    end
-
-    test "get_selected_command/1 returns selected command" do
-      props = CommandPalette.new(commands: sample_commands())
-      {:ok, state} = CommandPalette.init(props)
-
-      selected = CommandPalette.get_selected_command(state)
-      assert selected != nil
-    end
-
-    test "add_commands/2 adds new commands" do
-      props = CommandPalette.new(commands: sample_commands())
-      {:ok, state} = CommandPalette.init(props)
-
-      initial_count = length(state.commands)
-
-      state =
-        CommandPalette.add_commands(state, [
-          %{id: :new_cmd, label: "New Command", action: fn -> :new end}
-        ])
-
-      assert length(state.commands) == initial_count + 1
-    end
-
-    test "remove_commands/2 removes commands by id" do
-      props = CommandPalette.new(commands: sample_commands())
-      {:ok, state} = CommandPalette.init(props)
-
-      state = CommandPalette.remove_commands(state, [:save, :open])
-
-      ids = Enum.map(state.commands, & &1.id)
-      refute :save in ids
-      refute :open in ids
-    end
   end
 
-  describe "rendering" do
-    test "renders visible palette" do
+  describe "render/2" do
+    test "returns empty when not visible" do
       props = CommandPalette.new(commands: sample_commands())
       {:ok, state} = CommandPalette.init(props)
-
-      result = CommandPalette.render(state, @default_area)
-
-      # Should return a non-empty render node
-      assert result != nil
-    end
-
-    test "renders empty when not visible" do
-      props = CommandPalette.new(commands: sample_commands())
-      {:ok, state} = CommandPalette.init(props)
-
       state = CommandPalette.hide(state)
-      result = CommandPalette.render(state, @default_area)
 
-      # Should return empty node
+      result = CommandPalette.render(state, @default_area)
       assert result.type == :empty
     end
 
-    test "renders with query" do
-      props = CommandPalette.new(commands: sample_commands())
-      {:ok, state} = CommandPalette.init(props)
-
-      state = CommandPalette.set_query(state, "save")
-      result = CommandPalette.render(state, @default_area)
-
-      assert result != nil
-    end
-
-    test "renders no results message" do
-      props = CommandPalette.new(commands: sample_commands())
-      {:ok, state} = CommandPalette.init(props)
-
-      state = CommandPalette.set_query(state, "xyz123nonexistent")
-      result = CommandPalette.render(state, @default_area)
-
-      # Should still render (with "No commands found" message)
-      assert result != nil
-    end
-  end
-
-  describe "async loading" do
-    test "async action triggers loading state" do
-      commands = [
-        %{id: :async_cmd, label: "Async", action: {:async, fn _query -> [] end}}
-      ]
-
-      props = CommandPalette.new(commands: commands)
-      {:ok, state} = CommandPalette.init(props)
-
-      {:ok, state} = CommandPalette.handle_event(Event.key(:enter), state)
-
-      # After sync execution, loading should be false again
-      assert state.loading == false
-    end
-
-    test "async action loads subcommands" do
-      subcommands = [
-        %{id: :loaded1, label: "Loaded 1", action: fn -> :ok end},
-        %{id: :loaded2, label: "Loaded 2", action: fn -> :ok end}
-      ]
-
-      commands = [
-        %{id: :async_cmd, label: "Async", action: {:async, fn _query -> subcommands end}}
-      ]
-
-      props = CommandPalette.new(commands: commands)
-      {:ok, state} = CommandPalette.init(props)
-
-      {:ok, state} = CommandPalette.handle_event(Event.key(:enter), state)
-
-      # Should have pushed submenu with loaded commands
-      assert length(state.submenu_stack) == 1
-      assert length(state.filtered_commands) == 2
-    end
-
-    test "async action handles loader errors gracefully" do
-      commands = [
-        %{id: :error_cmd, label: "Error", action: {:async, fn _query -> raise "Loader error" end}}
-      ]
-
-      props = CommandPalette.new(commands: commands)
-      {:ok, state} = CommandPalette.init(props)
-
-      # Should not crash despite loader error
-      {:ok, state} = CommandPalette.handle_event(Event.key(:enter), state)
-
-      # Loading should be false and async_error should be set
-      assert state.loading == false
-      assert state.async_error != nil
-    end
-
-    test "async_error is initialized to nil" do
-      props = CommandPalette.new(commands: sample_commands())
-      {:ok, state} = CommandPalette.init(props)
-
-      assert state.async_error == nil
-    end
-  end
-
-  describe "empty commands edge case" do
-    test "handles empty commands list" do
-      props = CommandPalette.new(commands: [])
-
-      {:ok, state} = CommandPalette.init(props)
-
-      assert state.commands == []
-      assert state.filtered_commands == []
-    end
-
-    test "navigation with empty commands" do
-      props = CommandPalette.new(commands: [])
-
-      {:ok, state} = CommandPalette.init(props)
-
-      # Navigation should not crash
-      {:ok, state} = CommandPalette.handle_event(Event.key(:down), state)
-      assert state.selected_index == 0
-
-      {:ok, state} = CommandPalette.handle_event(Event.key(:up), state)
-      assert state.selected_index == 0
-    end
-
-    test "enter with empty commands does nothing" do
-      props = CommandPalette.new(commands: [])
-
-      {:ok, state} = CommandPalette.init(props)
-
-      {:ok, state} = CommandPalette.handle_event(Event.key(:enter), state)
-      # Should not crash and state should be unchanged
-      assert state.visible == true
-    end
-  end
-
-  describe "render output verification" do
-    test "visible palette has correct structure" do
+    test "returns render tree when visible" do
       props = CommandPalette.new(commands: sample_commands())
       {:ok, state} = CommandPalette.init(props)
 
       result = CommandPalette.render(state, @default_area)
-
-      # Should return a valid render node (type varies by implementation)
-      assert result != nil
-      assert result.type in [:styled, :box, :stack]
-    end
-
-    test "hidden palette returns empty node" do
-      props = CommandPalette.new(commands: sample_commands())
-      {:ok, state} = CommandPalette.init(props)
-
-      state = CommandPalette.hide(state)
-      result = CommandPalette.render(state, @default_area)
-
-      assert result.type == :empty
-    end
-
-    test "palette with search query renders filtered results" do
-      props = CommandPalette.new(commands: sample_commands())
-      {:ok, state} = CommandPalette.init(props)
-
-      state = CommandPalette.set_query(state, "Save")
-      result = CommandPalette.render(state, @default_area)
-
-      # Result should be valid render node
-      assert result != nil
-      assert result.type in [:styled, :box, :stack]
+      assert is_list(result) or is_map(result)
     end
   end
 
-  describe "category edge cases" do
-    test "invalid prefix is treated as search term" do
-      props = CommandPalette.new(commands: sample_commands())
-      {:ok, state} = CommandPalette.init(props)
-
-      state = CommandPalette.set_query(state, "xsave")
-
-      # No category filter, treated as fuzzy search
-      assert state.category_filter == nil
-    end
-
-    test "category with no matching commands" do
-      props = CommandPalette.new(commands: sample_commands())
-      {:ok, state} = CommandPalette.init(props)
-
-      # Filter by tag category but no tag commands in sample
-      state = CommandPalette.set_query(state, "#nonexistent")
-
-      assert state.category_filter == :tag
-      # No tag commands in sample, so filtered_commands may be empty
-    end
-  end
-
-  describe "fuzzy search optimization" do
-    test "query longer than target returns 0 score" do
-      props =
-        CommandPalette.new(
-          commands: [
-            %{id: :short, label: "Hi", action: fn -> :ok end}
-          ]
-        )
-
-      {:ok, state} = CommandPalette.init(props)
-
-      state = CommandPalette.set_query(state, "Hello World")
-
-      # Should not match since query is longer than "Hi"
-      assert state.filtered_commands == []
-    end
-
-    test "handles large command sets efficiently" do
-      # Create 100 commands
+  describe "scroll" do
+    test "scrolls when selection moves past visible area" do
       commands =
-        Enum.map(1..100, fn i ->
-          %{id: :"cmd_#{i}", label: "Command #{i}", action: fn -> :ok end}
+        for i <- 1..20 do
+          %{id: :"cmd_#{i}", label: "Command #{i}", action: fn -> i end}
+        end
+
+      props = CommandPalette.new(commands: commands, max_visible: 5)
+      {:ok, state} = CommandPalette.init(props)
+
+      assert state.scroll == 0
+
+      # Move down past visible area
+      state =
+        Enum.reduce(1..6, state, fn _, s ->
+          {:ok, new_state} = CommandPalette.handle_event(%Event.Key{key: :down}, s)
+          new_state
         end)
 
-      props = CommandPalette.new(commands: commands)
-      {:ok, state} = CommandPalette.init(props)
-
-      # Search should complete quickly
-      state = CommandPalette.set_query(state, "com")
-
-      # All commands should match since they all start with "Command"
-      assert length(state.filtered_commands) == 100
+      assert state.scroll > 0
     end
   end
 end

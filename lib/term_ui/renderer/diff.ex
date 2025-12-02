@@ -88,14 +88,17 @@ defmodule TermUI.Renderer.Diff do
     current_cells =
       current_row |> Enum.with_index(1) |> Enum.map(fn {cell, col} -> {col, cell} end)
 
+    # Build a map for quick lookup of current cells by column
+    current_cells_map = Map.new(current_cells)
+
     previous_cells =
       previous_row |> Enum.with_index(1) |> Enum.map(fn {cell, col} -> {col, cell} end)
 
     # Find changed spans
     spans = find_changed_spans(current_cells, previous_cells, row)
 
-    # Merge small gaps between spans
-    merged_spans = merge_spans(spans)
+    # Merge small gaps between spans, using actual cells from current buffer for gaps
+    merged_spans = merge_spans(spans, current_cells_map)
 
     # Generate operations for each span
     Enum.flat_map(merged_spans, &span_to_operations/1)
@@ -148,36 +151,45 @@ defmodule TermUI.Renderer.Diff do
 
   This reduces cursor movements by including unchanged cells in the output
   when it's cheaper than moving the cursor around them.
-  """
-  @spec merge_spans([span()]) :: [span()]
-  def merge_spans([]), do: []
-  def merge_spans([span]), do: [span]
 
-  def merge_spans(spans) do
+  The current_cells_map is used to fill gaps with actual cell content from
+  the current buffer, rather than empty cells.
+  """
+  @spec merge_spans([span()], map()) :: [span()]
+  def merge_spans([], _current_cells_map), do: []
+  def merge_spans([span], _current_cells_map), do: [span]
+
+  def merge_spans(spans, current_cells_map) do
     spans
-    |> Enum.reduce([], fn span, acc -> merge_span_into_acc(span, acc) end)
+    |> Enum.reduce([], fn span, acc -> merge_span_into_acc(span, acc, current_cells_map) end)
     |> Enum.reverse()
   end
 
-  defp merge_span_into_acc(span, []), do: [span]
+  defp merge_span_into_acc(span, [], _current_cells_map), do: [span]
 
-  defp merge_span_into_acc(span, [prev | rest]) do
+  defp merge_span_into_acc(span, [prev | rest], current_cells_map) do
     gap = span.start_col - prev.end_col - 1
 
     if gap <= @merge_gap_threshold and gap >= 0 do
-      merged = create_merged_span(prev, span, gap)
+      merged = create_merged_span(prev, span, gap, current_cells_map)
       [merged | rest]
     else
       [span, prev | rest]
     end
   end
 
-  defp create_merged_span(prev, span, gap) do
+  defp create_merged_span(prev, span, _gap, current_cells_map) do
+    # Get actual cells from current buffer for the gap positions
+    gap_cells =
+      for col <- (prev.end_col + 1)..(span.start_col - 1) do
+        Map.get(current_cells_map, col, Cell.empty())
+      end
+
     %{
       row: prev.row,
       start_col: prev.start_col,
       end_col: span.end_col,
-      cells: prev.cells ++ List.duplicate(Cell.empty(), gap) ++ span.cells
+      cells: prev.cells ++ gap_cells ++ span.cells
     }
   end
 
