@@ -25,6 +25,7 @@ defmodule Menu.App do
 
   alias TermUI.Event
   alias TermUI.Renderer.Style
+  alias TermUI.Widgets.Menu
 
   # ----------------------------------------------------------------------------
   # Component Callbacks
@@ -32,108 +33,102 @@ defmodule Menu.App do
 
   @doc """
   Initialize the component state.
-
-  We build a menu structure with different item types and manage
-  selection state manually for this example.
   """
   def init(_opts) do
+    props =
+      Menu.new(
+        items: menu_items(),
+        selected_style: Style.new(fg: :black, bg: :cyan),
+        disabled_style: Style.new(fg: :bright_black)
+      )
+
+    {:ok, menu_state} = Menu.init(props)
+
     %{
-      # Current cursor position in the menu
-      cursor: 0,
-      # Which submenus are expanded
-      expanded: MapSet.new(),
-      # Checkbox states
-      checkboxes: %{
-        autosave: true,
-        dark_mode: false,
-        notifications: true
-      },
-      # Last selected action (for demo purposes)
+      menu: menu_state,
       last_action: nil
     }
+  end
+
+  defp menu_items do
+    [
+      Menu.action(:new, "New File", shortcut: "Ctrl+N"),
+      Menu.action(:open, "Open...", shortcut: "Ctrl+O"),
+      Menu.action(:save, "Save", shortcut: "Ctrl+S"),
+      Menu.separator(),
+      Menu.submenu(:recent, "Recent Files", [
+        Menu.action(:file1, "document.txt"),
+        Menu.action(:file2, "notes.md"),
+        Menu.action(:file3, "config.json")
+      ]),
+      Menu.submenu(:export, "Export As", [
+        Menu.action(:export_pdf, "PDF"),
+        Menu.action(:export_html, "HTML"),
+        Menu.action(:export_md, "Markdown")
+      ]),
+      Menu.separator(),
+      Menu.checkbox(:autosave, "Auto Save", checked: true),
+      Menu.checkbox(:dark_mode, "Dark Mode"),
+      Menu.checkbox(:notifications, "Notifications", checked: true),
+      Menu.separator(),
+      Menu.action(:settings, "Settings...", shortcut: "Ctrl+,"),
+      Menu.action(:exit, "Exit", shortcut: "Ctrl+Q")
+    ]
   end
 
   @doc """
   Convert keyboard events to messages.
   """
-  def event_to_msg(%Event.Key{key: :up}, _state), do: {:msg, {:move, -1}}
-  def event_to_msg(%Event.Key{key: :down}, _state), do: {:msg, {:move, 1}}
-  def event_to_msg(%Event.Key{key: :right}, _state), do: {:msg, :expand}
-  def event_to_msg(%Event.Key{key: :left}, _state), do: {:msg, :collapse}
-  def event_to_msg(%Event.Key{key: :enter}, _state), do: {:msg, :select}
-  def event_to_msg(%Event.Key{key: " "}, _state), do: {:msg, :select}
   def event_to_msg(%Event.Key{key: key}, _state) when key in ["q", "Q"], do: {:msg, :quit}
-  def event_to_msg(_event, _state), do: :ignore
+
+  def event_to_msg(event, _state) do
+    {:msg, {:menu_event, event}}
+  end
 
   @doc """
   Update state based on messages.
   """
-  def update({:move, delta}, state) do
-    items = get_visible_items(state)
-    max_index = length(items) - 1
-    new_cursor = max(0, min(max_index, state.cursor + delta))
-    {%{state | cursor: new_cursor}, []}
-  end
-
-  def update(:expand, state) do
-    items = get_visible_items(state)
-    current = Enum.at(items, state.cursor)
-
-    case current do
-      {:submenu, id, _label, _children} ->
-        {%{state | expanded: MapSet.put(state.expanded, id)}, []}
-
-      _ ->
-        {state, []}
-    end
-  end
-
-  def update(:collapse, state) do
-    items = get_visible_items(state)
-    current = Enum.at(items, state.cursor)
-
-    case current do
-      {:submenu, id, _label, _children} ->
-        {%{state | expanded: MapSet.delete(state.expanded, id)}, []}
-
-      _ ->
-        {state, []}
-    end
-  end
-
-  def update(:select, state) do
-    items = get_visible_items(state)
-    current = Enum.at(items, state.cursor)
-
-    case current do
-      {:action, id, _label, _shortcut} ->
-        # Execute action
-        {%{state | last_action: id}, []}
-
-      {:checkbox, id, _label} ->
-        # Toggle checkbox
-        current_value = Map.get(state.checkboxes, id, false)
-        checkboxes = Map.put(state.checkboxes, id, not current_value)
-        {%{state | checkboxes: checkboxes}, []}
-
-      {:submenu, id, _label, _children} ->
-        # Toggle submenu expansion
-        expanded =
-          if MapSet.member?(state.expanded, id) do
-            MapSet.delete(state.expanded, id)
-          else
-            MapSet.put(state.expanded, id)
-          end
-
-        {%{state | expanded: expanded}, []}
-
-      _ ->
-        {state, []}
-    end
-  end
-
   def update(:quit, state) do
     {state, [:quit]}
+  end
+
+  def update({:menu_event, %Event.Key{key: key} = event}, state) when key in [:enter, " "] do
+    # Track what item was selected before handling the event
+    cursor = Menu.get_cursor(state.menu)
+    {:ok, menu} = Menu.handle_event(event, state.menu)
+
+    # Update last_action if it was an action item
+    last_action =
+      case get_item_type(state.menu, cursor) do
+        :action -> cursor
+        _ -> state.last_action
+      end
+
+    {%{state | menu: menu, last_action: last_action}, []}
+  end
+
+  def update({:menu_event, event}, state) do
+    {:ok, menu} = Menu.handle_event(event, state.menu)
+    {%{state | menu: menu}, []}
+  end
+
+  defp get_item_type(menu, id) do
+    menu.items
+    |> find_item(id)
+    |> case do
+      %{type: type} -> type
+      _ -> nil
+    end
+  end
+
+  defp find_item(items, id) do
+    Enum.find_value(items, fn item ->
+      cond do
+        item.id == id -> item
+        item.type == :submenu -> find_item(item.children, id)
+        true -> nil
+      end
+    end)
   end
 
   @doc """
@@ -146,7 +141,7 @@ defmodule Menu.App do
       text("", nil),
 
       # Render the menu
-      render_menu(state),
+      Menu.render(state.menu, %{width: 40, height: 20}),
 
       # Show last action
       text("", nil),
@@ -157,141 +152,34 @@ defmodule Menu.App do
   end
 
   defp render_controls(state) do
-    box_width = 44
+    box_width = 50
     inner_width = box_width - 2
 
-    top_border = "┌─ Controls " <> String.duplicate("─", inner_width - 12) <> "─┐"
-    bottom_border = "└" <> String.duplicate("─", inner_width) <> "┘"
+    top_border = "+" <> String.duplicate("-", inner_width - 10) <> " Controls " <> "+"
+    bottom_border = "+" <> String.duplicate("-", inner_width) <> "+"
+
+    # Get checkbox states from the menu widget
+    autosave = Menu.checked?(state.menu, :autosave)
+    dark_mode = Menu.checked?(state.menu, :dark_mode)
+    notifications = Menu.checked?(state.menu, :notifications)
 
     stack(:vertical, [
       text("", nil),
       text(top_border, Style.new(fg: :yellow)),
-      text("│" <> String.pad_trailing("  ↑/↓     Navigate", inner_width) <> "│", nil),
-      text("│" <> String.pad_trailing("  →       Expand submenu", inner_width) <> "│", nil),
-      text("│" <> String.pad_trailing("  ←       Collapse submenu", inner_width) <> "│", nil),
-      text("│" <> String.pad_trailing("  Enter   Select / Toggle", inner_width) <> "│", nil),
-      text("│" <> String.pad_trailing("  Q       Quit", inner_width) <> "│", nil),
-      text("│" <> String.pad_trailing("", inner_width) <> "│", nil),
-      text("│" <> String.pad_trailing("  Last action: #{state.last_action || "(none)"}", inner_width) <> "│", nil),
+      text("|" <> String.pad_trailing("  Up/Down     Navigate", inner_width) <> "|", nil),
+      text("|" <> String.pad_trailing("  Right       Expand submenu", inner_width) <> "|", nil),
+      text("|" <> String.pad_trailing("  Left        Collapse submenu", inner_width) <> "|", nil),
+      text("|" <> String.pad_trailing("  Enter       Select / Toggle", inner_width) <> "|", nil),
+      text("|" <> String.pad_trailing("  Q           Quit", inner_width) <> "|", nil),
+      text("|" <> String.pad_trailing("", inner_width) <> "|", nil),
+      text("|" <> String.pad_trailing("  Last action: #{state.last_action || "(none)"}", inner_width) <> "|", nil),
+      text("|" <> String.pad_trailing("", inner_width) <> "|", nil),
+      text("|" <> String.pad_trailing("  Checkboxes:", inner_width) <> "|", nil),
+      text("|" <> String.pad_trailing("    Auto Save: #{autosave}", inner_width) <> "|", nil),
+      text("|" <> String.pad_trailing("    Dark Mode: #{dark_mode}", inner_width) <> "|", nil),
+      text("|" <> String.pad_trailing("    Notifications: #{notifications}", inner_width) <> "|", nil),
       text(bottom_border, Style.new(fg: :yellow))
     ])
-  end
-
-  # ----------------------------------------------------------------------------
-  # Private Helpers
-  # ----------------------------------------------------------------------------
-
-  # Define the menu structure
-  defp menu_items do
-    [
-      {:action, :new, "New File", "Ctrl+N"},
-      {:action, :open, "Open...", "Ctrl+O"},
-      {:action, :save, "Save", "Ctrl+S"},
-      :separator,
-      {:submenu, :recent, "Recent Files", [
-        {:action, :file1, "document.txt", nil},
-        {:action, :file2, "notes.md", nil},
-        {:action, :file3, "config.json", nil}
-      ]},
-      {:submenu, :export, "Export As", [
-        {:action, :export_pdf, "PDF", nil},
-        {:action, :export_html, "HTML", nil},
-        {:action, :export_md, "Markdown", nil}
-      ]},
-      :separator,
-      {:checkbox, :autosave, "Auto Save"},
-      {:checkbox, :dark_mode, "Dark Mode"},
-      {:checkbox, :notifications, "Notifications"},
-      :separator,
-      {:action, :settings, "Settings...", "Ctrl+,"},
-      {:action, :exit, "Exit", "Ctrl+Q"}
-    ]
-  end
-
-  # Get visible items (flattening expanded submenus)
-  defp get_visible_items(state) do
-    flatten_items(menu_items(), state.expanded, 0)
-  end
-
-  defp flatten_items(items, expanded, depth) do
-    Enum.flat_map(items, fn item ->
-      case item do
-        {:submenu, id, label, children} ->
-          submenu_item = {:submenu, id, label, children}
-
-          if MapSet.member?(expanded, id) do
-            # Include submenu header and children
-            [submenu_item | flatten_items(children, expanded, depth + 1)]
-          else
-            [submenu_item]
-          end
-
-        :separator ->
-          [:separator]
-
-        other ->
-          [other]
-      end
-    end)
-  end
-
-  # Render the menu
-  defp render_menu(state) do
-    items = get_visible_items(state)
-
-    rows =
-      items
-      |> Enum.with_index()
-      |> Enum.map(fn {item, index} ->
-        render_item(item, index, state)
-      end)
-
-    stack(:vertical, rows)
-  end
-
-  defp render_item(:separator, _index, _state) do
-    text("  ────────────────────────────", nil)
-  end
-
-  defp render_item({:action, _id, label, shortcut}, index, state) do
-    is_selected = index == state.cursor
-    prefix = if is_selected, do: "► ", else: "  "
-    shortcut_str = if shortcut, do: "  #{shortcut}", else: ""
-    line = "#{prefix}#{label}#{shortcut_str}"
-
-    if is_selected do
-      text(line, Style.new(fg: :black, bg: :cyan))
-    else
-      text(line, nil)
-    end
-  end
-
-  defp render_item({:checkbox, id, label}, index, state) do
-    is_selected = index == state.cursor
-    is_checked = Map.get(state.checkboxes, id, false)
-    prefix = if is_selected, do: "► ", else: "  "
-    checkbox = if is_checked, do: "[×]", else: "[ ]"
-    line = "#{prefix}#{checkbox} #{label}"
-
-    if is_selected do
-      text(line, Style.new(fg: :black, bg: :cyan))
-    else
-      text(line, nil)
-    end
-  end
-
-  defp render_item({:submenu, id, label, _children}, index, state) do
-    is_selected = index == state.cursor
-    is_expanded = MapSet.member?(state.expanded, id)
-    prefix = if is_selected, do: "► ", else: "  "
-    arrow = if is_expanded, do: "▼", else: "▶"
-    line = "#{prefix}#{arrow} #{label}"
-
-    if is_selected do
-      text(line, Style.new(fg: :black, bg: :cyan))
-    else
-      text(line, nil)
-    end
   end
 
   # ----------------------------------------------------------------------------
