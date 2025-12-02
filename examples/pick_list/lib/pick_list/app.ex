@@ -163,58 +163,44 @@ defmodule PickList.App do
 
       {:ok, new_picker_state, commands} ->
         # Process commands from picker
-        state = %{state | picker_state: new_picker_state}
-        process_picker_commands(state, commands)
+        process_picker_commands(state, new_picker_state, commands)
     end
-  end
-
-  def update({:selected, item}, state) do
-    state =
-      case state.picker do
-        :fruit -> %{state | selected_fruit: item}
-        :color -> %{state | selected_color: item}
-        :country -> %{state | selected_country: item}
-      end
-
-    {%{state |
-      picker: nil,
-      picker_state: nil,
-      last_action: "Selected: #{item}"
-    }, []}
-  end
-
-  def update(:cancelled, state) do
-    {%{state |
-      picker: nil,
-      picker_state: nil,
-      last_action: "Selection cancelled"
-    }, []}
   end
 
   def update(_msg, state) do
     {state, []}
   end
 
-  defp process_picker_commands(state, commands) do
-    Enum.reduce(commands, {state, []}, fn cmd, {s, cmds} ->
+  defp process_picker_commands(state, new_picker_state, commands) do
+    Enum.reduce(commands, {%{state | picker_state: new_picker_state}, []}, fn cmd, {s, cmds} ->
       case cmd do
         {:send, _pid, {:select, item}} ->
-          {s, [{:send_msg, {:selected, item}} | cmds]}
+          # Handle selection - update the appropriate field and close picker
+          new_state =
+            case s.picker do
+              :fruit -> %{s | selected_fruit: item}
+              :color -> %{s | selected_color: item}
+              :country -> %{s | selected_country: item}
+            end
+
+          {%{new_state |
+            picker: nil,
+            picker_state: nil,
+            last_action: "Selected: #{item}"
+          }, cmds}
 
         {:send, _pid, :cancel} ->
-          {s, [{:send_msg, :cancelled} | cmds]}
+          # Handle cancel - just close picker
+          {%{s |
+            picker: nil,
+            picker_state: nil,
+            last_action: "Selection cancelled"
+          }, cmds}
 
         _ ->
           {s, cmds}
       end
     end)
-  end
-
-  @doc """
-  Handle info messages.
-  """
-  def handle_info(_msg, state) do
-    {state, []}
   end
 
   @doc """
