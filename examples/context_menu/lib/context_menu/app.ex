@@ -52,8 +52,8 @@ defmodule ContextMenu.App do
   def event_to_msg(%Event.Key{key: "2"}, %{menu: nil}), do: {:msg, {:show_menu, {20, 8}}}
   def event_to_msg(%Event.Key{key: "3"}, %{menu: nil}), do: {:msg, {:show_menu, {35, 5}}}
 
-  # Mouse events - show menu on right-click
-  def event_to_msg(%Event.Mouse{action: :click, button: :right, x: x, y: y}, %{menu: nil}) do
+  # Mouse events - show menu on right-click (action is :press from terminal)
+  def event_to_msg(%Event.Mouse{action: :press, button: :right, x: x, y: y}, %{menu: nil}) do
     {:msg, {:show_menu, {x, y}}}
   end
 
@@ -157,6 +157,17 @@ defmodule ContextMenu.App do
       text("  Position 1: Top-left area (key: 1)", nil),
       text("  Position 2: Center area (key: 2)", nil),
       text("  Position 3: Right area (key: 3)", nil),
+      text("", nil),
+      # Large click area for right-click testing
+      text("┌" <> String.duplicate("─", 58) <> "┐", Style.new(fg: :bright_black)),
+      text("│" <> String.pad_trailing("", 58) <> "│", Style.new(fg: :bright_black)),
+      text("│" <> String.pad_trailing("      Right-click in this area to open context menu", 58) <> "│", Style.new(fg: :bright_black)),
+      text("│" <> String.pad_trailing("", 58) <> "│", Style.new(fg: :bright_black)),
+      text("│" <> String.pad_trailing("", 58) <> "│", Style.new(fg: :bright_black)),
+      text("│" <> String.pad_trailing("", 58) <> "│", Style.new(fg: :bright_black)),
+      text("│" <> String.pad_trailing("", 58) <> "│", Style.new(fg: :bright_black)),
+      text("│" <> String.pad_trailing("", 58) <> "│", Style.new(fg: :bright_black)),
+      text("└" <> String.duplicate("─", 58) <> "┘", Style.new(fg: :bright_black)),
       text("", nil)
     ])
   end

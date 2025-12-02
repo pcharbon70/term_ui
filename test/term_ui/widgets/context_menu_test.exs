@@ -176,7 +176,7 @@ defmodule TermUI.Widgets.ContextMenuTest do
       state = %{state | on_select: on_select}
 
       # Click on second item (Copy) at position relative to menu
-      event = %Event.Mouse{action: :click, x: 15, y: 6}
+      event = %Event.Mouse{action: :press, x: 15, y: 6}
       {:ok, new_state} = ContextMenu.handle_event(event, state)
 
       assert_receive {:selected, :copy}
@@ -188,14 +188,14 @@ defmodule TermUI.Widgets.ContextMenuTest do
       state = %{state | on_close: on_close}
 
       # Click outside menu bounds
-      event = %Event.Mouse{action: :click, x: 100, y: 100}
+      event = %Event.Mouse{action: :press, x: 100, y: 100}
       {:ok, new_state} = ContextMenu.handle_event(event, state)
 
       assert_receive :closed
       assert not ContextMenu.visible?(new_state)
     end
 
-    test "click on disabled item does nothing", %{state: state} do
+    test "click on disabled item does nothing", %{state: _state} do
       items = [
         ContextMenu.action(:enabled, "Enabled"),
         ContextMenu.action(:disabled, "Disabled", disabled: true)
@@ -205,7 +205,7 @@ defmodule TermUI.Widgets.ContextMenuTest do
       {:ok, state} = ContextMenu.init(props)
 
       # Click on disabled item
-      event = %Event.Mouse{action: :click, x: 5, y: 1}
+      event = %Event.Mouse{action: :press, x: 5, y: 1}
       {:ok, new_state} = ContextMenu.handle_event(event, state)
 
       # Menu should still be visible
@@ -214,7 +214,7 @@ defmodule TermUI.Widgets.ContextMenuTest do
 
     test "click on separator does nothing", %{state: state} do
       # Click on separator (y=3 relative to position y=5, so y=8)
-      event = %Event.Mouse{action: :click, x: 15, y: 8}
+      event = %Event.Mouse{action: :press, x: 15, y: 8}
       {:ok, new_state} = ContextMenu.handle_event(event, state)
 
       # Menu should still be visible

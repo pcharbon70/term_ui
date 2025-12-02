@@ -122,7 +122,7 @@ defmodule TermUI.Widgets.ContextMenu do
     {:ok, state}
   end
 
-  def handle_event(%Event.Mouse{action: :click, x: x, y: y}, state) do
+  def handle_event(%Event.Mouse{action: :press, x: x, y: y}, state) do
     {pos_x, pos_y} = state.position
     menu_width = calculate_width(state.items)
     menu_height = length(state.items)
@@ -144,6 +144,28 @@ defmodule TermUI.Widgets.ContextMenu do
     else
       # Click outside menu - close
       state = close_menu(state)
+      {:ok, state}
+    end
+  end
+
+  # Mouse move/drag - highlight item under cursor
+  def handle_event(%Event.Mouse{action: action, x: x, y: y}, state) when action in [:move, :drag] do
+    {pos_x, pos_y} = state.position
+    menu_width = calculate_width(state.items)
+    menu_height = length(state.items)
+
+    # Check if mouse is inside menu bounds
+    if x >= pos_x and x < pos_x + menu_width and
+         y >= pos_y and y < pos_y + menu_height do
+      relative_y = y - pos_y
+      item = Enum.at(state.items, relative_y)
+
+      if item && selectable?(item) do
+        {:ok, %{state | cursor: item.id}}
+      else
+        {:ok, state}
+      end
+    else
       {:ok, state}
     end
   end
