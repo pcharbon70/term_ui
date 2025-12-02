@@ -37,6 +37,7 @@ defmodule TermUI.Widgets.Dialog do
   use TermUI.StatefulComponent
 
   alias TermUI.Event
+  alias TermUI.Renderer.Style
 
   @doc """
   Creates new Dialog widget props.
@@ -50,7 +51,6 @@ defmodule TermUI.Widgets.Dialog do
   - `:on_close` - Callback when dialog is closed
   - `:on_confirm` - Callback when button is activated
   - `:closeable` - Whether Escape closes dialog (default: true)
-  - `:backdrop_style` - Style for backdrop
   - `:title_style` - Style for title bar
   - `:content_style` - Style for content area
   - `:button_style` - Style for buttons
@@ -66,7 +66,6 @@ defmodule TermUI.Widgets.Dialog do
       on_close: Keyword.get(opts, :on_close),
       on_confirm: Keyword.get(opts, :on_confirm),
       closeable: Keyword.get(opts, :closeable, true),
-      backdrop_style: Keyword.get(opts, :backdrop_style),
       title_style: Keyword.get(opts, :title_style),
       content_style: Keyword.get(opts, :content_style),
       button_style: Keyword.get(opts, :button_style),
@@ -85,7 +84,6 @@ defmodule TermUI.Widgets.Dialog do
       on_close: props.on_close,
       on_confirm: props.on_confirm,
       closeable: props.closeable,
-      backdrop_style: props.backdrop_style,
       title_style: props.title_style,
       content_style: props.content_style,
       button_style: props.button_style,
@@ -113,12 +111,12 @@ defmodule TermUI.Widgets.Dialog do
   end
 
   def handle_event(%Event.Key{key: key}, state) when key in [:enter, " "] do
-    # Activate focused button
+    # Activate focused button and close dialog
     if state.on_confirm && state.focused_button do
       state.on_confirm.(state.focused_button)
     end
 
-    {:ok, state}
+    {:ok, %{state | visible: false}}
   end
 
   def handle_event(%Event.Key{key: :left}, state) do
@@ -138,13 +136,11 @@ defmodule TermUI.Widgets.Dialog do
         {:ok, state}
 
       button_id ->
-        state = %{state | focused_button: button_id}
-
         if state.on_confirm do
           state.on_confirm.(button_id)
         end
 
-        {:ok, state}
+        {:ok, %{state | focused_button: button_id, visible: false}}
     end
   end
 
@@ -153,36 +149,31 @@ defmodule TermUI.Widgets.Dialog do
   end
 
   @impl true
+  def render(%{visible: false}, _area), do: empty()
+
   def render(state, area) do
-    if state.visible do
-      # Calculate dialog position (centered)
-      dialog_width = state.width
-      dialog_height = calculate_height(state)
+    # Calculate dialog position (centered)
+    dialog_width = state.width
+    dialog_height = calculate_height(state)
 
-      pos_x = max(0, div(area.width - dialog_width, 2))
-      pos_y = max(0, div(area.height - dialog_height, 2))
+    pos_x = max(0, div(area.width - dialog_width, 2))
+    pos_y = max(0, div(area.height - dialog_height, 2))
 
-      # Render backdrop
-      backdrop = render_backdrop(state, area)
+    # Render dialog content
+    dialog = render_dialog(state, dialog_width)
 
-      # Render dialog content
-      dialog = render_dialog(state, dialog_width)
-
-      # Combine as overlay
-      %{
-        type: :overlay,
-        content: stack(:vertical, [backdrop, dialog]),
-        x: 0,
-        y: 0,
-        z: 100,
-        dialog_x: pos_x,
-        dialog_y: pos_y,
-        dialog_width: dialog_width,
-        dialog_height: dialog_height
-      }
-    else
-      empty()
-    end
+    # Return as overlay with opaque background
+    %{
+      type: :overlay,
+      content: dialog,
+      x: pos_x,
+      y: pos_y,
+      z: 100,
+      # Provide dimensions and background for opaque fill
+      width: dialog_width,
+      height: dialog_height,
+      bg: Style.new(bg: :black)
+    }
   end
 
   # Private functions
@@ -246,23 +237,6 @@ defmodule TermUI.Widgets.Dialog do
     end
   end
 
-  defp render_backdrop(state, area) do
-    # Create backdrop covering full area
-    backdrop_char = "░"
-    backdrop_line = String.duplicate(backdrop_char, area.width)
-
-    lines =
-      for _y <- 0..(area.height - 1) do
-        if state.backdrop_style do
-          styled(text(backdrop_line), state.backdrop_style)
-        else
-          text(backdrop_line)
-        end
-      end
-
-    stack(:vertical, lines)
-  end
-
   defp render_dialog(state, width) do
     # Title bar
     title = render_title(state, width)
@@ -313,7 +287,7 @@ defmodule TermUI.Widgets.Dialog do
   end
 
   defp render_content(state, width) do
-    # Wrap content with borders
+    # Extract text from content node
     content_text =
       case state.content do
         %{type: :text, content: t} -> t
@@ -321,18 +295,24 @@ defmodule TermUI.Widgets.Dialog do
         _ -> ""
       end
 
-    # Pad content to width
+    # Split into lines and render each with borders
     inner_width = width - 4
-    padded = String.pad_trailing(content_text, inner_width)
-    padded = String.slice(padded, 0, inner_width)
+    lines = String.split(content_text, "\n")
 
-    line = "│ " <> padded <> " │"
+    content_lines =
+      Enum.map(lines, fn line_text ->
+        padded = String.pad_trailing(line_text, inner_width)
+        padded = String.slice(padded, 0, inner_width)
+        line = "│ " <> padded <> " │"
 
-    if state.content_style do
-      styled(text(line), state.content_style)
-    else
-      text(line)
-    end
+        if state.content_style do
+          styled(text(line), state.content_style)
+        else
+          text(line)
+        end
+      end)
+
+    stack(:vertical, content_lines)
   end
 
   defp render_buttons(state) do

@@ -99,13 +99,14 @@ defmodule TermUI.Runtime.NodeRenderer do
 
   # Handle overlay nodes (from AlertDialog, Dialog, ContextMenu, Toast widgets)
   # Overlay renders content at an absolute position on screen
+  # Optional: width, height, bg for opaque background fill
   defp render_node(
          %{
            type: :overlay,
            content: content,
            x: x,
            y: y
-         },
+         } = overlay,
          buffer,
          _row,
          _col,
@@ -113,7 +114,19 @@ defmodule TermUI.Runtime.NodeRenderer do
        ) do
     # Overlay uses absolute positioning - x and y are 0-indexed screen coordinates
     # Convert to 1-indexed buffer coordinates
-    render_node(content, buffer, y + 1, x + 1, style)
+    buf_row = y + 1
+    buf_col = x + 1
+
+    # If width, height, and bg are provided, fill background first
+    case overlay do
+      %{width: width, height: height, bg: bg} when is_integer(width) and is_integer(height) ->
+        fill_background(buffer, buf_row, buf_col, width, height, bg)
+
+      _ ->
+        :ok
+    end
+
+    render_node(content, buffer, buf_row, buf_col, style)
   end
 
   # Handle tuple-based render nodes from Elm.Helpers
@@ -274,6 +287,17 @@ defmodule TermUI.Runtime.NodeRenderer do
         # If we can't create a buffer, just return the viewport dimensions
         {vp_width, vp_height}
     end
+  end
+
+  # Fill a rectangular region with a background color
+  defp fill_background(buffer, row, col, width, height, bg_style) do
+    cell = create_cell(" ", bg_style)
+
+    for dy <- 0..(height - 1), dx <- 0..(width - 1) do
+      Buffer.set_cell(buffer, row + dy, col + dx, cell)
+    end
+
+    :ok
   end
 
   # Cell creation
