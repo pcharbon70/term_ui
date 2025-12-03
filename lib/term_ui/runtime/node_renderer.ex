@@ -42,14 +42,19 @@ defmodule TermUI.Runtime.NodeRenderer do
   end
 
   defp render_node(
-         %RenderNode{type: :box, children: children, style: style},
+         %RenderNode{type: :box, children: children, style: style, width: width, height: height},
          buffer,
          row,
          col,
          parent_style
        ) do
     effective_style = merge_styles(parent_style, style)
-    render_children_vertical(children, buffer, row, col, effective_style)
+    {rendered_width, rendered_height} = render_children_vertical(children, buffer, row, col, effective_style)
+
+    # Return specified dimensions if provided, otherwise use rendered dimensions
+    final_width = width || rendered_width
+    final_height = height || rendered_height
+    {final_width, final_height}
   end
 
   defp render_node(

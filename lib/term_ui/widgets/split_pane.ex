@@ -608,16 +608,27 @@ defmodule TermUI.Widgets.SplitPane do
     pane_after = Enum.at(state.panes, divider_idx + 1)
 
     if pane_before && pane_after && not pane_before.collapsed && not pane_after.collapsed do
+      # If computed_size is 0, use proportional sizes based on total_size or a default
+      {size_before, size_after} =
+        if pane_before.computed_size == 0 and pane_after.computed_size == 0 do
+          # Use the size ratios to compute approximate sizes
+          # Default to 100 units if no area has been rendered yet
+          total = if state.total_size > 0, do: state.total_size, else: 100
+          {round(pane_before.size * total), round(pane_after.size * total)}
+        else
+          {pane_before.computed_size, pane_after.computed_size}
+        end
+
       # Calculate new sizes
-      new_size_before = pane_before.computed_size + delta
-      new_size_after = pane_after.computed_size - delta
+      new_size_before = size_before + delta
+      new_size_after = size_after - delta
 
       # Apply constraints
       {final_before, final_after} =
         apply_resize_constraints(pane_before, pane_after, new_size_before, new_size_after)
 
       # Only update if we could actually move
-      if final_before != pane_before.computed_size do
+      if final_before != size_before do
         # Update pane sizes as ratios
         total = final_before + final_after
 
