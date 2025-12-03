@@ -1,1 +1,1 @@
-StreamWidgetExample.App.run()
+StreamWidget.App.run()

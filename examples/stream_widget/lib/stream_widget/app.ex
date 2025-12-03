@@ -1,4 +1,4 @@
-defmodule StreamWidgetExample.App do
+defmodule StreamWidget.App do
   @moduledoc """
   Example application demonstrating the StreamWidget.
 
@@ -26,12 +26,12 @@ defmodule StreamWidgetExample.App do
 
   alias TermUI.Widgets.StreamWidget
   alias TermUI.Widgets.StreamWidget.Consumer
+  alias TermUI.Event
   alias TermUI.Renderer.Style
   alias StreamWidgetExample.Producer
 
   # TermUI.Elm Callbacks
 
-  @impl true
   def init(_args) do
     # Create stream widget props
     props =
@@ -44,141 +44,146 @@ defmodule StreamWidgetExample.App do
 
     {:ok, widget_state} = StreamWidget.init(props)
 
-    model = %{
+    %{
       widget_state: widget_state,
       producer_pid: nil,
       consumer_pid: nil,
       interval_ms: 100,
       message: "Press Space to start streaming, q to quit"
     }
-
-    {:ok, model}
   end
 
-  @impl true
-  def update(msg, model) do
-    case msg do
-      # Start streaming
-      {:key, %{char: " "}} when model.producer_pid == nil ->
-        {:ok, producer} = Producer.start_link(interval_ms: model.interval_ms)
-        {:ok, consumer} = Consumer.start_link(self())
-        Consumer.subscribe(consumer, producer)
+  def event_to_msg(%Event.Key{key: " "}, _state), do: {:msg, :toggle_stream}
+  def event_to_msg(%Event.Key{key: "c"}, _state), do: {:msg, :clear}
+  def event_to_msg(%Event.Key{key: "s"}, _state), do: {:msg, :toggle_stats}
+  def event_to_msg(%Event.Key{key: "1"}, _state), do: {:msg, {:strategy, :drop_oldest}}
+  def event_to_msg(%Event.Key{key: "2"}, _state), do: {:msg, {:strategy, :drop_newest}}
+  def event_to_msg(%Event.Key{key: "3"}, _state), do: {:msg, {:strategy, :block}}
+  def event_to_msg(%Event.Key{key: "4"}, _state), do: {:msg, {:strategy, :sliding}}
+  def event_to_msg(%Event.Key{key: "+"}, _state), do: {:msg, :faster}
+  def event_to_msg(%Event.Key{key: "-"}, _state), do: {:msg, :slower}
+  def event_to_msg(%Event.Key{key: key}, _state) when key in ["q", "Q"], do: {:msg, :quit}
+  def event_to_msg(%Event.Key{key: :escape}, _state), do: {:msg, :quit}
 
-        # Update widget state to reflect running
-        {:ok, widget_state} =
-          StreamWidget.handle_info({:consumer_started, consumer}, model.widget_state)
+  def event_to_msg(%Event.Key{key: key}, _state)
+      when key in [:up, :down, :page_up, :page_down, :home, :end] do
+    {:msg, {:widget_event, %Event.Key{key: key}}}
+  end
 
-        new_model = %{
-          model
-          | producer_pid: producer,
-            consumer_pid: consumer,
-            widget_state: widget_state,
-            message: "Streaming... Space to pause, q to quit"
-        }
+  def event_to_msg(_event, _state), do: :ignore
 
-        {:ok, new_model}
+  def update(:quit, state) do
+    # Stop producer and consumer
+    if state.producer_pid, do: GenStage.stop(state.producer_pid)
+    if state.consumer_pid, do: GenStage.stop(state.consumer_pid)
+    {state, [:quit]}
+  end
 
-      # Pause/resume when streaming
-      {:key, %{char: " "}} when model.producer_pid != nil ->
-        if StreamWidget.paused?(model.widget_state) do
-          Producer.resume(model.producer_pid)
-          {:ok, widget_state} = StreamWidget.resume(model.widget_state)
-          {:ok, %{model | widget_state: widget_state, message: "Resumed streaming"}}
-        else
-          Producer.pause(model.producer_pid)
-          {:ok, widget_state} = StreamWidget.pause(model.widget_state)
-          {:ok, %{model | widget_state: widget_state, message: "Paused streaming"}}
-        end
+  def update(:toggle_stream, state) when state.producer_pid == nil do
+    # Start streaming
+    {:ok, producer} = Producer.start_link(interval_ms: state.interval_ms)
+    {:ok, consumer} = Consumer.start_link(self())
+    Consumer.subscribe(consumer, producer)
 
-      # Clear buffer
-      {:key, %{char: "c"}} ->
-        {:ok, widget_state} = StreamWidget.clear(model.widget_state)
-        {:ok, %{model | widget_state: widget_state, message: "Buffer cleared"}}
+    # Update widget state to reflect running
+    {:ok, widget_state} =
+      StreamWidget.handle_info({:consumer_started, consumer}, state.widget_state)
 
-      # Toggle stats
-      {:key, %{char: "s"}} ->
-        {:ok, widget_state} = StreamWidget.handle_event(%TermUI.Event.Key{char: "s"}, model.widget_state)
-        {:ok, %{model | widget_state: widget_state}}
+    {%{state |
+      producer_pid: producer,
+      consumer_pid: consumer,
+      widget_state: widget_state,
+      message: "Streaming... Space to pause, q to quit"
+    }, []}
+  end
 
-      # Overflow strategies
-      {:key, %{char: "1"}} ->
-        {:ok, widget_state} = StreamWidget.set_overflow_strategy(model.widget_state, :drop_oldest)
-        {:ok, %{model | widget_state: widget_state, message: "Strategy: drop_oldest"}}
-
-      {:key, %{char: "2"}} ->
-        {:ok, widget_state} = StreamWidget.set_overflow_strategy(model.widget_state, :drop_newest)
-        {:ok, %{model | widget_state: widget_state, message: "Strategy: drop_newest"}}
-
-      {:key, %{char: "3"}} ->
-        {:ok, widget_state} = StreamWidget.set_overflow_strategy(model.widget_state, :block)
-        {:ok, %{model | widget_state: widget_state, message: "Strategy: block"}}
-
-      {:key, %{char: "4"}} ->
-        {:ok, widget_state} = StreamWidget.set_overflow_strategy(model.widget_state, :sliding)
-        {:ok, %{model | widget_state: widget_state, message: "Strategy: sliding"}}
-
-      # Rate adjustment
-      {:key, %{char: "+"}} ->
-        new_interval = max(10, model.interval_ms - 10)
-        if model.producer_pid, do: Producer.set_interval(model.producer_pid, new_interval)
-        {:ok, %{model | interval_ms: new_interval, message: "Interval: #{new_interval}ms"}}
-
-      {:key, %{char: "-"}} ->
-        new_interval = min(1000, model.interval_ms + 10)
-        if model.producer_pid, do: Producer.set_interval(model.producer_pid, new_interval)
-        {:ok, %{model | interval_ms: new_interval, message: "Interval: #{new_interval}ms"}}
-
-      # Navigation
-      {:key, %{key: key}} when key in [:up, :down, :page_up, :page_down, :home, :end] ->
-        event = %TermUI.Event.Key{key: key}
-        {:ok, widget_state} = StreamWidget.handle_event(event, model.widget_state)
-        {:ok, %{model | widget_state: widget_state}}
-
-      # Quit
-      {:key, %{char: "q"}} ->
-        {:stop, :normal}
-
-      {:key, %{key: :escape}} ->
-        {:stop, :normal}
-
-      # Stream items from consumer
-      {:stream_items, items} ->
-        {:ok, widget_state} = StreamWidget.handle_info({:stream_items, items}, model.widget_state)
-        {:ok, %{model | widget_state: widget_state}}
-
-      {:consumer_started, pid} ->
-        {:ok, widget_state} = StreamWidget.handle_info({:consumer_started, pid}, model.widget_state)
-        {:ok, %{model | widget_state: widget_state}}
-
-      _ ->
-        {:ok, model}
+  def update(:toggle_stream, state) do
+    # Pause/resume when streaming
+    if StreamWidget.paused?(state.widget_state) do
+      Producer.resume(state.producer_pid)
+      {:ok, widget_state} = StreamWidget.resume(state.widget_state)
+      {%{state | widget_state: widget_state, message: "Resumed streaming"}, []}
+    else
+      Producer.pause(state.producer_pid)
+      {:ok, widget_state} = StreamWidget.pause(state.widget_state)
+      {%{state | widget_state: widget_state, message: "Paused streaming"}, []}
     end
   end
 
-  @impl true
-  def view(model) do
+  def update(:clear, state) do
+    {:ok, widget_state} = StreamWidget.clear(state.widget_state)
+    {%{state | widget_state: widget_state, message: "Buffer cleared"}, []}
+  end
+
+  def update(:toggle_stats, state) do
+    {:ok, widget_state} = StreamWidget.handle_event(%Event.Key{key: "s"}, state.widget_state)
+    {%{state | widget_state: widget_state}, []}
+  end
+
+  def update({:strategy, strategy}, state) do
+    {:ok, widget_state} = StreamWidget.set_overflow_strategy(state.widget_state, strategy)
+    {%{state | widget_state: widget_state, message: "Strategy: #{strategy}"}, []}
+  end
+
+  def update(:faster, state) do
+    new_interval = max(10, state.interval_ms - 10)
+    if state.producer_pid, do: Producer.set_interval(state.producer_pid, new_interval)
+    {%{state | interval_ms: new_interval, message: "Interval: #{new_interval}ms"}, []}
+  end
+
+  def update(:slower, state) do
+    new_interval = min(1000, state.interval_ms + 10)
+    if state.producer_pid, do: Producer.set_interval(state.producer_pid, new_interval)
+    {%{state | interval_ms: new_interval, message: "Interval: #{new_interval}ms"}, []}
+  end
+
+  def update({:widget_event, event}, state) do
+    {:ok, widget_state} = StreamWidget.handle_event(event, state.widget_state)
+    {%{state | widget_state: widget_state}, []}
+  end
+
+  def update(_msg, state) do
+    {state, []}
+  end
+
+  # Handle info messages from the consumer
+  def handle_info({:stream_items, items}, state) do
+    {:ok, widget_state} = StreamWidget.handle_info({:stream_items, items}, state.widget_state)
+    {%{state | widget_state: widget_state}, []}
+  end
+
+  def handle_info({:consumer_started, pid}, state) do
+    {:ok, widget_state} = StreamWidget.handle_info({:consumer_started, pid}, state.widget_state)
+    {%{state | widget_state: widget_state}, []}
+  end
+
+  def handle_info(_msg, state) do
+    {state, []}
+  end
+
+  def view(state) do
     # Use fixed dimensions for the widget
     area = %{x: 0, y: 0, width: 78, height: 15}
 
-    widget_view = StreamWidget.render(model.widget_state, area)
+    widget_view = StreamWidget.render(state.widget_state, area)
 
     help_text = "[Space] Start/Pause | [c] Clear | [s] Stats | [1-4] Strategy | [+/-] Rate | [q] Quit"
 
     stack(:vertical, [
       text("StreamWidget Example", Style.new(fg: :cyan, attrs: [:bold])),
-      text(model.message, Style.new(fg: :yellow)),
+      text(state.message, Style.new(fg: :yellow)),
       text("", nil),
-      render_widget_container(widget_view, model),
+      render_widget_container(widget_view, state),
       text("", nil),
       text(help_text, Style.new(fg: :white, attrs: [:dim]))
     ])
   end
 
-  defp render_widget_container(widget_view, model) do
+  defp render_widget_container(widget_view, state) do
     box_width = 80
     inner_width = box_width - 2
 
-    stats = StreamWidget.get_stats(model.widget_state)
+    stats = StreamWidget.get_stats(state.widget_state)
     buffer_info = "Buffer: #{stats.buffer_size}/#{stats.buffer_capacity}"
 
     top_border = "+" <> String.duplicate("-", 3) <> " Stream " <> String.duplicate("-", inner_width - 14 - String.length(buffer_info)) <> " #{buffer_info} +"
@@ -203,5 +208,11 @@ defmodule StreamWidgetExample.App do
       is_binary(data) -> data
       true -> inspect(data)
     end
+  end
+
+  # Public API
+
+  def run do
+    TermUI.Runtime.run(root: __MODULE__)
   end
 end

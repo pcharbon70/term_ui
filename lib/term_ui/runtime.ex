@@ -339,6 +339,38 @@ defmodule TermUI.Runtime do
     {:stop, :normal, state}
   end
 
+  # Catch-all for unknown messages - forward to root module's handle_info if it exists
+  @impl true
+  def handle_info(msg, state) do
+    if function_exported?(state.root_module, :handle_info, 2) do
+      case state.root_module.handle_info(msg, state.root_state) do
+        {new_root_state, commands} ->
+          # Update both root_state and components[:root].state
+          components =
+            Map.update!(state.components, :root, fn comp ->
+              %{comp | state: new_root_state}
+            end)
+
+          state = %{state | root_state: new_root_state, components: components, dirty: true}
+          state = execute_commands(commands, state)
+          {:noreply, state}
+
+        new_root_state ->
+          # Support simple return without commands
+          # Update both root_state and components[:root].state
+          components =
+            Map.update!(state.components, :root, fn comp ->
+              %{comp | state: new_root_state}
+            end)
+
+          {:noreply, %{state | root_state: new_root_state, components: components, dirty: true}}
+      end
+    else
+      # Ignore unknown messages if root module doesn't handle them
+      {:noreply, state}
+    end
+  end
+
   @impl true
   def handle_call(:get_state, _from, state) do
     {:reply, state, state}
