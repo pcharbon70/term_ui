@@ -1,131 +1,94 @@
-# System Dashboard Example
+# Dashboard Example
 
-A terminal-based system monitoring dashboard built with TermUI. This example demonstrates the framework's key features including real-time updates, multiple widget types, and keyboard navigation.
+This example demonstrates building a comprehensive system monitoring dashboard using multiple TermUI widgets including Gauge, Sparkline, and Table components.
 
-## Features
+## Overview
 
-- **CPU Gauge** - Real-time CPU usage with color zones
-- **Memory Gauge** - Memory utilization with visual feedback
-- **System Info** - Hostname, uptime, and load averages
-- **Network Sparklines** - RX/TX activity visualization
-- **Process Table** - Navigable list of running processes
-- **Theme Switching** - Toggle between dark and light themes
+The dashboard displays real-time system metrics in a terminal-based interface. While this example uses the Dashboard namespace rather than a single widget, it showcases how to compose multiple widgets into a cohesive application.
 
-## Requirements
+**Key Features:**
+- CPU and memory usage gauges with color zones
+- Network traffic sparklines (RX/TX)
+- Process table with selection
+- System information display
+- Theme switching (dark/light)
+- Responsive layout with bordered sections
 
-- Elixir 1.15+
-- OTP 28+
-- Terminal with Unicode support
-- 80x24 minimum terminal size (larger recommended)
+**Widgets Demonstrated:**
+- `TermUI.Widgets.Gauge` - CPU and memory percentage bars
+- `TermUI.Widgets.Sparkline` - Network traffic history
+- `TermUI.Widgets.Table.Column` - Process table formatting
 
-## Installation
+## Example Structure
+
+```
+dashboard/
+├── lib/
+│   ├── dashboard/
+│   │   ├── app.ex              # Main dashboard component
+│   │   ├── application.ex      # OTP application
+│   │   └── data/
+│   │       └── metrics.ex      # Mock metrics generator
+│   └── dashboard.ex            # Application entry point
+├── mix.exs                      # Project configuration
+└── README.md                   # This file
+```
+
+**app.ex** - Main dashboard implementation:
+- Implements Elm Architecture (init/update/view)
+- Composes gauges, sparklines, and tables
+- Handles theme switching
+- Manages process selection
+
+**metrics.ex** - Provides simulated system metrics:
+- CPU and memory percentages
+- Network RX/TX data streams
+- Process list with stats
+- System info (hostname, uptime, load average)
+
+## Running the Example
 
 ```bash
-# From the project root, navigate to the example
-cd examples/dashboard
-
-# Install dependencies
+# From the dashboard directory
 mix deps.get
+mix run --no-halt
+
+# Or using mix.exs aliases
+mix start
 ```
-
-## Running
-
-```bash
-# Run the dashboard
-mix run run.exs
-```
-
-The dashboard will take over your terminal. Press `Q` to quit and restore normal terminal operation.
 
 ## Controls
 
-| Key | Action |
-|-----|--------|
-| `Q` | Quit the application |
-| `R` | Force refresh data |
-| `T` | Toggle theme (dark/light) |
-| `↑` | Select previous process |
-| `↓` | Select next process |
+- **Q** - Quit the application
+- **R** - Refresh display (triggers re-render)
+- **T** - Toggle theme between dark and light
+- **Up/Down** - Navigate through process list
 
-Keys are case-insensitive (both `q` and `Q` work).
+## Layout Details
 
-## Architecture
+The dashboard uses a fixed-width layout (58 characters) with these sections:
 
-```
-lib/
-  dashboard.ex              # Entry points (start/run)
-  dashboard/
-    application.ex          # OTP application
-    app.ex                  # Root Elm component
-    data/
-      metrics.ex            # Simulated metrics generator
-```
+1. **Header** - Title with decorative border
+2. **Gauges Row** - CPU and Memory gauges side-by-side with color zones
+3. **System Info** - Hostname, uptime, and load averages
+4. **Network Section** - RX/TX sparklines showing traffic history
+5. **Process Table** - Sortable process list with PID, name, CPU%, and memory
+6. **Controls Bar** - Help text with keyboard shortcuts
 
-### The Elm Architecture
+**Color Zones:**
+- CPU Gauge: Green (0-59%), Yellow (60-79%), Red (80-100%)
+- Memory Gauge: Green (0-69%), Yellow (70-84%), Red (85-100%)
 
-The dashboard uses TermUI's Elm Architecture pattern:
+## Themes
 
-1. **init/1** - Initialize component state
-2. **event_to_msg/2** - Convert terminal events to messages
-3. **update/2** - Handle messages and return new state + commands
-4. **view/1** - Render state to UI tree
+**Dark Theme:**
+- Cyan borders and headers
+- White text on black background
+- Green/blue sparklines
+- Cyan selection highlight
 
-```elixir
-def event_to_msg(%Event.Key{key: key}, _state) when key in ["q", "Q"] do
-  {:msg, :quit}
-end
-
-def update(:quit, state) do
-  {state, [:quit]}  # Return quit command
-end
-
-def view(state) do
-  stack(:vertical, [
-    render_header(theme),
-    stack(:horizontal, [gauge1, gauge2, info]),
-    render_processes(...)
-  ])
-end
-```
-
-## Simulated Metrics
-
-The dashboard uses simulated metrics that follow realistic patterns:
-
-- **CPU** - Smooth variations with occasional spikes
-- **Memory** - Gradual increase with periodic drops (simulating GC)
-- **Network** - Bursty traffic patterns
-- **Processes** - Stable list with slight variations
-
-This ensures the example works on any system without requiring actual system metrics access.
-
-## Customization
-
-### Adding Themes
-
-Add new themes in `get_theme/1`:
-
-```elixir
-defp get_theme(:custom) do
-  %{
-    header: Style.new(fg: :magenta, attrs: [:bold]),
-    border: Style.new(fg: :magenta),
-    # ... other styles
-  }
-end
-```
-
-### Adding Widgets
-
-Import widget modules and add to the render tree:
-
-```elixir
-alias TermUI.Widgets.{Gauge, Sparkline, Table}
-
-def view(state) do
-  stack(:vertical, [
-    Gauge.render(value: cpu, width: 20),
-    Sparkline.render(values: history, min: 0, max: 100)
-  ])
-end
-```
+**Light Theme:**
+- Yellow borders and headers
+- Bright white text
+- Bright green/cyan sparklines
+- Yellow selection highlight

@@ -1,84 +1,163 @@
 # Gauge Widget Example
 
-This example demonstrates how to use the `TermUI.Widgets.Gauge` widget for displaying values within a range.
+This example demonstrates the Gauge widget for displaying numeric values within a range using visual bars or arcs.
 
-## Features Demonstrated
+## Widget Overview
 
-- Simple percentage gauge
-- Color zones (green/yellow/red based on value)
-- Bar and arc display styles
-- Custom bar characters
-- Value and range labels
+The Gauge widget provides visual representation of values with support for color zones and multiple display styles. It's ideal for:
 
-## Installation
+- Progress indicators
+- Resource usage displays (CPU, memory, disk)
+- Percentage visualizations
+- Status meters
+- Loading indicators
 
-```bash
-cd examples/gauge
-mix deps.get
+**Key Features:**
+- Bar style (horizontal filled bar)
+- Arc style (semi-circular arc)
+- Color zones for visual feedback
+- Customizable characters for bar display
+- Min/max range labels
+- Value display
+- Custom labeling
+
+## Widget Options
+
+The `Gauge.render/1` function accepts the following options:
+
+- `:value` (required) - Current numeric value to display
+- `:min` - Minimum value (default: 0)
+- `:max` - Maximum value (default: 100)
+- `:width` - Gauge width in characters (default: 40)
+- `:type` - Display type, `:bar` or `:arc` (default: `:bar`)
+- `:show_value` - Show numeric value below gauge (default: true)
+- `:show_range` - Show min/max labels (default: true)
+- `:zones` - List of `{threshold, style}` tuples for color zones
+- `:label` - Label text displayed above gauge
+- `:bar_char` - Character for filled portion (default: "█")
+- `:empty_char` - Character for empty portion (default: "░")
+
+**Helper Functions:**
+
+- `Gauge.percentage(value, opts)` - Quick percentage gauge (0-100 range)
+- `Gauge.traffic_light(opts)` - Gauge with green/yellow/red zones
+
+**Color Zones:**
+
+Zones define style changes at thresholds:
+```elixir
+zones: [
+  {0, Style.new(fg: :green)},    # Green from 0-59
+  {60, Style.new(fg: :yellow)},  # Yellow from 60-79
+  {80, Style.new(fg: :red)}      # Red from 80-100
+]
 ```
 
-## Running
+## Example Structure
+
+```
+gauge/
+├── lib/
+│   └── gauge/
+│       └── app.ex          # Main application component
+├── mix.exs                  # Project configuration
+└── README.md               # This file
+```
+
+**app.ex** - Demonstrates various gauge configurations:
+- Simple percentage gauge using helper
+- Gauge with color zones (green/yellow/red)
+- Gauge with custom characters
+- Interactive value adjustment
+- Style switching (bar/arc)
+
+## Running the Example
 
 ```bash
-mix run run.exs
+# From the gauge directory
+mix deps.get
+mix run -e "Gauge.App.run()" --no-halt
 ```
 
 ## Controls
 
-| Key | Action |
-|-----|--------|
-| ↑/↓ | Adjust value by 5 |
-| ←/→ | Adjust value by 10 |
-| S | Toggle bar/arc style |
-| Q | Quit |
+- **Up Arrow** - Increase value by 5
+- **Down Arrow** - Decrease value by 5
+- **Right Arrow** - Increase value by 10
+- **Left Arrow** - Decrease value by 10
+- **S** - Toggle between bar and arc display styles
+- **Q** - Quit the application
 
-## Code Overview
+The value is automatically clamped between 0 and 100.
 
-### Basic Gauge
+## Display Styles
 
+**Bar Style:**
+```
+Simple Percentage Gauge:
+████████████████████░░░░░░░░░░
+       50
+```
+
+**Arc Style:**
+```
+╭────────────────────────────╮
+│          ▼                 │
+╰────────────────────────────╯
+           50
+```
+
+## Gauge Examples
+
+**Simple Percentage:**
 ```elixir
-# Simple percentage gauge (0-100)
 Gauge.percentage(75, width: 30)
 ```
 
-### Gauge with Options
-
+**With Color Zones:**
 ```elixir
 Gauge.render(
-  value: 75,           # Current value (required)
-  min: 0,              # Minimum value (default: 0)
-  max: 100,            # Maximum value (default: 100)
-  width: 30,           # Gauge width in characters
-  style_type: :bar,    # :bar or :arc display
-  show_value: true,    # Show numeric value
-  show_range: true,    # Show min/max labels
-  label: "CPU Usage"   # Optional label
-)
-```
-
-### Color Zones
-
-```elixir
-Gauge.render(
-  value: 85,
+  value: 75,
+  min: 0,
+  max: 100,
+  width: 30,
   zones: [
-    {0, Style.new(fg: :green)},    # Green when value >= 0
-    {60, Style.new(fg: :yellow)},  # Yellow when value >= 60
-    {80, Style.new(fg: :red)}      # Red when value >= 80
-  ]
+    {0, Style.new(fg: :green)},
+    {60, Style.new(fg: :yellow)},
+    {80, Style.new(fg: :red)}
+  ],
+  label: "CPU Usage"
 )
 ```
 
-### Custom Characters
-
+**Custom Characters:**
 ```elixir
 Gauge.render(
-  value: 50,
-  bar_char: "▓",       # Character for filled portion
-  empty_char: "░"      # Character for empty portion
+  value: 75,
+  min: 0,
+  max: 100,
+  width: 30,
+  bar_char: "▓",
+  empty_char: "░"
 )
 ```
 
-## Widget API
+**Arc Style:**
+```elixir
+Gauge.render(
+  value: 75,
+  min: 0,
+  max: 100,
+  width: 30,
+  type: :arc,
+  show_value: true
+)
+```
 
-See `lib/term_ui/widgets/gauge.ex` for the full API documentation.
+## Use Cases
+
+- **System Monitoring:** Display CPU, memory, or disk usage
+- **Progress Tracking:** Show download/upload progress
+- **Resource Limits:** Visualize quota usage
+- **Performance Metrics:** Display response times or throughput
+- **Health Indicators:** Show service health status

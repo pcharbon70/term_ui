@@ -1,148 +1,111 @@
 # Canvas Widget Example
 
-This example demonstrates how to use the `TermUI.Widgets.Canvas` widget for custom drawing with direct buffer access.
+This example demonstrates the TermUI Canvas widget, which provides a direct character buffer for custom drawing with primitives for lines, rectangles, text, and Braille graphics.
 
-## Features Demonstrated
+## Widget Overview
 
-- Basic canvas creation and clearing
-- Drawing text at specific positions
-- Drawing lines (horizontal, vertical, diagonal)
-- Drawing rectangles with different border styles
-- Braille characters for sub-character resolution
+The Canvas widget offers a low-level drawing surface for creating custom visualizations, diagrams, charts, and graphics that don't fit standard widget patterns. It provides:
 
-## Installation
+- **Direct buffer access** - Set individual characters at any position
+- **Drawing primitives** - Lines (horizontal, vertical, diagonal), rectangles, text
+- **Braille graphics** - Sub-character resolution (2x4 dots per character cell)
+- **Flexible rendering** - Use callback functions or direct manipulation
+- **Clear and fill operations** - Reset or fill entire canvas
+
+Use Canvas when you need complete control over rendering, want to create custom visualizations, or need higher resolution than standard character-based rendering.
+
+## Widget Options
+
+The `Canvas.new/1` function accepts the following options:
+
+- `:width` - Canvas width in characters (default: 40)
+- `:height` - Canvas height in characters (default: 20)
+- `:default_char` - Character to fill canvas initially (default: `" "`)
+- `:on_draw` - Callback function `fn(state) -> state` to draw on canvas
+
+The `Canvas.draw/3` utility function creates a canvas inline:
+
+```elixir
+Canvas.draw(width, height, fn state ->
+  # Draw operations here
+end)
+```
+
+## Drawing Functions
+
+**Character buffer operations:**
+- `clear/1` - Clear canvas with default character
+- `fill/2` - Fill canvas with specific character
+- `set_char/4` - Set character at (x, y) position
+- `get_char/3` - Get character at (x, y) position
+- `draw_text/4` - Draw text string at position
+
+**Line primitives:**
+- `draw_hline/5` - Horizontal line at (x, y) with length
+- `draw_vline/5` - Vertical line at (x, y) with length
+- `draw_line/6` - Arbitrary line between two points (Bresenham's algorithm)
+
+**Rectangle primitives:**
+- `draw_rect/6` - Rectangle outline with customizable border characters
+- `fill_rect/6` - Filled rectangle
+
+**Braille graphics (sub-character resolution):**
+- `set_dot/3` - Set dot at (x, y) in dot space (width*2, height*4)
+- `clear_dot/3` - Clear dot at position
+- `draw_braille_line/5` - Line with sub-character precision
+- `dots_to_braille/1` - Convert dot coordinates to Braille character
+- `braille_resolution/1` - Get canvas resolution in dots
+
+## Example Structure
+
+The example consists of:
+
+- `lib/canvas/app.ex` - Main application with three demos:
+  - **Shapes demo** - Basic lines, points, and text
+  - **Boxes demo** - Rectangle drawing with different border styles
+  - **Braille demo** - Sub-character resolution explanation and patterns
+
+## Running the Example
 
 ```bash
 cd examples/canvas
 mix deps.get
+iex -S mix
 ```
 
-## Running
+Then in the IEx shell:
 
-```bash
-mix run run.exs
+```elixir
+Canvas.App.run()
 ```
 
 ## Controls
 
-| Key | Action |
-|-----|--------|
-| 1 | Basic shapes demo |
-| 2 | Box drawing demo |
-| 3 | Braille drawing demo |
-| C | Clear canvas |
-| Q | Quit |
+- `1` - Show basic shapes demo
+- `2` - Show box drawing demo
+- `3` - Show Braille drawing demo
+- `C` - Clear canvas
+- `Q` - Quit application
 
-## Code Overview
+## Implementation Notes
 
-### Creating a Canvas
-
-```elixir
-Canvas.new(
-  width: 40,
-  height: 20,
-  default_char: " ",
-  on_draw: fn canvas ->
-    canvas
-    |> Canvas.draw_text(2, 2, "Hello!")
-    |> Canvas.draw_rect(0, 0, 10, 5)
-  end
-)
-```
-
-### Drawing Primitives
-
-```elixir
-# Set a single character
-Canvas.set_char(canvas, x, y, "●")
-
-# Get a character
-char = Canvas.get_char(canvas, x, y)
-
-# Draw text
-Canvas.draw_text(canvas, x, y, "Hello World")
-
-# Draw horizontal line
-Canvas.draw_hline(canvas, x, y, length, "─")
-
-# Draw vertical line
-Canvas.draw_vline(canvas, x, y, length, "│")
-
-# Draw arbitrary line (Bresenham's algorithm)
-Canvas.draw_line(canvas, x1, y1, x2, y2, "•")
-```
-
-### Drawing Rectangles
-
-```elixir
-# Simple box
-Canvas.draw_rect(canvas, x, y, width, height)
-
-# Box with custom border characters
-Canvas.draw_rect(canvas, x, y, width, height, %{
-  h: "═",     # Horizontal
-  v: "║",     # Vertical
-  tl: "╔",    # Top-left corner
-  tr: "╗",    # Top-right corner
-  bl: "╚",    # Bottom-left corner
-  br: "╝"     # Bottom-right corner
-})
-
-# Rounded corners
-Canvas.draw_rect(canvas, x, y, width, height, %{
-  tl: "╭", tr: "╮", bl: "╰", br: "╯"
-})
-
-# Fill a rectangle
-Canvas.fill_rect(canvas, x, y, width, height, "░")
-```
-
-### Canvas Operations
-
-```elixir
-# Clear entire canvas
-Canvas.clear(canvas)
-
-# Fill canvas with character
-Canvas.fill(canvas, "·")
-
-# Resize canvas
-Canvas.resize(canvas, new_width, new_height)
-
-# Convert to list of strings
-lines = Canvas.to_strings(canvas)
-```
+The example demonstrates:
+- Creating and drawing on a canvas using the `Canvas.draw/3` function
+- Drawing horizontal and vertical lines
+- Drawing diagonal lines with Bresenham's algorithm
+- Drawing rectangles with different border styles (single-line, double-line, rounded)
+- Nested rectangles
+- Text rendering at arbitrary positions
+- Braille graphics for sub-character resolution (each character = 2x4 dots)
+- Converting canvas state to string lines for rendering
 
 ### Braille Graphics
 
-Each character cell provides 2x4 dot resolution using Unicode Braille:
+Braille characters provide 2x4 dot resolution per character cell:
+- Canvas character resolution: width × height
+- Canvas dot resolution: (width × 2) × (height × 4)
 
-```elixir
-# Set a single dot
-Canvas.set_dot(canvas, x, y)
-
-# Clear a dot
-Canvas.clear_dot(canvas, x, y)
-
-# Draw a braille line
-Canvas.draw_braille_line(canvas, x1, y1, x2, y2)
-
-# Get braille resolution
-{dot_width, dot_height} = Canvas.braille_resolution(canvas)
-# For 40x20 canvas: {80, 80} dots
-
-# Create braille characters from dot positions
-Canvas.dots_to_braille([{0, 0}, {1, 1}])  # Diagonal dots
-
-# Empty and full braille characters
-Canvas.empty_braille()  # "⠀"
-Canvas.full_braille()   # "⣿"
-```
-
-## Braille Dot Positions
-
-Each Braille character has 8 dots arranged as:
-
+Each Braille dot position is numbered:
 ```
 1 4
 2 5
@@ -150,12 +113,4 @@ Each Braille character has 8 dots arranged as:
 7 8
 ```
 
-In code, coordinates are `{column, row}` from 0:
-- `{0, 0}` = dot 1 (top-left)
-- `{1, 0}` = dot 4 (top-right)
-- `{0, 3}` = dot 7 (bottom-left)
-- `{1, 3}` = dot 8 (bottom-right)
-
-## Widget API
-
-See `lib/term_ui/widgets/canvas.ex` for the full API documentation.
+This enables smooth curves and higher-resolution graphics within the character grid.

@@ -1,126 +1,114 @@
 # Dialog Widget Example
 
-This example demonstrates how to use the `TermUI.Widgets.Dialog` widget for displaying modal dialogs.
+This example demonstrates the Dialog widget for displaying modal dialogs with customizable buttons and content.
 
-## Features Demonstrated
+## Widget Overview
 
-- Dialog with title and content
-- Multiple button options
-- Button navigation with Tab/arrows
-- Dialog open/close states
-- Different dialog types (info, confirm, warning)
+The Dialog widget provides modal overlays that appear centered on screen with focus trapping. It's ideal for:
 
-## Installation
+- Confirmation dialogs (Yes/No, OK/Cancel)
+- Information alerts (single OK button)
+- Warning messages with multiple options
+- Simple forms or prompts
 
-```bash
-cd examples/dialog
-mix deps.get
+**Key Features:**
+- Centered modal display with backdrop
+- Customizable width and content
+- Multiple button configurations
+- Button navigation with keyboard and mouse
+- Focus trapping (Tab cycles within dialog)
+- Escape to close (configurable)
+- Default button selection
+- Button highlighting for focused state
+
+## Widget Options
+
+The `Dialog.new/1` function accepts the following options:
+
+- `:title` (required) - Dialog title displayed in header
+- `:content` - Dialog body content (render node, default: empty)
+- `:buttons` - List of button definitions (default: single OK button)
+  - Each button: `%{id: atom, label: string, default: boolean}`
+- `:width` - Dialog width in characters (default: 40)
+- `:on_close` - Callback function `(() -> any)` when dialog closes
+- `:on_confirm` - Callback function `(button_id -> any)` when button is activated
+- `:closeable` - Whether Escape closes dialog (default: true)
+- `:title_style` - Style for title bar
+- `:content_style` - Style for content area
+- `:button_style` - Style for buttons
+- `:focused_button_style` - Style for focused button
+
+## Example Structure
+
+```
+dialog/
+├── lib/
+│   └── dialog/
+│       └── app.ex          # Main application component
+├── mix.exs                  # Project configuration
+└── README.md               # This file
 ```
 
-## Running
+**app.ex** - Implements the Elm Architecture pattern:
+- Maintains dialog state (visibility, button focus, result)
+- Shows different dialog types (info, confirm, warning)
+- Forwards keyboard events to dialog widget when visible
+- Tracks last selected button for demonstration
+
+## Running the Example
 
 ```bash
-mix run run.exs
+# From the dialog directory
+mix deps.get
+mix run -e "Dialog.App.run()" --no-halt
 ```
 
 ## Controls
 
-| Key | Action |
-|-----|--------|
-| 1 | Show Info dialog |
-| 2 | Show Confirm dialog |
-| 3 | Show Warning dialog |
-| Tab/←/→ | Navigate buttons (in dialog) |
-| Enter/Space | Select button |
-| Escape | Close dialog |
-| Q | Quit |
+- **1** - Show Info Dialog (single "OK" button)
+- **2** - Show Confirm Dialog (Cancel/Confirm buttons)
+- **3** - Show Warning Dialog (Don't Save/Cancel/Save buttons with default)
+- **Tab / Shift+Tab** - Navigate between buttons (when dialog open)
+- **Left/Right** - Navigate between buttons (when dialog open)
+- **Enter** - Select focused button
+- **Space** - Select focused button
+- **Escape** - Close dialog (calls on_close callback)
+- **Q** - Quit the application
 
-## Code Overview
+## Dialog Types Demonstrated
 
-### Creating a Dialog
-
+**Info Dialog:**
 ```elixir
 Dialog.new(
-  title: "Confirm Delete",
-  content: text("Are you sure you want to delete this item?"),
+  title: "Information",
+  content: text("This is an informational message.\nPress OK to continue.", nil),
+  buttons: [%{id: :ok, label: "OK"}]
+)
+```
+
+**Confirm Dialog:**
+```elixir
+Dialog.new(
+  title: "Confirm Action",
+  content: text("Are you sure you want to proceed?", nil),
   buttons: [
     %{id: :cancel, label: "Cancel"},
-    %{id: :delete, label: "Delete", style: :danger}
-  ],
-  on_close: fn -> handle_close() end,
-  on_confirm: fn button_id -> handle_button(button_id) end
+    %{id: :confirm, label: "Confirm"}
+  ]
 )
 ```
 
-### Dialog Options
-
+**Warning Dialog with Default:**
 ```elixir
 Dialog.new(
-  title: "Dialog Title",       # Required: title text
-  content: render_node,        # Dialog body content
-  buttons: [...],              # List of button definitions
-  width: 40,                   # Dialog width
-  closeable: true,             # Whether Escape closes dialog
-  on_close: fn -> ... end,     # Called when dialog closes
-  on_confirm: fn id -> ... end # Called when button selected
+  title: "Warning",
+  content: text("Unsaved changes will be lost!", nil),
+  buttons: [
+    %{id: :dont_save, label: "Don't Save"},
+    %{id: :cancel, label: "Cancel"},
+    %{id: :save, label: "Save", default: true}
+  ]
 )
 ```
 
-### Button Definition
-
-```elixir
-%{
-  id: :confirm,        # Unique identifier
-  label: "Confirm",    # Display text
-  default: true,       # Initially focused
-  style: :danger       # Visual style hint
-}
-```
-
-### Styling Options
-
-```elixir
-Dialog.new(
-  title: "Styled Dialog",
-  backdrop_style: Style.new(fg: :bright_black),
-  title_style: Style.new(fg: :cyan, attrs: [:bold]),
-  content_style: Style.new(fg: :white),
-  button_style: Style.new(fg: :white),
-  focused_button_style: Style.new(fg: :black, bg: :cyan)
-)
-```
-
-### Dialog API
-
-```elixir
-# Check visibility
-Dialog.visible?(state)
-
-# Show/hide
-Dialog.show(state)
-Dialog.hide(state)
-
-# Get focused button
-Dialog.get_focused_button(state)
-
-# Focus specific button
-Dialog.focus_button(state, :confirm)
-
-# Update content
-Dialog.set_content(state, new_content)
-Dialog.set_title(state, "New Title")
-```
-
-## Dialog Types
-
-The example shows three common dialog patterns:
-
-| Type | Buttons | Use Case |
-|------|---------|----------|
-| Info | OK | Display information |
-| Confirm | Cancel, Confirm | Yes/No decisions |
-| Warning | Don't Save, Cancel, Save | Complex choices |
-
-## Widget API
-
-See `lib/term_ui/widgets/dialog.ex` for the full API documentation.
+The `default: true` option sets initial focus to that button.

@@ -1,26 +1,80 @@
 # Table Widget Example
 
-This example demonstrates how to use the `TermUI.Widgets.Table` widget for displaying tabular data with selection and scrolling.
+A demonstration of the TermUI Table widget for displaying tabular data with selection, sorting, and scrolling.
 
-## Features Demonstrated
+## Widget Overview
 
-- Column definitions with width constraints
-- Row selection and keyboard navigation
+The Table widget provides efficient display of structured data in a tabular format with virtual scrolling, making it suitable for both small datasets and large collections (10,000+ rows). It supports flexible column layouts, custom cell rendering, row selection, and keyboard/mouse navigation.
+
+**Key Features:**
+- Virtual scrolling for large datasets
+- Flexible column layout (fixed, proportional, percentage widths)
+- Row selection (single or multi-select)
 - Custom cell rendering functions
+- Keyboard and mouse navigation
+- Alternating row styles
 - Header and row styling
-- Scrolling through large datasets
 
-## Installation
+**When to Use:**
+- Displaying lists of records
+- Data browsers and explorers
+- Log viewers
+- Database query results
+- Any structured data display
+
+## Widget Options
+
+The `Table.new/1` function accepts these options:
+
+- `:columns` - List of Column specifications (required)
+- `:data` - List of row maps (required)
+- `:selection_mode` - `:none`, `:single`, or `:multi` (default: `:single`)
+- `:sortable` - Enable column sorting (default: true)
+- `:on_select` - Callback when selection changes: `fn selected_rows -> ... end`
+- `:on_sort` - Callback when sort changes: `fn {column, direction} -> ... end`
+- `:header_style` - Style for header row
+- `:row_style` - Style for data rows
+- `:selected_style` - Style for selected rows
+- `:alternating` - Alternating row backgrounds (default: false)
+
+**Column Specification** using `Column.new(key, header, opts)`:
+
+- `key` - Map key to extract value from row data
+- `header` - Header text to display
+- `:width` - Column width constraint:
+  - `Constraint.length(n)` - Fixed width in characters
+  - `Constraint.percentage(p)` - Percentage of total width
+  - `Constraint.fill()` - Fill remaining space
+  - `Constraint.ratio(r)` - Proportional width
+- `:align` - Text alignment: `:left`, `:right`, or `:center` (default: `:left`)
+- `:render` - Custom render function: `fn value -> String.t()`
+
+## Example Structure
+
+This example consists of:
+
+- `lib/table/app.ex` - Main application demonstrating:
+  - Basic table with multiple columns
+  - Mixed column widths (fixed and fill)
+  - Custom cell rendering (status with icons)
+  - Row selection and navigation
+  - Scrolling through data
+- `mix.exs` - Mix project configuration
+- `run.exs` - Helper script to run the example
+
+## Running the Example
+
+From this directory:
 
 ```bash
-cd examples/table
+# Install dependencies
 mix deps.get
-```
 
-## Running
+# Run with the helper script
+elixir run.exs
 
-```bash
-mix run run.exs
+# Or run directly with mix
+mix run -e "Table.App.run()" --no-halt
 ```
 
 ## Controls
@@ -32,7 +86,7 @@ mix run run.exs
 | Home/End | Jump to first/last row |
 | Q | Quit |
 
-## Code Overview
+## Code Examples
 
 ### Defining Columns
 
@@ -121,6 +175,30 @@ Table.new(
   selected_style: Style.new(bg: :blue)
 )
 ```
+
+## Column Layout
+
+The example demonstrates different column width strategies:
+
+1. **ID Column** - Fixed width (4 characters, right-aligned)
+2. **Name Column** - Fills remaining space
+3. **Email Column** - Fixed width (25 characters)
+4. **Role Column** - Fixed width (12 characters)
+5. **Status Column** - Fixed width (10 characters) with custom rendering
+
+## Custom Cell Rendering
+
+The Status column demonstrates custom rendering with icons:
+
+- **● Active** - Green indicator for active users
+- **○ Inactive** - White indicator for inactive users
+- **◐ Pending** - Half-filled indicator for pending users
+
+This shows how to transform data values into formatted display text with visual indicators.
+
+## Note on Implementation
+
+This example demonstrates a simplified approach where the Table widget is rendered as a static display with manual state management in the app. For production use with stateful components, the Table widget can be integrated as a StatefulComponent with automatic state handling for selection, sorting, and scrolling.
 
 ## Widget API
 
