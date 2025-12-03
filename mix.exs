@@ -1,7 +1,7 @@
 defmodule TermUI.MixProject do
   use Mix.Project
 
-  @version "0.1.0"
+  @version "0.2.0"
   @source_url "https://github.com/pcharbon70/term_ui"
 
   def project do
@@ -100,6 +100,7 @@ defmodule TermUI.MixProject do
         "guides/user/07-widgets.md": [title: "Widgets"],
         "guides/user/08-terminal.md": [title: "Terminal"],
         "guides/user/09-commands.md": [title: "Commands"],
+        "guides/user/10-advanced-widgets.md": [title: "Advanced Widgets"],
         "guides/developer/README.md": [filename: "developer-guides", title: "Developer Guides"],
         "guides/developer/01-architecture-overview.md": [title: "Architecture Overview"],
         "guides/developer/02-runtime-internals.md": [title: "Runtime Internals"],
