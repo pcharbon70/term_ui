@@ -255,72 +255,128 @@ defmodule TextInput.App do
   # Private Helpers
   # ----------------------------------------------------------------------------
 
+  # Border character sets (matching TermUI.Widget.Block)
+  @border_rounded %{tl: "╭", tr: "╮", bl: "╰", br: "╯", h: "─", v: "│"}
+  @border_single %{tl: "┌", tr: "┐", bl: "└", br: "┘", h: "─", v: "│"}
+
   defp render_instructions do
+    b = @border_rounded
+    inner_width = 53
+
+    label = " Controls "
+    left_pad = 2
+    right_pad = inner_width - left_pad - String.length(label)
+
+    top = b.tl <> String.duplicate(b.h, left_pad) <> label <> String.duplicate(b.h, right_pad) <> b.tr
+    bot = b.bl <> String.duplicate(b.h, inner_width) <> b.br
+
     stack(:vertical, [
-      text("Controls:", Style.new(fg: :yellow)),
-      text("  Arrow keys       Move cursor"),
-      text("  Home/End         Move to start/end of line"),
-      text("  Ctrl+Home/End    Move to start/end of text"),
-      text("  Backspace/Del    Delete characters"),
-      text("  Ctrl+Enter       Insert newline (multiline)"),
-      text("  Enter            Submit (single/chat) or newline (multi)"),
-      text("  Tab              Switch between inputs"),
-      text("  Q                Quit (when single input is empty)")
+      text(top, Style.new(fg: :yellow)),
+      text(b.v <> String.pad_trailing("  Arrow keys       Move cursor", inner_width) <> b.v, nil),
+      text(b.v <> String.pad_trailing("  Home/End         Move to start/end of line", inner_width) <> b.v, nil),
+      text(b.v <> String.pad_trailing("  Ctrl+Home/End    Move to start/end of text", inner_width) <> b.v, nil),
+      text(b.v <> String.pad_trailing("  Backspace/Del    Delete characters", inner_width) <> b.v, nil),
+      text(b.v <> String.pad_trailing("  Ctrl+Enter       Insert newline (multiline)", inner_width) <> b.v, nil),
+      text(b.v <> String.pad_trailing("  Enter            Submit (single/chat) or newline", inner_width) <> b.v, nil),
+      text(b.v <> String.pad_trailing("  Tab              Switch between inputs", inner_width) <> b.v, nil),
+      text(b.v <> String.pad_trailing("  Q                Quit (when input is empty)", inner_width) <> b.v, nil),
+      text(bot, Style.new(fg: :yellow))
     ])
   end
 
   defp render_single_input(state) do
-    focused_style =
-      if state.focused_input == :single,
-        do: Style.new(fg: :green, attrs: [:bold]),
-        else: Style.new(fg: :white)
+    focused = state.focused_input == :single
+    b = @border_single
+    border_style = if focused, do: Style.new(fg: :green), else: Style.new(fg: :blue)
 
     current_value = TI.get_value(state.single_input)
+    inner_width = 52
+
+    label = " Single-line Input (Enter to submit) "
+    left_pad = 2
+    right_pad = inner_width - left_pad - String.length(label)
+
+    top = b.tl <> String.duplicate(b.h, left_pad) <> label <> String.duplicate(b.h, right_pad) <> b.tr
+    bot = b.bl <> String.duplicate(b.h, inner_width) <> b.br
 
     stack(:vertical, [
-      text("Single-line Input (press Enter to submit):", focused_style),
-      TI.render(state.single_input, %{width: 50, height: 1}),
-      text("  Value: \"#{current_value}\"", Style.new(fg: :bright_black))
+      text(top, border_style),
+      stack(:horizontal, [
+        text(b.v <> " ", border_style),
+        TI.render(state.single_input, %{width: 50, height: 1}),
+        text(" " <> b.v, border_style)
+      ]),
+      text(b.v <> String.pad_trailing("  Value: \"#{String.slice(current_value, 0, 40)}\"", inner_width) <> b.v, Style.new(fg: :bright_black)),
+      text(bot, border_style)
     ])
   end
 
   defp render_multi_input(state) do
-    focused_style =
-      if state.focused_input == :multi,
-        do: Style.new(fg: :green, attrs: [:bold]),
-        else: Style.new(fg: :white)
+    focused = state.focused_input == :multi
+    b = @border_single
+    border_style = if focused, do: Style.new(fg: :green), else: Style.new(fg: :blue)
 
     line_count = TI.get_line_count(state.multi_input)
     {cursor_row, cursor_col} = TI.get_cursor(state.multi_input)
 
+    inner_width = 62
+
+    label = " Multi-line Input (Ctrl+Enter for newline) "
+    left_pad = 2
+    right_pad = inner_width - left_pad - String.length(label)
+
+    top = b.tl <> String.duplicate(b.h, left_pad) <> label <> String.duplicate(b.h, right_pad) <> b.tr
+    bot = b.bl <> String.duplicate(b.h, inner_width) <> b.br
+
+    input_view = TI.render(state.multi_input, %{width: 60, height: 5})
+
     stack(:vertical, [
-      text("Multi-line Input (Ctrl+Enter for newline, scrolls after 5 lines):", focused_style),
-      TI.render(state.multi_input, %{width: 60, height: 10}),
-      text(
-        "  Lines: #{line_count}, Cursor: row #{cursor_row + 1}, col #{cursor_col + 1}",
-        Style.new(fg: :bright_black)
-      )
+      text(top, border_style),
+      stack(:horizontal, [
+        text(b.v <> " ", border_style),
+        input_view,
+        text(" " <> b.v, border_style)
+      ]),
+      text(b.v <> String.pad_trailing("  Lines: #{line_count}, Cursor: row #{cursor_row + 1}, col #{cursor_col + 1}", inner_width) <> b.v, Style.new(fg: :bright_black)),
+      text(bot, border_style)
     ])
   end
 
   defp render_chat_input(state) do
-    focused_style =
-      if state.focused_input == :chat,
-        do: Style.new(fg: :green, attrs: [:bold]),
-        else: Style.new(fg: :white)
+    focused = state.focused_input == :chat
+    b = @border_single
+    border_style = if focused, do: Style.new(fg: :green), else: Style.new(fg: :blue)
+
+    inner_width = 62
+
+    label = " Chat Input (Enter submits, Ctrl+Enter for newline) "
+    left_pad = 2
+    right_pad = inner_width - left_pad - String.length(label)
+
+    top = b.tl <> String.duplicate(b.h, left_pad) <> label <> String.duplicate(b.h, right_pad) <> b.tr
+    bot = b.bl <> String.duplicate(b.h, inner_width) <> b.br
+
+    input_view = TI.render(state.chat_input, %{width: 60, height: 3})
 
     stack(:vertical, [
-      text("Chat Input (Enter submits, Ctrl+Enter for newline):", focused_style),
-      render_chat_messages(state.chat_messages),
-      TI.render(state.chat_input, %{width: 60, height: 5})
+      text(top, border_style),
+      render_chat_messages(state.chat_messages, inner_width, b, border_style),
+      stack(:horizontal, [
+        text(b.v <> " ", border_style),
+        input_view,
+        text(" " <> b.v, border_style)
+      ]),
+      text(bot, border_style)
     ])
   end
 
-  defp render_chat_messages([]) do
-    text("  (no messages yet)", Style.new(fg: :bright_black))
+  defp render_chat_messages([], inner_width, b, border_style) do
+    stack(:vertical, [
+      text(b.v <> String.pad_trailing("  (no messages yet)", inner_width) <> b.v, border_style)
+    ])
   end
 
-  defp render_chat_messages(messages) do
+  defp render_chat_messages(messages, inner_width, b, _border_style) do
     message_nodes =
       Enum.map(messages, fn msg ->
         # Truncate long messages
@@ -329,7 +385,8 @@ defmodule TextInput.App do
             do: String.slice(msg, 0, 47) <> "...",
             else: msg
 
-        text("  > #{display_msg}", Style.new(fg: :cyan))
+        content = "  > #{display_msg}"
+        text(b.v <> String.pad_trailing(content, inner_width) <> b.v, Style.new(fg: :cyan))
       end)
 
     stack(:vertical, message_nodes)
