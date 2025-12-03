@@ -22,6 +22,8 @@ node = Widget.render(widget_state, %{width: 80, height: 24})
 
 ### Tabs
 
+> **Example:** See [`examples/tabs/`](../../examples/tabs/) for a complete demonstration.
+
 Tabbed interface for organizing content into switchable panels.
 
 ```elixir
@@ -50,6 +52,8 @@ Tabs.render(tabs_state, %{width: 60, height: 1})
 | `closeable` | boolean | `false` | Show close buttons |
 
 ### Context Menu
+
+> **Example:** See [`examples/context_menu/`](../../examples/context_menu/) for a complete demonstration.
 
 Right-click context menu that appears at cursor position.
 
@@ -88,6 +92,8 @@ ContextMenu.render(menu_state, %{width: 30, height: 10})
 ## Overlay Widgets
 
 ### Alert Dialog
+
+> **Example:** See [`examples/alert_dialog/`](../../examples/alert_dialog/) for a complete demonstration.
 
 Modal dialog for confirmations and messages with standard button configurations.
 
@@ -128,47 +134,80 @@ AlertDialog.render(dialog_state, %{width: 80, height: 24})
 
 ### Toast
 
-Non-blocking notification that auto-dismisses.
+> **Example:** See [`examples/toast/`](../../examples/toast/) for a complete demonstration.
+
+Non-blocking notification that auto-dismisses. Use `ToastManager` to manage multiple toasts with stacking.
 
 ```elixir
-alias TermUI.Widgets.Toast
+alias TermUI.Widgets.ToastManager
 
-# Create props
-props = Toast.new(
-  toasts: state.toasts,
-  position: :bottom_right,
-  max_visible: 5
-)
-
-# Initialize and use
-{:ok, toast_state} = Toast.init(props)
-Toast.render(toast_state, %{width: 80, height: 24})
-
-# Add a toast to your state
-def update(:save_success, state) do
-  toast = %{
-    id: System.unique_integer(),
-    type: :success,
-    message: "File saved successfully",
-    duration: 3000
+# Create manager in your init
+def init(_opts) do
+  %{
+    toast_manager: ToastManager.new(
+      position: :bottom_right,
+      default_duration: 3000,
+      max_toasts: 5
+    )
   }
-  {%{state | toasts: [toast | state.toasts]}, []}
+end
+
+# Add toasts
+def update({:show_toast, type, message}, state) do
+  manager = ToastManager.add_toast(state.toast_manager, message, type)
+  {%{state | toast_manager: manager}, []}
+end
+
+# Update on tick (removes expired toasts)
+def update(:tick, state) do
+  manager = ToastManager.tick(state.toast_manager)
+  {%{state | toast_manager: manager}, []}
+end
+
+# Render in view
+def view(state) do
+  stack(:vertical, [
+    render_main_content(state),
+    ToastManager.render(state.toast_manager, %{width: 80, height: 24, x: 0, y: 0})
+  ])
 end
 ```
 
-**Toast Structure:**
+**ToastManager Options:**
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `position` | atom | `:bottom_right` | Toast position (see below) |
+| `max_toasts` | integer | 5 | Maximum simultaneous toasts |
+| `default_duration` | integer | 3000 | Default duration in ms |
+| `spacing` | integer | 1 | Vertical spacing between toasts |
+
+**Positions:** `:top_left`, `:top_center`, `:top_right`, `:bottom_left`, `:bottom_center`, `:bottom_right`
+
+**Toast Types:** `:info` (ℹ blue), `:success` (✓ green), `:warning` (⚠ yellow), `:error` (✗ red)
+
+**ToastManager Functions:**
+
 ```elixir
-%{
-  id: unique_id,
-  type: :info,        # :info, :success, :warning, :error
-  message: "Text",
-  duration: 3000      # ms, nil for persistent
-}
+# Add a toast
+manager = ToastManager.add_toast(manager, "Message", :success)
+manager = ToastManager.add_toast(manager, "Message", :warning, duration: 5000)
+
+# Update (removes expired toasts)
+manager = ToastManager.tick(manager)
+
+# Get visible toast count
+count = ToastManager.toast_count(manager)
+
+# Clear all toasts
+manager = ToastManager.clear_all(manager)
 ```
 
 ## Visualization Widgets
 
 ### Bar Chart
+
+> **Example:** See [`examples/bar_chart/`](../../examples/bar_chart/) for a complete demonstration.
 
 Horizontal or vertical bar chart for categorical data.
 
@@ -208,6 +247,8 @@ Engineering █████████████████████ 200
 
 ### Line Chart
 
+> **Example:** See [`examples/line_chart/`](../../examples/line_chart/) for a complete demonstration.
+
 Line chart using Braille characters for sub-character resolution.
 
 ```elixir
@@ -246,6 +287,8 @@ LineChart.render(
 
 ### Canvas
 
+> **Example:** See [`examples/canvas/`](../../examples/canvas/) for a complete demonstration.
+
 Direct drawing surface for custom visualizations.
 
 ```elixir
@@ -281,6 +324,8 @@ Canvas.render(canvas_state, %{width: 60, height: 20})
 ## Layout Widgets
 
 ### Viewport
+
+> **Example:** See [`examples/viewport/`](../../examples/viewport/) for a complete demonstration.
 
 Scrollable view of content larger than the display area. The Viewport widget clips content to a visible region and supports both keyboard and mouse scrolling.
 
@@ -386,6 +431,8 @@ end
 
 ### Split Pane
 
+> **Example:** See [`examples/split_pane/`](../../examples/split_pane/) for a complete demonstration.
+
 Resizable split layout for IDE-style interfaces.
 
 ```elixir
@@ -416,6 +463,8 @@ SplitPane.render(pane_state, %{width: 100, height: 30})
 | `draggable` | boolean | `true` | Allow resize |
 
 ### Tree View
+
+> **Example:** See [`examples/tree_view/`](../../examples/tree_view/) for a complete demonstration.
 
 Hierarchical data with expand/collapse.
 
@@ -457,6 +506,8 @@ TreeView.render(tree_state, %{width: 40, height: 20})
 ## Input Widgets
 
 ### Form Builder
+
+> **Example:** See [`examples/form_builder/`](../../examples/form_builder/) for a complete demonstration.
 
 Structured forms with validation and multiple field types.
 
@@ -518,6 +569,8 @@ FormBuilder.render(form_state, %{width: 60, height: 20})
 
 ### Command Palette
 
+> **Example:** See [`examples/command_palette/`](../../examples/command_palette/) for a complete demonstration.
+
 VS Code-style command interface with fuzzy search.
 
 ```elixir
@@ -555,6 +608,8 @@ CommandPalette.render(palette_state, %{width: 80, height: 24})
 ## Data Streaming Widgets
 
 ### Log Viewer
+
+> **Example:** See [`examples/log_viewer/`](../../examples/log_viewer/) for a complete demonstration.
 
 High-performance log viewer with virtual scrolling, search, and filtering.
 
@@ -605,6 +660,8 @@ LogViewer.render(viewer_state, %{width: 100, height: 30})
 
 ### Stream Widget
 
+> **Example:** See [`examples/stream_widget/`](../../examples/stream_widget/) for a complete demonstration.
+
 GenStage-integrated widget for real-time data streams with backpressure.
 
 ```elixir
@@ -640,6 +697,8 @@ StreamWidget.render(stream_state, %{width: 80, height: 20})
 These widgets leverage Erlang's runtime introspection capabilities for live system visualization.
 
 ### Process Monitor
+
+> **Example:** See [`examples/process_monitor/`](../../examples/process_monitor/) for a complete demonstration.
 
 Live BEAM process inspection with sorting, filtering, and process control.
 
@@ -685,6 +744,8 @@ ProcessMonitor.render(monitor_state, %{width: 100, height: 30})
 
 ### Supervision Tree Viewer
 
+> **Example:** See [`examples/supervision_tree_viewer/`](../../examples/supervision_tree_viewer/) for a complete demonstration.
+
 Visualize supervision hierarchies with live status.
 
 ```elixir
@@ -728,6 +789,8 @@ SupervisionTreeViewer.render(tree_state, %{width: 80, height: 25})
 - `1:→` - rest_for_one
 
 ### Cluster Dashboard
+
+> **Example:** See [`examples/cluster_dashboard/`](../../examples/cluster_dashboard/) for a complete demonstration.
 
 Distributed Erlang cluster visualization.
 
