@@ -424,6 +424,17 @@ defmodule TermUI.Runtime do
       _ -> :ok
     end
 
+    # Defensive cleanup: directly write mouse disable sequences to terminal
+    # This ensures cleanup even if Terminal GenServer is unavailable or crashed
+    try do
+      # Disable all mouse tracking modes
+      IO.write("\e[?1006l\e[?1003l\e[?1002l\e[?1000l")
+      # Show cursor
+      IO.write("\e[?25h")
+    rescue
+      _ -> :ok
+    end
+
     :ok
   end
 

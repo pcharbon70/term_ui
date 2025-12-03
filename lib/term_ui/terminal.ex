@@ -31,6 +31,9 @@ defmodule TermUI.Terminal do
   @mouse_sgr_on "\e[?1006h"
   @mouse_sgr_off "\e[?1006l"
 
+  # Comprehensive mouse disable - disables ALL mouse modes defensively
+  @all_mouse_off "\e[?1006l\e[?1003l\e[?1002l\e[?1000l"
+
   # Client API
 
   @doc """
@@ -565,13 +568,12 @@ defmodule TermUI.Terminal do
   end
 
   defp do_restore(state) do
+    # Always disable ALL mouse tracking modes defensively
+    # This ensures cleanup even if state is inconsistent
+    write_to_terminal(@all_mouse_off)
+
     if not state.cursor_visible do
       write_to_terminal(@show_cursor)
-    end
-
-    if state.mouse_tracking != :off do
-      disable_current_mouse_mode(state.mouse_tracking)
-      write_to_terminal(@mouse_sgr_off)
     end
 
     if state.alternate_screen_active do
@@ -649,6 +651,8 @@ defmodule TermUI.Terminal do
       case :ets.lookup(@ets_table, :raw_mode_active) do
         [{:raw_mode_active, true}] ->
           Logger.warning("Detected unclean termination from previous run, resetting terminal")
+          # Disable all mouse tracking modes first
+          write_to_terminal(@all_mouse_off)
           write_to_terminal(@show_cursor)
           write_to_terminal(@leave_alternate_screen)
           write_to_terminal(@reset_terminal)
