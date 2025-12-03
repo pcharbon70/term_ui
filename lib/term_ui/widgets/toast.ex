@@ -348,6 +348,9 @@ defmodule TermUI.Widgets.ToastManager do
 
   @doc """
   Renders all toasts with stacking.
+
+  Returns a list of overlay nodes that should be rendered.
+  Each toast is an overlay with absolute positioning.
   """
   @spec render(map(), map()) :: term()
   def render(manager, area) do
@@ -357,7 +360,8 @@ defmodule TermUI.Widgets.ToastManager do
       %{type: :empty}
     else
       # Render each toast with offset for stacking
-      toast_nodes =
+      # Each toast returns an overlay with absolute positioning
+      toast_overlays =
         toasts
         |> Enum.with_index()
         |> Enum.map(fn {toast, index} ->
@@ -368,7 +372,9 @@ defmodule TermUI.Widgets.ToastManager do
           Toast.render(toast, adjusted_area)
         end)
 
-      %{type: :stack, direction: :vertical, children: toast_nodes}
+      # Return overlays as a list - NodeRenderer handles lists
+      # by rendering each item (overlays render at absolute positions)
+      toast_overlays
     end
   end
 
