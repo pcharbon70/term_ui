@@ -83,6 +83,19 @@ defmodule TermUI.Backend.Config do
   @valid_character_sets [:unicode, :ascii]
   @valid_line_modes [:full_redraw, :incremental]
 
+  @typedoc """
+  Complete runtime configuration map.
+
+  Contains all configuration values needed to initialize and operate the backend system.
+  """
+  @type config :: %{
+          backend: :auto | module(),
+          character_set: :unicode | :ascii,
+          fallback_character_set: :unicode | :ascii,
+          tty_opts: keyword(),
+          raw_opts: keyword()
+        }
+
   @doc """
   Returns the configured backend selection mode.
 
@@ -310,13 +323,7 @@ defmodule TermUI.Backend.Config do
         raw_opts: [alternate_screen: false]
       }
   """
-  @spec runtime_config() :: %{
-          backend: :auto | module(),
-          character_set: :unicode | :ascii,
-          fallback_character_set: :unicode | :ascii,
-          tty_opts: keyword(),
-          raw_opts: keyword()
-        }
+  @spec runtime_config() :: config()
   def runtime_config do
     validate!()
 
@@ -331,6 +338,7 @@ defmodule TermUI.Backend.Config do
 
   # Private validation helpers
 
+  @spec validate_backend!() :: :ok
   defp validate_backend! do
     backend = get_backend()
 
@@ -339,8 +347,11 @@ defmodule TermUI.Backend.Config do
             "invalid :backend value: #{inspect(backend)}, " <>
               "expected one of #{inspect(@valid_backends)}"
     end
+
+    :ok
   end
 
+  @spec validate_character_set!() :: :ok
   defp validate_character_set! do
     char_set = get_character_set()
 
@@ -349,8 +360,11 @@ defmodule TermUI.Backend.Config do
             "invalid :character_set value: #{inspect(char_set)}, " <>
               "expected one of #{inspect(@valid_character_sets)}"
     end
+
+    :ok
   end
 
+  @spec validate_fallback_character_set!() :: :ok
   defp validate_fallback_character_set! do
     fallback = get_fallback_character_set()
 
@@ -359,12 +373,15 @@ defmodule TermUI.Backend.Config do
             "invalid :fallback_character_set value: #{inspect(fallback)}, " <>
               "expected one of #{inspect(@valid_character_sets)}"
     end
+
+    :ok
   end
 
+  @spec validate_tty_opts!() :: :ok
   defp validate_tty_opts! do
     opts = get_tty_opts()
 
-    unless is_list(opts) do
+    unless Keyword.keyword?(opts) do
       raise ArgumentError,
             "invalid :tty_opts value: #{inspect(opts)}, expected a keyword list"
     end
@@ -378,14 +395,28 @@ defmodule TermUI.Backend.Config do
                 "expected one of #{inspect(@valid_line_modes)}"
       end
     end
+
+    :ok
   end
 
+  @spec validate_raw_opts!() :: :ok
   defp validate_raw_opts! do
     opts = get_raw_opts()
 
-    unless is_list(opts) do
+    unless Keyword.keyword?(opts) do
       raise ArgumentError,
             "invalid :raw_opts value: #{inspect(opts)}, expected a keyword list"
     end
+
+    if Keyword.has_key?(opts, :alternate_screen) do
+      alt = Keyword.get(opts, :alternate_screen)
+
+      unless is_boolean(alt) do
+        raise ArgumentError,
+              "invalid :alternate_screen value in :raw_opts: #{inspect(alt)}, expected boolean"
+      end
+    end
+
+    :ok
   end
 end

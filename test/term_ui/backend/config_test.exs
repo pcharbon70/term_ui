@@ -319,6 +319,58 @@ defmodule TermUI.Backend.ConfigTest do
       Application.put_env(:term_ui, :raw_opts, [])
       assert Config.validate!() == :ok
     end
+
+    test "raises for non-keyword list tty_opts" do
+      Application.put_env(:term_ui, :tty_opts, [1, 2, 3])
+
+      assert_raise ArgumentError, ~r/invalid :tty_opts value: \[1, 2, 3\]/, fn ->
+        Config.validate!()
+      end
+    end
+
+    test "raises for non-keyword list raw_opts" do
+      Application.put_env(:term_ui, :raw_opts, [:a, :b, :c])
+
+      assert_raise ArgumentError, ~r/invalid :raw_opts value: \[:a, :b, :c\]/, fn ->
+        Config.validate!()
+      end
+    end
+
+    test "raises for invalid alternate_screen type (atom)" do
+      Application.put_env(:term_ui, :raw_opts, alternate_screen: :maybe)
+
+      assert_raise ArgumentError, ~r/invalid :alternate_screen value in :raw_opts: :maybe/, fn ->
+        Config.validate!()
+      end
+    end
+
+    test "raises for invalid alternate_screen type (string)" do
+      Application.put_env(:term_ui, :raw_opts, alternate_screen: "true")
+
+      assert_raise ArgumentError, ~r/invalid :alternate_screen value in :raw_opts: "true"/, fn ->
+        Config.validate!()
+      end
+    end
+
+    test "raises for invalid alternate_screen type (integer)" do
+      Application.put_env(:term_ui, :raw_opts, alternate_screen: 1)
+
+      assert_raise ArgumentError, ~r/invalid :alternate_screen value in :raw_opts: 1/, fn ->
+        Config.validate!()
+      end
+    end
+
+    test "accepts valid alternate_screen boolean values" do
+      for value <- [true, false] do
+        Application.put_env(:term_ui, :raw_opts, alternate_screen: value)
+        assert Config.validate!() == :ok
+      end
+    end
+
+    test "accepts raw_opts without alternate_screen" do
+      Application.put_env(:term_ui, :raw_opts, custom_option: :value)
+      assert Config.validate!() == :ok
+    end
   end
 
   describe "valid?/0" do
@@ -368,6 +420,21 @@ defmodule TermUI.Backend.ConfigTest do
       # Should not raise, just return false
       result = Config.valid?()
       assert result == false
+    end
+
+    test "returns false for non-keyword list tty_opts" do
+      Application.put_env(:term_ui, :tty_opts, [1, 2, 3])
+      assert Config.valid?() == false
+    end
+
+    test "returns false for non-keyword list raw_opts" do
+      Application.put_env(:term_ui, :raw_opts, [:a, :b])
+      assert Config.valid?() == false
+    end
+
+    test "returns false for invalid alternate_screen type" do
+      Application.put_env(:term_ui, :raw_opts, alternate_screen: :maybe)
+      assert Config.valid?() == false
     end
   end
 
