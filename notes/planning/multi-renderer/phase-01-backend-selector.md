@@ -269,40 +269,40 @@ Implement function to get complete runtime configuration as a map.
 
 ## 1.5 Integration Tests
 
-- [ ] **Section 1.5 Complete**
+- [x] **Section 1.5 Complete**
 
 Integration tests verify that all Phase 1 modules work together correctly. These tests exercise the full backend selection flow from configuration through selector.
 
 ### 1.5.1 Backend Selection Flow Tests
 
-- [ ] **Task 1.5.1 Complete**
+- [x] **Task 1.5.1 Complete**
 
 Test the complete flow from configuration to backend selection.
 
-- [ ] 1.5.1.1 Test configuration with `:auto` backend triggers selector
-- [ ] 1.5.1.2 Test selector result provides correct backend module and init options
-- [ ] 1.5.1.3 Test explicit backend configuration bypasses selector
-- [ ] 1.5.1.4 Test invalid configuration is caught before selector runs
+- [x] 1.5.1.1 Test configuration with `:auto` backend triggers selector
+- [x] 1.5.1.2 Test selector result provides correct backend module and init options
+- [x] 1.5.1.3 Test explicit backend configuration bypasses selector
+- [x] 1.5.1.4 Test invalid configuration is caught before selector runs
 
 ### 1.5.2 Capability Integration Tests
 
-- [ ] **Task 1.5.2 Complete**
+- [x] **Task 1.5.2 Complete**
 
 Test capability detection integrates with existing `TermUI.Capabilities` module where applicable.
 
-- [ ] 1.5.2.1 Test TTY capability detection produces compatible capability format
-- [ ] 1.5.2.2 Test capability map can be passed to TTY backend init
-- [ ] 1.5.2.3 Test environment variable changes affect capability detection
+- [x] 1.5.2.1 Test TTY capability detection produces compatible capability format
+- [x] 1.5.2.2 Test capability map can be passed to TTY backend init
+- [x] 1.5.2.3 Test environment variable changes affect capability detection
 
 ### 1.5.3 State Management Tests
 
-- [ ] **Task 1.5.3 Complete**
+- [x] **Task 1.5.3 Complete**
 
 Test state management across the selection flow.
 
-- [ ] 1.5.3.1 Test `Backend.State` correctly wraps selector results
-- [ ] 1.5.3.2 Test state updates preserve backend-specific state
-- [ ] 1.5.3.3 Test mode field correctly reflects selection result
+- [x] 1.5.3.1 Test `Backend.State` correctly wraps selector results
+- [x] 1.5.3.2 Test state updates preserve backend-specific state
+- [x] 1.5.3.3 Test mode field correctly reflects selection result
 
 ---
 
