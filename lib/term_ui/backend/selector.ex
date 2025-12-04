@@ -121,6 +121,10 @@ defmodule TermUI.Backend.Selector do
   """
   @type color_depth :: :true_color | :color_256 | :color_16 | :monochrome
 
+  # Terminal types that support at least 16 colors.
+  # Used by basic_terminal?/1 to detect color support when COLORTERM is not set.
+  @basic_terminals ~w(xterm screen tmux vt100 vt220 linux rxvt ansi cygwin putty konsole gnome eterm)
+
   @doc """
   Selects the appropriate backend by attempting raw mode first.
 
@@ -202,8 +206,10 @@ defmodule TermUI.Backend.Selector do
         {:tty, detect_capabilities()}
 
       {:error, reason} ->
-        # Other errors also fall back to TTY mode
-        # This handles unexpected error conditions gracefully
+        # Defensive programming: handle unexpected errors from :shell.start_interactive/1.
+        # While OTP 28 documentation only specifies :ok and {:error, :already_started},
+        # we gracefully handle other error conditions for forward compatibility and
+        # robustness. The error reason is preserved in the capabilities map for debugging.
         {:tty, Map.put(detect_capabilities(), :raw_mode_error, reason)}
     end
   end
@@ -249,26 +255,11 @@ defmodule TermUI.Backend.Selector do
     end
   end
 
-  # Checks if TERM indicates a basic terminal with at least 16 colors
+  # Checks if TERM indicates a basic terminal with at least 16 colors.
+  # Uses @basic_terminals module attribute for the list of supported terminal types.
   @spec basic_terminal?(String.t()) :: boolean()
   defp basic_terminal?(term) do
-    basic_terms = [
-      "xterm",
-      "screen",
-      "tmux",
-      "vt100",
-      "vt220",
-      "linux",
-      "rxvt",
-      "ansi",
-      "cygwin",
-      "putty",
-      "konsole",
-      "gnome",
-      "eterm"
-    ]
-
-    Enum.any?(basic_terms, fn basic ->
+    Enum.any?(@basic_terminals, fn basic ->
       String.starts_with?(term, basic) or String.contains?(term, basic)
     end)
   end
@@ -281,7 +272,13 @@ defmodule TermUI.Backend.Selector do
     lc_ctype = System.get_env("LC_CTYPE") || ""
 
     # Check all locale variables, prioritizing LC_ALL > LC_CTYPE > LANG
-    locale = if lc_all != "", do: lc_all, else: if(lc_ctype != "", do: lc_ctype, else: lang)
+    locale =
+      cond do
+        lc_all != "" -> lc_all
+        lc_ctype != "" -> lc_ctype
+        true -> lang
+      end
+
     locale_upper = String.upcase(locale)
 
     String.contains?(locale_upper, "UTF-8") or String.contains?(locale_upper, "UTF8")
@@ -303,7 +300,7 @@ defmodule TermUI.Backend.Selector do
   defp detect_terminal_presence do
     case :io.getopts() do
       {:ok, opts} ->
-        Keyword.get(opts, :terminal, false) == true
+        Keyword.get(opts, :terminal, false)
 
       _ ->
         false

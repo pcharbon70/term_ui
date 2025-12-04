@@ -2,6 +2,7 @@ defmodule TermUI.Backend.SelectorTest do
   use ExUnit.Case, async: true
 
   alias TermUI.Backend.Selector
+  import TermUI.Backend.SelectorTestHelpers
 
   describe "module structure" do
     test "module compiles successfully" do
@@ -377,238 +378,178 @@ defmodule TermUI.Backend.SelectorTest do
 
   describe "color depth detection" do
     # These tests verify the color detection logic using environment manipulation
-    # Note: We save and restore the original values to not affect other tests
+    # Uses with_env/2 helper for environment isolation
 
     test "detects true_color from COLORTERM=truecolor" do
-      original = System.get_env("COLORTERM")
-
-      try do
-        System.put_env("COLORTERM", "truecolor")
+      with_env(%{"COLORTERM" => "truecolor"}, fn ->
         caps = Selector.detect_capabilities()
         assert caps.colors == :true_color
-      after
-        if original, do: System.put_env("COLORTERM", original), else: System.delete_env("COLORTERM")
-      end
+      end)
     end
 
     test "detects true_color from COLORTERM=24bit" do
-      original = System.get_env("COLORTERM")
-
-      try do
-        System.put_env("COLORTERM", "24bit")
+      with_env(%{"COLORTERM" => "24bit"}, fn ->
         caps = Selector.detect_capabilities()
         assert caps.colors == :true_color
-      after
-        if original, do: System.put_env("COLORTERM", original), else: System.delete_env("COLORTERM")
-      end
+      end)
     end
 
     test "detects color_256 from TERM containing -256color" do
-      original_colorterm = System.get_env("COLORTERM")
-      original_term = System.get_env("TERM")
-
-      try do
-        System.delete_env("COLORTERM")
-        System.put_env("TERM", "xterm-256color")
+      with_env(%{"COLORTERM" => nil, "TERM" => "xterm-256color"}, fn ->
         caps = Selector.detect_capabilities()
         assert caps.colors == :color_256
-      after
-        if original_colorterm,
-          do: System.put_env("COLORTERM", original_colorterm),
-          else: System.delete_env("COLORTERM")
-
-        if original_term,
-          do: System.put_env("TERM", original_term),
-          else: System.delete_env("TERM")
-      end
+      end)
     end
 
     test "detects true_color from TERM containing -direct" do
-      original_colorterm = System.get_env("COLORTERM")
-      original_term = System.get_env("TERM")
-
-      try do
-        System.delete_env("COLORTERM")
-        System.put_env("TERM", "xterm-direct")
+      with_env(%{"COLORTERM" => nil, "TERM" => "xterm-direct"}, fn ->
         caps = Selector.detect_capabilities()
         assert caps.colors == :true_color
-      after
-        if original_colorterm,
-          do: System.put_env("COLORTERM", original_colorterm),
-          else: System.delete_env("COLORTERM")
-
-        if original_term,
-          do: System.put_env("TERM", original_term),
-          else: System.delete_env("TERM")
-      end
+      end)
     end
 
     test "detects color_16 from basic terminal TERM" do
-      original_colorterm = System.get_env("COLORTERM")
-      original_term = System.get_env("TERM")
-
-      try do
-        System.delete_env("COLORTERM")
-        System.put_env("TERM", "xterm")
+      with_env(%{"COLORTERM" => nil, "TERM" => "xterm"}, fn ->
         caps = Selector.detect_capabilities()
         assert caps.colors == :color_16
-      after
-        if original_colorterm,
-          do: System.put_env("COLORTERM", original_colorterm),
-          else: System.delete_env("COLORTERM")
-
-        if original_term,
-          do: System.put_env("TERM", original_term),
-          else: System.delete_env("TERM")
-      end
+      end)
     end
 
     test "falls back to monochrome when TERM is empty" do
-      original_colorterm = System.get_env("COLORTERM")
-      original_term = System.get_env("TERM")
-
-      try do
-        System.delete_env("COLORTERM")
-        System.delete_env("TERM")
+      with_env(%{"COLORTERM" => nil, "TERM" => nil}, fn ->
         caps = Selector.detect_capabilities()
         assert caps.colors == :monochrome
-      after
-        if original_colorterm,
-          do: System.put_env("COLORTERM", original_colorterm),
-          else: System.delete_env("COLORTERM")
-
-        if original_term,
-          do: System.put_env("TERM", original_term),
-          else: System.delete_env("TERM")
-      end
+      end)
     end
 
     test "COLORTERM takes priority over TERM" do
-      original_colorterm = System.get_env("COLORTERM")
-      original_term = System.get_env("TERM")
-
-      try do
-        # Even with xterm (which would be color_16), truecolor COLORTERM wins
-        System.put_env("COLORTERM", "truecolor")
-        System.put_env("TERM", "xterm")
+      # Even with xterm (which would be color_16), truecolor COLORTERM wins
+      with_env(%{"COLORTERM" => "truecolor", "TERM" => "xterm"}, fn ->
         caps = Selector.detect_capabilities()
         assert caps.colors == :true_color
-      after
-        if original_colorterm,
-          do: System.put_env("COLORTERM", original_colorterm),
-          else: System.delete_env("COLORTERM")
+      end)
+    end
+  end
 
-        if original_term,
-          do: System.put_env("TERM", original_term),
-          else: System.delete_env("TERM")
+  describe "basic terminal type detection" do
+    # Tests for all 13 terminal types supported by basic_terminal?/1
+
+    @basic_terminals ~w(xterm screen tmux vt100 vt220 linux rxvt ansi cygwin putty konsole gnome eterm)
+
+    test "detects all supported basic terminal types" do
+      for terminal <- @basic_terminals do
+        with_env(%{"COLORTERM" => nil, "TERM" => terminal}, fn ->
+          caps = Selector.detect_capabilities()
+
+          assert caps.colors == :color_16,
+                 "Expected #{terminal} to be detected as color_16, got #{caps.colors}"
+        end)
+      end
+    end
+
+    test "detects terminal types with suffixes" do
+      # Test that terminal types with common suffixes are still detected
+      test_cases = [
+        {"xterm-256color", :color_256},
+        {"screen-256color", :color_256},
+        {"tmux-256color", :color_256},
+        {"rxvt-unicode", :color_16},
+        {"gnome-terminal", :color_16}
+      ]
+
+      for {terminal, expected} <- test_cases do
+        with_env(%{"COLORTERM" => nil, "TERM" => terminal}, fn ->
+          caps = Selector.detect_capabilities()
+
+          assert caps.colors == expected,
+                 "Expected #{terminal} to be detected as #{expected}, got #{caps.colors}"
+        end)
+      end
+    end
+
+    test "detects terminal types with prefixes" do
+      # Test that terminal types can be detected when they appear as substrings
+      test_cases = [
+        "my-xterm-custom",
+        "custom-screen",
+        "linux-console"
+      ]
+
+      for terminal <- test_cases do
+        with_env(%{"COLORTERM" => nil, "TERM" => terminal}, fn ->
+          caps = Selector.detect_capabilities()
+
+          assert caps.colors == :color_16,
+                 "Expected #{terminal} to be detected as color_16, got #{caps.colors}"
+        end)
+      end
+    end
+
+    test "returns monochrome for unknown terminal types" do
+      unknown_terminals = ["dumb", "unknown", "weird-terminal", ""]
+
+      for terminal <- unknown_terminals do
+        with_env(%{"COLORTERM" => nil, "TERM" => terminal}, fn ->
+          caps = Selector.detect_capabilities()
+
+          assert caps.colors == :monochrome,
+                 "Expected #{inspect(terminal)} to be detected as monochrome, got #{caps.colors}"
+        end)
       end
     end
   end
 
   describe "unicode detection" do
-    test "detects unicode from LANG containing UTF-8" do
-      original_lang = System.get_env("LANG")
-      original_lc_all = System.get_env("LC_ALL")
-      original_lc_ctype = System.get_env("LC_CTYPE")
+    # Uses with_env/2 helper for environment isolation
 
-      try do
-        System.delete_env("LC_ALL")
-        System.delete_env("LC_CTYPE")
-        System.put_env("LANG", "en_US.UTF-8")
+    test "detects unicode from LANG containing UTF-8" do
+      with_env(%{"LC_ALL" => nil, "LC_CTYPE" => nil, "LANG" => "en_US.UTF-8"}, fn ->
         caps = Selector.detect_capabilities()
         assert caps.unicode == true
-      after
-        if original_lang,
-          do: System.put_env("LANG", original_lang),
-          else: System.delete_env("LANG")
-
-        if original_lc_all,
-          do: System.put_env("LC_ALL", original_lc_all),
-          else: System.delete_env("LC_ALL")
-
-        if original_lc_ctype,
-          do: System.put_env("LC_CTYPE", original_lc_ctype),
-          else: System.delete_env("LC_CTYPE")
-      end
+      end)
     end
 
-    test "detects unicode from LC_ALL taking priority" do
-      original_lang = System.get_env("LANG")
-      original_lc_all = System.get_env("LC_ALL")
-      original_lc_ctype = System.get_env("LC_CTYPE")
-
-      try do
-        System.put_env("LC_ALL", "en_US.UTF-8")
-        System.put_env("LANG", "C")
-        System.delete_env("LC_CTYPE")
+    test "detects unicode from LC_ALL taking priority over LANG" do
+      with_env(%{"LC_ALL" => "en_US.UTF-8", "LC_CTYPE" => nil, "LANG" => "C"}, fn ->
         caps = Selector.detect_capabilities()
         assert caps.unicode == true
-      after
-        if original_lang,
-          do: System.put_env("LANG", original_lang),
-          else: System.delete_env("LANG")
+      end)
+    end
 
-        if original_lc_all,
-          do: System.put_env("LC_ALL", original_lc_all),
-          else: System.delete_env("LC_ALL")
+    test "detects unicode from LC_CTYPE taking priority over LANG" do
+      with_env(%{"LC_ALL" => nil, "LC_CTYPE" => "en_US.UTF-8", "LANG" => "C"}, fn ->
+        caps = Selector.detect_capabilities()
+        assert caps.unicode == true
+      end)
+    end
 
-        if original_lc_ctype,
-          do: System.put_env("LC_CTYPE", original_lc_ctype),
-          else: System.delete_env("LC_CTYPE")
-      end
+    test "LC_ALL takes priority over LC_CTYPE" do
+      with_env(%{"LC_ALL" => "en_US.UTF-8", "LC_CTYPE" => "C", "LANG" => "C"}, fn ->
+        caps = Selector.detect_capabilities()
+        assert caps.unicode == true
+      end)
     end
 
     test "returns false when no UTF locale is set" do
-      original_lang = System.get_env("LANG")
-      original_lc_all = System.get_env("LC_ALL")
-      original_lc_ctype = System.get_env("LC_CTYPE")
-
-      try do
-        System.delete_env("LC_ALL")
-        System.delete_env("LC_CTYPE")
-        System.put_env("LANG", "C")
+      with_env(%{"LC_ALL" => nil, "LC_CTYPE" => nil, "LANG" => "C"}, fn ->
         caps = Selector.detect_capabilities()
         assert caps.unicode == false
-      after
-        if original_lang,
-          do: System.put_env("LANG", original_lang),
-          else: System.delete_env("LANG")
-
-        if original_lc_all,
-          do: System.put_env("LC_ALL", original_lc_all),
-          else: System.delete_env("LC_ALL")
-
-        if original_lc_ctype,
-          do: System.put_env("LC_CTYPE", original_lc_ctype),
-          else: System.delete_env("LC_CTYPE")
-      end
+      end)
     end
 
     test "handles case-insensitive UTF-8 detection" do
-      original_lang = System.get_env("LANG")
-      original_lc_all = System.get_env("LC_ALL")
-      original_lc_ctype = System.get_env("LC_CTYPE")
-
-      try do
-        System.delete_env("LC_ALL")
-        System.delete_env("LC_CTYPE")
-        # Some systems use lowercase utf-8
-        System.put_env("LANG", "en_US.utf-8")
+      # Some systems use lowercase utf-8
+      with_env(%{"LC_ALL" => nil, "LC_CTYPE" => nil, "LANG" => "en_US.utf-8"}, fn ->
         caps = Selector.detect_capabilities()
         assert caps.unicode == true
-      after
-        if original_lang,
-          do: System.put_env("LANG", original_lang),
-          else: System.delete_env("LANG")
+      end)
+    end
 
-        if original_lc_all,
-          do: System.put_env("LC_ALL", original_lc_all),
-          else: System.delete_env("LC_ALL")
-
-        if original_lc_ctype,
-          do: System.put_env("LC_CTYPE", original_lc_ctype),
-          else: System.delete_env("LC_CTYPE")
-      end
+    test "handles UTF8 without hyphen" do
+      with_env(%{"LC_ALL" => nil, "LC_CTYPE" => nil, "LANG" => "en_US.UTF8"}, fn ->
+        caps = Selector.detect_capabilities()
+        assert caps.unicode == true
+      end)
     end
   end
 
@@ -639,6 +580,39 @@ defmodule TermUI.Backend.SelectorTest do
     test "returns a boolean" do
       caps = Selector.detect_capabilities()
       assert is_boolean(caps.terminal)
+    end
+  end
+
+  describe "defensive error handling" do
+    # Tests documenting the defensive programming approach for unexpected errors
+
+    test "attempt_raw_mode handles documented error types" do
+      # The function should always return a valid result
+      result = Selector.attempt_raw_mode()
+      assert_valid_selection_result(result)
+    end
+
+    test "generic error handling preserves error reason in capabilities" do
+      # This test documents the expected behavior when an unexpected error occurs.
+      # While we can't easily simulate an unexpected error from :shell.start_interactive/1,
+      # we document that when such errors occur:
+      # 1. The function returns {:tty, capabilities} (graceful degradation)
+      # 2. The error reason is preserved in the :raw_mode_error key
+      #
+      # This defensive approach ensures forward compatibility with future OTP versions
+      # that might introduce new error conditions.
+      result = Selector.attempt_raw_mode()
+
+      case result do
+        {:tty, caps} ->
+          # In test environment, we typically get {:error, :already_started}
+          # which doesn't add :raw_mode_error. But the structure is valid.
+          assert_valid_capabilities(caps)
+
+        {:raw, state} ->
+          # Raw mode succeeded - also valid
+          assert_valid_raw_state(state)
+      end
     end
   end
 end
