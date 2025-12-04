@@ -111,14 +111,14 @@ Create the selector module with proper structure and documentation explaining th
 
 ### 1.2.2 Implement Core Selection Logic
 
-- [ ] **Task 1.2.2 Complete**
+- [x] **Task 1.2.2 Complete**
 
 Implement the `select/0` function that attempts raw mode and returns appropriate backend context.
 
-- [ ] 1.2.2.1 Implement `select/0` function calling `:shell.start_interactive({:noshell, :raw})`
-- [ ] 1.2.2.2 Handle `:ok` return by returning `{:raw, %{raw_mode_started: true}}`
-- [ ] 1.2.2.3 Handle `{:error, :already_started}` return by calling `detect_tty_capabilities/0` and returning `{:tty, capabilities}`
-- [ ] 1.2.2.4 Wrap call in try/rescue to handle `UndefinedFunctionError` on pre-OTP 28 systems (fall back to TTY)
+- [x] 1.2.2.1 Implement `select/0` function calling `:shell.start_interactive({:noshell, :raw})`
+- [x] 1.2.2.2 Handle `:ok` return by returning `{:raw, %{raw_mode_started: true}}`
+- [x] 1.2.2.3 Handle `{:error, :already_started}` return by calling `detect_tty_capabilities/0` and returning `{:tty, capabilities}`
+- [x] 1.2.2.4 Wrap call in try/rescue to handle `UndefinedFunctionError` on pre-OTP 28 systems (fall back to TTY)
 
 ### 1.2.3 Implement TTY Capability Detection
 

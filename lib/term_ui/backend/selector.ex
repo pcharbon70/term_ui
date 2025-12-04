@@ -174,14 +174,38 @@ defmodule TermUI.Backend.Selector do
   end
 
   # Private implementation functions
-  # Core logic will be implemented in task 1.2.2
 
   @doc false
   @spec try_raw_mode() :: {:raw, raw_state()} | {:tty, capabilities()}
   def try_raw_mode do
-    # Placeholder implementation - will be completed in task 1.2.2
-    # For now, always return TTY mode for safety
-    {:tty, detect_capabilities()}
+    try do
+      attempt_raw_mode()
+    rescue
+      # Handle pre-OTP 28 systems where :shell.start_interactive/1 doesn't exist
+      UndefinedFunctionError ->
+        {:tty, detect_capabilities()}
+    end
+  end
+
+  # Attempts to start raw mode using OTP 28's shell.start_interactive/1
+  # This is separated to allow testing the rescue path
+  @doc false
+  @spec attempt_raw_mode() :: {:raw, raw_state()} | {:tty, capabilities()}
+  def attempt_raw_mode do
+    case :shell.start_interactive({:noshell, :raw}) do
+      :ok ->
+        # Raw mode successfully activated
+        {:raw, %{raw_mode_started: true}}
+
+      {:error, :already_started} ->
+        # A shell is already running, fall back to TTY mode
+        {:tty, detect_capabilities()}
+
+      {:error, reason} ->
+        # Other errors also fall back to TTY mode
+        # This handles unexpected error conditions gracefully
+        {:tty, Map.put(detect_capabilities(), :raw_mode_error, reason)}
+    end
   end
 
   @doc false

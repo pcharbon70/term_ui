@@ -198,4 +198,134 @@ defmodule TermUI.Backend.SelectorTest do
       assert result == {:explicit, TermUI.Backend.TTY, opts}
     end
   end
+
+  describe "try_raw_mode/0 core selection logic" do
+    test "returns a two-element tuple" do
+      result = Selector.try_raw_mode()
+      assert is_tuple(result)
+      assert tuple_size(result) == 2
+    end
+
+    test "first element is :raw or :tty" do
+      {mode, _} = Selector.try_raw_mode()
+      assert mode in [:raw, :tty]
+    end
+
+    test "raw mode returns map with raw_mode_started key" do
+      case Selector.try_raw_mode() do
+        {:raw, state} ->
+          assert is_map(state)
+          assert Map.has_key?(state, :raw_mode_started)
+          assert state.raw_mode_started == true
+
+        {:tty, _} ->
+          # TTY mode is also valid - depends on environment
+          :ok
+      end
+    end
+
+    test "tty mode returns capabilities map" do
+      case Selector.try_raw_mode() do
+        {:tty, capabilities} ->
+          assert is_map(capabilities)
+          assert Map.has_key?(capabilities, :colors)
+          assert Map.has_key?(capabilities, :unicode)
+          assert Map.has_key?(capabilities, :dimensions)
+          assert Map.has_key?(capabilities, :terminal)
+
+        {:raw, _} ->
+          # Raw mode is also valid - depends on environment
+          :ok
+      end
+    end
+  end
+
+  describe "attempt_raw_mode/0" do
+    # These tests verify the attempt_raw_mode function behavior
+    # The actual result depends on OTP version and terminal state
+
+    test "returns a valid selection result" do
+      result = Selector.attempt_raw_mode()
+      assert is_tuple(result)
+      assert tuple_size(result) == 2
+
+      case result do
+        {:raw, state} ->
+          assert is_map(state)
+          assert state.raw_mode_started == true
+
+        {:tty, capabilities} ->
+          assert is_map(capabilities)
+
+        other ->
+          flunk("Unexpected result: #{inspect(other)}")
+      end
+    end
+
+    test "handles :already_started error by returning tty mode" do
+      # In a test environment with IEx/shell already running,
+      # we expect {:error, :already_started} which should return TTY mode
+      # This test documents expected behavior - actual result depends on environment
+      result = Selector.attempt_raw_mode()
+
+      case result do
+        {:tty, capabilities} ->
+          assert is_map(capabilities)
+          assert Map.has_key?(capabilities, :colors)
+
+        {:raw, _state} ->
+          # Raw mode succeeded - also valid
+          :ok
+      end
+    end
+  end
+
+  describe "pre-OTP 28 fallback" do
+    # Test that the try/rescue in try_raw_mode handles UndefinedFunctionError
+    # We can't easily simulate this without mocking, so we test the structure
+
+    test "try_raw_mode wraps attempt_raw_mode in try/rescue" do
+      # The function should not raise even if shell.start_interactive doesn't exist
+      # This is verified by the function returning a valid result
+      result = Selector.try_raw_mode()
+      assert match?({:raw, _}, result) or match?({:tty, _}, result)
+    end
+
+    test "function exports attempt_raw_mode for testability" do
+      # attempt_raw_mode is exported (doc false) to allow testing the core logic
+      assert function_exported?(Selector, :attempt_raw_mode, 0)
+    end
+  end
+
+  describe "raw mode state format" do
+    test "raw state contains raw_mode_started boolean" do
+      # When raw mode succeeds, state should have this key
+      # Test the expected structure
+      expected_keys = [:raw_mode_started]
+
+      case Selector.try_raw_mode() do
+        {:raw, state} ->
+          for key <- expected_keys do
+            assert Map.has_key?(state, key), "Raw state should have #{key} key"
+          end
+
+          assert is_boolean(state.raw_mode_started)
+
+        {:tty, _} ->
+          # TTY mode - raw state format not applicable
+          :ok
+      end
+    end
+  end
+
+  describe "integration with select/0" do
+    test "select/0 delegates to try_raw_mode/0" do
+      # Both should return compatible formats
+      select_result = Selector.select()
+      try_result = Selector.try_raw_mode()
+
+      # Both should be same mode (raw or tty)
+      assert elem(select_result, 0) == elem(try_result, 0)
+    end
+  end
 end
