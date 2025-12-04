@@ -1,0 +1,554 @@
+# Phase 2: Raw Backend Implementation
+
+## Overview
+
+Phase 2 implements the `TermUI.Backend.Raw` module, which provides full terminal control when raw mode is available. This backend assumes raw mode was already activated by the selector (Phase 1) and provides optimized ANSI output with true color support.
+
+The Raw backend serves as the primary high-fidelity rendering path. It enables alternate screen buffer usage, cursor hiding, mouse tracking, and all advanced terminal features. Since raw mode is active, input arrives character-by-character, enabling real-time keyboard and mouse event handling.
+
+The implementation wraps and extends functionality from the existing `TermUI.Terminal` module, reusing its proven raw mode handling while adapting it to the backend behaviour interface. The key architectural change is that the selector handles raw mode activation, so `init/1` only performs terminal setup (alternate screen, cursor hiding) without calling `:shell.start_interactive/1`.
+
+This phase maintains full backward compatibility—existing applications using TermUI will continue to work identically, as the Raw backend preserves all current rendering capabilities.
+
+---
+
+## 2.1 Create Raw Backend Module Structure
+
+- [ ] **Section 2.1 Complete**
+
+Set up the `TermUI.Backend.Raw` module implementing the `TermUI.Backend` behaviour. The module structure follows existing TermUI patterns while conforming to the new backend abstraction.
+
+### 2.1.1 Define Module with Behaviour Declaration
+
+- [x] **Task 2.1.1 Complete**
+
+Create the module with proper structure, documentation, and behaviour declaration.
+
+- [x] 2.1.1.1 Create `lib/term_ui/backend/raw.ex` with `@behaviour TermUI.Backend` declaration
+- [x] 2.1.1.2 Add comprehensive `@moduledoc` explaining the backend's purpose, requirements (OTP 28+), and capabilities
+- [x] 2.1.1.3 Document that raw mode is already active when `init/1` is called (started by Selector)
+- [x] 2.1.1.4 Import or alias `TermUI.ANSI` for escape sequence generation
+
+### 2.1.2 Define Internal State Structure
+
+- [ ] **Task 2.1.2 Complete**
+
+Define the internal state struct for tracking terminal state within the backend.
+
+- [ ] 2.1.2.1 Define `defstruct` with field `size :: {rows :: pos_integer(), cols :: pos_integer()}`
+- [ ] 2.1.2.2 Define field `cursor_visible :: boolean()` defaulting to `false` (hidden during rendering)
+- [ ] 2.1.2.3 Define field `cursor_position :: {row :: pos_integer(), col :: pos_integer()} | nil`
+- [ ] 2.1.2.4 Define field `alternate_screen :: boolean()` tracking alternate screen state
+- [ ] 2.1.2.5 Define field `mouse_mode :: :none | :click | :drag | :all` tracking mouse tracking state
+- [ ] 2.1.2.6 Define field `current_style :: Style.t() | nil` for tracking current SGR state to minimize output
+
+### Unit Tests - Section 2.1
+
+- [ ] **Unit Tests 2.1 Complete**
+- [ ] Test module compiles and declares `@behaviour TermUI.Backend`
+- [ ] Test state struct has all expected fields with correct defaults
+- [ ] Test state struct can be pattern matched
+
+---
+
+## 2.2 Implement Initialization Lifecycle
+
+- [ ] **Section 2.2 Complete**
+
+Implement `init/1` and `shutdown/1` callbacks for terminal setup and teardown. These callbacks assume raw mode is already active from the selector.
+
+### 2.2.1 Implement init/1 Callback
+
+- [ ] **Task 2.2.1 Complete**
+
+Implement initialization that sets up the terminal for rendering without activating raw mode (already done by selector).
+
+- [ ] 2.2.1.1 Implement `@impl true` `init/1` accepting keyword options
+- [ ] 2.2.1.2 Accept `:alternate_screen` option (default: `true`) to control alternate screen usage
+- [ ] 2.2.1.3 Accept `:hide_cursor` option (default: `true`) to control initial cursor visibility
+- [ ] 2.2.1.4 Accept `:mouse_tracking` option (default: `:none`) for mouse mode
+- [ ] 2.2.1.5 Accept `:size` option for explicit dimensions, falling back to query
+
+### 2.2.2 Implement Terminal Setup Sequence
+
+- [ ] **Task 2.2.2 Complete**
+
+Implement the sequence of operations to prepare the terminal for rendering.
+
+- [ ] 2.2.2.1 Query terminal size using `:io.columns/0` and `:io.rows/0` if not provided in options
+- [ ] 2.2.2.2 Enter alternate screen buffer with `\e[?1049h` if `alternate_screen: true`
+- [ ] 2.2.2.3 Hide cursor with `\e[?25l` if `hide_cursor: true`
+- [ ] 2.2.2.4 Enable mouse tracking if requested using appropriate escape sequences
+- [ ] 2.2.2.5 Clear the screen with `\e[2J\e[1;1H` to start fresh
+- [ ] 2.2.2.6 Return `{:ok, state}` with initialized state struct
+
+### 2.2.3 Implement shutdown/1 Callback
+
+- [ ] **Task 2.2.3 Complete**
+
+Implement clean shutdown that restores terminal to pre-init state.
+
+- [ ] 2.2.3.1 Implement `@impl true` `shutdown/1` accepting state
+- [ ] 2.2.3.2 Disable mouse tracking if it was enabled
+- [ ] 2.2.3.3 Show cursor with `\e[?25h`
+- [ ] 2.2.3.4 Leave alternate screen with `\e[?1049l` if it was entered
+- [ ] 2.2.3.5 Reset all attributes with `\e[0m`
+- [ ] 2.2.3.6 Return to cooked mode with `:shell.start_interactive({:noshell, :cooked})`
+- [ ] 2.2.3.7 Return `:ok`
+
+### 2.2.4 Implement Error-Safe Shutdown
+
+- [ ] **Task 2.2.4 Complete**
+
+Ensure shutdown completes even if individual operations fail.
+
+- [ ] 2.2.4.1 Wrap each shutdown step in try/rescue
+- [ ] 2.2.4.2 Log errors but continue cleanup sequence
+- [ ] 2.2.4.3 Ensure cooked mode restoration happens last and is attempted even after errors
+- [ ] 2.2.4.4 Make shutdown idempotent (safe to call multiple times)
+
+### Unit Tests - Section 2.2
+
+- [ ] **Unit Tests 2.2 Complete**
+- [ ] Test `init/1` with default options returns `{:ok, state}`
+- [ ] Test `init/1` with `alternate_screen: false` does not enter alternate screen
+- [ ] Test `init/1` with explicit size option uses provided dimensions
+- [ ] Test `init/1` queries terminal size when not provided
+- [ ] Test `shutdown/1` returns `:ok`
+- [ ] Test `shutdown/1` is idempotent (can be called twice safely)
+- [ ] Test shutdown continues after individual step failure
+
+---
+
+## 2.3 Implement Cursor Operations
+
+- [ ] **Section 2.3 Complete**
+
+Implement cursor control callbacks for positioning and visibility. These operations use ANSI escape sequences from the existing `TermUI.ANSI` module.
+
+### 2.3.1 Implement move_cursor/2 Callback
+
+- [ ] **Task 2.3.1 Complete**
+
+Implement cursor positioning using absolute coordinates.
+
+- [ ] 2.3.1.1 Implement `@impl true` `move_cursor/2` accepting state and `{row, col}` position
+- [ ] 2.3.1.2 Generate `\e[row;colH` sequence using `TermUI.ANSI.cursor_position/2`
+- [ ] 2.3.1.3 Write sequence to stdout via `IO.write/1`
+- [ ] 2.3.1.4 Update `cursor_position` in state
+- [ ] 2.3.1.5 Return `{:ok, updated_state}`
+
+### 2.3.2 Implement hide_cursor/1 and show_cursor/1 Callbacks
+
+- [ ] **Task 2.3.2 Complete**
+
+Implement cursor visibility control.
+
+- [ ] 2.3.2.1 Implement `@impl true` `hide_cursor/1` writing `\e[?25l`
+- [ ] 2.3.2.2 Update `cursor_visible` to `false` in state
+- [ ] 2.3.2.3 Implement `@impl true` `show_cursor/1` writing `\e[?25h`
+- [ ] 2.3.2.4 Update `cursor_visible` to `true` in state
+- [ ] 2.3.2.5 Make operations idempotent (no-op if already in desired state)
+
+### 2.3.3 Implement Cursor Position Optimization
+
+- [ ] **Task 2.3.3 Complete**
+
+Implement optional cursor movement optimization comparing absolute vs relative moves.
+
+- [ ] 2.3.3.1 Calculate cost of absolute move (`\e[row;colH` = 6-10 bytes)
+- [ ] 2.3.3.2 Calculate cost of relative moves (up/down/forward/back sequences)
+- [ ] 2.3.3.3 Choose cheaper option based on distance and current position
+- [ ] 2.3.3.4 Reference existing `TermUI.Renderer.CursorOptimizer` for algorithm
+
+### Unit Tests - Section 2.3
+
+- [ ] **Unit Tests 2.3 Complete**
+- [ ] Test `move_cursor/2` generates correct escape sequence for various positions
+- [ ] Test `move_cursor/2` updates state with new position
+- [ ] Test `hide_cursor/1` updates state to `cursor_visible: false`
+- [ ] Test `show_cursor/1` updates state to `cursor_visible: true`
+- [ ] Test cursor operations are idempotent
+- [ ] Test cursor optimizer chooses relative move for short distances
+
+---
+
+## 2.4 Implement Screen Operations
+
+- [ ] **Section 2.4 Complete**
+
+Implement screen clearing and the size query callback. These provide essential screen management capabilities.
+
+### 2.4.1 Implement clear/1 Callback
+
+- [ ] **Task 2.4.1 Complete**
+
+Implement full screen clear.
+
+- [ ] 2.4.1.1 Implement `@impl true` `clear/1` accepting state
+- [ ] 2.4.1.2 Write `\e[2J` (clear entire screen)
+- [ ] 2.4.1.3 Write `\e[1;1H` (move cursor to home position)
+- [ ] 2.4.1.4 Reset `current_style` in state (style state unknown after clear)
+- [ ] 2.4.1.5 Return `{:ok, updated_state}`
+
+### 2.4.2 Implement size/1 Callback
+
+- [ ] **Task 2.4.2 Complete**
+
+Implement terminal size query.
+
+- [ ] 2.4.2.1 Implement `@impl true` `size/1` accepting state
+- [ ] 2.4.2.2 Return `{:ok, state.size}` from cached state
+- [ ] 2.4.2.3 Provide `refresh_size/1` function to re-query dimensions
+- [ ] 2.4.2.4 Handle `:io.columns/0` or `:io.rows/0` failure with `{:error, :enotsup}`
+
+### 2.4.3 Implement Size Refresh
+
+- [ ] **Task 2.4.3 Complete**
+
+Implement size refresh for handling terminal resize events.
+
+- [ ] 2.4.3.1 Implement `refresh_size/1` querying `:io.columns/0` and `:io.rows/0`
+- [ ] 2.4.3.2 Update `size` field in state
+- [ ] 2.4.3.3 Return `{:ok, new_size, updated_state}`
+- [ ] 2.4.3.4 Document that this should be called after SIGWINCH handling
+
+### Unit Tests - Section 2.4
+
+- [ ] **Unit Tests 2.4 Complete**
+- [ ] Test `clear/1` returns `{:ok, state}`
+- [ ] Test `clear/1` resets current_style in state
+- [ ] Test `size/1` returns cached dimensions
+- [ ] Test `refresh_size/1` updates state with new dimensions
+- [ ] Test size query handles `:io.columns/0` failure gracefully
+
+---
+
+## 2.5 Implement Cell Drawing
+
+- [ ] **Section 2.5 Complete**
+
+Implement the core `draw_cells/2` callback for rendering. This is the primary rendering interface, taking a list of positioned cells and outputting optimized ANSI sequences.
+
+### 2.5.1 Implement draw_cells/2 Callback
+
+- [ ] **Task 2.5.1 Complete**
+
+Implement the main cell drawing callback with batch optimization.
+
+- [ ] 2.5.1.1 Implement `@impl true` `draw_cells/2` accepting state and list of `{position, cell}` tuples
+- [ ] 2.5.1.2 Sort cells by row then column for sequential output
+- [ ] 2.5.1.3 Group consecutive cells on same row for efficient cursor handling
+- [ ] 2.5.1.4 Track current position and style to minimize escape sequences
+- [ ] 2.5.1.5 Build output as iolist for efficient concatenation
+
+### 2.5.2 Implement Style Application
+
+- [ ] **Task 2.5.2 Complete**
+
+Implement conversion of cell styles to ANSI escape sequences.
+
+- [ ] 2.5.2.1 Track `current_style` in state to emit only style changes (deltas)
+- [ ] 2.5.2.2 Reset style with `\e[0m` when transitioning to simpler style (fewer attributes)
+- [ ] 2.5.2.3 Apply foreground color using appropriate sequence based on color type
+- [ ] 2.5.2.4 Apply background color using appropriate sequence based on color type
+- [ ] 2.5.2.5 Apply text attributes (bold, italic, underline, etc.) using SGR codes
+
+### 2.5.3 Implement True Color Output
+
+- [ ] **Task 2.5.3 Complete**
+
+Implement true color (24-bit) output for RGB color values.
+
+- [ ] 2.5.3.1 Detect RGB tuple `{r, g, b}` color type
+- [ ] 2.5.3.2 Generate foreground sequence `\e[38;2;r;g;bm`
+- [ ] 2.5.3.3 Generate background sequence `\e[48;2;r;g;bm`
+- [ ] 2.5.3.4 Use existing `TermUI.ANSI.true_color_foreground/1` and `true_color_background/1`
+
+### 2.5.4 Implement 256-Color Output
+
+- [ ] **Task 2.5.4 Complete**
+
+Implement 256-color palette output for integer color indices.
+
+- [ ] 2.5.4.1 Detect integer color value `0..255`
+- [ ] 2.5.4.2 Generate foreground sequence `\e[38;5;nm`
+- [ ] 2.5.4.3 Generate background sequence `\e[48;5;nm`
+- [ ] 2.5.4.4 Use existing `TermUI.ANSI.color256_foreground/1` and `color256_background/1`
+
+### 2.5.5 Implement Named Color Output
+
+- [ ] **Task 2.5.5 Complete**
+
+Implement standard 16-color output for named color atoms.
+
+- [ ] 2.5.5.1 Detect atom color value (`:red`, `:green`, `:blue`, etc.)
+- [ ] 2.5.5.2 Map to ANSI color codes (30-37 foreground, 40-47 background, 90-97/100-107 bright)
+- [ ] 2.5.5.3 Handle `:default` by using default foreground `\e[39m` or background `\e[49m`
+- [ ] 2.5.5.4 Use existing `TermUI.ANSI.foreground/1` and `TermUI.ANSI.background/1`
+
+### 2.5.6 Implement Attribute Handling
+
+- [ ] **Task 2.5.6 Complete**
+
+Implement text attribute application from cell attribute list.
+
+- [ ] 2.5.6.1 Handle `:bold` attribute with `\e[1m`
+- [ ] 2.5.6.2 Handle `:dim` attribute with `\e[2m`
+- [ ] 2.5.6.3 Handle `:italic` attribute with `\e[3m`
+- [ ] 2.5.6.4 Handle `:underline` attribute with `\e[4m`
+- [ ] 2.5.6.5 Handle `:blink` attribute with `\e[5m`
+- [ ] 2.5.6.6 Handle `:reverse` attribute with `\e[7m`
+- [ ] 2.5.6.7 Handle `:hidden` attribute with `\e[8m`
+- [ ] 2.5.6.8 Handle `:strikethrough` attribute with `\e[9m`
+
+### 2.5.7 Implement Output Batching
+
+- [ ] **Task 2.5.7 Complete**
+
+Optimize output by batching all sequences into a single write.
+
+- [ ] 2.5.7.1 Accumulate all escape sequences and characters in iolist
+- [ ] 2.5.7.2 Perform single `IO.write/1` call with complete iolist
+- [ ] 2.5.7.3 Update state with final cursor position and style
+- [ ] 2.5.7.4 Return `{:ok, updated_state}`
+
+### Unit Tests - Section 2.5
+
+- [ ] **Unit Tests 2.5 Complete**
+- [ ] Test `draw_cells/2` with single cell generates correct output
+- [ ] Test `draw_cells/2` with multiple cells on same row
+- [ ] Test `draw_cells/2` with cells on different rows
+- [ ] Test true color output format `\e[38;2;r;g;bm`
+- [ ] Test 256-color output format `\e[38;5;nm`
+- [ ] Test named color output maps correctly to ANSI codes
+- [ ] Test `:default` color uses reset sequences
+- [ ] Test attribute application for all supported attributes
+- [ ] Test style delta optimization (only changed attributes emitted)
+- [ ] Test output is batched into single write
+
+---
+
+## 2.6 Implement Flush Operation
+
+- [ ] **Section 2.6 Complete**
+
+Implement the `flush/1` callback for ensuring output is sent to the terminal.
+
+### 2.6.1 Implement flush/1 Callback
+
+- [ ] **Task 2.6.1 Complete**
+
+Implement flush that ensures all pending output is written.
+
+- [ ] 2.6.1.1 Implement `@impl true` `flush/1` accepting state
+- [ ] 2.6.1.2 For Raw backend, `IO.write/1` is synchronous so flush is largely a no-op
+- [ ] 2.6.1.3 Optionally call `:erlang.port_command/3` with sync option if buffering is used
+- [ ] 2.6.1.4 Return `{:ok, state}` unchanged
+
+### Unit Tests - Section 2.6
+
+- [ ] **Unit Tests 2.6 Complete**
+- [ ] Test `flush/1` returns `{:ok, state}`
+- [ ] Test `flush/1` is safe to call multiple times
+
+---
+
+## 2.7 Implement Input Polling
+
+- [ ] **Section 2.7 Complete**
+
+Implement the `poll_event/2` callback for reading keyboard and mouse input. In raw mode, input arrives character-by-character, enabling real-time event handling.
+
+### 2.7.1 Implement poll_event/2 Callback
+
+- [ ] **Task 2.7.1 Complete**
+
+Implement input polling with timeout support.
+
+- [ ] 2.7.1.1 Implement `@impl true` `poll_event/2` accepting state and timeout in milliseconds
+- [ ] 2.7.1.2 Use non-blocking read with timeout (delegate to existing InputReader pattern)
+- [ ] 2.7.1.3 Return `{:ok, event}` when input available
+- [ ] 2.7.1.4 Return `:timeout` when timeout expires with no input
+- [ ] 2.7.1.5 Handle read errors gracefully
+
+### 2.7.2 Implement Escape Sequence Handling
+
+- [ ] **Task 2.7.2 Complete**
+
+Handle multi-byte escape sequences with timeout-based disambiguation.
+
+- [ ] 2.7.2.1 Detect escape character (`\e`, byte 27) as potential sequence start
+- [ ] 2.7.2.2 Use short timeout (50ms) to read additional sequence bytes
+- [ ] 2.7.2.3 Delegate parsing to `TermUI.Terminal.EscapeParser`
+- [ ] 2.7.2.4 Return raw Escape key event if timeout expires (single escape press)
+
+### 2.7.3 Implement Event Construction
+
+- [ ] **Task 2.7.3 Complete**
+
+Convert parsed input to `TermUI.Event` structs.
+
+- [ ] 2.7.3.1 Construct `Event.Key` for keyboard input with key identifier and modifiers
+- [ ] 2.7.3.2 Construct `Event.Mouse` for mouse input with action, button, position, modifiers
+- [ ] 2.7.3.3 Handle special sequences (paste, focus, resize) as appropriate event types
+- [ ] 2.7.3.4 Include timestamp in events
+
+### Unit Tests - Section 2.7
+
+- [ ] **Unit Tests 2.7 Complete**
+- [ ] Test `poll_event/2` returns `:timeout` when no input
+- [ ] Test `poll_event/2` returns key event for single character
+- [ ] Test escape sequence parsing produces correct key events
+- [ ] Test arrow keys parsed from escape sequences
+- [ ] Test function keys parsed correctly
+- [ ] Test modifier detection (Ctrl, Alt, Shift)
+- [ ] Test mouse event parsing when mouse tracking enabled
+
+---
+
+## 2.8 Implement Mouse Tracking
+
+- [ ] **Section 2.8 Complete**
+
+Implement optional mouse tracking for interactive applications. Mouse tracking enables click, drag, and movement detection.
+
+### 2.8.1 Implement Mouse Tracking Enable
+
+- [ ] **Task 2.8.1 Complete**
+
+Implement mouse tracking activation with configurable modes.
+
+- [ ] 2.8.1.1 Implement `enable_mouse/2` accepting state and mode (`:click`, `:drag`, `:all`)
+- [ ] 2.8.1.2 Enable X10 mouse tracking with `\e[?9h` for basic click
+- [ ] 2.8.1.3 Enable button event tracking with `\e[?1002h` for drag
+- [ ] 2.8.1.4 Enable any event tracking with `\e[?1003h` for all movement
+- [ ] 2.8.1.5 Enable SGR extended mode with `\e[?1006h` for better coordinate handling
+- [ ] 2.8.1.6 Update `mouse_mode` in state
+
+### 2.8.2 Implement Mouse Tracking Disable
+
+- [ ] **Task 2.8.2 Complete**
+
+Implement mouse tracking deactivation.
+
+- [ ] 2.8.2.1 Implement `disable_mouse/1` accepting state
+- [ ] 2.8.2.2 Disable SGR mode with `\e[?1006l`
+- [ ] 2.8.2.3 Disable tracking mode with appropriate sequence (`\e[?1003l`, `\e[?1002l`, or `\e[?9l`)
+- [ ] 2.8.2.4 Update `mouse_mode` to `:none` in state
+
+### 2.8.3 Implement Mouse Event Parsing
+
+- [ ] **Task 2.8.3 Complete**
+
+Parse mouse events in `poll_event/2` when mouse tracking is active.
+
+- [ ] 2.8.3.1 Detect SGR mouse sequence prefix `\e[<`
+- [ ] 2.8.3.2 Parse button, column, row from sequence `\e[<button;col;rowM` (press) or `m` (release)
+- [ ] 2.8.3.3 Decode button to `:left`, `:middle`, `:right`, `:scroll_up`, `:scroll_down`
+- [ ] 2.8.3.4 Decode modifiers from button byte (Shift, Alt, Ctrl)
+- [ ] 2.8.3.5 Construct `Event.Mouse` with action, button, position, modifiers
+
+### Unit Tests - Section 2.8
+
+- [ ] **Unit Tests 2.8 Complete**
+- [ ] Test `enable_mouse/2` with `:click` mode writes correct sequences
+- [ ] Test `enable_mouse/2` with `:all` mode enables movement tracking
+- [ ] Test `disable_mouse/1` disables all tracking modes
+- [ ] Test SGR mouse sequence parsing for button press
+- [ ] Test SGR mouse sequence parsing for button release
+- [ ] Test mouse modifier detection
+- [ ] Test scroll wheel event parsing
+
+---
+
+## 2.9 Integration Tests
+
+- [ ] **Section 2.9 Complete**
+
+Integration tests verify the Raw backend works correctly in realistic scenarios, including interaction with existing TermUI components.
+
+### 2.9.1 Full Lifecycle Tests
+
+- [ ] **Task 2.9.1 Complete**
+
+Test complete backend lifecycle from init to shutdown.
+
+- [ ] 2.9.1.1 Test init → draw_cells → poll_event → shutdown sequence
+- [ ] 2.9.1.2 Test alternate screen is properly entered and exited
+- [ ] 2.9.1.3 Test terminal state is properly restored after shutdown
+- [ ] 2.9.1.4 Test shutdown after error during rendering
+
+### 2.9.2 Renderer Integration Tests
+
+- [ ] **Task 2.9.2 Complete**
+
+Test Raw backend integration with existing renderer components.
+
+- [ ] 2.9.2.1 Test `draw_cells/2` with cells from `TermUI.Renderer.Buffer`
+- [ ] 2.9.2.2 Test `draw_cells/2` with diff operations from `TermUI.Renderer.Diff`
+- [ ] 2.9.2.3 Test style rendering matches `TermUI.Renderer.Style` expectations
+- [ ] 2.9.2.4 Test cell rendering matches `TermUI.Renderer.Cell` format
+
+### 2.9.3 Input Integration Tests
+
+- [ ] **Task 2.9.3 Complete**
+
+Test input handling integration (requires terminal, tagged `:requires_terminal`).
+
+- [ ] 2.9.3.1 Test keyboard input produces correct `Event.Key` structs
+- [ ] 2.9.3.2 Test mouse input produces correct `Event.Mouse` structs when enabled
+- [ ] 2.9.3.3 Test escape sequence handling with timeout disambiguation
+- [ ] 2.9.3.4 Test input handling after resize event
+
+### 2.9.4 Performance Tests
+
+- [ ] **Task 2.9.4 Complete**
+
+Verify rendering performance is acceptable.
+
+- [ ] 2.9.4.1 Measure time to render full 80x24 screen
+- [ ] 2.9.4.2 Measure time to render differential update (10% changed cells)
+- [ ] 2.9.4.3 Verify output batching reduces write syscalls
+- [ ] 2.9.4.4 Verify style delta tracking reduces escape sequence bytes
+
+---
+
+## Success Criteria
+
+1. **Behaviour Implementation**: `TermUI.Backend.Raw` implements all `TermUI.Backend` callbacks
+2. **Initialization**: Backend initializes correctly when raw mode is already active from Selector
+3. **Rendering**: Cell drawing produces correct ANSI output for all color modes and attributes
+4. **Input Handling**: Input polling correctly parses keyboard and mouse events
+5. **Shutdown**: Clean shutdown restores terminal state even after errors
+6. **Performance**: Rendering performance is comparable to existing `TermUI.Terminal` implementation
+7. **Test Coverage**: All unit and integration tests pass
+
+---
+
+## Provides Foundation
+
+This phase establishes:
+- **Phase 3**: Reference implementation for TTY backend to follow
+- **Phase 4**: Input polling pattern for input abstraction
+- **Phase 5**: Full-capability baseline for widget degradation comparison
+- **Phase 6**: Backend implementation for runtime integration
+
+---
+
+## Key Outputs
+
+- `lib/term_ui/backend/raw.ex` - Complete Raw backend implementation
+- `test/term_ui/backend/raw_test.exs` - Unit tests for all callbacks
+- `test/integration/backend_raw_test.exs` - Integration tests
+- Documentation updates for backend usage patterns
+
+---
+
+## Critical Files to Reference
+
+- `lib/term_ui/terminal.ex` - Existing raw mode handling and escape sequences
+- `lib/term_ui/ansi.ex` - ANSI escape sequence generation functions
+- `lib/term_ui/terminal/escape_parser.ex` - Escape sequence parsing for input
+- `lib/term_ui/renderer/cell.ex` - Cell structure and types
+- `lib/term_ui/renderer/cursor_optimizer.ex` - Cursor movement optimization algorithm
