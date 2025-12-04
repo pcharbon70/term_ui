@@ -101,13 +101,13 @@ The `TermUI.Backend.Selector` module determines which backend to use by attempti
 
 ### 1.2.1 Create Selector Module Structure
 
-- [ ] **Task 1.2.1 Complete**
+- [x] **Task 1.2.1 Complete**
 
 Create the selector module with proper structure and documentation explaining the "try raw mode first" strategy.
 
-- [ ] 1.2.1.1 Create `lib/term_ui/backend/selector.ex` with comprehensive `@moduledoc`
-- [ ] 1.2.1.2 Document why heuristics are insufficient (Nerves erlinit, SSH sessions, remote IEx)
-- [ ] 1.2.1.3 Document the two possible return values: `{:raw, state}` and `{:tty, capabilities}`
+- [x] 1.2.1.1 Create `lib/term_ui/backend/selector.ex` with comprehensive `@moduledoc`
+- [x] 1.2.1.2 Document why heuristics are insufficient (Nerves erlinit, SSH sessions, remote IEx)
+- [x] 1.2.1.3 Document the two possible return values: `{:raw, state}` and `{:tty, capabilities}`
 
 ### 1.2.2 Implement Core Selection Logic
 
