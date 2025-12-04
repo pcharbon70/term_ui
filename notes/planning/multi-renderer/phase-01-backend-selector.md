@@ -161,7 +161,7 @@ Implement `select/1` for explicit backend selection, useful for testing and conf
 
 ## 1.3 Create Backend State Module
 
-- [ ] **Section 1.3 Complete**
+- [x] **Section 1.3 Complete**
 
 The `TermUI.Backend.State` module provides a shared state structure that wraps backend-specific state with common metadata. This enables consistent state management across different backend implementations.
 
@@ -191,24 +191,24 @@ Implement constructor functions for creating state structs.
 
 ### 1.3.3 Implement State Update Functions
 
-- [ ] **Task 1.3.3 Complete**
+- [x] **Task 1.3.3 Complete**
 
 Implement immutable update functions for state manipulation.
 
-- [ ] 1.3.3.1 Implement `put_backend_state/2` for updating inner backend state
-- [ ] 1.3.3.2 Implement `put_size/2` for updating cached dimensions
-- [ ] 1.3.3.3 Implement `put_capabilities/2` for updating capabilities map
-- [ ] 1.3.3.4 Implement `mark_initialized/1` for setting initialized flag
+- [x] 1.3.3.1 Implement `put_backend_state/2` for updating inner backend state
+- [x] 1.3.3.2 Implement `put_size/2` for updating cached dimensions
+- [x] 1.3.3.3 Implement `put_capabilities/2` for updating capabilities map
+- [x] 1.3.3.4 Implement `mark_initialized/1` for setting initialized flag
 
 ### Unit Tests - Section 1.3
 
-- [ ] **Unit Tests 1.3 Complete**
-- [ ] Test `new/2` creates state with correct backend module
-- [ ] Test `new_raw/1` sets mode to `:raw`
-- [ ] Test `new_tty/2` sets mode to `:tty` and stores capabilities
-- [ ] Test `put_backend_state/2` returns new state with updated backend_state
-- [ ] Test `put_size/2` returns new state with updated size
-- [ ] Test state struct enforces required fields
+- [x] **Unit Tests 1.3 Complete**
+- [x] Test `new/2` creates state with correct backend module
+- [x] Test `new_raw/1` sets mode to `:raw`
+- [x] Test `new_tty/2` sets mode to `:tty` and stores capabilities
+- [x] Test `put_backend_state/2` returns new state with updated backend_state
+- [x] Test `put_size/2` returns new state with updated size
+- [x] Test state struct enforces required fields
 
 ---
 

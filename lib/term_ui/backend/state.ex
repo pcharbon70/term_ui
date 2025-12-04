@@ -67,12 +67,11 @@ defmodule TermUI.Backend.State do
 
   ## State Updates
 
-  State structs are immutable. Updates create new structs:
+  State structs are immutable. Use update functions for convenience:
 
       state = State.new_tty(%{colors: :true_color})
-      updated = %{state | initialized: true}
-
-  For convenience functions to update state, see task 1.3.3.
+      state = State.put_size(state, {24, 80})
+      state = State.mark_initialized(state)
   """
 
   @typedoc """
@@ -205,5 +204,99 @@ defmodule TermUI.Backend.State do
       size: nil,
       initialized: false
     }
+  end
+
+  # ============================================================================
+  # Update Functions
+  # ============================================================================
+
+  @doc """
+  Updates the backend-specific state.
+
+  ## Arguments
+
+  - `state` - The current state struct
+  - `backend_state` - The new backend-specific state value
+
+  ## Examples
+
+      iex> state = State.new_raw()
+      iex> state = State.put_backend_state(state, %{cursor: {1, 1}})
+      iex> state.backend_state
+      %{cursor: {1, 1}}
+  """
+  @spec put_backend_state(t(), term()) :: t()
+  def put_backend_state(%__MODULE__{} = state, backend_state) do
+    %{state | backend_state: backend_state}
+  end
+
+  @doc """
+  Updates the cached terminal dimensions.
+
+  ## Arguments
+
+  - `state` - The current state struct
+  - `size` - The new size as `{rows, cols}` tuple or `nil`
+
+  ## Examples
+
+      iex> state = State.new_tty(%{})
+      iex> state = State.put_size(state, {24, 80})
+      iex> state.size
+      {24, 80}
+
+      iex> state = State.put_size(state, nil)
+      iex> state.size
+      nil
+  """
+  @spec put_size(t(), dimensions()) :: t()
+  def put_size(%__MODULE__{} = state, size) do
+    %{state | size: size}
+  end
+
+  @doc """
+  Updates the capabilities map.
+
+  Note: This replaces the entire capabilities map, it does not merge.
+
+  ## Arguments
+
+  - `state` - The current state struct
+  - `capabilities` - The new capabilities map
+
+  ## Examples
+
+      iex> state = State.new_tty(%{colors: :basic})
+      iex> state = State.put_capabilities(state, %{colors: :true_color, unicode: true})
+      iex> state.capabilities
+      %{colors: :true_color, unicode: true}
+  """
+  @spec put_capabilities(t(), map()) :: t()
+  def put_capabilities(%__MODULE__{} = state, capabilities) when is_map(capabilities) do
+    %{state | capabilities: capabilities}
+  end
+
+  @doc """
+  Marks the state as initialized.
+
+  This function is idempotent - calling it on an already initialized state
+  has no effect.
+
+  ## Arguments
+
+  - `state` - The current state struct
+
+  ## Examples
+
+      iex> state = State.new_tty(%{})
+      iex> state.initialized
+      false
+      iex> state = State.mark_initialized(state)
+      iex> state.initialized
+      true
+  """
+  @spec mark_initialized(t()) :: t()
+  def mark_initialized(%__MODULE__{} = state) do
+    %{state | initialized: true}
   end
 end

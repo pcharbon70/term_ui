@@ -419,6 +419,256 @@ defmodule TermUI.Backend.StateTest do
     end
   end
 
+  describe "put_backend_state/2" do
+    test "updates backend_state" do
+      state = State.new_raw()
+      updated = State.put_backend_state(state, %{cursor: {1, 1}})
+
+      assert updated.backend_state == %{cursor: {1, 1}}
+    end
+
+    test "preserves other fields" do
+      state = State.new_tty(%{colors: :true_color})
+      state = State.put_size(state, {24, 80})
+      state = State.mark_initialized(state)
+
+      updated = State.put_backend_state(state, %{some: :state})
+
+      assert updated.backend_state == %{some: :state}
+      assert updated.backend_module == TermUI.Backend.TTY
+      assert updated.mode == :tty
+      assert updated.capabilities == %{colors: :true_color}
+      assert updated.size == {24, 80}
+      assert updated.initialized == true
+    end
+
+    test "accepts any term as backend_state" do
+      state = State.new_raw()
+
+      assert State.put_backend_state(state, :atom).backend_state == :atom
+      assert State.put_backend_state(state, [1, 2, 3]).backend_state == [1, 2, 3]
+      assert State.put_backend_state(state, "string").backend_state == "string"
+      assert State.put_backend_state(state, nil).backend_state == nil
+    end
+
+    test "returns new struct (immutability)" do
+      original = State.new_raw()
+      updated = State.put_backend_state(original, %{new: :state})
+
+      assert original.backend_state == nil
+      assert updated.backend_state == %{new: :state}
+      refute original == updated
+    end
+  end
+
+  describe "put_size/2" do
+    test "updates size with tuple" do
+      state = State.new_tty(%{})
+      updated = State.put_size(state, {24, 80})
+
+      assert updated.size == {24, 80}
+    end
+
+    test "updates size with nil" do
+      state = State.new_tty(%{})
+      state = State.put_size(state, {24, 80})
+      updated = State.put_size(state, nil)
+
+      assert updated.size == nil
+    end
+
+    test "accepts different dimension values" do
+      state = State.new_tty(%{})
+
+      assert State.put_size(state, {1, 1}).size == {1, 1}
+      assert State.put_size(state, {50, 120}).size == {50, 120}
+      assert State.put_size(state, {1000, 2000}).size == {1000, 2000}
+    end
+
+    test "preserves other fields" do
+      state = State.new_tty(%{colors: :true_color})
+      state = State.put_backend_state(state, %{some: :state})
+      state = State.mark_initialized(state)
+
+      updated = State.put_size(state, {30, 100})
+
+      assert updated.size == {30, 100}
+      assert updated.backend_module == TermUI.Backend.TTY
+      assert updated.mode == :tty
+      assert updated.capabilities == %{colors: :true_color}
+      assert updated.backend_state == %{some: :state}
+      assert updated.initialized == true
+    end
+
+    test "returns new struct (immutability)" do
+      original = State.new_tty(%{})
+      updated = State.put_size(original, {24, 80})
+
+      assert original.size == nil
+      assert updated.size == {24, 80}
+      refute original == updated
+    end
+  end
+
+  describe "put_capabilities/2" do
+    test "updates capabilities" do
+      state = State.new_tty(%{colors: :basic})
+      updated = State.put_capabilities(state, %{colors: :true_color, unicode: true})
+
+      assert updated.capabilities == %{colors: :true_color, unicode: true}
+    end
+
+    test "replaces entire map (does not merge)" do
+      state = State.new_tty(%{colors: :basic, unicode: true, terminal: true})
+      updated = State.put_capabilities(state, %{colors: :true_color})
+
+      assert updated.capabilities == %{colors: :true_color}
+      refute Map.has_key?(updated.capabilities, :unicode)
+      refute Map.has_key?(updated.capabilities, :terminal)
+    end
+
+    test "accepts empty map" do
+      state = State.new_tty(%{colors: :true_color})
+      updated = State.put_capabilities(state, %{})
+
+      assert updated.capabilities == %{}
+    end
+
+    test "raises when capabilities is not a map" do
+      state = State.new_tty(%{})
+
+      assert_raise FunctionClauseError, fn ->
+        State.put_capabilities(state, :not_a_map)
+      end
+
+      assert_raise FunctionClauseError, fn ->
+        State.put_capabilities(state, [colors: :true_color])
+      end
+    end
+
+    test "preserves other fields" do
+      state = State.new_tty(%{colors: :basic})
+      state = State.put_size(state, {24, 80})
+      state = State.put_backend_state(state, %{some: :state})
+      state = State.mark_initialized(state)
+
+      updated = State.put_capabilities(state, %{colors: :true_color})
+
+      assert updated.capabilities == %{colors: :true_color}
+      assert updated.backend_module == TermUI.Backend.TTY
+      assert updated.mode == :tty
+      assert updated.size == {24, 80}
+      assert updated.backend_state == %{some: :state}
+      assert updated.initialized == true
+    end
+
+    test "returns new struct (immutability)" do
+      original = State.new_tty(%{colors: :basic})
+      updated = State.put_capabilities(original, %{colors: :true_color})
+
+      assert original.capabilities == %{colors: :basic}
+      assert updated.capabilities == %{colors: :true_color}
+      refute original == updated
+    end
+  end
+
+  describe "mark_initialized/1" do
+    test "sets initialized to true" do
+      state = State.new_tty(%{})
+      assert state.initialized == false
+
+      updated = State.mark_initialized(state)
+      assert updated.initialized == true
+    end
+
+    test "is idempotent" do
+      state = State.new_tty(%{})
+      state = State.mark_initialized(state)
+      assert state.initialized == true
+
+      state = State.mark_initialized(state)
+      assert state.initialized == true
+    end
+
+    test "preserves other fields" do
+      state = State.new_tty(%{colors: :true_color})
+      state = State.put_size(state, {24, 80})
+      state = State.put_backend_state(state, %{some: :state})
+
+      updated = State.mark_initialized(state)
+
+      assert updated.initialized == true
+      assert updated.backend_module == TermUI.Backend.TTY
+      assert updated.mode == :tty
+      assert updated.capabilities == %{colors: :true_color}
+      assert updated.size == {24, 80}
+      assert updated.backend_state == %{some: :state}
+    end
+
+    test "returns new struct (immutability)" do
+      original = State.new_tty(%{})
+      updated = State.mark_initialized(original)
+
+      assert original.initialized == false
+      assert updated.initialized == true
+      refute original == updated
+    end
+  end
+
+  describe "update function documentation" do
+    test "put_backend_state/2 has docs" do
+      {:docs_v1, _, :elixir, _, _, _, docs} = Code.fetch_docs(State)
+
+      func_docs =
+        docs
+        |> Enum.filter(fn
+          {{:function, :put_backend_state, 2}, _, _, _, _} -> true
+          _ -> false
+        end)
+
+      assert length(func_docs) == 1, "put_backend_state/2 should have documentation"
+    end
+
+    test "put_size/2 has docs" do
+      {:docs_v1, _, :elixir, _, _, _, docs} = Code.fetch_docs(State)
+
+      func_docs =
+        docs
+        |> Enum.filter(fn
+          {{:function, :put_size, 2}, _, _, _, _} -> true
+          _ -> false
+        end)
+
+      assert length(func_docs) == 1, "put_size/2 should have documentation"
+    end
+
+    test "put_capabilities/2 has docs" do
+      {:docs_v1, _, :elixir, _, _, _, docs} = Code.fetch_docs(State)
+
+      func_docs =
+        docs
+        |> Enum.filter(fn
+          {{:function, :put_capabilities, 2}, _, _, _, _} -> true
+          _ -> false
+        end)
+
+      assert length(func_docs) == 1, "put_capabilities/2 should have documentation"
+    end
+
+    test "mark_initialized/1 has docs" do
+      {:docs_v1, _, :elixir, _, _, _, docs} = Code.fetch_docs(State)
+
+      func_docs =
+        docs
+        |> Enum.filter(fn
+          {{:function, :mark_initialized, 1}, _, _, _, _} -> true
+          _ -> false
+        end)
+
+      assert length(func_docs) == 1, "mark_initialized/1 should have documentation"
+    end
+  end
+
   describe "typical usage patterns" do
     test "raw mode state creation" do
       # Simulates what happens after Selector.select() returns {:raw, raw_state}
