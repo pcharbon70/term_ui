@@ -59,9 +59,29 @@ defmodule TermUI.Backend.Config do
       # Get backend-specific options
       tty_opts = Config.get_tty_opts()
       raw_opts = Config.get_raw_opts()
+
+  ## Validation
+
+  Use `validate!/0` to check configuration at application startup:
+
+      # In your Application.start/2
+      TermUI.Backend.Config.validate!()
+
+  Or use `valid?/0` to check without raising:
+
+      if Config.valid?() do
+        # proceed
+      else
+        # handle invalid config
+      end
   """
 
   @app :term_ui
+
+  # Valid configuration values
+  @valid_backends [:auto, TermUI.Backend.Raw, TermUI.Backend.TTY, TermUI.Backend.Test]
+  @valid_character_sets [:unicode, :ascii]
+  @valid_line_modes [:full_redraw, :incremental]
 
   @doc """
   Returns the configured backend selection mode.
@@ -183,5 +203,130 @@ defmodule TermUI.Backend.Config do
   @spec get_raw_opts() :: keyword()
   def get_raw_opts do
     Application.get_env(@app, :raw_opts, alternate_screen: true)
+  end
+
+  # ============================================================================
+  # Validation Functions
+  # ============================================================================
+
+  @doc """
+  Validates the current configuration, raising on errors.
+
+  Checks that all configuration values are valid. Call this at application
+  startup to catch configuration errors early.
+
+  ## Returns
+
+  - `:ok` if configuration is valid
+
+  ## Raises
+
+  - `ArgumentError` with a descriptive message if any configuration is invalid
+
+  ## Examples
+
+      iex> Config.validate!()
+      :ok
+
+      # With invalid config: [backend: :invalid]
+      iex> Config.validate!()
+      ** (ArgumentError) invalid :backend value: :invalid, expected one of [:auto, TermUI.Backend.Raw, TermUI.Backend.TTY, TermUI.Backend.Test]
+  """
+  @spec validate!() :: :ok
+  def validate! do
+    validate_backend!()
+    validate_character_set!()
+    validate_fallback_character_set!()
+    validate_tty_opts!()
+    validate_raw_opts!()
+    :ok
+  end
+
+  @doc """
+  Checks if the current configuration is valid.
+
+  Returns `true` if all configuration values are valid, `false` otherwise.
+  Does not raise exceptions.
+
+  ## Returns
+
+  - `true` if configuration is valid
+  - `false` if any configuration value is invalid
+
+  ## Examples
+
+      iex> Config.valid?()
+      true
+
+      # With invalid config: [backend: :invalid]
+      iex> Config.valid?()
+      false
+  """
+  @spec valid?() :: boolean()
+  def valid? do
+    validate!()
+    true
+  rescue
+    ArgumentError -> false
+  end
+
+  # Private validation helpers
+
+  defp validate_backend! do
+    backend = get_backend()
+
+    unless backend in @valid_backends do
+      raise ArgumentError,
+            "invalid :backend value: #{inspect(backend)}, " <>
+              "expected one of #{inspect(@valid_backends)}"
+    end
+  end
+
+  defp validate_character_set! do
+    char_set = get_character_set()
+
+    unless char_set in @valid_character_sets do
+      raise ArgumentError,
+            "invalid :character_set value: #{inspect(char_set)}, " <>
+              "expected one of #{inspect(@valid_character_sets)}"
+    end
+  end
+
+  defp validate_fallback_character_set! do
+    fallback = get_fallback_character_set()
+
+    unless fallback in @valid_character_sets do
+      raise ArgumentError,
+            "invalid :fallback_character_set value: #{inspect(fallback)}, " <>
+              "expected one of #{inspect(@valid_character_sets)}"
+    end
+  end
+
+  defp validate_tty_opts! do
+    opts = get_tty_opts()
+
+    unless is_list(opts) do
+      raise ArgumentError,
+            "invalid :tty_opts value: #{inspect(opts)}, expected a keyword list"
+    end
+
+    if Keyword.has_key?(opts, :line_mode) do
+      line_mode = Keyword.get(opts, :line_mode)
+
+      unless line_mode in @valid_line_modes do
+        raise ArgumentError,
+              "invalid :line_mode value in :tty_opts: #{inspect(line_mode)}, " <>
+                "expected one of #{inspect(@valid_line_modes)}"
+      end
+    end
+  end
+
+  defp validate_raw_opts! do
+    opts = get_raw_opts()
+
+    unless is_list(opts) do
+      raise ArgumentError,
+            "invalid :raw_opts value: #{inspect(opts)}, expected a keyword list"
+    end
   end
 end

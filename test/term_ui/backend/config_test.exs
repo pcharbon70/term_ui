@@ -229,6 +229,176 @@ defmodule TermUI.Backend.ConfigTest do
     end
   end
 
+  describe "validate!/0" do
+    test "returns :ok with default configuration" do
+      assert Config.validate!() == :ok
+    end
+
+    test "returns :ok with all valid backends" do
+      for backend <- [:auto, TermUI.Backend.Raw, TermUI.Backend.TTY, TermUI.Backend.Test] do
+        Application.put_env(:term_ui, :backend, backend)
+        assert Config.validate!() == :ok
+      end
+    end
+
+    test "raises for invalid backend" do
+      Application.put_env(:term_ui, :backend, :invalid)
+
+      assert_raise ArgumentError, ~r/invalid :backend value: :invalid/, fn ->
+        Config.validate!()
+      end
+    end
+
+    test "raises for invalid backend with descriptive message" do
+      Application.put_env(:term_ui, :backend, SomeUnknownBackend)
+
+      error =
+        assert_raise ArgumentError, fn ->
+          Config.validate!()
+        end
+
+      assert error.message =~ "invalid :backend value: SomeUnknownBackend"
+      assert error.message =~ "expected one of"
+      assert error.message =~ ":auto"
+    end
+
+    test "raises for invalid character_set" do
+      Application.put_env(:term_ui, :character_set, :utf8)
+
+      assert_raise ArgumentError, ~r/invalid :character_set value: :utf8/, fn ->
+        Config.validate!()
+      end
+    end
+
+    test "raises for invalid fallback_character_set" do
+      Application.put_env(:term_ui, :fallback_character_set, :latin1)
+
+      assert_raise ArgumentError, ~r/invalid :fallback_character_set value: :latin1/, fn ->
+        Config.validate!()
+      end
+    end
+
+    test "raises for invalid tty_opts (not a list)" do
+      Application.put_env(:term_ui, :tty_opts, :invalid)
+
+      assert_raise ArgumentError, ~r/invalid :tty_opts value: :invalid/, fn ->
+        Config.validate!()
+      end
+    end
+
+    test "raises for invalid line_mode in tty_opts" do
+      Application.put_env(:term_ui, :tty_opts, line_mode: :partial)
+
+      assert_raise ArgumentError, ~r/invalid :line_mode value in :tty_opts: :partial/, fn ->
+        Config.validate!()
+      end
+    end
+
+    test "accepts valid line_modes" do
+      for mode <- [:full_redraw, :incremental] do
+        Application.put_env(:term_ui, :tty_opts, line_mode: mode)
+        assert Config.validate!() == :ok
+      end
+    end
+
+    test "accepts tty_opts without line_mode" do
+      Application.put_env(:term_ui, :tty_opts, custom_option: :value)
+      assert Config.validate!() == :ok
+    end
+
+    test "raises for invalid raw_opts (not a list)" do
+      Application.put_env(:term_ui, :raw_opts, "not a list")
+
+      assert_raise ArgumentError, ~r/invalid :raw_opts value/, fn ->
+        Config.validate!()
+      end
+    end
+
+    test "accepts empty lists for opts" do
+      Application.put_env(:term_ui, :tty_opts, [])
+      Application.put_env(:term_ui, :raw_opts, [])
+      assert Config.validate!() == :ok
+    end
+  end
+
+  describe "valid?/0" do
+    test "returns true with default configuration" do
+      assert Config.valid?() == true
+    end
+
+    test "returns true with valid configuration" do
+      Application.put_env(:term_ui, :backend, TermUI.Backend.Raw)
+      Application.put_env(:term_ui, :character_set, :ascii)
+      assert Config.valid?() == true
+    end
+
+    test "returns false with invalid backend" do
+      Application.put_env(:term_ui, :backend, :invalid)
+      assert Config.valid?() == false
+    end
+
+    test "returns false with invalid character_set" do
+      Application.put_env(:term_ui, :character_set, :utf16)
+      assert Config.valid?() == false
+    end
+
+    test "returns false with invalid fallback_character_set" do
+      Application.put_env(:term_ui, :fallback_character_set, :unknown)
+      assert Config.valid?() == false
+    end
+
+    test "returns false with invalid tty_opts" do
+      Application.put_env(:term_ui, :tty_opts, :not_a_list)
+      assert Config.valid?() == false
+    end
+
+    test "returns false with invalid line_mode" do
+      Application.put_env(:term_ui, :tty_opts, line_mode: :bad)
+      assert Config.valid?() == false
+    end
+
+    test "returns false with invalid raw_opts" do
+      Application.put_env(:term_ui, :raw_opts, %{not: :a_list})
+      assert Config.valid?() == false
+    end
+
+    test "does not raise exceptions" do
+      Application.put_env(:term_ui, :backend, :totally_invalid)
+
+      # Should not raise, just return false
+      result = Config.valid?()
+      assert result == false
+    end
+  end
+
+  describe "validation documentation" do
+    test "validate!/0 has docs" do
+      {:docs_v1, _, :elixir, _, _, _, docs} = Code.fetch_docs(Config)
+
+      func_docs =
+        docs
+        |> Enum.filter(fn
+          {{:function, :validate!, 0}, _, _, _, _} -> true
+          _ -> false
+        end)
+
+      assert length(func_docs) == 1
+    end
+
+    test "valid?/0 has docs" do
+      {:docs_v1, _, :elixir, _, _, _, docs} = Code.fetch_docs(Config)
+
+      func_docs =
+        docs
+        |> Enum.filter(fn
+          {{:function, :valid?, 0}, _, _, _, _} -> true
+          _ -> false
+        end)
+
+      assert length(func_docs) == 1
+    end
+  end
+
   describe "typical usage patterns" do
     test "all defaults work together" do
       assert Config.get_backend() == :auto
@@ -251,6 +421,17 @@ defmodule TermUI.Backend.ConfigTest do
       assert Config.get_fallback_character_set() == :ascii
       assert Config.get_tty_opts() == [line_mode: :incremental]
       assert Config.get_raw_opts() == [alternate_screen: false]
+    end
+
+    test "validate before using configuration" do
+      # Common pattern: validate at startup
+      Application.put_env(:term_ui, :backend, TermUI.Backend.TTY)
+      Application.put_env(:term_ui, :character_set, :unicode)
+
+      assert Config.validate!() == :ok
+
+      # Now safe to use
+      assert Config.get_backend() == TermUI.Backend.TTY
     end
   end
 end
