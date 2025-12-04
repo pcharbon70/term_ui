@@ -2,21 +2,20 @@ defmodule TermUI.Backend.RawTest do
   @moduledoc """
   Unit tests for TermUI.Backend.Raw module.
 
-  This test file covers the module structure and behaviour declaration.
-  Callback implementation tests will be added in subsequent tasks.
+  This test file covers the module structure, behaviour declaration, and state structure.
+  Callback implementation tests will be added as each section is implemented.
   """
 
   use ExUnit.Case, async: true
 
   alias TermUI.Backend.Raw
 
-  describe "module structure (Task 2.1.1)" do
+  describe "module structure" do
     test "module compiles successfully" do
       assert Code.ensure_loaded?(Raw)
     end
 
     test "declares @behaviour TermUI.Backend" do
-      # Check that the module declares the Backend behaviour
       behaviours = Raw.__info__(:attributes)[:behaviour] || []
       assert TermUI.Backend in behaviours
     end
@@ -43,13 +42,18 @@ defmodule TermUI.Backend.RawTest do
       assert function_exported?(Raw, :poll_event, 2)
     end
 
+    test "exports helper functions" do
+      assert function_exported?(Raw, :valid_position?, 2)
+      assert function_exported?(Raw, :mouse_mode_to_ansi, 1)
+      assert function_exported?(Raw, :ansi_module, 0)
+    end
+
     test "has ANSI module aliased" do
-      # The module should have access to TermUI.ANSI
       assert Raw.ansi_module() == TermUI.ANSI
     end
   end
 
-  describe "documentation (Task 2.1.1)" do
+  describe "documentation" do
     test "module has moduledoc" do
       {:docs_v1, _, :elixir, _, module_doc, _, _} = Code.fetch_docs(Raw)
       assert module_doc != :none
@@ -71,6 +75,20 @@ defmodule TermUI.Backend.RawTest do
       {:docs_v1, _, :elixir, _, %{"en" => doc}, _, _} = Code.fetch_docs(Raw)
       assert doc =~ "init/1"
       assert doc =~ "alternate screen"
+    end
+
+    test "moduledoc documents mouse tracking modes" do
+      {:docs_v1, _, :elixir, _, %{"en" => doc}, _, _} = Code.fetch_docs(Raw)
+      assert doc =~ "Mouse Tracking Modes"
+      assert doc =~ ":click"
+      assert doc =~ ":drag"
+      assert doc =~ "ANSI Protocol"
+    end
+
+    test "moduledoc documents style delta optimization" do
+      {:docs_v1, _, :elixir, _, %{"en" => doc}, _, _} = Code.fetch_docs(Raw)
+      assert doc =~ "Style Delta Optimization"
+      assert doc =~ "current_style"
     end
 
     test "init/1 has documentation" do
@@ -100,7 +118,7 @@ defmodule TermUI.Backend.RawTest do
     end
   end
 
-  describe "state structure (Task 2.1.2)" do
+  describe "state structure" do
     test "state struct has all expected fields" do
       state = %Raw{}
 
@@ -195,67 +213,106 @@ defmodule TermUI.Backend.RawTest do
     end
   end
 
-  describe "stub callbacks (Task 2.1.1)" do
-    # These tests verify the stubs work correctly
-    # Full implementation tests will be added in subsequent tasks
+  describe "helper functions" do
+    test "valid_position?/2 returns true for positions within bounds" do
+      state = %Raw{size: {24, 80}}
 
-    test "init/1 returns {:ok, state}" do
-      assert {:ok, _state} = Raw.init([])
+      assert Raw.valid_position?(state, {1, 1}) == true
+      assert Raw.valid_position?(state, {24, 80}) == true
+      assert Raw.valid_position?(state, {12, 40}) == true
+    end
+
+    test "valid_position?/2 returns false for positions outside bounds" do
+      state = %Raw{size: {24, 80}}
+
+      assert Raw.valid_position?(state, {0, 1}) == false
+      assert Raw.valid_position?(state, {1, 0}) == false
+      assert Raw.valid_position?(state, {25, 1}) == false
+      assert Raw.valid_position?(state, {1, 81}) == false
+      assert Raw.valid_position?(state, {-1, 1}) == false
+    end
+
+    test "valid_position?/2 handles non-integer positions" do
+      state = %Raw{size: {24, 80}}
+
+      assert Raw.valid_position?(state, {"1", 1}) == false
+      assert Raw.valid_position?(state, {1.5, 1}) == false
+      assert Raw.valid_position?(state, nil) == false
+    end
+
+    test "mouse_mode_to_ansi/1 maps Raw modes to ANSI protocol modes" do
+      assert Raw.mouse_mode_to_ansi(:none) == nil
+      assert Raw.mouse_mode_to_ansi(:click) == :normal
+      assert Raw.mouse_mode_to_ansi(:drag) == :button
+      assert Raw.mouse_mode_to_ansi(:all) == :all
+    end
+  end
+
+  describe "stub callbacks" do
+    # Use setup to avoid repeating Raw.init([]) in every test
+    setup do
+      {:ok, state} = Raw.init([])
+      %{state: state}
+    end
+
+    test "init/1 returns {:ok, state} with default struct" do
+      {:ok, state} = Raw.init([])
+      assert %Raw{} = state
+      assert state.size == {24, 80}
+      assert state.mouse_mode == :none
     end
 
     test "init/1 accepts options" do
-      assert {:ok, _state} = Raw.init(alternate_screen: false, hide_cursor: true)
+      {:ok, state} = Raw.init(alternate_screen: false, hide_cursor: true)
+      assert %Raw{} = state
     end
 
-    test "shutdown/1 returns :ok" do
-      {:ok, state} = Raw.init([])
+    test "shutdown/1 returns :ok", %{state: state} do
       assert :ok = Raw.shutdown(state)
     end
 
-    test "size/1 returns result tuple" do
-      {:ok, state} = Raw.init([])
-      result = Raw.size(state)
-      # Stub returns {:error, :enotsup}
-      assert match?({:ok, _}, result) or match?({:error, _}, result)
+    test "size/1 returns {:ok, size} tuple", %{state: state} do
+      assert {:ok, {24, 80}} = Raw.size(state)
     end
 
-    test "move_cursor/2 returns {:ok, state}" do
-      {:ok, state} = Raw.init([])
-      assert {:ok, _updated_state} = Raw.move_cursor(state, {1, 1})
+    test "move_cursor/2 returns {:ok, state} for valid position", %{state: state} do
+      assert {:ok, %Raw{}} = Raw.move_cursor(state, {1, 1})
+      assert {:ok, %Raw{}} = Raw.move_cursor(state, {10, 20})
     end
 
-    test "hide_cursor/1 returns {:ok, state}" do
+    test "move_cursor/2 enforces positive integer positions" do
       {:ok, state} = Raw.init([])
-      assert {:ok, _updated_state} = Raw.hide_cursor(state)
+      # These should raise FunctionClauseError due to guard clauses
+      assert_raise FunctionClauseError, fn -> Raw.move_cursor(state, {0, 1}) end
+      assert_raise FunctionClauseError, fn -> Raw.move_cursor(state, {1, 0}) end
+      assert_raise FunctionClauseError, fn -> Raw.move_cursor(state, {-1, 1}) end
     end
 
-    test "show_cursor/1 returns {:ok, state}" do
-      {:ok, state} = Raw.init([])
-      assert {:ok, _updated_state} = Raw.show_cursor(state)
+    test "hide_cursor/1 returns {:ok, state}", %{state: state} do
+      assert {:ok, %Raw{}} = Raw.hide_cursor(state)
     end
 
-    test "clear/1 returns {:ok, state}" do
-      {:ok, state} = Raw.init([])
-      assert {:ok, _updated_state} = Raw.clear(state)
+    test "show_cursor/1 returns {:ok, state}", %{state: state} do
+      assert {:ok, %Raw{}} = Raw.show_cursor(state)
     end
 
-    test "draw_cells/2 returns {:ok, state}" do
-      {:ok, state} = Raw.init([])
+    test "clear/1 returns {:ok, state}", %{state: state} do
+      assert {:ok, %Raw{}} = Raw.clear(state)
+    end
+
+    test "draw_cells/2 returns {:ok, state}", %{state: state} do
       cells = [{{1, 1}, {"A", :default, :default, []}}]
-      assert {:ok, _updated_state} = Raw.draw_cells(state, cells)
+      assert {:ok, %Raw{}} = Raw.draw_cells(state, cells)
     end
 
-    test "flush/1 returns {:ok, state}" do
-      {:ok, state} = Raw.init([])
-      assert {:ok, _updated_state} = Raw.flush(state)
+    test "flush/1 returns {:ok, state}", %{state: state} do
+      assert {:ok, %Raw{}} = Raw.flush(state)
     end
 
-    test "poll_event/2 returns valid result" do
-      {:ok, state} = Raw.init([])
-      result = Raw.poll_event(state, 0)
-      # Stub returns {:timeout, state}
-      assert match?({:ok, _, _}, result) or match?({:timeout, _}, result) or
-               match?({:error, _, _}, result)
+    test "poll_event/2 returns {:timeout, state} for stub", %{state: state} do
+      # Stub always returns timeout
+      assert {:timeout, %Raw{}} = Raw.poll_event(state, 0)
+      assert {:timeout, %Raw{}} = Raw.poll_event(state, 100)
     end
   end
 end

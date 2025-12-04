@@ -11,27 +11,15 @@ defmodule TermUI.Terminal do
   require Logger
 
   alias TermUI.Terminal.State
+  alias TermUI.ANSI
 
   @ets_table :term_ui_terminal_state
 
-  # Escape sequences
-  @enter_alternate_screen "\e[?1049h"
-  @leave_alternate_screen "\e[?1049l"
-  @hide_cursor "\e[?25l"
-  @show_cursor "\e[?25h"
+  # Full terminal reset sequence (not in ANSI module as it's rarely needed)
   @reset_terminal "\ec"
 
-  # Mouse tracking escape sequences
-  @mouse_click_on "\e[?1000h"
-  @mouse_click_off "\e[?1000l"
-  @mouse_drag_on "\e[?1002h"
-  @mouse_drag_off "\e[?1002l"
-  @mouse_all_on "\e[?1003h"
-  @mouse_all_off "\e[?1003l"
-  @mouse_sgr_on "\e[?1006h"
-  @mouse_sgr_off "\e[?1006l"
-
   # Comprehensive mouse disable - disables ALL mouse modes defensively
+  # This is kept as a constant for performance in cleanup paths
   @all_mouse_off "\e[?1006l\e[?1003l\e[?1002l\e[?1000l"
 
   # Client API
@@ -230,7 +218,7 @@ defmodule TermUI.Terminal do
     if state.alternate_screen_active do
       {:reply, :ok, state}
     else
-      write_to_terminal(@enter_alternate_screen)
+      write_to_terminal(ANSI.enter_alternate_screen())
       new_state = %{state | alternate_screen_active: true}
       {:reply, :ok, new_state}
     end
@@ -239,7 +227,7 @@ defmodule TermUI.Terminal do
   @impl true
   def handle_call(:leave_alternate_screen, _from, state) do
     if state.alternate_screen_active do
-      write_to_terminal(@leave_alternate_screen)
+      write_to_terminal(ANSI.leave_alternate_screen())
       new_state = %{state | alternate_screen_active: false}
       {:reply, :ok, new_state}
     else
@@ -249,14 +237,14 @@ defmodule TermUI.Terminal do
 
   @impl true
   def handle_call(:hide_cursor, _from, state) do
-    write_to_terminal(@hide_cursor)
+    write_to_terminal(ANSI.cursor_hide())
     new_state = %{state | cursor_visible: false}
     {:reply, :ok, new_state}
   end
 
   @impl true
   def handle_call(:show_cursor, _from, state) do
-    write_to_terminal(@show_cursor)
+    write_to_terminal(ANSI.cursor_show())
     new_state = %{state | cursor_visible: true}
     {:reply, :ok, new_state}
   end
@@ -311,19 +299,17 @@ defmodule TermUI.Terminal do
     end
 
     # Enable new tracking mode with SGR
-    case mode do
-      :click ->
-        write_to_terminal(@mouse_click_on)
-        write_to_terminal(@mouse_sgr_on)
+    # Map user-friendly mode names to ANSI protocol modes:
+    # :click -> :normal (1000), :drag -> :button (1002), :all -> :all (1003)
+    ansi_mode =
+      case mode do
+        :click -> :normal
+        :drag -> :button
+        :all -> :all
+      end
 
-      :drag ->
-        write_to_terminal(@mouse_drag_on)
-        write_to_terminal(@mouse_sgr_on)
-
-      :all ->
-        write_to_terminal(@mouse_all_on)
-        write_to_terminal(@mouse_sgr_on)
-    end
+    write_to_terminal(ANSI.enable_mouse_tracking(ansi_mode))
+    write_to_terminal(ANSI.enable_sgr_mouse())
 
     new_state = %{state | mouse_tracking: mode}
     {:reply, :ok, new_state}
@@ -333,7 +319,7 @@ defmodule TermUI.Terminal do
   def handle_call(:disable_mouse_tracking, _from, state) do
     if state.mouse_tracking != :off do
       disable_current_mouse_mode(state.mouse_tracking)
-      write_to_terminal(@mouse_sgr_off)
+      write_to_terminal(ANSI.disable_sgr_mouse())
     end
 
     new_state = %{state | mouse_tracking: :off}
@@ -573,11 +559,11 @@ defmodule TermUI.Terminal do
     write_to_terminal(@all_mouse_off)
 
     if not state.cursor_visible do
-      write_to_terminal(@show_cursor)
+      write_to_terminal(ANSI.cursor_show())
     end
 
     if state.alternate_screen_active do
-      write_to_terminal(@leave_alternate_screen)
+      write_to_terminal(ANSI.leave_alternate_screen())
     end
 
     if state.raw_mode_active do
@@ -585,7 +571,7 @@ defmodule TermUI.Terminal do
     end
 
     # Reset terminal attributes (colors, styles)
-    write_to_terminal("\e[0m")
+    write_to_terminal(ANSI.reset())
 
     if :ets.whereis(@ets_table) != :undefined do
       :ets.insert(@ets_table, {:raw_mode_active, false})
@@ -595,11 +581,17 @@ defmodule TermUI.Terminal do
   end
 
   defp disable_current_mouse_mode(mode) do
-    case mode do
-      :click -> write_to_terminal(@mouse_click_off)
-      :drag -> write_to_terminal(@mouse_drag_off)
-      :all -> write_to_terminal(@mouse_all_off)
-      _ -> :ok
+    # Map user-friendly mode names to ANSI protocol modes
+    ansi_mode =
+      case mode do
+        :click -> :normal
+        :drag -> :button
+        :all -> :all
+        _ -> nil
+      end
+
+    if ansi_mode do
+      write_to_terminal(ANSI.disable_mouse_tracking(ansi_mode))
     end
   end
 
@@ -653,8 +645,8 @@ defmodule TermUI.Terminal do
           Logger.warning("Detected unclean termination from previous run, resetting terminal")
           # Disable all mouse tracking modes first
           write_to_terminal(@all_mouse_off)
-          write_to_terminal(@show_cursor)
-          write_to_terminal(@leave_alternate_screen)
+          write_to_terminal(ANSI.cursor_show())
+          write_to_terminal(ANSI.leave_alternate_screen())
           write_to_terminal(@reset_terminal)
 
         _ ->

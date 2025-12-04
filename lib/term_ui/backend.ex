@@ -67,15 +67,19 @@ defmodule TermUI.Backend do
 
   Row 1 is the top of the screen, column 1 is the left edge.
   This matches standard terminal addressing (ANSI escape sequences use 1-indexed positions).
+
+  Note: Positions use `pos_integer()` (minimum 1) since terminal coordinates are 1-indexed.
+  Position `{0, 0}` is invalid in terminal addressing.
   """
-  @type position :: {row :: non_neg_integer(), col :: non_neg_integer()}
+  @type position :: {row :: pos_integer(), col :: pos_integer()}
 
   @typedoc """
   Terminal dimensions as `{rows, cols}`.
 
   Represents the current terminal size in character cells.
+  Terminals always have at least 1 row and 1 column.
   """
-  @type size :: {rows :: non_neg_integer(), cols :: non_neg_integer()}
+  @type size :: {rows :: pos_integer(), cols :: pos_integer()}
 
   @typedoc """
   Color specification for foreground or background.

@@ -88,6 +88,51 @@ defmodule TermUI.Backend.Raw do
       # 4. Input polling via poll_event/2
       # 5. Clean shutdown
 
+  ## Mouse Tracking Modes
+
+  The Raw backend uses intuitive mode names that map to underlying ANSI protocol modes:
+
+  | Raw Backend | ANSI Protocol | Escape Sequence | Description |
+  |-------------|---------------|-----------------|-------------|
+  | `:none`     | (disabled)    | -               | No mouse tracking |
+  | `:click`    | Normal (1000) | `ESC[?1000h`    | Button press/release only |
+  | `:drag`     | Button (1002) | `ESC[?1002h`    | Press/release + motion while pressed |
+  | `:all`      | Any (1003)    | `ESC[?1003h`    | All mouse motion events |
+
+  When mouse tracking is enabled, SGR extended mode (`ESC[?1006h`) is also activated
+  for accurate coordinate encoding beyond column 223.
+
+  Note: The `TermUI.ANSI` module uses protocol names (`:normal`, `:button`, `:all`),
+  while this backend uses user-friendly names (`:click`, `:drag`, `:all`). The mapping
+  is handled internally when emitting sequences.
+
+  ## Style Delta Optimization
+
+  The `current_style` field in the backend state tracks the last-emitted SGR (Select
+  Graphic Rendition) attributes. This enables **style delta optimization** in
+  `draw_cells/2`:
+
+  Instead of emitting full style sequences for every cell:
+  ```
+  ESC[0;38;2;255;0;0;48;2;0;0;0mA  <- 25 bytes per cell
+  ESC[0;38;2;255;0;0;48;2;0;0;0mB
+  ```
+
+  We only emit changes from the previous style:
+  ```
+  ESC[38;2;255;0;0;48;2;0;0;0mA   <- Full style for first cell
+  B                                <- No escape needed, same style!
+  ESC[38;2;0;255;0mC              <- Only foreground changed
+  ```
+
+  This optimization can reduce escape sequence output by 80-90% for typical UIs
+  where adjacent cells share styles (text blocks, borders, backgrounds).
+
+  The `current_style` map tracks:
+  - `:fg` - Current foreground color
+  - `:bg` - Current background color
+  - `:attrs` - Current text attributes (`:bold`, `:underline`, `:reverse`, etc.)
+
   ## See Also
 
   - `TermUI.Backend` - Behaviour definition
@@ -101,16 +146,20 @@ defmodule TermUI.Backend.Raw do
   alias TermUI.ANSI
 
   # ===========================================================================
-  # State Structure (Task 2.1.2)
+  # Type Definitions and State Structure
   # ===========================================================================
 
   @typedoc """
   Mouse tracking mode for the terminal.
 
-  - `:none` - No mouse tracking
-  - `:click` - Track button clicks only (X10 mode)
-  - `:drag` - Track clicks and drag events (button event mode)
-  - `:all` - Track all mouse movement (any event mode)
+  These are user-friendly names that map to ANSI protocol modes internally:
+
+  - `:none` - No mouse tracking (disabled)
+  - `:click` - Track button press/release only (ANSI "normal" mode, 1000)
+  - `:drag` - Track clicks and motion while button pressed (ANSI "button" mode, 1002)
+  - `:all` - Track all mouse movement (ANSI "any" mode, 1003)
+
+  See the "Mouse Tracking Modes" section in the module documentation for details.
   """
   @type mouse_mode :: :none | :click | :drag | :all
 
@@ -120,6 +169,23 @@ defmodule TermUI.Backend.Raw do
   Tracks the current foreground color, background color, and text attributes
   to enable style delta optimization - only emitting escape sequences for
   changed attributes.
+
+  ## Fields
+
+  - `:fg` - Current foreground color (see `TermUI.Backend.color()`)
+  - `:bg` - Current background color (see `TermUI.Backend.color()`)
+  - `:attrs` - List of active text attributes:
+    - `:bold` - Bold/bright text
+    - `:dim` - Dimmed text
+    - `:italic` - Italic text
+    - `:underline` - Underlined text
+    - `:blink` - Blinking text
+    - `:reverse` - Swapped foreground/background
+    - `:hidden` - Hidden text
+    - `:strikethrough` - Struck-through text
+
+  See the "Style Delta Optimization" section in the module documentation for
+  how this enables efficient rendering.
   """
   @type style_state :: %{
           fg: TermUI.Backend.color(),
@@ -158,11 +224,9 @@ defmodule TermUI.Backend.Raw do
             current_style: nil
 
   # ===========================================================================
-  # Behaviour Callbacks
+  # Behaviour Callbacks - Lifecycle, Queries, Cursor, Rendering, Input
   # ===========================================================================
-
-  # Stub implementations for behaviour callbacks
-  # These will be fully implemented in subsequent tasks (2.2.x - 2.8.x)
+  # Full implementations will be added in subsequent tasks
 
   @impl true
   @doc """
@@ -181,11 +245,26 @@ defmodule TermUI.Backend.Raw do
   ## Returns
 
   - `{:ok, state}` on success
-  - `{:error, reason}` on failure
+  - `{:error, :invalid_size}` if size option is malformed
+  - `{:error, :terminal_setup_failed}` if terminal configuration fails
+  - `{:error, :size_detection_failed}` if auto-detect fails and no size provided
+
+  ## Examples
+
+      # Default initialization
+      {:ok, state} = Raw.init([])
+
+      # With explicit options
+      {:ok, state} = Raw.init(
+        alternate_screen: true,
+        hide_cursor: true,
+        mouse_tracking: :click,
+        size: {24, 80}
+      )
   """
   @spec init(keyword()) :: {:ok, t()} | {:error, term()}
   def init(_opts \\ []) do
-    # Stub - will be implemented in Task 2.2.1
+    # Stub - full implementation in Section 2.2
     {:ok, %__MODULE__{}}
   end
 
@@ -194,12 +273,27 @@ defmodule TermUI.Backend.Raw do
   Shuts down the backend and restores terminal state.
 
   Performs cleanup in order: disable mouse, show cursor, reset attributes,
-  leave alternate screen, return to cooked mode. Error-safe - continues
-  cleanup even if individual steps fail.
+  leave alternate screen, return to cooked mode.
+
+  ## Error Safety
+
+  This function is designed to be error-safe:
+  - Each cleanup step is wrapped in try/rescue
+  - Individual failures are logged but don't prevent subsequent steps
+  - Always returns `:ok` regardless of individual step failures
+  - Idempotent: safe to call multiple times
+
+  ## Cleanup Sequence
+
+  1. Disable mouse tracking (if enabled)
+  2. Show cursor (ANSI: `ESC[?25h`)
+  3. Reset all text attributes (ANSI: `ESC[0m`)
+  4. Leave alternate screen (ANSI: `ESC[?1049l`)
+  5. Return to cooked mode via `:shell.start_interactive({:noshell, :cooked})`
   """
   @spec shutdown(t()) :: :ok
   def shutdown(_state) do
-    # Stub - will be implemented in Task 2.2.3
+    # Stub - full implementation in Section 2.2
     :ok
   end
 
@@ -220,10 +314,22 @@ defmodule TermUI.Backend.Raw do
   Moves the cursor to the specified position.
 
   Position is 1-indexed: `{1, 1}` is the top-left corner.
+
+  ## Position Validation
+
+  Positions must have positive integer coordinates. The position will be
+  clamped to terminal bounds in the implementation to prevent invalid
+  cursor states.
+
+  ## Examples
+
+      {:ok, state} = Raw.move_cursor(state, {1, 1})   # Top-left
+      {:ok, state} = Raw.move_cursor(state, {24, 80}) # Bottom-right (80x24)
   """
   @spec move_cursor(t(), TermUI.Backend.position()) :: {:ok, t()}
-  def move_cursor(state, _position) do
-    # Stub - will be implemented in Task 2.3.1
+  def move_cursor(state, {row, col} = _position)
+      when is_integer(row) and is_integer(col) and row > 0 and col > 0 do
+    # Stub - full implementation in Section 2.3
     {:ok, state}
   end
 
@@ -235,7 +341,7 @@ defmodule TermUI.Backend.Raw do
   """
   @spec hide_cursor(t()) :: {:ok, t()}
   def hide_cursor(state) do
-    # Stub - will be implemented in Task 2.3.2
+    # Stub - full implementation in Section 2.3
     {:ok, state}
   end
 
@@ -247,7 +353,7 @@ defmodule TermUI.Backend.Raw do
   """
   @spec show_cursor(t()) :: {:ok, t()}
   def show_cursor(state) do
-    # Stub - will be implemented in Task 2.3.2
+    # Stub - full implementation in Section 2.3
     {:ok, state}
   end
 
@@ -259,7 +365,7 @@ defmodule TermUI.Backend.Raw do
   """
   @spec clear(t()) :: {:ok, t()}
   def clear(state) do
-    # Stub - will be implemented in Task 2.4.1
+    # Stub - full implementation in Section 2.4
     {:ok, state}
   end
 
@@ -268,11 +374,25 @@ defmodule TermUI.Backend.Raw do
   Draws cells to the terminal at specified positions.
 
   Cells are rendered with optimized cursor movement and style delta tracking
-  to minimize escape sequence output.
+  to minimize escape sequence output. See the "Style Delta Optimization" section
+  in the module documentation for details on how this works.
+
+  ## Cell Format
+
+  Each cell is a tuple `{position, cell_data}` where:
+  - `position` is `{row, col}` (1-indexed)
+  - `cell_data` is `{char, fg, bg, attrs}`
+
+  ## Performance
+
+  This function uses several optimizations:
+  - Style delta tracking (only emit changed attributes)
+  - Relative cursor movement when cheaper than absolute
+  - Batched I/O writes
   """
   @spec draw_cells(t(), [{TermUI.Backend.position(), TermUI.Backend.cell()}]) :: {:ok, t()}
   def draw_cells(state, _cells) do
-    # Stub - will be implemented in Task 2.5.1
+    # Stub - full implementation in Section 2.5
     {:ok, state}
   end
 
@@ -284,7 +404,7 @@ defmodule TermUI.Backend.Raw do
   """
   @spec flush(t()) :: {:ok, t()}
   def flush(state) do
-    # Stub - will be implemented in Task 2.6.1
+    # Stub - full implementation in Section 2.6
     {:ok, state}
   end
 
@@ -295,23 +415,78 @@ defmodule TermUI.Backend.Raw do
   In raw mode, input arrives character-by-character enabling real-time
   keyboard and mouse event handling.
 
+  ## Parameters
+
+  - `state` - Current backend state
+  - `timeout` - Milliseconds to wait (0 for non-blocking)
+
   ## Returns
 
-  - `{:ok, event, state}` - Event received
-  - `{:timeout, state}` - No input within timeout
-  - `{:error, reason, state}` - Error occurred
+  - `{:ok, event, state}` - Event received and parsed
+  - `{:timeout, state}` - No input within timeout period
+  - `{:error, :io_error, state}` - Terminal I/O error occurred
+  - `{:error, :parse_error, state}` - Failed to parse input sequence
   """
   @spec poll_event(t(), non_neg_integer()) ::
           {:ok, TermUI.Backend.event(), t()}
           | {:timeout, t()}
           | {:error, term(), t()}
   def poll_event(state, _timeout) do
-    # Stub - will be implemented in Task 2.7.1
+    # Stub - full implementation in Section 2.7
     {:timeout, state}
   end
 
-  # Keep the ANSI alias visible for future use
-  # This satisfies subtask 2.1.1.4
+  # ===========================================================================
+  # Helper Functions
+  # ===========================================================================
+
+  @doc """
+  Checks if a position is valid within the terminal bounds.
+
+  Returns `true` if the position has positive coordinates and is within
+  the terminal dimensions stored in state.
+
+  ## Examples
+
+      iex> state = %Raw{size: {24, 80}}
+      iex> Raw.valid_position?(state, {1, 1})
+      true
+      iex> Raw.valid_position?(state, {24, 80})
+      true
+      iex> Raw.valid_position?(state, {25, 1})
+      false
+      iex> Raw.valid_position?(state, {0, 1})
+      false
+  """
+  @spec valid_position?(t(), {integer(), integer()}) :: boolean()
+  def valid_position?(%__MODULE__{size: {max_rows, max_cols}}, {row, col})
+      when is_integer(row) and is_integer(col) do
+    row > 0 and col > 0 and row <= max_rows and col <= max_cols
+  end
+
+  def valid_position?(_state, _position), do: false
+
+  @doc """
+  Maps a Raw backend mouse mode to the corresponding ANSI protocol mode.
+
+  This is used internally when emitting mouse tracking escape sequences.
+
+  ## Examples
+
+      iex> Raw.mouse_mode_to_ansi(:click)
+      :normal
+      iex> Raw.mouse_mode_to_ansi(:drag)
+      :button
+      iex> Raw.mouse_mode_to_ansi(:all)
+      :all
+  """
+  @spec mouse_mode_to_ansi(mouse_mode()) :: :normal | :button | :all | nil
+  def mouse_mode_to_ansi(:none), do: nil
+  def mouse_mode_to_ansi(:click), do: :normal
+  def mouse_mode_to_ansi(:drag), do: :button
+  def mouse_mode_to_ansi(:all), do: :all
+
+  # Provides access to the ANSI module for escape sequence generation
   @doc false
   def ansi_module, do: ANSI
 end
