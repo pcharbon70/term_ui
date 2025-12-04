@@ -225,6 +225,200 @@ defmodule TermUI.Backend.StateTest do
     end
   end
 
+  describe "new/2 constructor" do
+    test "creates state with backend_module and mode" do
+      state = State.new(SomeBackend, mode: :tty)
+
+      assert state.backend_module == SomeBackend
+      assert state.mode == :tty
+    end
+
+    test "raises when mode is missing" do
+      assert_raise ArgumentError, "the :mode option is required", fn ->
+        State.new(SomeBackend)
+      end
+    end
+
+    test "raises when mode is missing from options" do
+      assert_raise ArgumentError, "the :mode option is required", fn ->
+        State.new(SomeBackend, capabilities: %{})
+      end
+    end
+
+    test "accepts all optional fields" do
+      caps = %{colors: :true_color}
+
+      state =
+        State.new(SomeBackend,
+          mode: :tty,
+          backend_state: %{some: :state},
+          capabilities: caps,
+          size: {24, 80},
+          initialized: true
+        )
+
+      assert state.backend_module == SomeBackend
+      assert state.mode == :tty
+      assert state.backend_state == %{some: :state}
+      assert state.capabilities == caps
+      assert state.size == {24, 80}
+      assert state.initialized == true
+    end
+
+    test "applies defaults for omitted optional fields" do
+      state = State.new(SomeBackend, mode: :raw)
+
+      assert state.backend_state == nil
+      assert state.capabilities == %{}
+      assert state.size == nil
+      assert state.initialized == false
+    end
+
+    test "accepts :raw mode" do
+      state = State.new(SomeBackend, mode: :raw)
+      assert state.mode == :raw
+    end
+
+    test "accepts :tty mode" do
+      state = State.new(SomeBackend, mode: :tty)
+      assert state.mode == :tty
+    end
+  end
+
+  describe "new_raw/0 and new_raw/1 constructor" do
+    test "creates raw mode state with defaults" do
+      state = State.new_raw()
+
+      assert state.backend_module == TermUI.Backend.Raw
+      assert state.mode == :raw
+      assert state.backend_state == nil
+      assert state.capabilities == %{}
+      assert state.size == nil
+      assert state.initialized == false
+    end
+
+    test "accepts backend_state" do
+      backend_state = %{raw_mode_started: true}
+      state = State.new_raw(backend_state)
+
+      assert state.backend_module == TermUI.Backend.Raw
+      assert state.mode == :raw
+      assert state.backend_state == backend_state
+    end
+
+    test "accepts any term as backend_state" do
+      state = State.new_raw(:ready)
+      assert state.backend_state == :ready
+
+      state = State.new_raw([1, 2, 3])
+      assert state.backend_state == [1, 2, 3]
+
+      state = State.new_raw({:some, :tuple})
+      assert state.backend_state == {:some, :tuple}
+    end
+  end
+
+  describe "new_tty/1 and new_tty/2 constructor" do
+    test "creates tty mode state with capabilities" do
+      caps = %{colors: :color_256, unicode: true}
+      state = State.new_tty(caps)
+
+      assert state.backend_module == TermUI.Backend.TTY
+      assert state.mode == :tty
+      assert state.capabilities == caps
+      assert state.backend_state == nil
+      assert state.size == nil
+      assert state.initialized == false
+    end
+
+    test "accepts backend_state as second argument" do
+      caps = %{colors: :true_color}
+      backend_state = %{some: :state}
+      state = State.new_tty(caps, backend_state)
+
+      assert state.backend_module == TermUI.Backend.TTY
+      assert state.mode == :tty
+      assert state.capabilities == caps
+      assert state.backend_state == backend_state
+    end
+
+    test "accepts empty capabilities map" do
+      state = State.new_tty(%{})
+
+      assert state.capabilities == %{}
+    end
+
+    test "raises when capabilities is not a map" do
+      assert_raise FunctionClauseError, fn ->
+        State.new_tty(:not_a_map)
+      end
+
+      assert_raise FunctionClauseError, fn ->
+        State.new_tty([colors: :true_color])
+      end
+    end
+
+    test "preserves all capability keys" do
+      caps = %{
+        colors: :true_color,
+        unicode: true,
+        dimensions: {24, 80},
+        terminal: true,
+        custom: :value
+      }
+
+      state = State.new_tty(caps)
+
+      assert state.capabilities == caps
+      assert state.capabilities.colors == :true_color
+      assert state.capabilities.unicode == true
+      assert state.capabilities.dimensions == {24, 80}
+      assert state.capabilities.terminal == true
+      assert state.capabilities.custom == :value
+    end
+  end
+
+  describe "constructor documentation" do
+    test "new/2 has docs" do
+      {:docs_v1, _, :elixir, _, _, _, docs} = Code.fetch_docs(State)
+
+      func_docs =
+        docs
+        |> Enum.filter(fn
+          {{:function, :new, 2}, _, _, _, _} -> true
+          _ -> false
+        end)
+
+      assert length(func_docs) == 1, "new/2 should have documentation"
+    end
+
+    test "new_raw/1 has docs" do
+      {:docs_v1, _, :elixir, _, _, _, docs} = Code.fetch_docs(State)
+
+      func_docs =
+        docs
+        |> Enum.filter(fn
+          {{:function, :new_raw, 1}, _, _, _, _} -> true
+          _ -> false
+        end)
+
+      assert length(func_docs) == 1, "new_raw/1 should have documentation"
+    end
+
+    test "new_tty/2 has docs" do
+      {:docs_v1, _, :elixir, _, _, _, docs} = Code.fetch_docs(State)
+
+      func_docs =
+        docs
+        |> Enum.filter(fn
+          {{:function, :new_tty, 2}, _, _, _, _} -> true
+          _ -> false
+        end)
+
+      assert length(func_docs) == 1, "new_tty/2 should have documentation"
+    end
+  end
+
   describe "typical usage patterns" do
     test "raw mode state creation" do
       # Simulates what happens after Selector.select() returns {:raw, raw_state}

@@ -181,13 +181,13 @@ Define the state struct with fields for tracking backend information and capabil
 
 ### 1.3.2 Implement State Constructors
 
-- [ ] **Task 1.3.2 Complete**
+- [x] **Task 1.3.2 Complete**
 
 Implement constructor functions for creating state structs.
 
-- [ ] 1.3.2.1 Implement `new/2` accepting `backend_module` and keyword options
-- [ ] 1.3.2.2 Implement `new_raw/1` convenience function for raw mode state
-- [ ] 1.3.2.3 Implement `new_tty/2` convenience function for TTY mode state with capabilities
+- [x] 1.3.2.1 Implement `new/2` accepting `backend_module` and keyword options
+- [x] 1.3.2.2 Implement `new_raw/1` convenience function for raw mode state
+- [x] 1.3.2.3 Implement `new_tty/2` convenience function for TTY mode state with capabilities
 
 ### 1.3.3 Implement State Update Functions
 
