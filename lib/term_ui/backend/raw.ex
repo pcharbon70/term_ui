@@ -144,6 +144,11 @@ defmodule TermUI.Backend.Raw do
   @behaviour TermUI.Backend
 
   alias TermUI.ANSI
+  require Logger
+
+  # Comprehensive mouse disable sequence - disables ALL mouse modes defensively
+  # This ensures cleanup even if state is inconsistent
+  @all_mouse_off "\e[?1006l\e[?1003l\e[?1002l\e[?1000l"
 
   # ===========================================================================
   # Type Definitions and State Structure
@@ -333,8 +338,25 @@ defmodule TermUI.Backend.Raw do
   5. Return to cooked mode via `:shell.start_interactive({:noshell, :cooked})`
   """
   @spec shutdown(t()) :: :ok
-  def shutdown(_state) do
-    # Stub - full implementation in Section 2.2
+  def shutdown(state) do
+    # Disable mouse tracking if it was enabled
+    # Use defensive cleanup - disable ALL modes regardless of state
+    safe_write(@all_mouse_off)
+
+    # Show cursor (always, even if state says visible - defensive)
+    safe_write(ANSI.cursor_show())
+
+    # Reset all text attributes
+    safe_write(ANSI.reset())
+
+    # Leave alternate screen if it was entered
+    if state.alternate_screen do
+      safe_write(ANSI.leave_alternate_screen())
+    end
+
+    # Return to cooked mode
+    safe_cooked_mode()
+
     :ok
   end
 
@@ -588,5 +610,35 @@ defmodule TermUI.Backend.Raw do
     IO.write(data)
   rescue
     _ -> :ok
+  end
+
+  # Error-safe write for shutdown - logs errors but continues
+  defp safe_write(data) do
+    IO.write(data)
+  rescue
+    e ->
+      Logger.warning("Failed to write during shutdown: #{Exception.message(e)}")
+      :ok
+  end
+
+  # Error-safe cooked mode restoration
+  defp safe_cooked_mode do
+    :shell.start_interactive({:noshell, :cooked})
+  rescue
+    e in UndefinedFunctionError ->
+      # :shell.start_interactive/1 not available (pre-OTP 28)
+      Logger.warning(
+        "Cooked mode restoration not available (OTP 28+ required): #{Exception.message(e)}"
+      )
+
+      :ok
+
+    e ->
+      Logger.warning("Failed to restore cooked mode: #{Exception.message(e)}")
+      :ok
+  catch
+    kind, reason ->
+      Logger.warning("Failed to restore cooked mode: #{kind} - #{inspect(reason)}")
+      :ok
   end
 end

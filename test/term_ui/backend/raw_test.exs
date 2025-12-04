@@ -334,6 +334,64 @@ defmodule TermUI.Backend.RawTest do
     end
   end
 
+  describe "shutdown/1 callback" do
+    test "returns :ok with default state" do
+      {:ok, state} = Raw.init(size: {24, 80})
+
+      assert :ok = Raw.shutdown(state)
+    end
+
+    test "returns :ok with alternate_screen: false" do
+      {:ok, state} = Raw.init(size: {24, 80}, alternate_screen: false)
+
+      assert :ok = Raw.shutdown(state)
+    end
+
+    test "returns :ok with mouse tracking enabled" do
+      {:ok, state} = Raw.init(size: {24, 80}, mouse_tracking: :click)
+
+      assert :ok = Raw.shutdown(state)
+    end
+
+    test "returns :ok with all mouse modes" do
+      for mode <- [:none, :click, :drag, :all] do
+        {:ok, state} = Raw.init(size: {24, 80}, mouse_tracking: mode)
+        assert :ok = Raw.shutdown(state)
+      end
+    end
+
+    test "is idempotent - can be called twice safely" do
+      {:ok, state} = Raw.init(size: {24, 80})
+
+      assert :ok = Raw.shutdown(state)
+      assert :ok = Raw.shutdown(state)
+    end
+
+    test "works with various state configurations" do
+      # Test with alternate screen and mouse tracking
+      {:ok, state1} =
+        Raw.init(
+          size: {30, 100},
+          alternate_screen: true,
+          hide_cursor: true,
+          mouse_tracking: :all
+        )
+
+      assert :ok = Raw.shutdown(state1)
+
+      # Test with minimal configuration
+      {:ok, state2} =
+        Raw.init(
+          size: {24, 80},
+          alternate_screen: false,
+          hide_cursor: false,
+          mouse_tracking: :none
+        )
+
+      assert :ok = Raw.shutdown(state2)
+    end
+  end
+
   describe "stub callbacks" do
     # Use setup to avoid repeating Raw.init([]) in every test
     setup do

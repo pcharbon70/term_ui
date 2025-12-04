@@ -53,7 +53,7 @@ Define the internal state struct for tracking terminal state within the backend.
 
 ## 2.2 Implement Initialization Lifecycle
 
-- [ ] **Section 2.2 Complete**
+- [x] **Section 2.2 Complete**
 
 Implement `init/1` and `shutdown/1` callbacks for terminal setup and teardown. These callbacks assume raw mode is already active from the selector.
 
@@ -84,39 +84,39 @@ Implement the sequence of operations to prepare the terminal for rendering.
 
 ### 2.2.3 Implement shutdown/1 Callback
 
-- [ ] **Task 2.2.3 Complete**
+- [x] **Task 2.2.3 Complete**
 
 Implement clean shutdown that restores terminal to pre-init state.
 
-- [ ] 2.2.3.1 Implement `@impl true` `shutdown/1` accepting state
-- [ ] 2.2.3.2 Disable mouse tracking if it was enabled
-- [ ] 2.2.3.3 Show cursor with `\e[?25h`
-- [ ] 2.2.3.4 Leave alternate screen with `\e[?1049l` if it was entered
-- [ ] 2.2.3.5 Reset all attributes with `\e[0m`
-- [ ] 2.2.3.6 Return to cooked mode with `:shell.start_interactive({:noshell, :cooked})`
-- [ ] 2.2.3.7 Return `:ok`
+- [x] 2.2.3.1 Implement `@impl true` `shutdown/1` accepting state
+- [x] 2.2.3.2 Disable mouse tracking if it was enabled
+- [x] 2.2.3.3 Show cursor with `\e[?25h`
+- [x] 2.2.3.4 Leave alternate screen with `\e[?1049l` if it was entered
+- [x] 2.2.3.5 Reset all attributes with `\e[0m`
+- [x] 2.2.3.6 Return to cooked mode with `:shell.start_interactive({:noshell, :cooked})`
+- [x] 2.2.3.7 Return `:ok`
 
 ### 2.2.4 Implement Error-Safe Shutdown
 
-- [ ] **Task 2.2.4 Complete**
+- [x] **Task 2.2.4 Complete**
 
 Ensure shutdown completes even if individual operations fail.
 
-- [ ] 2.2.4.1 Wrap each shutdown step in try/rescue
-- [ ] 2.2.4.2 Log errors but continue cleanup sequence
-- [ ] 2.2.4.3 Ensure cooked mode restoration happens last and is attempted even after errors
-- [ ] 2.2.4.4 Make shutdown idempotent (safe to call multiple times)
+- [x] 2.2.4.1 Wrap each shutdown step in try/rescue
+- [x] 2.2.4.2 Log errors but continue cleanup sequence
+- [x] 2.2.4.3 Ensure cooked mode restoration happens last and is attempted even after errors
+- [x] 2.2.4.4 Make shutdown idempotent (safe to call multiple times)
 
 ### Unit Tests - Section 2.2
 
-- [ ] **Unit Tests 2.2 Complete**
+- [x] **Unit Tests 2.2 Complete**
 - [x] Test `init/1` with default options returns `{:ok, state}`
 - [x] Test `init/1` with `alternate_screen: false` does not enter alternate screen
 - [x] Test `init/1` with explicit size option uses provided dimensions
 - [x] Test `init/1` queries terminal size when not provided
-- [ ] Test `shutdown/1` returns `:ok`
-- [ ] Test `shutdown/1` is idempotent (can be called twice safely)
-- [ ] Test shutdown continues after individual step failure
+- [x] Test `shutdown/1` returns `:ok`
+- [x] Test `shutdown/1` is idempotent (can be called twice safely)
+- [x] Test shutdown continues after individual step failure
 
 ---
 
