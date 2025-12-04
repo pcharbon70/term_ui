@@ -263,9 +263,50 @@ defmodule TermUI.Backend.Raw do
       )
   """
   @spec init(keyword()) :: {:ok, t()} | {:error, term()}
-  def init(_opts \\ []) do
-    # Stub - full implementation in Section 2.2
-    {:ok, %__MODULE__{}}
+  def init(opts \\ []) do
+    # Parse options with defaults
+    alternate_screen = Keyword.get(opts, :alternate_screen, true)
+    hide_cursor = Keyword.get(opts, :hide_cursor, true)
+    mouse_tracking = Keyword.get(opts, :mouse_tracking, :none)
+    size_opt = Keyword.get(opts, :size, nil)
+
+    # Validate and get terminal size
+    with {:ok, size} <- get_terminal_size(size_opt) do
+      # Perform terminal setup sequence
+      # Order: alternate screen -> hide cursor -> mouse tracking -> clear
+      if alternate_screen do
+        write_to_terminal(ANSI.enter_alternate_screen())
+      end
+
+      if hide_cursor do
+        write_to_terminal(ANSI.cursor_hide())
+      end
+
+      if mouse_tracking != :none do
+        ansi_mode = mouse_mode_to_ansi(mouse_tracking)
+
+        if ansi_mode do
+          write_to_terminal(ANSI.enable_mouse_tracking(ansi_mode))
+          write_to_terminal(ANSI.enable_sgr_mouse())
+        end
+      end
+
+      # Clear screen and home cursor
+      write_to_terminal(ANSI.clear_screen())
+      write_to_terminal(ANSI.cursor_position(1, 1))
+
+      # Build initial state
+      state = %__MODULE__{
+        size: size,
+        cursor_visible: not hide_cursor,
+        cursor_position: {1, 1},
+        alternate_screen: alternate_screen,
+        mouse_mode: mouse_tracking,
+        current_style: nil
+      }
+
+      {:ok, state}
+    end
   end
 
   @impl true
@@ -489,4 +530,63 @@ defmodule TermUI.Backend.Raw do
   # Provides access to the ANSI module for escape sequence generation
   @doc false
   def ansi_module, do: ANSI
+
+  # ===========================================================================
+  # Private Functions
+  # ===========================================================================
+
+  # Gets terminal size from explicit option or auto-detection
+  @spec get_terminal_size({pos_integer(), pos_integer()} | nil) ::
+          {:ok, {pos_integer(), pos_integer()}} | {:error, term()}
+  defp get_terminal_size({rows, cols})
+       when is_integer(rows) and is_integer(cols) and rows > 0 and cols > 0 do
+    {:ok, {rows, cols}}
+  end
+
+  defp get_terminal_size(nil) do
+    # Try :io.rows/0 and :io.columns/0 first
+    case {:io.rows(), :io.columns()} do
+      {{:ok, rows}, {:ok, cols}} when rows > 0 and cols > 0 ->
+        {:ok, {rows, cols}}
+
+      _ ->
+        # Fall back to environment variables
+        get_size_from_env()
+    end
+  end
+
+  defp get_terminal_size(_invalid) do
+    {:error, :invalid_size}
+  end
+
+  # Gets terminal size from LINES and COLUMNS environment variables
+  defp get_size_from_env do
+    with {:ok, lines} <- get_env_int("LINES"),
+         {:ok, columns} <- get_env_int("COLUMNS") do
+      {:ok, {lines, columns}}
+    else
+      _ -> {:error, :size_detection_failed}
+    end
+  end
+
+  # Parses an environment variable as a positive integer
+  defp get_env_int(var) do
+    case System.get_env(var) do
+      nil ->
+        {:error, :not_set}
+
+      value ->
+        case Integer.parse(value) do
+          {int, ""} when int > 0 -> {:ok, int}
+          _ -> {:error, :invalid}
+        end
+    end
+  end
+
+  # Writes data to the terminal, wrapping in try/rescue for error safety
+  defp write_to_terminal(data) do
+    IO.write(data)
+  rescue
+    _ -> :ok
+  end
 end

@@ -202,12 +202,12 @@ defmodule TermUI.Backend.RawTest do
     end
 
     test "init/1 returns state struct" do
-      {:ok, state} = Raw.init([])
+      {:ok, state} = Raw.init(size: {24, 80})
       assert %Raw{} = state
     end
 
     test "size/1 returns size from state" do
-      {:ok, state} = Raw.init([])
+      {:ok, state} = Raw.init(size: {24, 80})
       {:ok, size} = Raw.size(state)
       assert size == state.size
     end
@@ -248,23 +248,97 @@ defmodule TermUI.Backend.RawTest do
     end
   end
 
-  describe "stub callbacks" do
-    # Use setup to avoid repeating Raw.init([]) in every test
-    setup do
-      {:ok, state} = Raw.init([])
-      %{state: state}
+  describe "init/1 callback" do
+    test "returns {:ok, state} with explicit size option" do
+      {:ok, state} = Raw.init(size: {30, 100})
+
+      assert %Raw{} = state
+      assert state.size == {30, 100}
     end
 
-    test "init/1 returns {:ok, state} with default struct" do
-      {:ok, state} = Raw.init([])
-      assert %Raw{} = state
-      assert state.size == {24, 80}
+    test "sets alternate_screen to true by default" do
+      {:ok, state} = Raw.init(size: {24, 80})
+
+      assert state.alternate_screen == true
+    end
+
+    test "sets alternate_screen to false when option provided" do
+      {:ok, state} = Raw.init(size: {24, 80}, alternate_screen: false)
+
+      assert state.alternate_screen == false
+    end
+
+    test "sets cursor_visible to false by default (hide_cursor: true)" do
+      {:ok, state} = Raw.init(size: {24, 80})
+
+      assert state.cursor_visible == false
+    end
+
+    test "sets cursor_visible to true when hide_cursor: false" do
+      {:ok, state} = Raw.init(size: {24, 80}, hide_cursor: false)
+
+      assert state.cursor_visible == true
+    end
+
+    test "sets mouse_mode to :none by default" do
+      {:ok, state} = Raw.init(size: {24, 80})
+
       assert state.mouse_mode == :none
     end
 
-    test "init/1 accepts options" do
-      {:ok, state} = Raw.init(alternate_screen: false, hide_cursor: true)
-      assert %Raw{} = state
+    test "sets mouse_mode from option" do
+      {:ok, state1} = Raw.init(size: {24, 80}, mouse_tracking: :click)
+      {:ok, state2} = Raw.init(size: {24, 80}, mouse_tracking: :drag)
+      {:ok, state3} = Raw.init(size: {24, 80}, mouse_tracking: :all)
+
+      assert state1.mouse_mode == :click
+      assert state2.mouse_mode == :drag
+      assert state3.mouse_mode == :all
+    end
+
+    test "sets cursor_position to {1, 1} after clear" do
+      {:ok, state} = Raw.init(size: {24, 80})
+
+      assert state.cursor_position == {1, 1}
+    end
+
+    test "sets current_style to nil initially" do
+      {:ok, state} = Raw.init(size: {24, 80})
+
+      assert state.current_style == nil
+    end
+
+    test "returns error for invalid size format" do
+      assert {:error, :invalid_size} = Raw.init(size: "invalid")
+      assert {:error, :invalid_size} = Raw.init(size: {0, 80})
+      assert {:error, :invalid_size} = Raw.init(size: {24, 0})
+      assert {:error, :invalid_size} = Raw.init(size: {-1, 80})
+      assert {:error, :invalid_size} = Raw.init(size: {24})
+    end
+
+    test "accepts all options combined" do
+      {:ok, state} =
+        Raw.init(
+          size: {40, 120},
+          alternate_screen: false,
+          hide_cursor: false,
+          mouse_tracking: :drag
+        )
+
+      assert state.size == {40, 120}
+      assert state.alternate_screen == false
+      assert state.cursor_visible == true
+      assert state.mouse_mode == :drag
+      assert state.cursor_position == {1, 1}
+      assert state.current_style == nil
+    end
+  end
+
+  describe "stub callbacks" do
+    # Use setup to avoid repeating Raw.init([]) in every test
+    setup do
+      {:ok, state} = Raw.init(size: {24, 80})
+      %{state: state}
     end
 
     test "shutdown/1 returns :ok", %{state: state} do
@@ -280,8 +354,7 @@ defmodule TermUI.Backend.RawTest do
       assert {:ok, %Raw{}} = Raw.move_cursor(state, {10, 20})
     end
 
-    test "move_cursor/2 enforces positive integer positions" do
-      {:ok, state} = Raw.init([])
+    test "move_cursor/2 enforces positive integer positions", %{state: state} do
       # These should raise FunctionClauseError due to guard clauses
       assert_raise FunctionClauseError, fn -> Raw.move_cursor(state, {0, 1}) end
       assert_raise FunctionClauseError, fn -> Raw.move_cursor(state, {1, 0}) end

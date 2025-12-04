@@ -59,28 +59,28 @@ Implement `init/1` and `shutdown/1` callbacks for terminal setup and teardown. T
 
 ### 2.2.1 Implement init/1 Callback
 
-- [ ] **Task 2.2.1 Complete**
+- [x] **Task 2.2.1 Complete**
 
 Implement initialization that sets up the terminal for rendering without activating raw mode (already done by selector).
 
-- [ ] 2.2.1.1 Implement `@impl true` `init/1` accepting keyword options
-- [ ] 2.2.1.2 Accept `:alternate_screen` option (default: `true`) to control alternate screen usage
-- [ ] 2.2.1.3 Accept `:hide_cursor` option (default: `true`) to control initial cursor visibility
-- [ ] 2.2.1.4 Accept `:mouse_tracking` option (default: `:none`) for mouse mode
-- [ ] 2.2.1.5 Accept `:size` option for explicit dimensions, falling back to query
+- [x] 2.2.1.1 Implement `@impl true` `init/1` accepting keyword options
+- [x] 2.2.1.2 Accept `:alternate_screen` option (default: `true`) to control alternate screen usage
+- [x] 2.2.1.3 Accept `:hide_cursor` option (default: `true`) to control initial cursor visibility
+- [x] 2.2.1.4 Accept `:mouse_tracking` option (default: `:none`) for mouse mode
+- [x] 2.2.1.5 Accept `:size` option for explicit dimensions, falling back to query
 
 ### 2.2.2 Implement Terminal Setup Sequence
 
-- [ ] **Task 2.2.2 Complete**
+- [x] **Task 2.2.2 Complete**
 
 Implement the sequence of operations to prepare the terminal for rendering.
 
-- [ ] 2.2.2.1 Query terminal size using `:io.columns/0` and `:io.rows/0` if not provided in options
-- [ ] 2.2.2.2 Enter alternate screen buffer with `\e[?1049h` if `alternate_screen: true`
-- [ ] 2.2.2.3 Hide cursor with `\e[?25l` if `hide_cursor: true`
-- [ ] 2.2.2.4 Enable mouse tracking if requested using appropriate escape sequences
-- [ ] 2.2.2.5 Clear the screen with `\e[2J\e[1;1H` to start fresh
-- [ ] 2.2.2.6 Return `{:ok, state}` with initialized state struct
+- [x] 2.2.2.1 Query terminal size using `:io.columns/0` and `:io.rows/0` if not provided in options
+- [x] 2.2.2.2 Enter alternate screen buffer with `\e[?1049h` if `alternate_screen: true`
+- [x] 2.2.2.3 Hide cursor with `\e[?25l` if `hide_cursor: true`
+- [x] 2.2.2.4 Enable mouse tracking if requested using appropriate escape sequences
+- [x] 2.2.2.5 Clear the screen with `\e[2J\e[1;1H` to start fresh
+- [x] 2.2.2.6 Return `{:ok, state}` with initialized state struct
 
 ### 2.2.3 Implement shutdown/1 Callback
 
@@ -110,10 +110,10 @@ Ensure shutdown completes even if individual operations fail.
 ### Unit Tests - Section 2.2
 
 - [ ] **Unit Tests 2.2 Complete**
-- [ ] Test `init/1` with default options returns `{:ok, state}`
-- [ ] Test `init/1` with `alternate_screen: false` does not enter alternate screen
-- [ ] Test `init/1` with explicit size option uses provided dimensions
-- [ ] Test `init/1` queries terminal size when not provided
+- [x] Test `init/1` with default options returns `{:ok, state}`
+- [x] Test `init/1` with `alternate_screen: false` does not enter alternate screen
+- [x] Test `init/1` with explicit size option uses provided dimensions
+- [x] Test `init/1` queries terminal size when not provided
 - [ ] Test `shutdown/1` returns `:ok`
 - [ ] Test `shutdown/1` is idempotent (can be called twice safely)
 - [ ] Test shutdown continues after individual step failure
