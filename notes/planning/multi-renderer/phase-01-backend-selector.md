@@ -220,16 +220,16 @@ The `TermUI.Backend.Config` module handles backend configuration from the applic
 
 ### 1.4.1 Implement Configuration Reading
 
-- [ ] **Task 1.4.1 Complete**
+- [x] **Task 1.4.1 Complete**
 
 Implement functions for reading backend configuration from application environment.
 
-- [ ] 1.4.1.1 Create `lib/term_ui/backend/config.ex` module
-- [ ] 1.4.1.2 Implement `get_backend/0` reading `:term_ui, :backend` config, defaulting to `:auto`
-- [ ] 1.4.1.3 Implement `get_character_set/0` reading `:term_ui, :character_set` config, defaulting to `:unicode`
-- [ ] 1.4.1.4 Implement `get_fallback_character_set/0` reading `:term_ui, :fallback_character_set`, defaulting to `:ascii`
-- [ ] 1.4.1.5 Implement `get_tty_opts/0` reading `:term_ui, :tty_opts`, defaulting to `[line_mode: :full_redraw]`
-- [ ] 1.4.1.6 Implement `get_raw_opts/0` reading `:term_ui, :raw_opts`, defaulting to `[alternate_screen: true]`
+- [x] 1.4.1.1 Create `lib/term_ui/backend/config.ex` module
+- [x] 1.4.1.2 Implement `get_backend/0` reading `:term_ui, :backend` config, defaulting to `:auto`
+- [x] 1.4.1.3 Implement `get_character_set/0` reading `:term_ui, :character_set` config, defaulting to `:unicode`
+- [x] 1.4.1.4 Implement `get_fallback_character_set/0` reading `:term_ui, :fallback_character_set`, defaulting to `:ascii`
+- [x] 1.4.1.5 Implement `get_tty_opts/0` reading `:term_ui, :tty_opts`, defaulting to `[line_mode: :full_redraw]`
+- [x] 1.4.1.6 Implement `get_raw_opts/0` reading `:term_ui, :raw_opts`, defaulting to `[alternate_screen: true]`
 
 ### 1.4.2 Implement Configuration Validation
 
