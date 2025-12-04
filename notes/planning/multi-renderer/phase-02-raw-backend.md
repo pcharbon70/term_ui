@@ -14,7 +14,7 @@ This phase maintains full backward compatibility—existing applications using T
 
 ## 2.1 Create Raw Backend Module Structure
 
-- [ ] **Section 2.1 Complete**
+- [x] **Section 2.1 Complete**
 
 Set up the `TermUI.Backend.Raw` module implementing the `TermUI.Backend` behaviour. The module structure follows existing TermUI patterns while conforming to the new backend abstraction.
 
@@ -31,23 +31,23 @@ Create the module with proper structure, documentation, and behaviour declaratio
 
 ### 2.1.2 Define Internal State Structure
 
-- [ ] **Task 2.1.2 Complete**
+- [x] **Task 2.1.2 Complete**
 
 Define the internal state struct for tracking terminal state within the backend.
 
-- [ ] 2.1.2.1 Define `defstruct` with field `size :: {rows :: pos_integer(), cols :: pos_integer()}`
-- [ ] 2.1.2.2 Define field `cursor_visible :: boolean()` defaulting to `false` (hidden during rendering)
-- [ ] 2.1.2.3 Define field `cursor_position :: {row :: pos_integer(), col :: pos_integer()} | nil`
-- [ ] 2.1.2.4 Define field `alternate_screen :: boolean()` tracking alternate screen state
-- [ ] 2.1.2.5 Define field `mouse_mode :: :none | :click | :drag | :all` tracking mouse tracking state
-- [ ] 2.1.2.6 Define field `current_style :: Style.t() | nil` for tracking current SGR state to minimize output
+- [x] 2.1.2.1 Define `defstruct` with field `size :: {rows :: pos_integer(), cols :: pos_integer()}`
+- [x] 2.1.2.2 Define field `cursor_visible :: boolean()` defaulting to `false` (hidden during rendering)
+- [x] 2.1.2.3 Define field `cursor_position :: {row :: pos_integer(), col :: pos_integer()} | nil`
+- [x] 2.1.2.4 Define field `alternate_screen :: boolean()` tracking alternate screen state
+- [x] 2.1.2.5 Define field `mouse_mode :: :none | :click | :drag | :all` tracking mouse tracking state
+- [x] 2.1.2.6 Define field `current_style :: Style.t() | nil` for tracking current SGR state to minimize output
 
 ### Unit Tests - Section 2.1
 
-- [ ] **Unit Tests 2.1 Complete**
-- [ ] Test module compiles and declares `@behaviour TermUI.Backend`
-- [ ] Test state struct has all expected fields with correct defaults
-- [ ] Test state struct can be pattern matched
+- [x] **Unit Tests 2.1 Complete**
+- [x] Test module compiles and declares `@behaviour TermUI.Backend`
+- [x] Test state struct has all expected fields with correct defaults
+- [x] Test state struct can be pattern matched
 
 ---
 

@@ -100,6 +100,67 @@ defmodule TermUI.Backend.Raw do
 
   alias TermUI.ANSI
 
+  # ===========================================================================
+  # State Structure (Task 2.1.2)
+  # ===========================================================================
+
+  @typedoc """
+  Mouse tracking mode for the terminal.
+
+  - `:none` - No mouse tracking
+  - `:click` - Track button clicks only (X10 mode)
+  - `:drag` - Track clicks and drag events (button event mode)
+  - `:all` - Track all mouse movement (any event mode)
+  """
+  @type mouse_mode :: :none | :click | :drag | :all
+
+  @typedoc """
+  Current SGR (Select Graphic Rendition) style state.
+
+  Tracks the current foreground color, background color, and text attributes
+  to enable style delta optimization - only emitting escape sequences for
+  changed attributes.
+  """
+  @type style_state :: %{
+          fg: TermUI.Backend.color(),
+          bg: TermUI.Backend.color(),
+          attrs: [atom()]
+        }
+
+  @typedoc """
+  Internal state for the Raw backend.
+
+  Tracks all terminal state needed for rendering and input handling.
+
+  ## Fields
+
+  - `:size` - Terminal dimensions as `{rows, cols}`
+  - `:cursor_visible` - Whether cursor is currently visible (default: `false`)
+  - `:cursor_position` - Current cursor position as `{row, col}` or `nil`
+  - `:alternate_screen` - Whether alternate screen buffer is active
+  - `:mouse_mode` - Current mouse tracking mode
+  - `:current_style` - Current SGR state for style delta tracking
+  """
+  @type t :: %__MODULE__{
+          size: {pos_integer(), pos_integer()},
+          cursor_visible: boolean(),
+          cursor_position: {pos_integer(), pos_integer()} | nil,
+          alternate_screen: boolean(),
+          mouse_mode: mouse_mode(),
+          current_style: style_state() | nil
+        }
+
+  defstruct size: {24, 80},
+            cursor_visible: false,
+            cursor_position: nil,
+            alternate_screen: false,
+            mouse_mode: :none,
+            current_style: nil
+
+  # ===========================================================================
+  # Behaviour Callbacks
+  # ===========================================================================
+
   # Stub implementations for behaviour callbacks
   # These will be fully implemented in subsequent tasks (2.2.x - 2.8.x)
 
@@ -122,10 +183,10 @@ defmodule TermUI.Backend.Raw do
   - `{:ok, state}` on success
   - `{:error, reason}` on failure
   """
-  @spec init(keyword()) :: {:ok, term()} | {:error, term()}
+  @spec init(keyword()) :: {:ok, t()} | {:error, term()}
   def init(_opts \\ []) do
     # Stub - will be implemented in Task 2.2.1
-    {:ok, %{}}
+    {:ok, %__MODULE__{}}
   end
 
   @impl true
@@ -136,7 +197,7 @@ defmodule TermUI.Backend.Raw do
   leave alternate screen, return to cooked mode. Error-safe - continues
   cleanup even if individual steps fail.
   """
-  @spec shutdown(term()) :: :ok
+  @spec shutdown(t()) :: :ok
   def shutdown(_state) do
     # Stub - will be implemented in Task 2.2.3
     :ok
@@ -148,10 +209,10 @@ defmodule TermUI.Backend.Raw do
 
   Returns cached size from state. Use `refresh_size/1` to re-query.
   """
-  @spec size(term()) :: {:ok, TermUI.Backend.size()} | {:error, :enotsup}
-  def size(_state) do
+  @spec size(t()) :: {:ok, TermUI.Backend.size()} | {:error, :enotsup}
+  def size(state) do
     # Stub - will be implemented in Task 2.4.2
-    {:error, :enotsup}
+    {:ok, state.size}
   end
 
   @impl true
@@ -160,7 +221,7 @@ defmodule TermUI.Backend.Raw do
 
   Position is 1-indexed: `{1, 1}` is the top-left corner.
   """
-  @spec move_cursor(term(), TermUI.Backend.position()) :: {:ok, term()}
+  @spec move_cursor(t(), TermUI.Backend.position()) :: {:ok, t()}
   def move_cursor(state, _position) do
     # Stub - will be implemented in Task 2.3.1
     {:ok, state}
@@ -172,7 +233,7 @@ defmodule TermUI.Backend.Raw do
 
   Uses ANSI sequence `ESC[?25l`.
   """
-  @spec hide_cursor(term()) :: {:ok, term()}
+  @spec hide_cursor(t()) :: {:ok, t()}
   def hide_cursor(state) do
     # Stub - will be implemented in Task 2.3.2
     {:ok, state}
@@ -184,7 +245,7 @@ defmodule TermUI.Backend.Raw do
 
   Uses ANSI sequence `ESC[?25h`.
   """
-  @spec show_cursor(term()) :: {:ok, term()}
+  @spec show_cursor(t()) :: {:ok, t()}
   def show_cursor(state) do
     # Stub - will be implemented in Task 2.3.2
     {:ok, state}
@@ -196,7 +257,7 @@ defmodule TermUI.Backend.Raw do
 
   Uses ANSI sequences `ESC[2J` (clear) and `ESC[1;1H` (home).
   """
-  @spec clear(term()) :: {:ok, term()}
+  @spec clear(t()) :: {:ok, t()}
   def clear(state) do
     # Stub - will be implemented in Task 2.4.1
     {:ok, state}
@@ -209,7 +270,7 @@ defmodule TermUI.Backend.Raw do
   Cells are rendered with optimized cursor movement and style delta tracking
   to minimize escape sequence output.
   """
-  @spec draw_cells(term(), [{TermUI.Backend.position(), TermUI.Backend.cell()}]) :: {:ok, term()}
+  @spec draw_cells(t(), [{TermUI.Backend.position(), TermUI.Backend.cell()}]) :: {:ok, t()}
   def draw_cells(state, _cells) do
     # Stub - will be implemented in Task 2.5.1
     {:ok, state}
@@ -221,7 +282,7 @@ defmodule TermUI.Backend.Raw do
 
   For the Raw backend, `IO.write/1` is synchronous so this is largely a no-op.
   """
-  @spec flush(term()) :: {:ok, term()}
+  @spec flush(t()) :: {:ok, t()}
   def flush(state) do
     # Stub - will be implemented in Task 2.6.1
     {:ok, state}
@@ -240,10 +301,10 @@ defmodule TermUI.Backend.Raw do
   - `{:timeout, state}` - No input within timeout
   - `{:error, reason, state}` - Error occurred
   """
-  @spec poll_event(term(), non_neg_integer()) ::
-          {:ok, TermUI.Backend.event(), term()}
-          | {:timeout, term()}
-          | {:error, term(), term()}
+  @spec poll_event(t(), non_neg_integer()) ::
+          {:ok, TermUI.Backend.event(), t()}
+          | {:timeout, t()}
+          | {:error, term(), t()}
   def poll_event(state, _timeout) do
     # Stub - will be implemented in Task 2.7.1
     {:timeout, state}

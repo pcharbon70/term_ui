@@ -100,6 +100,101 @@ defmodule TermUI.Backend.RawTest do
     end
   end
 
+  describe "state structure (Task 2.1.2)" do
+    test "state struct has all expected fields" do
+      state = %Raw{}
+
+      assert Map.has_key?(state, :size)
+      assert Map.has_key?(state, :cursor_visible)
+      assert Map.has_key?(state, :cursor_position)
+      assert Map.has_key?(state, :alternate_screen)
+      assert Map.has_key?(state, :mouse_mode)
+      assert Map.has_key?(state, :current_style)
+    end
+
+    test "state struct has correct default values" do
+      state = %Raw{}
+
+      assert state.size == {24, 80}
+      assert state.cursor_visible == false
+      assert state.cursor_position == nil
+      assert state.alternate_screen == false
+      assert state.mouse_mode == :none
+      assert state.current_style == nil
+    end
+
+    test "state struct can be pattern matched" do
+      state = %Raw{size: {30, 100}, cursor_visible: true}
+
+      assert %Raw{size: {30, 100}} = state
+      assert %Raw{cursor_visible: true} = state
+    end
+
+    test "state struct can be created with custom values" do
+      state = %Raw{
+        size: {50, 120},
+        cursor_visible: true,
+        cursor_position: {10, 20},
+        alternate_screen: true,
+        mouse_mode: :all,
+        current_style: %{fg: :red, bg: :default, attrs: [:bold]}
+      }
+
+      assert state.size == {50, 120}
+      assert state.cursor_visible == true
+      assert state.cursor_position == {10, 20}
+      assert state.alternate_screen == true
+      assert state.mouse_mode == :all
+      assert state.current_style == %{fg: :red, bg: :default, attrs: [:bold]}
+    end
+
+    test "state struct can be updated with struct update syntax" do
+      state = %Raw{}
+      updated = %{state | cursor_visible: true, mouse_mode: :click}
+
+      assert updated.cursor_visible == true
+      assert updated.mouse_mode == :click
+      # Other fields unchanged
+      assert updated.size == {24, 80}
+    end
+
+    test "mouse_mode accepts all valid values" do
+      for mode <- [:none, :click, :drag, :all] do
+        state = %Raw{mouse_mode: mode}
+        assert state.mouse_mode == mode
+      end
+    end
+
+    test "cursor_position can be nil or tuple" do
+      state1 = %Raw{cursor_position: nil}
+      state2 = %Raw{cursor_position: {5, 10}}
+
+      assert state1.cursor_position == nil
+      assert state2.cursor_position == {5, 10}
+    end
+
+    test "current_style can be nil or map" do
+      state1 = %Raw{current_style: nil}
+      state2 = %Raw{current_style: %{fg: :blue, bg: :white, attrs: [:underline]}}
+
+      assert state1.current_style == nil
+      assert state2.current_style.fg == :blue
+      assert state2.current_style.bg == :white
+      assert state2.current_style.attrs == [:underline]
+    end
+
+    test "init/1 returns state struct" do
+      {:ok, state} = Raw.init([])
+      assert %Raw{} = state
+    end
+
+    test "size/1 returns size from state" do
+      {:ok, state} = Raw.init([])
+      {:ok, size} = Raw.size(state)
+      assert size == state.size
+    end
+  end
+
   describe "stub callbacks (Task 2.1.1)" do
     # These tests verify the stubs work correctly
     # Full implementation tests will be added in subsequent tasks
