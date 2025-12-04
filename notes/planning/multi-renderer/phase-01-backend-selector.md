@@ -214,7 +214,7 @@ Implement immutable update functions for state manipulation.
 
 ## 1.4 Create Configuration Module
 
-- [ ] **Section 1.4 Complete**
+- [x] **Section 1.4 Complete**
 
 The `TermUI.Backend.Config` module handles backend configuration from the application environment. It provides a clean interface for reading and validating configuration options.
 
@@ -245,25 +245,25 @@ Implement validation functions to catch configuration errors early.
 
 ### 1.4.3 Implement Runtime Configuration
 
-- [ ] **Task 1.4.3 Complete**
+- [x] **Task 1.4.3 Complete**
 
 Implement function to get complete runtime configuration as a map.
 
-- [ ] 1.4.3.1 Implement `runtime_config/0` returning map with all config values
-- [ ] 1.4.3.2 Include backend, character_set, fallback_character_set, tty_opts, raw_opts keys
-- [ ] 1.4.3.3 Document that this function validates configuration before returning
+- [x] 1.4.3.1 Implement `runtime_config/0` returning map with all config values
+- [x] 1.4.3.2 Include backend, character_set, fallback_character_set, tty_opts, raw_opts keys
+- [x] 1.4.3.3 Document that this function validates configuration before returning
 
 ### Unit Tests - Section 1.4
 
-- [ ] **Unit Tests 1.4 Complete**
-- [ ] Test `get_backend/0` returns `:auto` when no config present
-- [ ] Test `get_backend/0` returns configured value when present
-- [ ] Test `get_character_set/0` returns `:unicode` by default
-- [ ] Test `get_tty_opts/0` returns default `[line_mode: :full_redraw]`
-- [ ] Test `validate!/0` raises for invalid backend value
-- [ ] Test `validate!/0` raises for invalid character_set value
-- [ ] Test `valid?/0` returns false for invalid configuration
-- [ ] Test `runtime_config/0` returns complete configuration map
+- [x] **Unit Tests 1.4 Complete**
+- [x] Test `get_backend/0` returns `:auto` when no config present
+- [x] Test `get_backend/0` returns configured value when present
+- [x] Test `get_character_set/0` returns `:unicode` by default
+- [x] Test `get_tty_opts/0` returns default `[line_mode: :full_redraw]`
+- [x] Test `validate!/0` raises for invalid backend value
+- [x] Test `validate!/0` raises for invalid character_set value
+- [x] Test `valid?/0` returns false for invalid configuration
+- [x] Test `runtime_config/0` returns complete configuration map
 
 ---
 

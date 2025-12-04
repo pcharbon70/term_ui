@@ -434,4 +434,101 @@ defmodule TermUI.Backend.ConfigTest do
       assert Config.get_backend() == TermUI.Backend.TTY
     end
   end
+
+  describe "runtime_config/0" do
+    test "returns map with all expected keys" do
+      config = Config.runtime_config()
+
+      assert is_map(config)
+      assert Map.has_key?(config, :backend)
+      assert Map.has_key?(config, :character_set)
+      assert Map.has_key?(config, :fallback_character_set)
+      assert Map.has_key?(config, :tty_opts)
+      assert Map.has_key?(config, :raw_opts)
+    end
+
+    test "returns default values when no config present" do
+      config = Config.runtime_config()
+
+      assert config.backend == :auto
+      assert config.character_set == :unicode
+      assert config.fallback_character_set == :ascii
+      assert config.tty_opts == [line_mode: :full_redraw]
+      assert config.raw_opts == [alternate_screen: true]
+    end
+
+    test "returns configured values" do
+      Application.put_env(:term_ui, :backend, TermUI.Backend.Raw)
+      Application.put_env(:term_ui, :character_set, :ascii)
+      Application.put_env(:term_ui, :fallback_character_set, :unicode)
+      Application.put_env(:term_ui, :tty_opts, line_mode: :incremental)
+      Application.put_env(:term_ui, :raw_opts, alternate_screen: false)
+
+      config = Config.runtime_config()
+
+      assert config.backend == TermUI.Backend.Raw
+      assert config.character_set == :ascii
+      assert config.fallback_character_set == :unicode
+      assert config.tty_opts == [line_mode: :incremental]
+      assert config.raw_opts == [alternate_screen: false]
+    end
+
+    test "values match individual getter functions" do
+      Application.put_env(:term_ui, :backend, TermUI.Backend.TTY)
+
+      config = Config.runtime_config()
+
+      assert config.backend == Config.get_backend()
+      assert config.character_set == Config.get_character_set()
+      assert config.fallback_character_set == Config.get_fallback_character_set()
+      assert config.tty_opts == Config.get_tty_opts()
+      assert config.raw_opts == Config.get_raw_opts()
+    end
+
+    test "raises when configuration is invalid" do
+      Application.put_env(:term_ui, :backend, :invalid_backend)
+
+      assert_raise ArgumentError, ~r/invalid :backend value/, fn ->
+        Config.runtime_config()
+      end
+    end
+
+    test "raises for invalid character_set" do
+      Application.put_env(:term_ui, :character_set, :utf8)
+
+      assert_raise ArgumentError, ~r/invalid :character_set value/, fn ->
+        Config.runtime_config()
+      end
+    end
+
+    test "raises for invalid tty_opts" do
+      Application.put_env(:term_ui, :tty_opts, :not_a_list)
+
+      assert_raise ArgumentError, ~r/invalid :tty_opts value/, fn ->
+        Config.runtime_config()
+      end
+    end
+
+    test "returns only the expected keys (no extra keys)" do
+      config = Config.runtime_config()
+
+      expected_keys = [:backend, :character_set, :fallback_character_set, :tty_opts, :raw_opts]
+      assert Enum.sort(Map.keys(config)) == Enum.sort(expected_keys)
+    end
+  end
+
+  describe "runtime_config documentation" do
+    test "runtime_config/0 has docs" do
+      {:docs_v1, _, :elixir, _, _, _, docs} = Code.fetch_docs(Config)
+
+      func_docs =
+        docs
+        |> Enum.filter(fn
+          {{:function, :runtime_config, 0}, _, _, _, _} -> true
+          _ -> false
+        end)
+
+      assert length(func_docs) == 1
+    end
+  end
 end

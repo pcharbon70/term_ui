@@ -270,6 +270,65 @@ defmodule TermUI.Backend.Config do
     ArgumentError -> false
   end
 
+  @doc """
+  Returns the complete runtime configuration as a map.
+
+  This function validates the configuration before returning. If any
+  configuration value is invalid, an `ArgumentError` is raised.
+
+  ## Returns
+
+  A map containing all configuration values:
+  - `:backend` - Backend selection mode
+  - `:character_set` - Preferred character set
+  - `:fallback_character_set` - Fallback character set
+  - `:tty_opts` - TTY backend options
+  - `:raw_opts` - Raw backend options
+
+  ## Raises
+
+  - `ArgumentError` if any configuration value is invalid
+
+  ## Examples
+
+      iex> Config.runtime_config()
+      %{
+        backend: :auto,
+        character_set: :unicode,
+        fallback_character_set: :ascii,
+        tty_opts: [line_mode: :full_redraw],
+        raw_opts: [alternate_screen: true]
+      }
+
+      # With custom config
+      iex> Config.runtime_config()
+      %{
+        backend: TermUI.Backend.Raw,
+        character_set: :ascii,
+        fallback_character_set: :ascii,
+        tty_opts: [line_mode: :incremental],
+        raw_opts: [alternate_screen: false]
+      }
+  """
+  @spec runtime_config() :: %{
+          backend: :auto | module(),
+          character_set: :unicode | :ascii,
+          fallback_character_set: :unicode | :ascii,
+          tty_opts: keyword(),
+          raw_opts: keyword()
+        }
+  def runtime_config do
+    validate!()
+
+    %{
+      backend: get_backend(),
+      character_set: get_character_set(),
+      fallback_character_set: get_fallback_character_set(),
+      tty_opts: get_tty_opts(),
+      raw_opts: get_raw_opts()
+    }
+  end
+
   # Private validation helpers
 
   defp validate_backend! do
