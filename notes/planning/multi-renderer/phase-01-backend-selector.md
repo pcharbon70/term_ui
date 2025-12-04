@@ -95,7 +95,7 @@ Define the input polling callback. This callback has different behaviour between
 
 ## 1.2 Implement Backend Selector Module
 
-- [ ] **Section 1.2 Complete**
+- [x] **Section 1.2 Complete**
 
 The `TermUI.Backend.Selector` module determines which backend to use by attempting raw mode initialization. This is the **only reliable method** for detection—environment variables and `io:getopts/0` cannot detect all cases where a shell is already running (Nerves, remote IEx sessions, etc.).
 
@@ -135,27 +135,27 @@ Implement capability detection for TTY mode. This only runs when raw mode is una
 
 ### 1.2.4 Implement Explicit Selection
 
-- [ ] **Task 1.2.4 Complete**
+- [x] **Task 1.2.4 Complete**
 
 Implement `select/1` for explicit backend selection, useful for testing and configuration override.
 
-- [ ] 1.2.4.1 Implement `select(:auto)` delegating to `select/0`
-- [ ] 1.2.4.2 Implement `select(module)` when `is_atom(module)` returning `{:explicit, module, []}`
-- [ ] 1.2.4.3 Implement `select({module, opts})` returning `{:explicit, module, opts}`
-- [ ] 1.2.4.4 Document explicit selection bypass of auto-detection
+- [x] 1.2.4.1 Implement `select(:auto)` delegating to `select/0`
+- [x] 1.2.4.2 Implement `select(module)` when `is_atom(module)` returning `{:explicit, module, []}`
+- [x] 1.2.4.3 Implement `select({module, opts})` returning `{:explicit, module, opts}`
+- [x] 1.2.4.4 Document explicit selection bypass of auto-detection
 
 ### Unit Tests - Section 1.2
 
-- [ ] **Unit Tests 1.2 Complete**
-- [ ] Test `select/0` returns `{:raw, state}` tuple format when mocking `:shell.start_interactive/1` to return `:ok`
-- [ ] Test `select/0` returns `{:tty, capabilities}` tuple format when mocking to return `{:error, :already_started}`
-- [ ] Test capability detection populates `:colors` field correctly for various `$TERM` values
-- [ ] Test capability detection populates `:unicode` field correctly for various `$LANG` values
-- [ ] Test capability detection populates `:dimensions` with fallback values when `:io.columns/0` fails
-- [ ] Test `select/1` with `:auto` delegates to `select/0`
-- [ ] Test `select/1` with module atom returns `{:explicit, module, []}`
-- [ ] Test `select/1` with `{module, opts}` tuple returns `{:explicit, module, opts}`
-- [ ] Test pre-OTP 28 fallback when `:shell.start_interactive/1` is undefined
+- [x] **Unit Tests 1.2 Complete**
+- [x] Test `select/0` returns `{:raw, state}` tuple format when mocking `:shell.start_interactive/1` to return `:ok`
+- [x] Test `select/0` returns `{:tty, capabilities}` tuple format when mocking to return `{:error, :already_started}`
+- [x] Test capability detection populates `:colors` field correctly for various `$TERM` values
+- [x] Test capability detection populates `:unicode` field correctly for various `$LANG` values
+- [x] Test capability detection populates `:dimensions` with fallback values when `:io.columns/0` fails
+- [x] Test `select/1` with `:auto` delegates to `select/0`
+- [x] Test `select/1` with module atom returns `{:explicit, module, []}`
+- [x] Test `select/1` with `{module, opts}` tuple returns `{:explicit, module, opts}`
+- [x] Test pre-OTP 28 fallback when `:shell.start_interactive/1` is undefined
 
 ---
 
