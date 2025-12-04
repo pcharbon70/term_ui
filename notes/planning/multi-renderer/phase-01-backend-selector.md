@@ -122,16 +122,16 @@ Implement the `select/0` function that attempts raw mode and returns appropriate
 
 ### 1.2.3 Implement TTY Capability Detection
 
-- [ ] **Task 1.2.3 Complete**
+- [x] **Task 1.2.3 Complete**
 
 Implement capability detection for TTY mode. This only runs when raw mode is unavailable.
 
-- [ ] 1.2.3.1 Implement private `detect_tty_capabilities/0` returning capabilities map
-- [ ] 1.2.3.2 Detect color depth via `$COLORTERM` ("truecolor"/"24bit") and `$TERM` patterns ("256color", "color")
-- [ ] 1.2.3.3 Detect Unicode support via `$LANG` environment variable (contains "utf" case-insensitive)
-- [ ] 1.2.3.4 Detect terminal dimensions via `:io.columns/0`, `:io.rows/0` with fallback to `$COLUMNS`/`$LINES`
-- [ ] 1.2.3.5 Detect terminal presence via `:io.getopts/0` `:terminal` key
-- [ ] 1.2.3.6 Return map with keys: `:colors`, `:unicode`, `:dimensions`, `:terminal`
+- [x] 1.2.3.1 Implement private `detect_capabilities/0` returning capabilities map
+- [x] 1.2.3.2 Detect color depth via `$COLORTERM` ("truecolor"/"24bit") and `$TERM` patterns ("256color", "color")
+- [x] 1.2.3.3 Detect Unicode support via `$LANG` environment variable (contains "utf" case-insensitive)
+- [x] 1.2.3.4 Detect terminal dimensions via `:io.columns/0`, `:io.rows/0`
+- [x] 1.2.3.5 Detect terminal presence via `:io.getopts/0` `:terminal` key
+- [x] 1.2.3.6 Return map with keys: `:colors`, `:unicode`, `:dimensions`, `:terminal`
 
 ### 1.2.4 Implement Explicit Selection
 

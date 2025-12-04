@@ -211,12 +211,102 @@ defmodule TermUI.Backend.Selector do
   @doc false
   @spec detect_capabilities() :: capabilities()
   def detect_capabilities do
-    # Placeholder implementation - will be completed in task 1.2.3
     %{
-      colors: :color_256,
-      unicode: true,
-      dimensions: nil,
-      terminal: true
+      colors: detect_color_depth(),
+      unicode: detect_unicode_support(),
+      dimensions: detect_dimensions(),
+      terminal: detect_terminal_presence()
     }
+  end
+
+  # Detects color depth from environment variables
+  # Priority: $COLORTERM > $TERM patterns > monochrome fallback
+  @spec detect_color_depth() :: color_depth()
+  defp detect_color_depth do
+    colorterm = System.get_env("COLORTERM") || ""
+    term = System.get_env("TERM") || ""
+
+    cond do
+      # COLORTERM is the most reliable indicator for true color
+      colorterm in ["truecolor", "24bit"] ->
+        :true_color
+
+      # TERM patterns for true color
+      String.contains?(term, "-direct") ->
+        :true_color
+
+      # 256 color support
+      String.contains?(term, "-256color") or String.contains?(term, "256color") ->
+        :color_256
+
+      # Standard terminals with 16 color support
+      term != "" and basic_terminal?(term) ->
+        :color_16
+
+      # Unknown or no terminal
+      true ->
+        :monochrome
+    end
+  end
+
+  # Checks if TERM indicates a basic terminal with at least 16 colors
+  @spec basic_terminal?(String.t()) :: boolean()
+  defp basic_terminal?(term) do
+    basic_terms = [
+      "xterm",
+      "screen",
+      "tmux",
+      "vt100",
+      "vt220",
+      "linux",
+      "rxvt",
+      "ansi",
+      "cygwin",
+      "putty",
+      "konsole",
+      "gnome",
+      "eterm"
+    ]
+
+    Enum.any?(basic_terms, fn basic ->
+      String.starts_with?(term, basic) or String.contains?(term, basic)
+    end)
+  end
+
+  # Detects Unicode support from $LANG environment variable
+  @spec detect_unicode_support() :: boolean()
+  defp detect_unicode_support do
+    lang = System.get_env("LANG") || ""
+    lc_all = System.get_env("LC_ALL") || ""
+    lc_ctype = System.get_env("LC_CTYPE") || ""
+
+    # Check all locale variables, prioritizing LC_ALL > LC_CTYPE > LANG
+    locale = if lc_all != "", do: lc_all, else: if(lc_ctype != "", do: lc_ctype, else: lang)
+    locale_upper = String.upcase(locale)
+
+    String.contains?(locale_upper, "UTF-8") or String.contains?(locale_upper, "UTF8")
+  end
+
+  # Detects terminal dimensions using :io module
+  @spec detect_dimensions() :: {pos_integer(), pos_integer()} | nil
+  defp detect_dimensions do
+    with {:ok, cols} <- :io.columns(),
+         {:ok, rows} <- :io.rows() do
+      {rows, cols}
+    else
+      _ -> nil
+    end
+  end
+
+  # Detects if we're connected to a terminal
+  @spec detect_terminal_presence() :: boolean()
+  defp detect_terminal_presence do
+    case :io.getopts() do
+      {:ok, opts} ->
+        Keyword.get(opts, :terminal, false) == true
+
+      _ ->
+        false
+    end
   end
 end

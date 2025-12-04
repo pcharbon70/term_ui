@@ -328,4 +328,317 @@ defmodule TermUI.Backend.SelectorTest do
       assert elem(select_result, 0) == elem(try_result, 0)
     end
   end
+
+  describe "detect_capabilities/0" do
+    test "returns a map with required keys" do
+      caps = Selector.detect_capabilities()
+
+      assert is_map(caps)
+      assert Map.has_key?(caps, :colors)
+      assert Map.has_key?(caps, :unicode)
+      assert Map.has_key?(caps, :dimensions)
+      assert Map.has_key?(caps, :terminal)
+    end
+
+    test "colors is a valid color_depth atom" do
+      caps = Selector.detect_capabilities()
+
+      assert caps.colors in [:true_color, :color_256, :color_16, :monochrome]
+    end
+
+    test "unicode is a boolean" do
+      caps = Selector.detect_capabilities()
+
+      assert is_boolean(caps.unicode)
+    end
+
+    test "dimensions is nil or a {rows, cols} tuple" do
+      caps = Selector.detect_capabilities()
+
+      case caps.dimensions do
+        nil ->
+          :ok
+
+        {rows, cols} ->
+          assert is_integer(rows) and rows > 0
+          assert is_integer(cols) and cols > 0
+
+        other ->
+          flunk("Unexpected dimensions value: #{inspect(other)}")
+      end
+    end
+
+    test "terminal is a boolean" do
+      caps = Selector.detect_capabilities()
+
+      assert is_boolean(caps.terminal)
+    end
+  end
+
+  describe "color depth detection" do
+    # These tests verify the color detection logic using environment manipulation
+    # Note: We save and restore the original values to not affect other tests
+
+    test "detects true_color from COLORTERM=truecolor" do
+      original = System.get_env("COLORTERM")
+
+      try do
+        System.put_env("COLORTERM", "truecolor")
+        caps = Selector.detect_capabilities()
+        assert caps.colors == :true_color
+      after
+        if original, do: System.put_env("COLORTERM", original), else: System.delete_env("COLORTERM")
+      end
+    end
+
+    test "detects true_color from COLORTERM=24bit" do
+      original = System.get_env("COLORTERM")
+
+      try do
+        System.put_env("COLORTERM", "24bit")
+        caps = Selector.detect_capabilities()
+        assert caps.colors == :true_color
+      after
+        if original, do: System.put_env("COLORTERM", original), else: System.delete_env("COLORTERM")
+      end
+    end
+
+    test "detects color_256 from TERM containing -256color" do
+      original_colorterm = System.get_env("COLORTERM")
+      original_term = System.get_env("TERM")
+
+      try do
+        System.delete_env("COLORTERM")
+        System.put_env("TERM", "xterm-256color")
+        caps = Selector.detect_capabilities()
+        assert caps.colors == :color_256
+      after
+        if original_colorterm,
+          do: System.put_env("COLORTERM", original_colorterm),
+          else: System.delete_env("COLORTERM")
+
+        if original_term,
+          do: System.put_env("TERM", original_term),
+          else: System.delete_env("TERM")
+      end
+    end
+
+    test "detects true_color from TERM containing -direct" do
+      original_colorterm = System.get_env("COLORTERM")
+      original_term = System.get_env("TERM")
+
+      try do
+        System.delete_env("COLORTERM")
+        System.put_env("TERM", "xterm-direct")
+        caps = Selector.detect_capabilities()
+        assert caps.colors == :true_color
+      after
+        if original_colorterm,
+          do: System.put_env("COLORTERM", original_colorterm),
+          else: System.delete_env("COLORTERM")
+
+        if original_term,
+          do: System.put_env("TERM", original_term),
+          else: System.delete_env("TERM")
+      end
+    end
+
+    test "detects color_16 from basic terminal TERM" do
+      original_colorterm = System.get_env("COLORTERM")
+      original_term = System.get_env("TERM")
+
+      try do
+        System.delete_env("COLORTERM")
+        System.put_env("TERM", "xterm")
+        caps = Selector.detect_capabilities()
+        assert caps.colors == :color_16
+      after
+        if original_colorterm,
+          do: System.put_env("COLORTERM", original_colorterm),
+          else: System.delete_env("COLORTERM")
+
+        if original_term,
+          do: System.put_env("TERM", original_term),
+          else: System.delete_env("TERM")
+      end
+    end
+
+    test "falls back to monochrome when TERM is empty" do
+      original_colorterm = System.get_env("COLORTERM")
+      original_term = System.get_env("TERM")
+
+      try do
+        System.delete_env("COLORTERM")
+        System.delete_env("TERM")
+        caps = Selector.detect_capabilities()
+        assert caps.colors == :monochrome
+      after
+        if original_colorterm,
+          do: System.put_env("COLORTERM", original_colorterm),
+          else: System.delete_env("COLORTERM")
+
+        if original_term,
+          do: System.put_env("TERM", original_term),
+          else: System.delete_env("TERM")
+      end
+    end
+
+    test "COLORTERM takes priority over TERM" do
+      original_colorterm = System.get_env("COLORTERM")
+      original_term = System.get_env("TERM")
+
+      try do
+        # Even with xterm (which would be color_16), truecolor COLORTERM wins
+        System.put_env("COLORTERM", "truecolor")
+        System.put_env("TERM", "xterm")
+        caps = Selector.detect_capabilities()
+        assert caps.colors == :true_color
+      after
+        if original_colorterm,
+          do: System.put_env("COLORTERM", original_colorterm),
+          else: System.delete_env("COLORTERM")
+
+        if original_term,
+          do: System.put_env("TERM", original_term),
+          else: System.delete_env("TERM")
+      end
+    end
+  end
+
+  describe "unicode detection" do
+    test "detects unicode from LANG containing UTF-8" do
+      original_lang = System.get_env("LANG")
+      original_lc_all = System.get_env("LC_ALL")
+      original_lc_ctype = System.get_env("LC_CTYPE")
+
+      try do
+        System.delete_env("LC_ALL")
+        System.delete_env("LC_CTYPE")
+        System.put_env("LANG", "en_US.UTF-8")
+        caps = Selector.detect_capabilities()
+        assert caps.unicode == true
+      after
+        if original_lang,
+          do: System.put_env("LANG", original_lang),
+          else: System.delete_env("LANG")
+
+        if original_lc_all,
+          do: System.put_env("LC_ALL", original_lc_all),
+          else: System.delete_env("LC_ALL")
+
+        if original_lc_ctype,
+          do: System.put_env("LC_CTYPE", original_lc_ctype),
+          else: System.delete_env("LC_CTYPE")
+      end
+    end
+
+    test "detects unicode from LC_ALL taking priority" do
+      original_lang = System.get_env("LANG")
+      original_lc_all = System.get_env("LC_ALL")
+      original_lc_ctype = System.get_env("LC_CTYPE")
+
+      try do
+        System.put_env("LC_ALL", "en_US.UTF-8")
+        System.put_env("LANG", "C")
+        System.delete_env("LC_CTYPE")
+        caps = Selector.detect_capabilities()
+        assert caps.unicode == true
+      after
+        if original_lang,
+          do: System.put_env("LANG", original_lang),
+          else: System.delete_env("LANG")
+
+        if original_lc_all,
+          do: System.put_env("LC_ALL", original_lc_all),
+          else: System.delete_env("LC_ALL")
+
+        if original_lc_ctype,
+          do: System.put_env("LC_CTYPE", original_lc_ctype),
+          else: System.delete_env("LC_CTYPE")
+      end
+    end
+
+    test "returns false when no UTF locale is set" do
+      original_lang = System.get_env("LANG")
+      original_lc_all = System.get_env("LC_ALL")
+      original_lc_ctype = System.get_env("LC_CTYPE")
+
+      try do
+        System.delete_env("LC_ALL")
+        System.delete_env("LC_CTYPE")
+        System.put_env("LANG", "C")
+        caps = Selector.detect_capabilities()
+        assert caps.unicode == false
+      after
+        if original_lang,
+          do: System.put_env("LANG", original_lang),
+          else: System.delete_env("LANG")
+
+        if original_lc_all,
+          do: System.put_env("LC_ALL", original_lc_all),
+          else: System.delete_env("LC_ALL")
+
+        if original_lc_ctype,
+          do: System.put_env("LC_CTYPE", original_lc_ctype),
+          else: System.delete_env("LC_CTYPE")
+      end
+    end
+
+    test "handles case-insensitive UTF-8 detection" do
+      original_lang = System.get_env("LANG")
+      original_lc_all = System.get_env("LC_ALL")
+      original_lc_ctype = System.get_env("LC_CTYPE")
+
+      try do
+        System.delete_env("LC_ALL")
+        System.delete_env("LC_CTYPE")
+        # Some systems use lowercase utf-8
+        System.put_env("LANG", "en_US.utf-8")
+        caps = Selector.detect_capabilities()
+        assert caps.unicode == true
+      after
+        if original_lang,
+          do: System.put_env("LANG", original_lang),
+          else: System.delete_env("LANG")
+
+        if original_lc_all,
+          do: System.put_env("LC_ALL", original_lc_all),
+          else: System.delete_env("LC_ALL")
+
+        if original_lc_ctype,
+          do: System.put_env("LC_CTYPE", original_lc_ctype),
+          else: System.delete_env("LC_CTYPE")
+      end
+    end
+  end
+
+  describe "terminal dimensions detection" do
+    # Note: These tests are environment-dependent
+    # In a test environment, dimensions may or may not be available
+
+    test "returns valid format when dimensions are available" do
+      caps = Selector.detect_capabilities()
+
+      case caps.dimensions do
+        nil ->
+          # No dimensions available in test environment - acceptable
+          :ok
+
+        {rows, cols} ->
+          assert is_integer(rows)
+          assert is_integer(cols)
+          assert rows > 0
+          assert cols > 0
+      end
+    end
+  end
+
+  describe "terminal presence detection" do
+    # Note: Terminal presence depends on test environment
+
+    test "returns a boolean" do
+      caps = Selector.detect_capabilities()
+      assert is_boolean(caps.terminal)
+    end
+  end
 end
