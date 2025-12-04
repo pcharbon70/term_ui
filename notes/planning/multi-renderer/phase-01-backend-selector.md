@@ -167,17 +167,17 @@ The `TermUI.Backend.State` module provides a shared state structure that wraps b
 
 ### 1.3.1 Define State Structure
 
-- [ ] **Task 1.3.1 Complete**
+- [x] **Task 1.3.1 Complete**
 
 Define the state struct with fields for tracking backend information and capabilities.
 
-- [ ] 1.3.1.1 Create `lib/term_ui/backend/state.ex` with `defstruct`
-- [ ] 1.3.1.2 Define field `backend_module :: module()` for the active backend
-- [ ] 1.3.1.3 Define field `backend_state :: term()` for backend-specific state
-- [ ] 1.3.1.4 Define field `mode :: :raw | :tty` for current mode
-- [ ] 1.3.1.5 Define field `capabilities :: map()` for detected capabilities
-- [ ] 1.3.1.6 Define field `size :: {rows, cols} | nil` for cached dimensions
-- [ ] 1.3.1.7 Define field `initialized :: boolean()` for initialization status
+- [x] 1.3.1.1 Create `lib/term_ui/backend/state.ex` with `defstruct`
+- [x] 1.3.1.2 Define field `backend_module :: module()` for the active backend
+- [x] 1.3.1.3 Define field `backend_state :: term()` for backend-specific state
+- [x] 1.3.1.4 Define field `mode :: :raw | :tty` for current mode
+- [x] 1.3.1.5 Define field `capabilities :: map()` for detected capabilities
+- [x] 1.3.1.6 Define field `size :: {rows, cols} | nil` for cached dimensions
+- [x] 1.3.1.7 Define field `initialized :: boolean()` for initialization status
 
 ### 1.3.2 Implement State Constructors
 
