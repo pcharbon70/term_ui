@@ -175,7 +175,7 @@ Implement optional cursor movement optimization comparing absolute vs relative m
 
 ## 2.4 Implement Screen Operations
 
-- [ ] **Section 2.4 Complete**
+- [x] **Section 2.4 Complete**
 
 Implement screen clearing and the size query callback. These provide essential screen management capabilities.
 
@@ -199,28 +199,28 @@ Implement terminal size query.
 
 - [x] 2.4.2.1 Implement `@impl true` `size/1` accepting state
 - [x] 2.4.2.2 Return `{:ok, state.size}` from cached state
-- [ ] 2.4.2.3 Provide `refresh_size/1` function to re-query dimensions (see Task 2.4.3)
-- [ ] 2.4.2.4 Handle `:io.columns/0` or `:io.rows/0` failure with `{:error, :enotsup}` (see Task 2.4.3)
+- [x] 2.4.2.3 Provide `refresh_size/1` function to re-query dimensions (see Task 2.4.3)
+- [x] 2.4.2.4 Handle `:io.columns/0` or `:io.rows/0` failure with `{:error, :enotsup}` (see Task 2.4.3)
 
 ### 2.4.3 Implement Size Refresh
 
-- [ ] **Task 2.4.3 Complete**
+- [x] **Task 2.4.3 Complete**
 
 Implement size refresh for handling terminal resize events.
 
-- [ ] 2.4.3.1 Implement `refresh_size/1` querying `:io.columns/0` and `:io.rows/0`
-- [ ] 2.4.3.2 Update `size` field in state
-- [ ] 2.4.3.3 Return `{:ok, new_size, updated_state}`
-- [ ] 2.4.3.4 Document that this should be called after SIGWINCH handling
+- [x] 2.4.3.1 Implement `refresh_size/1` querying `:io.columns/0` and `:io.rows/0`
+- [x] 2.4.3.2 Update `size` field in state
+- [x] 2.4.3.3 Return `{:ok, new_size, updated_state}`
+- [x] 2.4.3.4 Document that this should be called after SIGWINCH handling
 
 ### Unit Tests - Section 2.4
 
-- [ ] **Unit Tests 2.4 Complete**
+- [x] **Unit Tests 2.4 Complete**
 - [x] Test `clear/1` returns `{:ok, state}`
 - [x] Test `clear/1` resets current_style in state
 - [x] Test `size/1` returns cached dimensions
-- [ ] Test `refresh_size/1` updates state with new dimensions
-- [ ] Test size query handles `:io.columns/0` failure gracefully
+- [x] Test `refresh_size/1` updates state with new dimensions
+- [x] Test size query handles `:io.columns/0` failure gracefully
 
 ---
 

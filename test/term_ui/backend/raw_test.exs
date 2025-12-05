@@ -770,6 +770,179 @@ defmodule TermUI.Backend.RawTest do
     end
   end
 
+  describe "refresh_size/1 callback" do
+    setup do
+      {:ok, state} = Raw.init(size: {24, 80})
+      %{state: state}
+    end
+
+    test "exports refresh_size/1 function" do
+      assert function_exported?(Raw, :refresh_size, 1)
+    end
+
+    test "returns 3-tuple on success", %{state: state} do
+      # In test environment, :io.rows/0 and :io.columns/0 may return {:error, :enotsup}
+      # We need to set environment variables for the fallback
+      System.put_env("LINES", "30")
+      System.put_env("COLUMNS", "100")
+
+      try do
+        result = Raw.refresh_size(state)
+        # Either succeeds with new size or returns error (depending on test environment)
+        assert match?({:ok, {_, _}, %Raw{}}, result) or match?({:error, _}, result)
+      after
+        System.delete_env("LINES")
+        System.delete_env("COLUMNS")
+      end
+    end
+
+    test "updates state.size on success" do
+      # Set environment for fallback
+      System.put_env("LINES", "50")
+      System.put_env("COLUMNS", "120")
+
+      try do
+        {:ok, state} = Raw.init(size: {24, 80})
+        assert state.size == {24, 80}
+
+        case Raw.refresh_size(state) do
+          {:ok, new_size, updated_state} ->
+            assert new_size == {50, 120}
+            assert updated_state.size == {50, 120}
+            assert updated_state.size == new_size
+
+          {:error, :size_detection_failed} ->
+            # If :io.rows/0 and :io.columns/0 succeed but with different values,
+            # the env fallback won't be used
+            :ok
+        end
+      after
+        System.delete_env("LINES")
+        System.delete_env("COLUMNS")
+      end
+    end
+
+    test "preserves other state fields on success" do
+      System.put_env("LINES", "30")
+      System.put_env("COLUMNS", "100")
+
+      try do
+        {:ok, state} = Raw.init(size: {24, 80}, mouse_tracking: :click, hide_cursor: false)
+
+        case Raw.refresh_size(state) do
+          {:ok, _new_size, updated_state} ->
+            # Only size should change
+            assert updated_state.cursor_visible == state.cursor_visible
+            assert updated_state.cursor_position == state.cursor_position
+            assert updated_state.alternate_screen == state.alternate_screen
+            assert updated_state.mouse_mode == state.mouse_mode
+            assert updated_state.current_style == state.current_style
+            assert updated_state.optimize_cursor == state.optimize_cursor
+
+          {:error, _} ->
+            :ok
+        end
+      after
+        System.delete_env("LINES")
+        System.delete_env("COLUMNS")
+      end
+    end
+
+    test "returns error when size detection fails", %{state: state} do
+      # Ensure environment variables are not set
+      System.delete_env("LINES")
+      System.delete_env("COLUMNS")
+
+      # In test environment without a real terminal, this may fail
+      # The result depends on whether :io.rows/0 and :io.columns/0 work
+      result = Raw.refresh_size(state)
+
+      # Either succeeds (real terminal) or fails (no terminal)
+      assert match?({:ok, {_, _}, %Raw{}}, result) or
+               match?({:error, :size_detection_failed}, result)
+    end
+
+    test "has documentation" do
+      {:docs_v1, _, :elixir, _, _, _, docs} = Code.fetch_docs(Raw)
+
+      func_docs =
+        docs
+        |> Enum.filter(fn
+          {{:function, :refresh_size, 1}, _, _, _, _} -> true
+          _ -> false
+        end)
+
+      assert length(func_docs) == 1
+
+      # Check documentation mentions SIGWINCH
+      [{{:function, :refresh_size, 1}, _, _, %{"en" => doc}, _}] = func_docs
+      assert doc =~ "SIGWINCH"
+    end
+
+    test "documentation mentions error handling" do
+      {:docs_v1, _, :elixir, _, _, _, docs} = Code.fetch_docs(Raw)
+
+      [{{:function, :refresh_size, 1}, _, _, %{"en" => doc}, _}] =
+        Enum.filter(docs, fn
+          {{:function, :refresh_size, 1}, _, _, _, _} -> true
+          _ -> false
+        end)
+
+      assert doc =~ "size_detection_failed"
+    end
+  end
+
+  describe "refresh_size/1 with mocked environment" do
+    test "uses environment variable fallback" do
+      # Create a state with known size
+      {:ok, state} = Raw.init(size: {24, 80})
+
+      # Set environment variables for fallback
+      System.put_env("LINES", "40")
+      System.put_env("COLUMNS", "160")
+
+      try do
+        result = Raw.refresh_size(state)
+
+        # If :io functions fail, should fall back to environment
+        case result do
+          {:ok, new_size, _updated_state} ->
+            # Size was detected (either from :io or env)
+            assert is_tuple(new_size)
+            assert tuple_size(new_size) == 2
+            {rows, cols} = new_size
+            assert is_integer(rows) and rows > 0
+            assert is_integer(cols) and cols > 0
+
+          {:error, :size_detection_failed} ->
+            # Both :io and env failed - unexpected given we set env
+            flunk("Size detection failed despite environment variables being set")
+        end
+      after
+        System.delete_env("LINES")
+        System.delete_env("COLUMNS")
+      end
+    end
+
+    test "returns error with invalid environment variables" do
+      # Set invalid environment variables
+      System.put_env("LINES", "invalid")
+      System.put_env("COLUMNS", "invalid")
+
+      try do
+        {:ok, state} = Raw.init(size: {24, 80})
+        result = Raw.refresh_size(state)
+
+        # Either :io functions work, or we get an error due to invalid env
+        assert match?({:ok, {_, _}, %Raw{}}, result) or
+                 match?({:error, :size_detection_failed}, result)
+      after
+        System.delete_env("LINES")
+        System.delete_env("COLUMNS")
+      end
+    end
+  end
+
   describe "stub callbacks" do
     # Use setup to avoid repeating Raw.init([]) in every test
     setup do

@@ -394,6 +394,62 @@ defmodule TermUI.Backend.Raw do
     {:ok, state.size}
   end
 
+  @doc """
+  Re-queries terminal dimensions and updates state.
+
+  This function queries the terminal for its current size using `:io.rows/0`
+  and `:io.columns/0`, then updates the cached size in state. It should be
+  called after receiving a SIGWINCH signal to handle terminal resize events.
+
+  ## Return Value
+
+  - `{:ok, {rows, cols}, updated_state}` - New dimensions and updated state
+  - `{:error, :size_detection_failed}` - Failed to query terminal dimensions
+
+  ## SIGWINCH Handling
+
+  Terminal resize events are delivered via SIGWINCH. Your application should:
+
+  1. Register a signal handler for SIGWINCH
+  2. Call `refresh_size/1` when the signal is received
+  3. Trigger a re-render with the new dimensions
+
+  Example integration:
+
+      def handle_info({:signal, :sigwinch}, state) do
+        case Raw.refresh_size(state.backend_state) do
+          {:ok, new_size, new_backend_state} ->
+            # Update state and trigger re-render
+            {:noreply, %{state | backend_state: new_backend_state, size: new_size}}
+          {:error, _reason} ->
+            # Keep existing size
+            {:noreply, state}
+        end
+      end
+
+  ## Size Detection
+
+  Uses the same detection logic as `init/1`:
+  1. Query `:io.rows/0` and `:io.columns/0`
+  2. Fall back to LINES and COLUMNS environment variables
+  3. Return error if all methods fail
+
+  ## See Also
+
+  - `size/1` - Return cached dimensions without re-querying
+  - `init/1` - Initial size detection during initialization
+  """
+  @spec refresh_size(t()) :: {:ok, TermUI.Backend.size(), t()} | {:error, :size_detection_failed}
+  def refresh_size(state) do
+    case get_terminal_size(nil) do
+      {:ok, new_size} ->
+        {:ok, new_size, %{state | size: new_size}}
+
+      {:error, _reason} ->
+        {:error, :size_detection_failed}
+    end
+  end
+
   @impl true
   @doc """
   Moves the cursor to the specified position.
