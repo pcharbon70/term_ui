@@ -947,11 +947,22 @@ defmodule TermUI.Backend.Raw do
   @doc """
   Flushes pending output to the terminal.
 
-  For the Raw backend, `IO.write/1` is synchronous so this is largely a no-op.
+  For the Raw backend, this is a no-op because `IO.write/1` is synchronous -
+  output is written directly to the terminal without buffering. The callback
+  exists for API completeness and compatibility with backends that may use
+  buffered I/O.
+
+  This function is idempotent and safe to call multiple times.
+
+  ## Returns
+
+  - `{:ok, state}` - Always succeeds, returning state unchanged
   """
   @spec flush(t()) :: {:ok, t()}
   def flush(state) do
-    # Stub - full implementation in Section 2.6
+    # IO.write/1 is synchronous in Erlang/OTP - no buffering to flush.
+    # For backends with buffered output, this would call :erlang.port_command/3
+    # with the :nosuspend option or similar synchronization mechanism.
     {:ok, state}
   end
 

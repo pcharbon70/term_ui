@@ -1217,6 +1217,55 @@ defmodule TermUI.Backend.RawTest do
     end
   end
 
+  describe "flush/1 callback" do
+    setup do
+      {:ok, state} = Raw.init(size: {24, 80})
+      %{state: state}
+    end
+
+    test "returns {:ok, state}", %{state: state} do
+      assert {:ok, %Raw{}} = Raw.flush(state)
+    end
+
+    test "is idempotent - safe to call multiple times", %{state: state} do
+      {:ok, state1} = Raw.flush(state)
+      {:ok, state2} = Raw.flush(state1)
+      {:ok, state3} = Raw.flush(state2)
+
+      # All calls should succeed and return equivalent state
+      assert state1 == state2
+      assert state2 == state3
+    end
+
+    test "preserves all state fields", %{state: state} do
+      {:ok, flushed_state} = Raw.flush(state)
+
+      # All fields should be unchanged
+      assert flushed_state.size == state.size
+      assert flushed_state.cursor_visible == state.cursor_visible
+      assert flushed_state.cursor_position == state.cursor_position
+      assert flushed_state.alternate_screen == state.alternate_screen
+      assert flushed_state.mouse_mode == state.mouse_mode
+      assert flushed_state.current_style == state.current_style
+      assert flushed_state.optimize_cursor == state.optimize_cursor
+    end
+
+    test "has documentation", %{state: _state} do
+      {:docs_v1, _, :elixir, _, _, _, docs} = Code.fetch_docs(Raw)
+
+      flush_doc =
+        Enum.find(docs, fn
+          {{:function, :flush, 1}, _, _, _, _} -> true
+          _ -> false
+        end)
+
+      assert flush_doc != nil
+      {{:function, :flush, 1}, _, _, %{"en" => doc}, _} = flush_doc
+      assert doc =~ "Flushes pending output"
+      assert doc =~ "no-op"
+    end
+  end
+
   describe "stub callbacks" do
     # Use setup to avoid repeating Raw.init([]) in every test
     setup do
@@ -1226,10 +1275,6 @@ defmodule TermUI.Backend.RawTest do
 
     test "shutdown/1 returns :ok", %{state: state} do
       assert :ok = Raw.shutdown(state)
-    end
-
-    test "flush/1 returns {:ok, state}", %{state: state} do
-      assert {:ok, %Raw{}} = Raw.flush(state)
     end
 
     test "poll_event/2 returns {:timeout, state} for stub", %{state: state} do

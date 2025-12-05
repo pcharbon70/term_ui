@@ -331,26 +331,28 @@ Optimize output by batching all sequences into a single write.
 
 ## 2.6 Implement Flush Operation
 
-- [ ] **Section 2.6 Complete**
+- [x] **Section 2.6 Complete**
 
 Implement the `flush/1` callback for ensuring output is sent to the terminal.
 
 ### 2.6.1 Implement flush/1 Callback
 
-- [ ] **Task 2.6.1 Complete**
+- [x] **Task 2.6.1 Complete**
 
 Implement flush that ensures all pending output is written.
 
-- [ ] 2.6.1.1 Implement `@impl true` `flush/1` accepting state
-- [ ] 2.6.1.2 For Raw backend, `IO.write/1` is synchronous so flush is largely a no-op
-- [ ] 2.6.1.3 Optionally call `:erlang.port_command/3` with sync option if buffering is used
-- [ ] 2.6.1.4 Return `{:ok, state}` unchanged
+- [x] 2.6.1.1 Implement `@impl true` `flush/1` accepting state
+- [x] 2.6.1.2 For Raw backend, `IO.write/1` is synchronous so flush is largely a no-op
+- [x] 2.6.1.3 Optionally call `:erlang.port_command/3` with sync option if buffering is used (documented in code)
+- [x] 2.6.1.4 Return `{:ok, state}` unchanged
 
 ### Unit Tests - Section 2.6
 
-- [ ] **Unit Tests 2.6 Complete**
-- [ ] Test `flush/1` returns `{:ok, state}`
-- [ ] Test `flush/1` is safe to call multiple times
+- [x] **Unit Tests 2.6 Complete**
+- [x] Test `flush/1` returns `{:ok, state}`
+- [x] Test `flush/1` is safe to call multiple times
+- [x] Test `flush/1` preserves all state fields
+- [x] Test `flush/1` has documentation
 
 ---
 
