@@ -140,15 +140,15 @@ Implement cursor positioning using absolute coordinates.
 
 ### 2.3.2 Implement hide_cursor/1 and show_cursor/1 Callbacks
 
-- [ ] **Task 2.3.2 Complete**
+- [x] **Task 2.3.2 Complete**
 
 Implement cursor visibility control.
 
-- [ ] 2.3.2.1 Implement `@impl true` `hide_cursor/1` writing `\e[?25l`
-- [ ] 2.3.2.2 Update `cursor_visible` to `false` in state
-- [ ] 2.3.2.3 Implement `@impl true` `show_cursor/1` writing `\e[?25h`
-- [ ] 2.3.2.4 Update `cursor_visible` to `true` in state
-- [ ] 2.3.2.5 Make operations idempotent (no-op if already in desired state)
+- [x] 2.3.2.1 Implement `@impl true` `hide_cursor/1` writing `\e[?25l`
+- [x] 2.3.2.2 Update `cursor_visible` to `false` in state
+- [x] 2.3.2.3 Implement `@impl true` `show_cursor/1` writing `\e[?25h`
+- [x] 2.3.2.4 Update `cursor_visible` to `true` in state
+- [x] 2.3.2.5 Make operations idempotent (no-op if already in desired state)
 
 ### 2.3.3 Implement Cursor Position Optimization
 
@@ -166,9 +166,9 @@ Implement optional cursor movement optimization comparing absolute vs relative m
 - [ ] **Unit Tests 2.3 Complete**
 - [x] Test `move_cursor/2` generates correct escape sequence for various positions
 - [x] Test `move_cursor/2` updates state with new position
-- [ ] Test `hide_cursor/1` updates state to `cursor_visible: false`
-- [ ] Test `show_cursor/1` updates state to `cursor_visible: true`
-- [ ] Test cursor operations are idempotent
+- [x] Test `hide_cursor/1` updates state to `cursor_visible: false`
+- [x] Test `show_cursor/1` updates state to `cursor_visible: true`
+- [x] Test cursor operations are idempotent
 - [ ] Test cursor optimizer chooses relative move for short distances
 
 ---

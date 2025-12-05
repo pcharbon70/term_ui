@@ -457,6 +457,120 @@ defmodule TermUI.Backend.RawTest do
     end
   end
 
+  describe "hide_cursor/1 callback" do
+    setup do
+      # Default init has hide_cursor: true, so cursor_visible is false
+      {:ok, state} = Raw.init(size: {24, 80})
+      %{state: state}
+    end
+
+    test "returns {:ok, state}", %{state: state} do
+      # Make cursor visible first
+      {:ok, visible_state} = Raw.show_cursor(state)
+      assert {:ok, %Raw{}} = Raw.hide_cursor(visible_state)
+    end
+
+    test "updates cursor_visible to false", %{state: state} do
+      # Make cursor visible first
+      {:ok, visible_state} = Raw.show_cursor(state)
+      assert visible_state.cursor_visible == true
+
+      {:ok, hidden_state} = Raw.hide_cursor(visible_state)
+      assert hidden_state.cursor_visible == false
+    end
+
+    test "is idempotent when cursor already hidden", %{state: state} do
+      # State already has cursor hidden (from init with hide_cursor: true)
+      assert state.cursor_visible == false
+
+      # Calling hide_cursor should return same state (no change)
+      {:ok, same_state} = Raw.hide_cursor(state)
+      assert same_state.cursor_visible == false
+      assert same_state == state
+    end
+
+    test "preserves other state fields", %{state: state} do
+      {:ok, visible_state} = Raw.show_cursor(state)
+      {:ok, hidden_state} = Raw.hide_cursor(visible_state)
+
+      assert hidden_state.size == state.size
+      assert hidden_state.cursor_position == state.cursor_position
+      assert hidden_state.alternate_screen == state.alternate_screen
+      assert hidden_state.mouse_mode == state.mouse_mode
+      assert hidden_state.current_style == state.current_style
+    end
+  end
+
+  describe "show_cursor/1 callback" do
+    setup do
+      # Default init has hide_cursor: true, so cursor_visible is false
+      {:ok, state} = Raw.init(size: {24, 80})
+      %{state: state}
+    end
+
+    test "returns {:ok, state}", %{state: state} do
+      assert {:ok, %Raw{}} = Raw.show_cursor(state)
+    end
+
+    test "updates cursor_visible to true", %{state: state} do
+      # State starts with cursor hidden
+      assert state.cursor_visible == false
+
+      {:ok, visible_state} = Raw.show_cursor(state)
+      assert visible_state.cursor_visible == true
+    end
+
+    test "is idempotent when cursor already visible", %{state: state} do
+      # First make cursor visible
+      {:ok, visible_state} = Raw.show_cursor(state)
+      assert visible_state.cursor_visible == true
+
+      # Calling show_cursor again should return same state (no change)
+      {:ok, same_state} = Raw.show_cursor(visible_state)
+      assert same_state.cursor_visible == true
+      assert same_state == visible_state
+    end
+
+    test "preserves other state fields", %{state: state} do
+      {:ok, visible_state} = Raw.show_cursor(state)
+
+      assert visible_state.size == state.size
+      assert visible_state.cursor_position == state.cursor_position
+      assert visible_state.alternate_screen == state.alternate_screen
+      assert visible_state.mouse_mode == state.mouse_mode
+      assert visible_state.current_style == state.current_style
+    end
+  end
+
+  describe "cursor visibility round-trip" do
+    setup do
+      {:ok, state} = Raw.init(size: {24, 80}, hide_cursor: false)
+      %{state: state}
+    end
+
+    test "hide then show restores visibility", %{state: state} do
+      assert state.cursor_visible == true
+
+      {:ok, hidden} = Raw.hide_cursor(state)
+      assert hidden.cursor_visible == false
+
+      {:ok, visible} = Raw.show_cursor(hidden)
+      assert visible.cursor_visible == true
+    end
+
+    test "multiple hide/show cycles work correctly", %{state: state} do
+      {:ok, s1} = Raw.hide_cursor(state)
+      {:ok, s2} = Raw.show_cursor(s1)
+      {:ok, s3} = Raw.hide_cursor(s2)
+      {:ok, s4} = Raw.show_cursor(s3)
+
+      assert s1.cursor_visible == false
+      assert s2.cursor_visible == true
+      assert s3.cursor_visible == false
+      assert s4.cursor_visible == true
+    end
+  end
+
   describe "stub callbacks" do
     # Use setup to avoid repeating Raw.init([]) in every test
     setup do
@@ -470,14 +584,6 @@ defmodule TermUI.Backend.RawTest do
 
     test "size/1 returns {:ok, size} tuple", %{state: state} do
       assert {:ok, {24, 80}} = Raw.size(state)
-    end
-
-    test "hide_cursor/1 returns {:ok, state}", %{state: state} do
-      assert {:ok, %Raw{}} = Raw.hide_cursor(state)
-    end
-
-    test "show_cursor/1 returns {:ok, state}", %{state: state} do
-      assert {:ok, %Raw{}} = Raw.show_cursor(state)
     end
 
     test "clear/1 returns {:ok, state}", %{state: state} do

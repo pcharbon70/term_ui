@@ -406,24 +406,50 @@ defmodule TermUI.Backend.Raw do
   @doc """
   Hides the terminal cursor.
 
-  Uses ANSI sequence `ESC[?25l`.
+  Uses ANSI sequence `ESC[?25l` (DECTCEM off).
+
+  This operation is idempotent - if the cursor is already hidden,
+  no escape sequence is written and the state is returned unchanged.
   """
   @spec hide_cursor(t()) :: {:ok, t()}
-  def hide_cursor(state) do
-    # Stub - full implementation in Section 2.3
+  def hide_cursor(%__MODULE__{cursor_visible: false} = state) do
+    # Already hidden - idempotent no-op
     {:ok, state}
+  end
+
+  def hide_cursor(state) do
+    # Write hide cursor sequence
+    write_to_terminal(ANSI.cursor_hide())
+
+    # Update state
+    updated_state = %{state | cursor_visible: false}
+
+    {:ok, updated_state}
   end
 
   @impl true
   @doc """
   Shows the terminal cursor.
 
-  Uses ANSI sequence `ESC[?25h`.
+  Uses ANSI sequence `ESC[?25h` (DECTCEM on).
+
+  This operation is idempotent - if the cursor is already visible,
+  no escape sequence is written and the state is returned unchanged.
   """
   @spec show_cursor(t()) :: {:ok, t()}
-  def show_cursor(state) do
-    # Stub - full implementation in Section 2.3
+  def show_cursor(%__MODULE__{cursor_visible: true} = state) do
+    # Already visible - idempotent no-op
     {:ok, state}
+  end
+
+  def show_cursor(state) do
+    # Write show cursor sequence
+    write_to_terminal(ANSI.cursor_show())
+
+    # Update state
+    updated_state = %{state | cursor_visible: true}
+
+    {:ok, updated_state}
   end
 
   @impl true
