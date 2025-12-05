@@ -81,14 +81,14 @@ Implement initialization that configures the backend from provided capabilities.
 
 ### 3.2.2 Implement Terminal Setup
 
-- [ ] **Task 3.2.2 Complete**
+- [x] **Task 3.2.2 Complete**
 
 Perform minimal terminal setup that works in TTY mode.
 
-- [ ] 3.2.2.1 Optionally enter alternate screen with `\e[?1049h` if configured
-- [ ] 3.2.2.2 Hide cursor with `\e[?25l` for cleaner rendering
-- [ ] 3.2.2.3 Clear screen with `\e[2J\e[H` for fresh start
-- [ ] 3.2.2.4 Note: No raw mode activation (shell already running)
+- [x] 3.2.2.1 Optionally enter alternate screen with `\e[?1049h` if configured
+- [x] 3.2.2.2 Hide cursor with `\e[?25l` for cleaner rendering
+- [x] 3.2.2.3 Clear screen with `\e[2J\e[H` for fresh start
+- [x] 3.2.2.4 Note: No raw mode activation (shell already running)
 
 ### 3.2.3 Implement shutdown/1 Callback
 

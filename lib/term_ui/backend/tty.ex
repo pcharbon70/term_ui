@@ -205,6 +205,9 @@ defmodule TermUI.Backend.TTY do
       alternate_screen: alternate_screen
     }
 
+    # Perform terminal setup
+    state = setup_terminal(state)
+
     {:ok, state}
   end
 
@@ -374,5 +377,30 @@ defmodule TermUI.Backend.TTY do
       _ ->
         {24, 80}
     end
+  end
+
+  # Performs terminal setup during initialization.
+  #
+  # Outputs ANSI escape sequences to prepare the terminal for rendering:
+  # - Optionally enters alternate screen buffer if configured
+  # - Hides cursor for cleaner rendering
+  # - Clears screen and moves cursor to home position
+  #
+  # Note: No raw mode activation - the shell is already running in TTY mode.
+  @spec setup_terminal(t()) :: t()
+  defp setup_terminal(state) do
+    # Enter alternate screen if configured
+    if state.alternate_screen do
+      IO.write("\e[?1049h")
+    end
+
+    # Hide cursor for cleaner rendering
+    IO.write("\e[?25l")
+
+    # Clear screen and move cursor to home position
+    IO.write("\e[2J\e[H")
+
+    # Update state to reflect cursor is hidden
+    %{state | cursor_visible: false, cursor_position: {1, 1}}
   end
 end
