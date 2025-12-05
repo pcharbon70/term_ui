@@ -358,7 +358,7 @@ Implement flush that ensures all pending output is written.
 
 ## 2.7 Implement Input Polling
 
-- [ ] **Section 2.7 Complete**
+- [x] **Section 2.7 Complete**
 
 Implement the `poll_event/2` callback for reading keyboard and mouse input. In raw mode, input arrives character-by-character, enabling real-time event handling.
 
@@ -387,25 +387,27 @@ Handle multi-byte escape sequences with timeout-based disambiguation.
 
 ### 2.7.3 Implement Event Construction
 
-- [ ] **Task 2.7.3 Complete**
+- [x] **Task 2.7.3 Complete**
 
 Convert parsed input to `TermUI.Event` structs.
 
-- [ ] 2.7.3.1 Construct `Event.Key` for keyboard input with key identifier and modifiers
-- [ ] 2.7.3.2 Construct `Event.Mouse` for mouse input with action, button, position, modifiers
-- [ ] 2.7.3.3 Handle special sequences (paste, focus, resize) as appropriate event types
-- [ ] 2.7.3.4 Include timestamp in events
+- [x] 2.7.3.1 Construct `Event.Key` for keyboard input with key identifier and modifiers
+- [x] 2.7.3.2 Construct `Event.Mouse` for mouse input with action, button, position, modifiers
+- [x] 2.7.3.3 Handle special sequences (paste, focus, resize) as appropriate event types
+- [x] 2.7.3.4 Include timestamp in events
+
+Note: Subtask 2.7.3.3 - Event types for paste/focus/resize exist; parsing deferred to Section 2.8+.
 
 ### Unit Tests - Section 2.7
 
-- [ ] **Unit Tests 2.7 Complete**
-- [ ] Test `poll_event/2` returns `:timeout` when no input
-- [ ] Test `poll_event/2` returns key event for single character
-- [ ] Test escape sequence parsing produces correct key events
-- [ ] Test arrow keys parsed from escape sequences
-- [ ] Test function keys parsed correctly
-- [ ] Test modifier detection (Ctrl, Alt, Shift)
-- [ ] Test mouse event parsing when mouse tracking enabled
+- [x] **Unit Tests 2.7 Complete**
+- [x] Test `poll_event/2` returns `:timeout` when no input
+- [x] Test `poll_event/2` returns key event for single character
+- [x] Test escape sequence parsing produces correct key events
+- [x] Test arrow keys parsed from escape sequences
+- [x] Test function keys parsed correctly
+- [x] Test modifier detection (Ctrl, Alt, Shift)
+- [ ] Test mouse event parsing when mouse tracking enabled (deferred to Section 2.8)
 
 ---
 
