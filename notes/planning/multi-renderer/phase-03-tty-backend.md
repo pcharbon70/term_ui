@@ -67,17 +67,17 @@ Implement lifecycle callbacks that set up the TTY backend using capabilities det
 
 ### 3.2.1 Implement init/1 Callback
 
-- [ ] **Task 3.2.1 Complete**
+- [x] **Task 3.2.1 Complete**
 
 Implement initialization that configures the backend from provided capabilities.
 
-- [ ] 3.2.1.1 Implement `@impl true` `init/1` accepting keyword options
-- [ ] 3.2.1.2 Extract `capabilities` from options (provided by Selector)
-- [ ] 3.2.1.3 Accept `:line_mode` option defaulting to `:full_redraw`
-- [ ] 3.2.1.4 Determine `color_mode` from capabilities (`:colors` field)
-- [ ] 3.2.1.5 Determine `character_set` from capabilities (`:unicode` field) with `:ascii` fallback
-- [ ] 3.2.1.6 Extract `size` from capabilities `:dimensions` or default to `{80, 24}`
-- [ ] 3.2.1.7 Return `{:ok, state}` with initialized state struct
+- [x] 3.2.1.1 Implement `@impl true` `init/1` accepting keyword options
+- [x] 3.2.1.2 Extract `capabilities` from options (provided by Selector)
+- [x] 3.2.1.3 Accept `:line_mode` option defaulting to `:full_redraw`
+- [x] 3.2.1.4 Determine `color_mode` from capabilities (`:colors` field)
+- [x] 3.2.1.5 Determine `character_set` from capabilities (`:unicode` field) with `:ascii` fallback
+- [x] 3.2.1.6 Extract `size` from capabilities `:dimensions` or default to `{24, 80}` (rows, cols)
+- [x] 3.2.1.7 Return `{:ok, state}` with initialized state struct
 
 ### 3.2.2 Implement Terminal Setup
 
