@@ -400,9 +400,27 @@ defmodule TermUI.Backend.Raw do
 
   ## Position Validation
 
-  Positions must have positive integer coordinates. The position will be
-  clamped to terminal bounds in the implementation to prevent invalid
-  cursor states.
+  Positions must have positive integer coordinates. This function does NOT
+  validate positions against terminal bounds - positions beyond the terminal
+  dimensions are accepted and recorded in state. Most terminals silently clamp
+  out-of-bounds positions, which may cause state-reality divergence.
+
+  **Callers should validate positions before calling** using `valid_position?/2`:
+
+      if Raw.valid_position?(state, position) do
+        Raw.move_cursor(state, position)
+      else
+        {:error, :out_of_bounds}
+      end
+
+  This design allows the renderer layer to handle bounds checking appropriately
+  for its use case (e.g., scrolling, wrapping, or clamping).
+
+  ## See Also
+
+  - `hide_cursor/1` - Hide cursor during rendering
+  - `show_cursor/1` - Show cursor after rendering
+  - `valid_position?/2` - Check if position is within terminal bounds
 
   ## Examples
 
@@ -422,30 +440,42 @@ defmodule TermUI.Backend.Raw do
     {:ok, updated_state}
   end
 
-  # Generates cursor movement sequence, using optimization when enabled
+  # Generates cursor movement sequence, using optimization when enabled.
+  # Clauses ordered from most specific to general:
+  # 1. Optimization disabled - always absolute (most restrictive)
+  # 2. No previous position - absolute (can't optimize without from position)
+  # 3. Optimization enabled with position - use optimizer
   @spec generate_cursor_sequence(t(), pos_integer(), pos_integer()) :: iodata()
+  defp generate_cursor_sequence(%__MODULE__{optimize_cursor: false}, row, col) do
+    # Optimization disabled - always use absolute positioning
+    ANSI.cursor_position(row, col)
+  end
+
+  defp generate_cursor_sequence(%__MODULE__{cursor_position: nil}, row, col) do
+    # No previous position known - use absolute positioning
+    # (applies regardless of optimize_cursor setting)
+    ANSI.cursor_position(row, col)
+  end
+
   defp generate_cursor_sequence(
          %__MODULE__{optimize_cursor: true, cursor_position: {from_row, from_col}},
          to_row,
          to_col
        ) do
-    # Use optimizer to find cheapest movement
-    {sequence, _cost} = CursorOptimizer.optimal_move(from_row, from_col, to_row, to_col)
-    sequence
-  end
+    # Use optimizer to find cheapest movement, with error recovery
+    try do
+      {sequence, _cost} = CursorOptimizer.optimal_move(from_row, from_col, to_row, to_col)
+      sequence
+    rescue
+      _ ->
+        # Fall back to absolute positioning if optimizer fails
+        Logger.warning("CursorOptimizer failed, falling back to absolute positioning",
+          from: {from_row, from_col},
+          to: {to_row, to_col}
+        )
 
-  defp generate_cursor_sequence(
-         %__MODULE__{optimize_cursor: true, cursor_position: nil},
-         row,
-         col
-       ) do
-    # No previous position known - use absolute positioning
-    ANSI.cursor_position(row, col)
-  end
-
-  defp generate_cursor_sequence(%__MODULE__{optimize_cursor: false}, row, col) do
-    # Optimization disabled - always use absolute positioning
-    ANSI.cursor_position(row, col)
+        ANSI.cursor_position(to_row, to_col)
+    end
   end
 
   @impl true
@@ -454,8 +484,20 @@ defmodule TermUI.Backend.Raw do
 
   Uses ANSI sequence `ESC[?25l` (DECTCEM off).
 
-  This operation is idempotent - if the cursor is already hidden,
-  no escape sequence is written and the state is returned unchanged.
+  ## Idempotent Behavior
+
+  This operation is idempotent. When the cursor is already hidden:
+  - No escape sequence is written to the terminal
+  - The exact same state object is returned unchanged
+  - Callers cannot distinguish a no-op from an actual state change
+
+  This design prevents redundant ANSI writes and allows callers to call
+  without tracking current visibility state.
+
+  ## See Also
+
+  - `show_cursor/1` - Show the cursor
+  - `move_cursor/2` - Move cursor to position
   """
   @spec hide_cursor(t()) :: {:ok, t()}
   def hide_cursor(%__MODULE__{cursor_visible: false} = state) do
@@ -479,8 +521,20 @@ defmodule TermUI.Backend.Raw do
 
   Uses ANSI sequence `ESC[?25h` (DECTCEM on).
 
-  This operation is idempotent - if the cursor is already visible,
-  no escape sequence is written and the state is returned unchanged.
+  ## Idempotent Behavior
+
+  This operation is idempotent. When the cursor is already visible:
+  - No escape sequence is written to the terminal
+  - The exact same state object is returned unchanged
+  - Callers cannot distinguish a no-op from an actual state change
+
+  This design prevents redundant ANSI writes and allows callers to call
+  without tracking current visibility state.
+
+  ## See Also
+
+  - `hide_cursor/1` - Hide the cursor
+  - `move_cursor/2` - Move cursor to position
   """
   @spec show_cursor(t()) :: {:ok, t()}
   def show_cursor(%__MODULE__{cursor_visible: true} = state) do

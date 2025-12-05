@@ -691,4 +691,103 @@ defmodule TermUI.Backend.RawTest do
       assert {:timeout, %Raw{}} = Raw.poll_event(state, 100)
     end
   end
+
+  # ==========================================================================
+  # Test Helpers
+  # ==========================================================================
+
+  # Asserts that all state fields except the specified ones are unchanged.
+  # Example: assert_state_unchanged_except(original, updated, [:cursor_position])
+  defp assert_state_unchanged_except(original, updated, changed_fields) do
+    all_fields = [
+      :size,
+      :cursor_visible,
+      :cursor_position,
+      :alternate_screen,
+      :mouse_mode,
+      :current_style,
+      :optimize_cursor
+    ]
+
+    for field <- all_fields, field not in changed_fields do
+      assert Map.get(updated, field) == Map.get(original, field),
+             "Expected #{field} to be unchanged, got #{inspect(Map.get(updated, field))} instead of #{inspect(Map.get(original, field))}"
+    end
+  end
+
+  # ==========================================================================
+  # Additional Cursor Optimization Tests
+  # ==========================================================================
+
+  describe "cursor optimization - large distance behavior" do
+    setup do
+      {:ok, state} = Raw.init(size: {24, 80}, optimize_cursor: true)
+      %{state: state}
+    end
+
+    test "optimizer uses absolute positioning for large horizontal moves", %{state: state} do
+      # Move to initial position
+      {:ok, state2} = Raw.move_cursor(state, {10, 10})
+
+      # Large move right (60 columns) - optimizer should prefer absolute
+      {:ok, state3} = Raw.move_cursor(state2, {10, 70})
+      assert state3.cursor_position == {10, 70}
+
+      # Verify state preservation
+      assert_state_unchanged_except(state2, state3, [:cursor_position])
+    end
+
+    test "optimizer uses absolute positioning for large vertical moves", %{state: state} do
+      # Move to initial position
+      {:ok, state2} = Raw.move_cursor(state, {5, 40})
+
+      # Large move down (15 rows) - optimizer should prefer absolute
+      {:ok, state3} = Raw.move_cursor(state2, {20, 40})
+      assert state3.cursor_position == {20, 40}
+
+      # Verify state preservation
+      assert_state_unchanged_except(state2, state3, [:cursor_position])
+    end
+
+    test "optimizer handles diagonal moves", %{state: state} do
+      # Move to initial position
+      {:ok, state2} = Raw.move_cursor(state, {5, 5})
+
+      # Diagonal move - optimizer should calculate best path
+      {:ok, state3} = Raw.move_cursor(state2, {15, 50})
+      assert state3.cursor_position == {15, 50}
+    end
+
+    test "optimizer handles home position special case", %{state: state} do
+      # Move to arbitrary position
+      {:ok, state2} = Raw.move_cursor(state, {20, 40})
+
+      # Move back to home - optimizer should recognize ESC[H is cheaper
+      {:ok, state3} = Raw.move_cursor(state2, {1, 1})
+      assert state3.cursor_position == {1, 1}
+    end
+  end
+
+  describe "cursor state preservation with helper" do
+    setup do
+      {:ok, state} = Raw.init(size: {24, 80})
+      %{state: state}
+    end
+
+    test "move_cursor preserves all other fields", %{state: state} do
+      {:ok, updated} = Raw.move_cursor(state, {10, 20})
+      assert_state_unchanged_except(state, updated, [:cursor_position])
+    end
+
+    test "hide_cursor preserves all other fields", %{state: state} do
+      {:ok, visible} = Raw.show_cursor(state)
+      {:ok, hidden} = Raw.hide_cursor(visible)
+      assert_state_unchanged_except(visible, hidden, [:cursor_visible])
+    end
+
+    test "show_cursor preserves all other fields", %{state: state} do
+      {:ok, visible} = Raw.show_cursor(state)
+      assert_state_unchanged_except(state, visible, [:cursor_visible])
+    end
+  end
 end

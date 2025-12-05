@@ -324,4 +324,40 @@ defmodule TermUI.Renderer.CursorOptimizerTest do
       assert CursorOptimizer.position(opt) == {24, 1}
     end
   end
+
+  describe "bounds checking" do
+    test "max_position/0 returns maximum supported position" do
+      max = CursorOptimizer.max_position()
+      assert is_integer(max)
+      assert max == 9999
+    end
+
+    test "advance/2 clamps to max position" do
+      # Start at high column
+      optimizer = CursorOptimizer.new(1, 9990)
+
+      # Advance by large amount
+      advanced = CursorOptimizer.advance(optimizer, 100)
+
+      # Should be clamped to max
+      {_row, col} = CursorOptimizer.position(advanced)
+      assert col == 9999
+    end
+
+    test "advance/2 works normally below max position" do
+      optimizer = CursorOptimizer.new(1, 10)
+      advanced = CursorOptimizer.advance(optimizer, 5)
+
+      {_row, col} = CursorOptimizer.position(advanced)
+      assert col == 15
+    end
+
+    test "advance/2 handles edge case at exactly max position" do
+      optimizer = CursorOptimizer.new(1, 9999)
+      advanced = CursorOptimizer.advance(optimizer, 1)
+
+      {_row, col} = CursorOptimizer.position(advanced)
+      assert col == 9999
+    end
+  end
 end
