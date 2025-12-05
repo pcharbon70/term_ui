@@ -193,14 +193,14 @@ Implement full screen clear.
 
 ### 2.4.2 Implement size/1 Callback
 
-- [ ] **Task 2.4.2 Complete**
+- [x] **Task 2.4.2 Complete**
 
 Implement terminal size query.
 
-- [ ] 2.4.2.1 Implement `@impl true` `size/1` accepting state
-- [ ] 2.4.2.2 Return `{:ok, state.size}` from cached state
-- [ ] 2.4.2.3 Provide `refresh_size/1` function to re-query dimensions
-- [ ] 2.4.2.4 Handle `:io.columns/0` or `:io.rows/0` failure with `{:error, :enotsup}`
+- [x] 2.4.2.1 Implement `@impl true` `size/1` accepting state
+- [x] 2.4.2.2 Return `{:ok, state.size}` from cached state
+- [ ] 2.4.2.3 Provide `refresh_size/1` function to re-query dimensions (see Task 2.4.3)
+- [ ] 2.4.2.4 Handle `:io.columns/0` or `:io.rows/0` failure with `{:error, :enotsup}` (see Task 2.4.3)
 
 ### 2.4.3 Implement Size Refresh
 
@@ -218,7 +218,7 @@ Implement size refresh for handling terminal resize events.
 - [ ] **Unit Tests 2.4 Complete**
 - [x] Test `clear/1` returns `{:ok, state}`
 - [x] Test `clear/1` resets current_style in state
-- [ ] Test `size/1` returns cached dimensions
+- [x] Test `size/1` returns cached dimensions
 - [ ] Test `refresh_size/1` updates state with new dimensions
 - [ ] Test size query handles `:io.columns/0` failure gracefully
 

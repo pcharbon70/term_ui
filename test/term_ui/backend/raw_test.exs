@@ -723,6 +723,53 @@ defmodule TermUI.Backend.RawTest do
     end
   end
 
+  describe "size/1 callback" do
+    test "returns {:ok, {rows, cols}} tuple" do
+      {:ok, state} = Raw.init(size: {24, 80})
+      assert {:ok, {24, 80}} = Raw.size(state)
+    end
+
+    test "returns cached dimensions from state" do
+      {:ok, state} = Raw.init(size: {50, 120})
+      {:ok, size} = Raw.size(state)
+      assert size == {50, 120}
+      assert size == state.size
+    end
+
+    test "works with various terminal sizes" do
+      # Standard 80x24
+      {:ok, state1} = Raw.init(size: {24, 80})
+      assert {:ok, {24, 80}} = Raw.size(state1)
+
+      # Large terminal
+      {:ok, state2} = Raw.init(size: {50, 200})
+      assert {:ok, {50, 200}} = Raw.size(state2)
+
+      # Small terminal
+      {:ok, state3} = Raw.init(size: {10, 40})
+      assert {:ok, {10, 40}} = Raw.size(state3)
+    end
+
+    test "size remains unchanged after cursor operations" do
+      {:ok, state} = Raw.init(size: {24, 80})
+      {:ok, state2} = Raw.move_cursor(state, {10, 20})
+      {:ok, state3} = Raw.hide_cursor(state2)
+      {:ok, state4} = Raw.clear(state3)
+
+      # Size should remain the same through all operations
+      assert {:ok, {24, 80}} = Raw.size(state4)
+    end
+
+    test "returns size in {rows, cols} format" do
+      {:ok, state} = Raw.init(size: {30, 100})
+      {:ok, {rows, cols}} = Raw.size(state)
+
+      # Rows first, columns second
+      assert rows == 30
+      assert cols == 100
+    end
+  end
+
   describe "stub callbacks" do
     # Use setup to avoid repeating Raw.init([]) in every test
     setup do
@@ -732,10 +779,6 @@ defmodule TermUI.Backend.RawTest do
 
     test "shutdown/1 returns :ok", %{state: state} do
       assert :ok = Raw.shutdown(state)
-    end
-
-    test "size/1 returns {:ok, size} tuple", %{state: state} do
-      assert {:ok, {24, 80}} = Raw.size(state)
     end
 
     test "draw_cells/2 returns {:ok, state}", %{state: state} do

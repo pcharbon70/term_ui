@@ -371,11 +371,26 @@ defmodule TermUI.Backend.Raw do
   @doc """
   Returns the current terminal dimensions.
 
-  Returns cached size from state. Use `refresh_size/1` to re-query.
+  Returns the cached size from state as `{rows, cols}`. This does not
+  re-query the terminal - it returns the dimensions captured at `init/1`
+  or last updated by `refresh_size/1`.
+
+  ## Return Value
+
+  - `{:ok, {rows, cols}}` - Terminal dimensions (rows first, then columns)
+
+  ## Examples
+
+      {:ok, {24, 80}} = Raw.size(state)  # Standard 80x24 terminal
+      {:ok, {50, 120}} = Raw.size(state) # Larger terminal
+
+  ## See Also
+
+  - `refresh_size/1` - Re-query terminal dimensions (call after SIGWINCH)
+  - `init/1` - Initial size detection
   """
   @spec size(t()) :: {:ok, TermUI.Backend.size()} | {:error, :enotsup}
   def size(state) do
-    # Stub - will be implemented in Task 2.4.2
     {:ok, state.size}
   end
 
