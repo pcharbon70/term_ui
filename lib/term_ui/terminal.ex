@@ -11,6 +11,7 @@ defmodule TermUI.Terminal do
   require Logger
 
   alias TermUI.Terminal.State
+  alias TermUI.Terminal.SizeDetector
   alias TermUI.ANSI
 
   @ets_table :term_ui_terminal_state
@@ -491,66 +492,9 @@ defmodule TermUI.Terminal do
     _ -> :ok
   end
 
+  # Delegates to SizeDetector for consistent size detection across modules.
   defp do_get_terminal_size do
-    if function_exported?(:io, :columns, 0) and function_exported?(:io, :rows, 0) do
-      case {:io.columns(), :io.rows()} do
-        {{:ok, cols}, {:ok, rows}} ->
-          {:ok, {rows, cols}}
-
-        _ ->
-          get_size_from_env()
-      end
-    else
-      get_size_from_env()
-    end
-  end
-
-  defp get_size_from_env do
-    # Try LINES and COLUMNS environment variables
-    with {:ok, lines} <- get_env_int("LINES"),
-         {:ok, columns} <- get_env_int("COLUMNS") do
-      {:ok, {lines, columns}}
-    else
-      _ ->
-        # Try stty as last resort
-        get_size_from_stty()
-    end
-  end
-
-  defp get_env_int(var) do
-    case System.get_env(var) do
-      nil ->
-        {:error, :not_set}
-
-      value ->
-        case Integer.parse(value) do
-          {int, ""} when int > 0 -> {:ok, int}
-          _ -> {:error, :invalid}
-        end
-    end
-  end
-
-  defp get_size_from_stty do
-    case System.cmd("stty", ["size"], stderr_to_stdout: true) do
-      {output, 0} ->
-        case String.split(String.trim(output)) do
-          [rows_str, cols_str] ->
-            with {rows, ""} <- Integer.parse(rows_str),
-                 {cols, ""} <- Integer.parse(cols_str) do
-              {:ok, {rows, cols}}
-            else
-              _ -> {:error, :parse_failed}
-            end
-
-          _ ->
-            {:error, :invalid_output}
-        end
-
-      {_, _} ->
-        {:error, :stty_failed}
-    end
-  rescue
-    _ -> {:error, :stty_failed}
+    SizeDetector.auto_detect()
   end
 
   defp do_restore(state) do

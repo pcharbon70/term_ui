@@ -145,17 +145,20 @@ defmodule TermUI.Backend.Raw do
 
   alias TermUI.ANSI
   alias TermUI.Renderer.CursorOptimizer
+  alias TermUI.Terminal.SizeDetector
   require Logger
 
   # Comprehensive mouse disable sequence - disables ALL mouse modes defensively
   # This ensures cleanup even if state is inconsistent
   @all_mouse_off "\e[?1006l\e[?1003l\e[?1002l\e[?1000l"
 
-  # Maximum practical terminal dimension (rows or columns).
-  # This limit provides defense against resource exhaustion from malicious
-  # LINES/COLUMNS environment variables. No production terminal exceeds this.
-  # Note: This matches CursorOptimizer.@max_cursor_pos for consistency.
-  @max_terminal_dimension 9999
+  # Maximum input buffer size (bytes) to prevent memory exhaustion from
+  # malicious or malformed input streams with unterminated escape sequences.
+  @max_input_buffer_size 1024
+
+  # Maximum event queue size to prevent memory exhaustion when events
+  # are parsed faster than they're consumed.
+  @max_event_queue_size 100
 
   # ===========================================================================
   # Type Definitions and State Structure
@@ -549,13 +552,15 @@ defmodule TermUI.Backend.Raw do
          to_col
        ) do
     # Use optimizer to find cheapest movement, with error recovery
+    # Only catch expected exceptions, not system-level errors
     try do
       {sequence, _cost} = CursorOptimizer.optimal_move(from_row, from_col, to_row, to_col)
       sequence
     rescue
-      _ ->
+      e in [ArgumentError, ArithmeticError, FunctionClauseError] ->
         # Fall back to absolute positioning if optimizer fails
-        Logger.warning("CursorOptimizer failed, falling back to absolute positioning",
+        Logger.warning(
+          "CursorOptimizer failed (#{Exception.message(e)}), falling back to absolute positioning",
           from: {from_row, from_col},
           to: {to_row, to_col}
         )
@@ -822,8 +827,8 @@ defmodule TermUI.Backend.Raw do
   # we must reset with ESC[0m and rebuild the full style, since ANSI doesn't have
   # efficient individual attribute removal for all attributes.
   #
-  # TODO: SGR generation logic here duplicates code in TermUI.Renderer.SequenceBuffer.
-  # Consider extracting to a shared TermUI.SGRGenerator module in a future refactoring.
+  # Note: This uses ANSI module for sequence generation. For parameter-level SGR
+  # operations (e.g., combining into single sequence), see TermUI.SGR module.
   @spec style_delta_output(style_state() | nil, style_state()) :: iodata()
   defp style_delta_output(nil, new_style) do
     # No previous style - emit full style
@@ -1180,8 +1185,9 @@ defmodule TermUI.Backend.Raw do
         {:ok, event, %{state | input_buffer: remaining}}
 
       {[event | rest_events], remaining} ->
-        # Multiple events parsed - return first, queue the rest
-        {:ok, event, %{state | input_buffer: remaining, event_queue: rest_events}}
+        # Multiple events parsed - return first, queue the rest (with size limit)
+        new_state = queue_events(%{state | input_buffer: remaining}, rest_events)
+        {:ok, event, new_state}
 
       {[], remaining} when remaining != <<>> ->
         # Partial sequence - check if it's a potential escape sequence
@@ -1211,9 +1217,8 @@ defmodule TermUI.Backend.Raw do
 
     case Task.yield(task, timeout) || Task.shutdown(task) do
       {:ok, {:ok, data}} ->
-        # Got input - add to buffer and try to parse
-        new_buffer = state.input_buffer <> data
-        new_state = %{state | input_buffer: new_buffer}
+        # Got input - add to buffer and try to parse (with size limit)
+        new_state = append_to_input_buffer(state, data)
         try_parse_or_continue(new_state, timeout)
 
       {:ok, :eof} ->
@@ -1412,53 +1417,60 @@ defmodule TermUI.Backend.Raw do
   # Private Functions
   # ===========================================================================
 
-  # Gets terminal size from explicit option or auto-detection
+  # Gets terminal size from explicit option or auto-detection.
+  # Delegates to SizeDetector for consistent detection across backends.
   @spec get_terminal_size({pos_integer(), pos_integer()} | nil) ::
           {:ok, {pos_integer(), pos_integer()}} | {:error, term()}
-  defp get_terminal_size({rows, cols})
-       when is_integer(rows) and is_integer(cols) and rows > 0 and cols > 0 do
-    {:ok, {rows, cols}}
+  defp get_terminal_size(size_opt) do
+    SizeDetector.detect(size: size_opt)
   end
 
-  defp get_terminal_size(nil) do
-    # Try :io.rows/0 and :io.columns/0 first
-    case {:io.rows(), :io.columns()} do
-      {{:ok, rows}, {:ok, cols}} when rows > 0 and cols > 0 ->
-        {:ok, {rows, cols}}
+  # Appends data to the input buffer with size limit protection.
+  # If the buffer exceeds @max_input_buffer_size, truncates from the beginning
+  # keeping only the most recent bytes. This prevents memory exhaustion from
+  # malformed input streams with unterminated escape sequences.
+  @spec append_to_input_buffer(t(), binary()) :: t()
+  defp append_to_input_buffer(state, data) do
+    new_buffer = state.input_buffer <> data
+    buffer_size = byte_size(new_buffer)
 
-      _ ->
-        # Fall back to environment variables
-        get_size_from_env()
+    if buffer_size > @max_input_buffer_size do
+      # Keep only the most recent bytes (potential partial escape sequence)
+      # We keep 256 bytes to preserve any valid partial sequence
+      keep_size = min(256, buffer_size)
+      truncated = binary_part(new_buffer, buffer_size - keep_size, keep_size)
+
+      Logger.warning(
+        "Input buffer overflow (#{buffer_size} bytes), truncating to #{keep_size} bytes"
+      )
+
+      %{state | input_buffer: truncated}
+    else
+      %{state | input_buffer: new_buffer}
     end
   end
 
-  defp get_terminal_size(_invalid) do
-    {:error, :invalid_size}
-  end
+  # Queues events with size limit protection.
+  # If the queue exceeds @max_event_queue_size, drops oldest events.
+  # This prevents memory exhaustion when events are parsed faster than consumed.
+  @spec queue_events(t(), [TermUI.Backend.event()]) :: t()
+  defp queue_events(state, []), do: state
 
-  # Gets terminal size from LINES and COLUMNS environment variables
-  defp get_size_from_env do
-    with {:ok, lines} <- get_env_int("LINES"),
-         {:ok, columns} <- get_env_int("COLUMNS") do
-      {:ok, {lines, columns}}
-    else
-      _ -> {:error, :size_detection_failed}
-    end
-  end
+  defp queue_events(state, new_events) do
+    combined = state.event_queue ++ new_events
+    queue_size = length(combined)
 
-  # Parses an environment variable as a positive integer within practical bounds.
-  # Uses `with` for idiomatic error flow. Validates against @max_terminal_dimension
-  # to prevent resource exhaustion from malicious environment variables.
-  defp get_env_int(var) do
-    with value when not is_nil(value) <- System.get_env(var),
-         {int, ""} <- Integer.parse(value),
-         true <- int > 0 and int <= @max_terminal_dimension do
-      {:ok, int}
+    if queue_size > @max_event_queue_size do
+      # Keep newest events, drop oldest
+      to_drop = queue_size - @max_event_queue_size
+
+      Logger.warning(
+        "Event queue overflow (#{queue_size} events), dropping #{to_drop} oldest events"
+      )
+
+      %{state | event_queue: Enum.drop(combined, to_drop)}
     else
-      nil -> {:error, :not_set}
-      {_int, _remainder} -> {:error, :invalid}
-      false -> {:error, :invalid}
-      _ -> {:error, :invalid}
+      %{state | event_queue: combined}
     end
   end
 

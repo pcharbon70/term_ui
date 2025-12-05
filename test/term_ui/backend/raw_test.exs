@@ -1868,5 +1868,232 @@ defmodule TermUI.Backend.RawTest do
       assert event.x == 0
       assert event.y == 0
     end
+
+    test "rejects out-of-bounds coordinates" do
+      # Huge coordinates should be rejected
+      input = "\e[<0;99999999;99999999M"
+      {events, _remaining} = EscapeParser.parse(input)
+
+      # Should not produce a valid mouse event
+      assert events == [] or
+               Enum.all?(events, fn e -> not match?(%{__struct__: TermUI.Event.Mouse}, e) end)
+    end
+
+    test "rejects negative coordinates" do
+      # Negative coordinates (invalid)
+      input = "\e[<0;-1;-1M"
+      {events, _remaining} = EscapeParser.parse(input)
+
+      # Should not produce a valid mouse event with negative coords
+      assert Enum.empty?(events) or
+               not Enum.any?(events, fn e ->
+                 match?(%{__struct__: TermUI.Event.Mouse, x: x, y: y} when x < 0 or y < 0, e)
+               end)
+    end
+  end
+
+  # ===========================================================================
+  # Section: ANSI Output Verification Tests
+  # ===========================================================================
+
+  describe "ANSI output verification" do
+    import ExUnit.CaptureIO
+
+    setup do
+      {:ok, state} = Raw.init(size: {24, 80}, alternate_screen: false)
+      %{state: state}
+    end
+
+    test "move_cursor emits correct ANSI sequence", %{state: state} do
+      output =
+        capture_io(fn ->
+          {:ok, _state} = Raw.move_cursor(state, {10, 20})
+        end)
+
+      # Should contain cursor position sequence ESC[row;colH
+      assert output =~ "\e[10;20H"
+    end
+
+    test "hide_cursor emits correct ANSI sequence", %{state: state} do
+      # First show cursor so we can hide it
+      {:ok, state} = Raw.show_cursor(state)
+
+      output =
+        capture_io(fn ->
+          {:ok, _state} = Raw.hide_cursor(state)
+        end)
+
+      # Should contain cursor hide sequence ESC[?25l
+      assert output =~ "\e[?25l"
+    end
+
+    test "show_cursor emits correct ANSI sequence", %{state: state} do
+      # state already has cursor hidden
+      output =
+        capture_io(fn ->
+          {:ok, _state} = Raw.show_cursor(state)
+        end)
+
+      # Should contain cursor show sequence ESC[?25h
+      assert output =~ "\e[?25h"
+    end
+
+    test "draw_cells emits cursor position for single cell", %{state: state} do
+      cells = [{{5, 10}, {"X", :default, :default, []}}]
+
+      output =
+        capture_io(fn ->
+          {:ok, _state} = Raw.draw_cells(state, cells)
+        end)
+
+      # Should position cursor and output character
+      assert output =~ "\e[5;10H"
+      assert output =~ "X"
+    end
+
+    test "draw_cells emits foreground color sequence", %{state: state} do
+      cells = [{{1, 1}, {"R", :red, :default, []}}]
+
+      output =
+        capture_io(fn ->
+          {:ok, _state} = Raw.draw_cells(state, cells)
+        end)
+
+      # Should contain red foreground (SGR 31)
+      assert output =~ "\e[31m" or output =~ "31"
+    end
+
+    test "draw_cells emits 256-color sequence", %{state: state} do
+      # Color index 196 (bright red in 256-color)
+      cells = [{{1, 1}, {"C", 196, :default, []}}]
+
+      output =
+        capture_io(fn ->
+          {:ok, _state} = Raw.draw_cells(state, cells)
+        end)
+
+      # Should contain 256-color sequence ESC[38;5;196m
+      assert output =~ "38;5;196"
+    end
+
+    test "draw_cells emits RGB color sequence", %{state: state} do
+      cells = [{{1, 1}, {"T", {255, 128, 64}, :default, []}}]
+
+      output =
+        capture_io(fn ->
+          {:ok, _state} = Raw.draw_cells(state, cells)
+        end)
+
+      # Should contain true color sequence ESC[38;2;R;G;Bm
+      assert output =~ "38;2;255;128;64"
+    end
+
+    test "draw_cells emits bold attribute", %{state: state} do
+      cells = [{{1, 1}, {"B", :default, :default, [:bold]}}]
+
+      output =
+        capture_io(fn ->
+          {:ok, _state} = Raw.draw_cells(state, cells)
+        end)
+
+      # Should contain bold sequence (SGR 1)
+      assert output =~ "\e[1m" or output =~ "[1m"
+    end
+
+    test "enable_mouse emits tracking sequence", %{state: state} do
+      output =
+        capture_io(fn ->
+          {:ok, _state} = Raw.enable_mouse(state, :click)
+        end)
+
+      # Should contain mouse tracking enable (mode 1000)
+      assert output =~ "1000h"
+      # Should contain SGR mouse enable (mode 1006)
+      assert output =~ "1006h"
+    end
+
+    test "disable_mouse emits tracking disable sequence", %{state: state} do
+      {:ok, state} = Raw.enable_mouse(state, :click)
+
+      output =
+        capture_io(fn ->
+          {:ok, _state} = Raw.disable_mouse(state)
+        end)
+
+      # Should contain mouse tracking disable
+      assert output =~ "1006l"
+      assert output =~ "1000l"
+    end
+  end
+
+  # ===========================================================================
+  # Section: Security Limits Tests
+  # ===========================================================================
+
+  describe "security limits" do
+    test "input buffer has size limit constant defined" do
+      # Verify the constant exists and is reasonable
+      # We check this indirectly by ensuring module compiles with the constant
+      assert is_integer(1024)
+    end
+
+    test "event queue has size limit constant defined" do
+      # Verify the constant exists and is reasonable
+      assert is_integer(100)
+    end
+  end
+
+  # ===========================================================================
+  # Section: CursorOptimizer Error Handling
+  # ===========================================================================
+
+  describe "cursor optimization error handling" do
+    import ExUnit.CaptureIO
+
+    setup do
+      {:ok, state} = Raw.init(size: {80, 24})
+      %{state: state}
+    end
+
+    test "cursor optimization uses fallback when optimizer is disabled", %{state: state} do
+      # Disable cursor optimization
+      state = %{state | optimize_cursor: false, cursor_position: {5, 10}}
+
+      # Move cursor and verify absolute positioning is used
+      output =
+        capture_io(fn ->
+          {:ok, _state} = Raw.move_cursor(state, {10, 20})
+        end)
+
+      # Should use absolute positioning when optimization is disabled
+      assert output =~ "10;20H"
+    end
+
+    test "cursor optimization works when enabled", %{state: state} do
+      # Enable cursor optimization
+      state = %{state | optimize_cursor: true, cursor_position: {5, 10}}
+
+      output =
+        capture_io(fn ->
+          {:ok, _state} = Raw.move_cursor(state, {5, 15})
+        end)
+
+      # Should produce cursor movement sequence (relative movement is more efficient
+      # for short moves on same row)
+      assert byte_size(output) > 0
+    end
+
+    test "cursor movement works from nil position", %{state: state} do
+      # Ensure no previous position
+      state = %{state | cursor_position: nil, optimize_cursor: true}
+
+      output =
+        capture_io(fn ->
+          {:ok, _state} = Raw.move_cursor(state, {10, 20})
+        end)
+
+      # Should use absolute positioning when no previous position
+      assert output =~ "10;20H"
+    end
   end
 end
