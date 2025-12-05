@@ -376,14 +376,14 @@ Implement input polling with timeout support.
 
 ### 2.7.2 Implement Escape Sequence Handling
 
-- [ ] **Task 2.7.2 Complete**
+- [x] **Task 2.7.2 Complete**
 
 Handle multi-byte escape sequences with timeout-based disambiguation.
 
-- [ ] 2.7.2.1 Detect escape character (`\e`, byte 27) as potential sequence start
-- [ ] 2.7.2.2 Use short timeout (50ms) to read additional sequence bytes
-- [ ] 2.7.2.3 Delegate parsing to `TermUI.Terminal.EscapeParser`
-- [ ] 2.7.2.4 Return raw Escape key event if timeout expires (single escape press)
+- [x] 2.7.2.1 Detect escape character (`\e`, byte 27) as potential sequence start
+- [x] 2.7.2.2 Use short timeout (50ms) to read additional sequence bytes
+- [x] 2.7.2.3 Delegate parsing to `TermUI.Terminal.EscapeParser`
+- [x] 2.7.2.4 Return raw Escape key event if timeout expires (single escape press)
 
 ### 2.7.3 Implement Event Construction
 
