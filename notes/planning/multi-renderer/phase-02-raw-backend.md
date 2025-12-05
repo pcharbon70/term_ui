@@ -472,53 +472,53 @@ Note: Mouse parsing was already implemented in EscapeParser. This task adds comp
 
 ## 2.9 Integration Tests
 
-- [ ] **Section 2.9 Complete**
+- [x] **Section 2.9 Complete**
 
 Integration tests verify the Raw backend works correctly in realistic scenarios, including interaction with existing TermUI components.
 
 ### 2.9.1 Full Lifecycle Tests
 
-- [ ] **Task 2.9.1 Complete**
+- [x] **Task 2.9.1 Complete**
 
 Test complete backend lifecycle from init to shutdown.
 
-- [ ] 2.9.1.1 Test init → draw_cells → poll_event → shutdown sequence
-- [ ] 2.9.1.2 Test alternate screen is properly entered and exited
-- [ ] 2.9.1.3 Test terminal state is properly restored after shutdown
-- [ ] 2.9.1.4 Test shutdown after error during rendering
+- [x] 2.9.1.1 Test init → draw_cells → poll_event → shutdown sequence
+- [x] 2.9.1.2 Test alternate screen is properly entered and exited
+- [x] 2.9.1.3 Test terminal state is properly restored after shutdown
+- [x] 2.9.1.4 Test shutdown after error during rendering
 
 ### 2.9.2 Renderer Integration Tests
 
-- [ ] **Task 2.9.2 Complete**
+- [x] **Task 2.9.2 Complete**
 
 Test Raw backend integration with existing renderer components.
 
-- [ ] 2.9.2.1 Test `draw_cells/2` with cells from `TermUI.Renderer.Buffer`
-- [ ] 2.9.2.2 Test `draw_cells/2` with diff operations from `TermUI.Renderer.Diff`
-- [ ] 2.9.2.3 Test style rendering matches `TermUI.Renderer.Style` expectations
-- [ ] 2.9.2.4 Test cell rendering matches `TermUI.Renderer.Cell` format
+- [x] 2.9.2.1 Test `draw_cells/2` with cells from `TermUI.Renderer.Buffer`
+- [x] 2.9.2.2 Test `draw_cells/2` with diff operations from `TermUI.Renderer.Diff`
+- [x] 2.9.2.3 Test style rendering matches `TermUI.Renderer.Style` expectations
+- [x] 2.9.2.4 Test cell rendering matches `TermUI.Renderer.Cell` format
 
 ### 2.9.3 Input Integration Tests
 
-- [ ] **Task 2.9.3 Complete**
+- [x] **Task 2.9.3 Complete**
 
 Test input handling integration (requires terminal, tagged `:requires_terminal`).
 
-- [ ] 2.9.3.1 Test keyboard input produces correct `Event.Key` structs
-- [ ] 2.9.3.2 Test mouse input produces correct `Event.Mouse` structs when enabled
-- [ ] 2.9.3.3 Test escape sequence handling with timeout disambiguation
-- [ ] 2.9.3.4 Test input handling after resize event
+- [x] 2.9.3.1 Test keyboard input produces correct `Event.Key` structs
+- [x] 2.9.3.2 Test mouse input produces correct `Event.Mouse` structs when enabled
+- [x] 2.9.3.3 Test escape sequence handling with timeout disambiguation
+- [x] 2.9.3.4 Test input handling after resize event
 
 ### 2.9.4 Performance Tests
 
-- [ ] **Task 2.9.4 Complete**
+- [x] **Task 2.9.4 Complete**
 
 Verify rendering performance is acceptable.
 
-- [ ] 2.9.4.1 Measure time to render full 80x24 screen
-- [ ] 2.9.4.2 Measure time to render differential update (10% changed cells)
-- [ ] 2.9.4.3 Verify output batching reduces write syscalls
-- [ ] 2.9.4.4 Verify style delta tracking reduces escape sequence bytes
+- [x] 2.9.4.1 Measure time to render full 80x24 screen
+- [x] 2.9.4.2 Measure time to render differential update (10% changed cells)
+- [x] 2.9.4.3 Verify output batching reduces write syscalls
+- [x] 2.9.4.4 Verify style delta tracking reduces escape sequence bytes
 
 ---
 
