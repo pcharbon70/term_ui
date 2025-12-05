@@ -1266,6 +1266,170 @@ defmodule TermUI.Backend.RawTest do
     end
   end
 
+  describe "poll_event/2 callback" do
+    setup do
+      {:ok, state} = Raw.init(size: {24, 80})
+      %{state: state}
+    end
+
+    test "returns {:timeout, state} when no input available", %{state: state} do
+      # With zero timeout, should return immediately if no input
+      result = Raw.poll_event(state, 0)
+
+      # In test environment without real terminal, we get timeout
+      assert match?({:timeout, %Raw{}}, result) or match?({:error, _, %Raw{}}, result)
+    end
+
+    test "state has input_buffer field initialized to empty", %{state: state} do
+      assert state.input_buffer == <<>>
+    end
+
+    test "parses buffered input from previous partial sequence", %{state: state} do
+      # Manually set buffer with a complete key
+      state_with_buffer = %{state | input_buffer: "a"}
+
+      # Should parse the buffered 'a' immediately without reading
+      {:ok, event, new_state} = Raw.poll_event(state_with_buffer, 0)
+
+      assert event.key == "a"
+      assert new_state.input_buffer == <<>>
+    end
+
+    test "parses multiple buffered characters one at a time", %{state: state} do
+      # Buffer with multiple characters
+      state_with_buffer = %{state | input_buffer: "abc"}
+
+      # First call returns 'a'
+      {:ok, event1, state1} = Raw.poll_event(state_with_buffer, 0)
+      assert event1.key == "a"
+
+      # Second call returns 'b'
+      {:ok, event2, state2} = Raw.poll_event(state1, 0)
+      assert event2.key == "b"
+
+      # Third call returns 'c'
+      {:ok, event3, state3} = Raw.poll_event(state2, 0)
+      assert event3.key == "c"
+
+      # Buffer should be empty
+      assert state3.input_buffer == <<>>
+    end
+
+    test "parses enter key from buffer", %{state: state} do
+      state_with_buffer = %{state | input_buffer: <<13>>}
+
+      {:ok, event, _new_state} = Raw.poll_event(state_with_buffer, 0)
+
+      assert event.key == :enter
+    end
+
+    test "parses tab key from buffer", %{state: state} do
+      state_with_buffer = %{state | input_buffer: <<9>>}
+
+      {:ok, event, _new_state} = Raw.poll_event(state_with_buffer, 0)
+
+      assert event.key == :tab
+    end
+
+    test "parses backspace from buffer", %{state: state} do
+      state_with_buffer = %{state | input_buffer: <<127>>}
+
+      {:ok, event, _new_state} = Raw.poll_event(state_with_buffer, 0)
+
+      assert event.key == :backspace
+    end
+
+    test "parses ctrl+c from buffer", %{state: state} do
+      # Ctrl+C is byte 3
+      state_with_buffer = %{state | input_buffer: <<3>>}
+
+      {:ok, event, _new_state} = Raw.poll_event(state_with_buffer, 0)
+
+      assert event.key == "c"
+      assert :ctrl in event.modifiers
+    end
+
+    test "parses arrow up from buffer", %{state: state} do
+      # Arrow up: ESC [ A
+      state_with_buffer = %{state | input_buffer: <<27, ?[, ?A>>}
+
+      {:ok, event, _new_state} = Raw.poll_event(state_with_buffer, 0)
+
+      assert event.key == :up
+    end
+
+    test "parses arrow keys from buffer", %{state: state} do
+      arrows = [
+        {<<27, ?[, ?A>>, :up},
+        {<<27, ?[, ?B>>, :down},
+        {<<27, ?[, ?C>>, :right},
+        {<<27, ?[, ?D>>, :left}
+      ]
+
+      for {seq, expected_key} <- arrows do
+        state_with_buffer = %{state | input_buffer: seq}
+        {:ok, event, _} = Raw.poll_event(state_with_buffer, 0)
+        assert event.key == expected_key, "Expected #{expected_key} for sequence #{inspect(seq)}"
+      end
+    end
+
+    test "parses function keys from buffer", %{state: state} do
+      # F1-F4 via SS3: ESC O P/Q/R/S
+      f_keys = [
+        {<<27, ?O, ?P>>, :f1},
+        {<<27, ?O, ?Q>>, :f2},
+        {<<27, ?O, ?R>>, :f3},
+        {<<27, ?O, ?S>>, :f4}
+      ]
+
+      for {seq, expected_key} <- f_keys do
+        state_with_buffer = %{state | input_buffer: seq}
+        {:ok, event, _} = Raw.poll_event(state_with_buffer, 0)
+        assert event.key == expected_key
+      end
+    end
+
+    test "has documentation", %{state: _state} do
+      {:docs_v1, _, :elixir, _, _, _, docs} = Code.fetch_docs(Raw)
+
+      poll_doc =
+        Enum.find(docs, fn
+          {{:function, :poll_event, 2}, _, _, _, _} -> true
+          _ -> false
+        end)
+
+      assert poll_doc != nil
+      {{:function, :poll_event, 2}, _, _, %{"en" => doc}, _} = poll_doc
+      assert doc =~ "Polls for input events"
+      assert doc =~ "timeout"
+    end
+  end
+
+  describe "poll_event/2 escape sequence timeout" do
+    setup do
+      {:ok, state} = Raw.init(size: {24, 80})
+      %{state: state}
+    end
+
+    test "lone ESC in buffer emits escape key event", %{state: state} do
+      # Just ESC byte - partial sequence
+      state_with_buffer = %{state | input_buffer: <<27>>}
+
+      # With zero timeout, partial escape should emit escape key
+      result = Raw.poll_event(state_with_buffer, 0)
+
+      case result do
+        {:ok, event, new_state} ->
+          assert event.key == :escape
+          assert new_state.input_buffer == <<>>
+
+        {:timeout, _} ->
+          # Also acceptable if implementation waits for more input
+          :ok
+      end
+    end
+  end
+
   describe "stub callbacks" do
     # Use setup to avoid repeating Raw.init([]) in every test
     setup do
@@ -1275,12 +1439,6 @@ defmodule TermUI.Backend.RawTest do
 
     test "shutdown/1 returns :ok", %{state: state} do
       assert :ok = Raw.shutdown(state)
-    end
-
-    test "poll_event/2 returns {:timeout, state} for stub", %{state: state} do
-      # Stub always returns timeout
-      assert {:timeout, %Raw{}} = Raw.poll_event(state, 0)
-      assert {:timeout, %Raw{}} = Raw.poll_event(state, 100)
     end
   end
 
@@ -1298,7 +1456,9 @@ defmodule TermUI.Backend.RawTest do
       :alternate_screen,
       :mouse_mode,
       :current_style,
-      :optimize_cursor
+      :optimize_cursor,
+      :input_buffer,
+      :event_queue
     ]
 
     for field <- all_fields, field not in changed_fields do

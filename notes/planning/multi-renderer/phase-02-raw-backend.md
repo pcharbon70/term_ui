@@ -364,15 +364,15 @@ Implement the `poll_event/2` callback for reading keyboard and mouse input. In r
 
 ### 2.7.1 Implement poll_event/2 Callback
 
-- [ ] **Task 2.7.1 Complete**
+- [x] **Task 2.7.1 Complete**
 
 Implement input polling with timeout support.
 
-- [ ] 2.7.1.1 Implement `@impl true` `poll_event/2` accepting state and timeout in milliseconds
-- [ ] 2.7.1.2 Use non-blocking read with timeout (delegate to existing InputReader pattern)
-- [ ] 2.7.1.3 Return `{:ok, event}` when input available
-- [ ] 2.7.1.4 Return `:timeout` when timeout expires with no input
-- [ ] 2.7.1.5 Handle read errors gracefully
+- [x] 2.7.1.1 Implement `@impl true` `poll_event/2` accepting state and timeout in milliseconds
+- [x] 2.7.1.2 Use non-blocking read with timeout (Task with yield/shutdown pattern)
+- [x] 2.7.1.3 Return `{:ok, event, state}` when input available
+- [x] 2.7.1.4 Return `{:timeout, state}` when timeout expires with no input
+- [x] 2.7.1.5 Handle read errors gracefully (returns `{:error, reason, state}`)
 
 ### 2.7.2 Implement Escape Sequence Handling
 

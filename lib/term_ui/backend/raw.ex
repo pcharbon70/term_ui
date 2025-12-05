@@ -219,6 +219,8 @@ defmodule TermUI.Backend.Raw do
   - `:mouse_mode` - Current mouse tracking mode
   - `:current_style` - Current SGR state for style delta tracking
   - `:optimize_cursor` - Whether to use cursor movement optimization (default: `true`)
+  - `:input_buffer` - Buffer for partial escape sequences during input parsing
+  - `:event_queue` - Queue of parsed events waiting to be returned
   """
   @type t :: %__MODULE__{
           size: {pos_integer(), pos_integer()},
@@ -227,7 +229,9 @@ defmodule TermUI.Backend.Raw do
           alternate_screen: boolean(),
           mouse_mode: mouse_mode(),
           current_style: style_state() | nil,
-          optimize_cursor: boolean()
+          optimize_cursor: boolean(),
+          input_buffer: binary(),
+          event_queue: [TermUI.Backend.event()]
         }
 
   defstruct size: {24, 80},
@@ -236,7 +240,9 @@ defmodule TermUI.Backend.Raw do
             alternate_screen: false,
             mouse_mode: :none,
             current_style: nil,
-            optimize_cursor: true
+            optimize_cursor: true,
+            input_buffer: <<>>,
+            event_queue: []
 
   # ===========================================================================
   # Behaviour Callbacks - Lifecycle, Queries, Cursor, Rendering, Input
@@ -971,7 +977,8 @@ defmodule TermUI.Backend.Raw do
   Polls for input events with the specified timeout.
 
   In raw mode, input arrives character-by-character enabling real-time
-  keyboard and mouse event handling.
+  keyboard and mouse event handling. This function uses the `EscapeParser`
+  module to parse escape sequences into `TermUI.Event` structs.
 
   ## Parameters
 
@@ -982,16 +989,237 @@ defmodule TermUI.Backend.Raw do
 
   - `{:ok, event, state}` - Event received and parsed
   - `{:timeout, state}` - No input within timeout period
-  - `{:error, :io_error, state}` - Terminal I/O error occurred
-  - `{:error, :parse_error, state}` - Failed to parse input sequence
+  - `{:error, reason, state}` - Terminal I/O error occurred
+
+  ## Escape Sequence Handling
+
+  Some sequences are ambiguous (ESC alone vs ESC followed by another key).
+  The function buffers partial sequences and uses the timeout to disambiguate.
+  If the buffer contains a partial escape sequence and the timeout expires,
+  the escape key is emitted and remaining bytes are re-parsed.
+
+  ## Examples
+
+      # Non-blocking poll (timeout = 0)
+      {:timeout, state} = Raw.poll_event(state, 0)
+
+      # Block up to 100ms for input
+      case Raw.poll_event(state, 100) do
+        {:ok, %Event.Key{key: :enter}, state} -> handle_enter(state)
+        {:ok, %Event.Mouse{action: :click}, state} -> handle_click(state)
+        {:timeout, state} -> handle_idle(state)
+      end
   """
   @spec poll_event(t(), non_neg_integer()) ::
           {:ok, TermUI.Backend.event(), t()}
           | {:timeout, t()}
           | {:error, term(), t()}
-  def poll_event(state, _timeout) do
-    # Stub - full implementation in Section 2.7
+  def poll_event(state, timeout) do
+    # First, try to parse any buffered input
+    case try_parse_buffer(state) do
+      {:ok, event, new_state} ->
+        {:ok, event, new_state}
+
+      {:need_more, state} ->
+        # Try to read more input with timeout
+        read_input_with_timeout(state, timeout)
+    end
+  end
+
+  # Attempts to parse an event from the current buffer or event queue.
+  # Returns {:ok, event, state} if a complete event is available,
+  # or {:need_more, state} if more input is needed.
+  @spec try_parse_buffer(t()) :: {:ok, TermUI.Backend.event(), t()} | {:need_more, t()}
+  defp try_parse_buffer(%{event_queue: [event | rest]} = state) do
+    # Return queued event first
+    {:ok, event, %{state | event_queue: rest}}
+  end
+
+  defp try_parse_buffer(%{input_buffer: <<>>, event_queue: []} = state) do
+    {:need_more, state}
+  end
+
+  defp try_parse_buffer(%{input_buffer: buffer, event_queue: []} = state) do
+    alias TermUI.Terminal.EscapeParser
+
+    case EscapeParser.parse(buffer) do
+      {[event], remaining} ->
+        # Single event - simple case
+        {:ok, event, %{state | input_buffer: remaining}}
+
+      {[event | rest_events], remaining} ->
+        # Multiple events parsed - return first, queue the rest
+        {:ok, event, %{state | input_buffer: remaining, event_queue: rest_events}}
+
+      {[], remaining} when remaining != <<>> ->
+        # Partial sequence - check if it's a potential escape sequence
+        if EscapeParser.partial_sequence?(remaining) do
+          {:need_more, %{state | input_buffer: remaining}}
+        else
+          # Unknown data - clear buffer
+          {:need_more, %{state | input_buffer: <<>>}}
+        end
+
+      {[], <<>>} ->
+        {:need_more, state}
+    end
+  end
+
+  # Reads input from the terminal with a timeout.
+  # Uses a Task to avoid blocking indefinitely on IO.getn/2.
+  @spec read_input_with_timeout(t(), non_neg_integer()) ::
+          {:ok, TermUI.Backend.event(), t()} | {:timeout, t()} | {:error, term(), t()}
+  defp read_input_with_timeout(state, timeout) do
+    alias TermUI.Terminal.EscapeParser
+    alias TermUI.Event
+
+    # For zero timeout, just check if there's input ready
+    # Unfortunately, IO.getn blocks, so we use a Task with timeout
+    task = Task.async(fn -> read_one_byte() end)
+
+    case Task.yield(task, timeout) || Task.shutdown(task) do
+      {:ok, {:ok, data}} ->
+        # Got input - add to buffer and try to parse
+        new_buffer = state.input_buffer <> data
+        new_state = %{state | input_buffer: new_buffer}
+        try_parse_or_continue(new_state, timeout)
+
+      {:ok, :eof} ->
+        {:error, :eof, state}
+
+      {:ok, {:error, reason}} ->
+        {:error, reason, state}
+
+      nil ->
+        # Timeout - if we have a partial escape sequence, handle it
+        handle_timeout(state)
+    end
+  end
+
+  # After reading new input, try to parse it. If we get a partial sequence,
+  # continue reading with remaining timeout (simplified: just try once more).
+  @spec try_parse_or_continue(t(), non_neg_integer()) ::
+          {:ok, TermUI.Backend.event(), t()} | {:timeout, t()} | {:error, term(), t()}
+  defp try_parse_or_continue(state, _timeout) do
+    alias TermUI.Terminal.EscapeParser
+    alias TermUI.Event
+
+    buffer = state.input_buffer
+
+    case EscapeParser.parse(buffer) do
+      {[event | _rest], remaining} ->
+        {:ok, event, %{state | input_buffer: remaining}}
+
+      {[], remaining} when remaining != <<>> ->
+        # Partial sequence - for escape sequences, use a short timeout
+        if EscapeParser.partial_sequence?(remaining) do
+          # Wait a bit more for the rest of the escape sequence
+          wait_for_escape_completion(state, remaining)
+        else
+          {:timeout, %{state | input_buffer: remaining}}
+        end
+
+      {[], <<>>} ->
+        {:timeout, state}
+    end
+  end
+
+  # Short timeout to wait for escape sequence completion.
+  @escape_timeout 50
+
+  @spec wait_for_escape_completion(t(), binary()) ::
+          {:ok, TermUI.Backend.event(), t()} | {:timeout, t()} | {:error, term(), t()}
+  defp wait_for_escape_completion(state, buffer) do
+    alias TermUI.Terminal.EscapeParser
+    alias TermUI.Event
+
+    task = Task.async(fn -> read_one_byte() end)
+
+    case Task.yield(task, @escape_timeout) || Task.shutdown(task) do
+      {:ok, {:ok, data}} ->
+        # Got more data - try to parse again
+        new_buffer = buffer <> data
+
+        case EscapeParser.parse(new_buffer) do
+          {[event | _], remaining} ->
+            {:ok, event, %{state | input_buffer: remaining}}
+
+          {[], remaining} ->
+            if EscapeParser.partial_sequence?(remaining) do
+              # Still partial - recurse with remaining timeout
+              wait_for_escape_completion(state, remaining)
+            else
+              {:timeout, %{state | input_buffer: remaining}}
+            end
+        end
+
+      {:ok, :eof} ->
+        # EOF during escape sequence - emit what we have
+        emit_partial_escape(state, buffer)
+
+      {:ok, {:error, _reason}} ->
+        emit_partial_escape(state, buffer)
+
+      nil ->
+        # Timeout - emit partial escape sequence
+        emit_partial_escape(state, buffer)
+    end
+  end
+
+  # Handles timeout when we have a partial escape sequence.
+  @spec handle_timeout(t()) :: {:timeout, t()} | {:ok, TermUI.Backend.event(), t()}
+  defp handle_timeout(%{input_buffer: <<>>} = state) do
     {:timeout, state}
+  end
+
+  defp handle_timeout(%{input_buffer: buffer} = state) do
+    alias TermUI.Terminal.EscapeParser
+
+    if EscapeParser.partial_sequence?(buffer) do
+      emit_partial_escape(state, buffer)
+    else
+      {:timeout, state}
+    end
+  end
+
+  # Emits events from a partial escape sequence (timeout disambiguation).
+  @spec emit_partial_escape(t(), binary()) :: {:ok, TermUI.Backend.event(), t()}
+  defp emit_partial_escape(state, buffer) do
+    alias TermUI.Terminal.EscapeParser
+    alias TermUI.Event
+
+    # Handle known partial sequences
+    case buffer do
+      # Lone ESC
+      <<0x1B>> ->
+        {:ok, Event.key(:escape), %{state | input_buffer: <<>>}}
+
+      # ESC[ without terminator - emit ESC, keep [ for next parse
+      <<0x1B, ?[>> ->
+        {:ok, Event.key(:escape), %{state | input_buffer: "["}}
+
+      # ESC O without terminator
+      <<0x1B, ?O>> ->
+        {:ok, Event.key(:escape), %{state | input_buffer: "O"}}
+
+      # Other partial sequences starting with ESC
+      <<0x1B, rest::binary>> ->
+        {:ok, Event.key(:escape), %{state | input_buffer: rest}}
+
+      # Non-escape partial - just clear buffer
+      _ ->
+        {:timeout, %{state | input_buffer: <<>>}}
+    end
+  end
+
+  # Reads one byte from stdin.
+  @spec read_one_byte() :: {:ok, binary()} | :eof | {:error, term()}
+  defp read_one_byte do
+    case IO.getn("", 1) do
+      :eof -> :eof
+      {:error, reason} -> {:error, reason}
+      data when is_binary(data) -> {:ok, data}
+    end
   end
 
   # ===========================================================================
