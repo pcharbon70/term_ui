@@ -390,10 +390,16 @@ defmodule TermUI.Backend.Raw do
       {:ok, state} = Raw.move_cursor(state, {24, 80}) # Bottom-right (80x24)
   """
   @spec move_cursor(t(), TermUI.Backend.position()) :: {:ok, t()}
-  def move_cursor(state, {row, col} = _position)
+  def move_cursor(state, {row, col} = position)
       when is_integer(row) and is_integer(col) and row > 0 and col > 0 do
-    # Stub - full implementation in Section 2.3
-    {:ok, state}
+    # Generate and write cursor position escape sequence
+    sequence = ANSI.cursor_position(row, col)
+    write_to_terminal(sequence)
+
+    # Update state with new cursor position
+    updated_state = %{state | cursor_position: position}
+
+    {:ok, updated_state}
   end
 
   @impl true

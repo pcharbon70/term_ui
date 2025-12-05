@@ -128,15 +128,15 @@ Implement cursor control callbacks for positioning and visibility. These operati
 
 ### 2.3.1 Implement move_cursor/2 Callback
 
-- [ ] **Task 2.3.1 Complete**
+- [x] **Task 2.3.1 Complete**
 
 Implement cursor positioning using absolute coordinates.
 
-- [ ] 2.3.1.1 Implement `@impl true` `move_cursor/2` accepting state and `{row, col}` position
-- [ ] 2.3.1.2 Generate `\e[row;colH` sequence using `TermUI.ANSI.cursor_position/2`
-- [ ] 2.3.1.3 Write sequence to stdout via `IO.write/1`
-- [ ] 2.3.1.4 Update `cursor_position` in state
-- [ ] 2.3.1.5 Return `{:ok, updated_state}`
+- [x] 2.3.1.1 Implement `@impl true` `move_cursor/2` accepting state and `{row, col}` position
+- [x] 2.3.1.2 Generate `\e[row;colH` sequence using `TermUI.ANSI.cursor_position/2`
+- [x] 2.3.1.3 Write sequence to stdout via `IO.write/1`
+- [x] 2.3.1.4 Update `cursor_position` in state
+- [x] 2.3.1.5 Return `{:ok, updated_state}`
 
 ### 2.3.2 Implement hide_cursor/1 and show_cursor/1 Callbacks
 
@@ -164,8 +164,8 @@ Implement optional cursor movement optimization comparing absolute vs relative m
 ### Unit Tests - Section 2.3
 
 - [ ] **Unit Tests 2.3 Complete**
-- [ ] Test `move_cursor/2` generates correct escape sequence for various positions
-- [ ] Test `move_cursor/2` updates state with new position
+- [x] Test `move_cursor/2` generates correct escape sequence for various positions
+- [x] Test `move_cursor/2` updates state with new position
 - [ ] Test `hide_cursor/1` updates state to `cursor_visible: false`
 - [ ] Test `show_cursor/1` updates state to `cursor_visible: true`
 - [ ] Test cursor operations are idempotent

@@ -392,6 +392,71 @@ defmodule TermUI.Backend.RawTest do
     end
   end
 
+  describe "move_cursor/2 callback" do
+    setup do
+      {:ok, state} = Raw.init(size: {24, 80})
+      %{state: state}
+    end
+
+    test "returns {:ok, state} for valid position", %{state: state} do
+      assert {:ok, %Raw{}} = Raw.move_cursor(state, {1, 1})
+      assert {:ok, %Raw{}} = Raw.move_cursor(state, {10, 20})
+    end
+
+    test "updates cursor_position in state", %{state: state} do
+      {:ok, updated_state} = Raw.move_cursor(state, {5, 10})
+      assert updated_state.cursor_position == {5, 10}
+
+      {:ok, updated_state2} = Raw.move_cursor(updated_state, {12, 40})
+      assert updated_state2.cursor_position == {12, 40}
+    end
+
+    test "handles top-left corner position {1, 1}", %{state: state} do
+      {:ok, updated_state} = Raw.move_cursor(state, {1, 1})
+      assert updated_state.cursor_position == {1, 1}
+    end
+
+    test "handles bottom-right corner position", %{state: state} do
+      # State has size {24, 80}
+      {:ok, updated_state} = Raw.move_cursor(state, {24, 80})
+      assert updated_state.cursor_position == {24, 80}
+    end
+
+    test "handles positions beyond terminal bounds", %{state: state} do
+      # Positions beyond bounds are accepted (clamping is renderer's responsibility)
+      {:ok, updated_state} = Raw.move_cursor(state, {100, 200})
+      assert updated_state.cursor_position == {100, 200}
+    end
+
+    test "preserves other state fields", %{state: state} do
+      {:ok, updated_state} = Raw.move_cursor(state, {5, 10})
+
+      # Original state fields preserved
+      assert updated_state.size == state.size
+      assert updated_state.cursor_visible == state.cursor_visible
+      assert updated_state.alternate_screen == state.alternate_screen
+      assert updated_state.mouse_mode == state.mouse_mode
+      assert updated_state.current_style == state.current_style
+    end
+
+    test "enforces positive integer row", %{state: state} do
+      assert_raise FunctionClauseError, fn -> Raw.move_cursor(state, {0, 1}) end
+      assert_raise FunctionClauseError, fn -> Raw.move_cursor(state, {-1, 1}) end
+    end
+
+    test "enforces positive integer col", %{state: state} do
+      assert_raise FunctionClauseError, fn -> Raw.move_cursor(state, {1, 0}) end
+      assert_raise FunctionClauseError, fn -> Raw.move_cursor(state, {1, -1}) end
+    end
+
+    test "rejects non-integer positions", %{state: state} do
+      assert_raise FunctionClauseError, fn -> Raw.move_cursor(state, {1.5, 1}) end
+      assert_raise FunctionClauseError, fn -> Raw.move_cursor(state, {1, 1.5}) end
+      assert_raise FunctionClauseError, fn -> Raw.move_cursor(state, {"1", 1}) end
+      assert_raise FunctionClauseError, fn -> Raw.move_cursor(state, {1, "1"}) end
+    end
+  end
+
   describe "stub callbacks" do
     # Use setup to avoid repeating Raw.init([]) in every test
     setup do
@@ -405,18 +470,6 @@ defmodule TermUI.Backend.RawTest do
 
     test "size/1 returns {:ok, size} tuple", %{state: state} do
       assert {:ok, {24, 80}} = Raw.size(state)
-    end
-
-    test "move_cursor/2 returns {:ok, state} for valid position", %{state: state} do
-      assert {:ok, %Raw{}} = Raw.move_cursor(state, {1, 1})
-      assert {:ok, %Raw{}} = Raw.move_cursor(state, {10, 20})
-    end
-
-    test "move_cursor/2 enforces positive integer positions", %{state: state} do
-      # These should raise FunctionClauseError due to guard clauses
-      assert_raise FunctionClauseError, fn -> Raw.move_cursor(state, {0, 1}) end
-      assert_raise FunctionClauseError, fn -> Raw.move_cursor(state, {1, 0}) end
-      assert_raise FunctionClauseError, fn -> Raw.move_cursor(state, {-1, 1}) end
     end
 
     test "hide_cursor/1 returns {:ok, state}", %{state: state} do
