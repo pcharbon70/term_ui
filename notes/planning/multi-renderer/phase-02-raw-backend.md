@@ -407,13 +407,13 @@ Note: Subtask 2.7.3.3 - Event types for paste/focus/resize exist; parsing deferr
 - [x] Test arrow keys parsed from escape sequences
 - [x] Test function keys parsed correctly
 - [x] Test modifier detection (Ctrl, Alt, Shift)
-- [ ] Test mouse event parsing when mouse tracking enabled (deferred to Section 2.8)
+- [x] Test mouse event parsing when mouse tracking enabled (completed in Section 2.8)
 
 ---
 
 ## 2.8 Implement Mouse Tracking
 
-- [ ] **Section 2.8 Complete**
+- [x] **Section 2.8 Complete**
 
 Implement optional mouse tracking for interactive applications. Mouse tracking enables click, drag, and movement detection.
 
@@ -445,26 +445,28 @@ Implement mouse tracking deactivation.
 
 ### 2.8.3 Implement Mouse Event Parsing
 
-- [ ] **Task 2.8.3 Complete**
+- [x] **Task 2.8.3 Complete**
 
 Parse mouse events in `poll_event/2` when mouse tracking is active.
 
-- [ ] 2.8.3.1 Detect SGR mouse sequence prefix `\e[<`
-- [ ] 2.8.3.2 Parse button, column, row from sequence `\e[<button;col;rowM` (press) or `m` (release)
-- [ ] 2.8.3.3 Decode button to `:left`, `:middle`, `:right`, `:scroll_up`, `:scroll_down`
-- [ ] 2.8.3.4 Decode modifiers from button byte (Shift, Alt, Ctrl)
-- [ ] 2.8.3.5 Construct `Event.Mouse` with action, button, position, modifiers
+- [x] 2.8.3.1 Detect SGR mouse sequence prefix `\e[<`
+- [x] 2.8.3.2 Parse button, column, row from sequence `\e[<button;col;rowM` (press) or `m` (release)
+- [x] 2.8.3.3 Decode button to `:left`, `:middle`, `:right`, `:scroll_up`, `:scroll_down`
+- [x] 2.8.3.4 Decode modifiers from button byte (Shift, Alt, Ctrl)
+- [x] 2.8.3.5 Construct `Event.Mouse` with action, button, position, modifiers
+
+Note: Mouse parsing was already implemented in EscapeParser. This task adds comprehensive tests.
 
 ### Unit Tests - Section 2.8
 
-- [ ] **Unit Tests 2.8 Complete**
-- [ ] Test `enable_mouse/2` with `:click` mode writes correct sequences
-- [ ] Test `enable_mouse/2` with `:all` mode enables movement tracking
-- [ ] Test `disable_mouse/1` disables all tracking modes
-- [ ] Test SGR mouse sequence parsing for button press
-- [ ] Test SGR mouse sequence parsing for button release
-- [ ] Test mouse modifier detection
-- [ ] Test scroll wheel event parsing
+- [x] **Unit Tests 2.8 Complete**
+- [x] Test `enable_mouse/2` with `:click` mode writes correct sequences
+- [x] Test `enable_mouse/2` with `:all` mode enables movement tracking
+- [x] Test `disable_mouse/1` disables all tracking modes
+- [x] Test SGR mouse sequence parsing for button press
+- [x] Test SGR mouse sequence parsing for button release
+- [x] Test mouse modifier detection
+- [x] Test scroll wheel event parsing
 
 ---
 

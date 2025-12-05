@@ -1728,4 +1728,145 @@ defmodule TermUI.Backend.RawTest do
       assert drag.mouse_mode == :drag
     end
   end
+
+  describe "mouse event parsing via EscapeParser" do
+    # These tests verify that EscapeParser correctly parses SGR mouse sequences
+    # which are used by poll_event/2 when mouse tracking is enabled
+
+    alias TermUI.Terminal.EscapeParser
+    alias TermUI.Event
+
+    test "parses left button press" do
+      # ESC [ < 0 ; 10 ; 20 M  (left button press at col 10, row 20)
+      input = "\e[<0;10;20M"
+      {events, remaining} = EscapeParser.parse(input)
+
+      assert remaining == ""
+      assert length(events) == 1
+      [event] = events
+
+      assert %Event.Mouse{} = event
+      assert event.action == :press
+      assert event.button == :left
+      # 0-indexed
+      assert event.x == 9
+      # 0-indexed
+      assert event.y == 19
+      assert event.modifiers == []
+    end
+
+    test "parses middle button press" do
+      input = "\e[<1;15;25M"
+      {[event], ""} = EscapeParser.parse(input)
+
+      assert event.action == :press
+      assert event.button == :middle
+      assert event.x == 14
+      assert event.y == 24
+    end
+
+    test "parses right button press" do
+      input = "\e[<2;5;5M"
+      {[event], ""} = EscapeParser.parse(input)
+
+      assert event.action == :press
+      assert event.button == :right
+      assert event.x == 4
+      assert event.y == 4
+    end
+
+    test "parses button release" do
+      # Lowercase 'm' indicates release
+      input = "\e[<0;10;20m"
+      {[event], ""} = EscapeParser.parse(input)
+
+      assert event.action == :release
+      # Note: On release, we default to :left since button info is often lost
+      assert event.button == :left
+      assert event.x == 9
+      assert event.y == 19
+    end
+
+    test "parses scroll up" do
+      # Bit 6 (64) + button 0 = scroll up
+      input = "\e[<64;10;20M"
+      {[event], ""} = EscapeParser.parse(input)
+
+      assert event.action == :scroll_up
+      assert event.button == nil
+      assert event.x == 9
+      assert event.y == 19
+    end
+
+    test "parses scroll down" do
+      # Bit 6 (64) + button 1 = scroll down
+      input = "\e[<65;10;20M"
+      {[event], ""} = EscapeParser.parse(input)
+
+      assert event.action == :scroll_down
+      assert event.button == nil
+    end
+
+    test "parses drag event" do
+      # Bit 5 (32) indicates motion, combined with button press
+      input = "\e[<32;15;25M"
+      {[event], ""} = EscapeParser.parse(input)
+
+      assert event.action == :drag
+      assert event.button == :left
+    end
+
+    test "parses shift modifier" do
+      # Bit 2 (4) = shift
+      input = "\e[<4;10;20M"
+      {[event], ""} = EscapeParser.parse(input)
+
+      assert :shift in event.modifiers
+    end
+
+    test "parses alt modifier" do
+      # Bit 3 (8) = alt
+      input = "\e[<8;10;20M"
+      {[event], ""} = EscapeParser.parse(input)
+
+      assert :alt in event.modifiers
+    end
+
+    test "parses ctrl modifier" do
+      # Bit 4 (16) = ctrl
+      input = "\e[<16;10;20M"
+      {[event], ""} = EscapeParser.parse(input)
+
+      assert :ctrl in event.modifiers
+    end
+
+    test "parses multiple modifiers" do
+      # Shift (4) + Alt (8) + Ctrl (16) = 28
+      input = "\e[<28;10;20M"
+      {[event], ""} = EscapeParser.parse(input)
+
+      assert :shift in event.modifiers
+      assert :alt in event.modifiers
+      assert :ctrl in event.modifiers
+    end
+
+    test "handles incomplete mouse sequence" do
+      # Incomplete - no terminator
+      input = "\e[<0;10;20"
+      {events, remaining} = EscapeParser.parse(input)
+
+      assert events == []
+      assert remaining == "\e[<0;10;20"
+    end
+
+    test "converts 1-indexed coords to 0-indexed" do
+      # Terminal sends 1-indexed coordinates
+      # Top-left corner
+      input = "\e[<0;1;1M"
+      {[event], ""} = EscapeParser.parse(input)
+
+      assert event.x == 0
+      assert event.y == 0
+    end
+  end
 end
