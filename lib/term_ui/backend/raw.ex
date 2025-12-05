@@ -151,6 +151,12 @@ defmodule TermUI.Backend.Raw do
   # This ensures cleanup even if state is inconsistent
   @all_mouse_off "\e[?1006l\e[?1003l\e[?1002l\e[?1000l"
 
+  # Maximum practical terminal dimension (rows or columns).
+  # This limit provides defense against resource exhaustion from malicious
+  # LINES/COLUMNS environment variables. No production terminal exceeds this.
+  # Note: This matches CursorOptimizer.@max_cursor_pos for consistency.
+  @max_terminal_dimension 9999
+
   # ===========================================================================
   # Type Definitions and State Structure
   # ===========================================================================
@@ -389,6 +395,9 @@ defmodule TermUI.Backend.Raw do
   - `refresh_size/1` - Re-query terminal dimensions (call after SIGWINCH)
   - `init/1` - Initial size detection
   """
+  # Note: The error case `{:error, :enotsup}` is included in the typespec for future-proofing
+  # and consistency with the Backend behaviour, even though this implementation always returns
+  # the cached size. A future backend might need to report unsupported size queries.
   @spec size(t()) :: {:ok, TermUI.Backend.size()} | {:error, :enotsup}
   def size(state) do
     {:ok, state.size}
@@ -639,6 +648,20 @@ defmodule TermUI.Backend.Raw do
 
   All other state fields are preserved.
 
+  ## Idempotency
+
+  This operation is idempotent - calling `clear/1` multiple times in succession
+  is safe and will result in the same state each time.
+
+  ## Examples
+
+      {:ok, state} = Raw.init(size: {24, 80})
+      {:ok, moved} = Raw.move_cursor(state, {10, 20})
+      {:ok, cleared} = Raw.clear(moved)
+
+      cleared.cursor_position  # => {1, 1}
+      cleared.current_style    # => nil
+
   ## See Also
 
   - `move_cursor/2` - Move cursor to specific position
@@ -814,25 +837,30 @@ defmodule TermUI.Backend.Raw do
     end
   end
 
-  # Parses an environment variable as a positive integer
+  # Parses an environment variable as a positive integer within practical bounds.
+  # Uses `with` for idiomatic error flow. Validates against @max_terminal_dimension
+  # to prevent resource exhaustion from malicious environment variables.
   defp get_env_int(var) do
-    case System.get_env(var) do
-      nil ->
-        {:error, :not_set}
-
-      value ->
-        case Integer.parse(value) do
-          {int, ""} when int > 0 -> {:ok, int}
-          _ -> {:error, :invalid}
-        end
+    with value when not is_nil(value) <- System.get_env(var),
+         {int, ""} <- Integer.parse(value),
+         true <- int > 0 and int <= @max_terminal_dimension do
+      {:ok, int}
+    else
+      nil -> {:error, :not_set}
+      {_int, _remainder} -> {:error, :invalid}
+      false -> {:error, :invalid}
+      _ -> {:error, :invalid}
     end
   end
 
-  # Writes data to the terminal, wrapping in try/rescue for error safety
+  # Writes data to the terminal, wrapping in try/rescue for error safety.
+  # Debug logging helps troubleshoot rendering issues without exposing errors to users.
   defp write_to_terminal(data) do
     IO.write(data)
   rescue
-    _ -> :ok
+    e ->
+      Logger.debug("Terminal write failed: #{Exception.message(e)}")
+      :ok
   end
 
   # Error-safe write for shutdown - logs errors but continues

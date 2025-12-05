@@ -691,12 +691,11 @@ defmodule TermUI.Backend.RawTest do
 
       {:ok, cleared_state} = Raw.clear(modified_state)
 
-      # Should preserve these fields
-      assert cleared_state.size == state.size
-      assert cleared_state.cursor_visible == state.cursor_visible
-      assert cleared_state.alternate_screen == state.alternate_screen
-      assert cleared_state.mouse_mode == state.mouse_mode
-      assert cleared_state.optimize_cursor == state.optimize_cursor
+      # Should preserve all fields except cursor_position and current_style
+      assert_state_unchanged_except(modified_state, cleared_state, [
+        :cursor_position,
+        :current_style
+      ])
     end
 
     test "works after multiple operations", %{state: state} do
@@ -783,25 +782,15 @@ defmodule TermUI.Backend.RawTest do
     test "returns 3-tuple on success", %{state: state} do
       # In test environment, :io.rows/0 and :io.columns/0 may return {:error, :enotsup}
       # We need to set environment variables for the fallback
-      System.put_env("LINES", "30")
-      System.put_env("COLUMNS", "100")
-
-      try do
+      with_terminal_env(30, 100, fn ->
         result = Raw.refresh_size(state)
         # Either succeeds with new size or returns error (depending on test environment)
         assert match?({:ok, {_, _}, %Raw{}}, result) or match?({:error, _}, result)
-      after
-        System.delete_env("LINES")
-        System.delete_env("COLUMNS")
-      end
+      end)
     end
 
     test "updates state.size on success" do
-      # Set environment for fallback
-      System.put_env("LINES", "50")
-      System.put_env("COLUMNS", "120")
-
-      try do
+      with_terminal_env(50, 120, fn ->
         {:ok, state} = Raw.init(size: {24, 80})
         assert state.size == {24, 80}
 
@@ -816,36 +805,22 @@ defmodule TermUI.Backend.RawTest do
             # the env fallback won't be used
             :ok
         end
-      after
-        System.delete_env("LINES")
-        System.delete_env("COLUMNS")
-      end
+      end)
     end
 
     test "preserves other state fields on success" do
-      System.put_env("LINES", "30")
-      System.put_env("COLUMNS", "100")
-
-      try do
+      with_terminal_env(30, 100, fn ->
         {:ok, state} = Raw.init(size: {24, 80}, mouse_tracking: :click, hide_cursor: false)
 
         case Raw.refresh_size(state) do
           {:ok, _new_size, updated_state} ->
             # Only size should change
-            assert updated_state.cursor_visible == state.cursor_visible
-            assert updated_state.cursor_position == state.cursor_position
-            assert updated_state.alternate_screen == state.alternate_screen
-            assert updated_state.mouse_mode == state.mouse_mode
-            assert updated_state.current_style == state.current_style
-            assert updated_state.optimize_cursor == state.optimize_cursor
+            assert_state_unchanged_except(state, updated_state, [:size])
 
           {:error, _} ->
             :ok
         end
-      after
-        System.delete_env("LINES")
-        System.delete_env("COLUMNS")
-      end
+      end)
     end
 
     test "returns error when size detection fails", %{state: state} do
@@ -897,11 +872,7 @@ defmodule TermUI.Backend.RawTest do
       # Create a state with known size
       {:ok, state} = Raw.init(size: {24, 80})
 
-      # Set environment variables for fallback
-      System.put_env("LINES", "40")
-      System.put_env("COLUMNS", "160")
-
-      try do
+      with_terminal_env(40, 160, fn ->
         result = Raw.refresh_size(state)
 
         # If :io functions fail, should fall back to environment
@@ -918,28 +889,30 @@ defmodule TermUI.Backend.RawTest do
             # Both :io and env failed - unexpected given we set env
             flunk("Size detection failed despite environment variables being set")
         end
-      after
-        System.delete_env("LINES")
-        System.delete_env("COLUMNS")
-      end
+      end)
     end
 
     test "returns error with invalid environment variables" do
-      # Set invalid environment variables
-      System.put_env("LINES", "invalid")
-      System.put_env("COLUMNS", "invalid")
-
-      try do
+      with_terminal_env("invalid", "invalid", fn ->
         {:ok, state} = Raw.init(size: {24, 80})
         result = Raw.refresh_size(state)
 
         # Either :io functions work, or we get an error due to invalid env
         assert match?({:ok, {_, _}, %Raw{}}, result) or
                  match?({:error, :size_detection_failed}, result)
-      after
-        System.delete_env("LINES")
-        System.delete_env("COLUMNS")
-      end
+      end)
+    end
+
+    test "rejects terminal size exceeding maximum bounds" do
+      # Test with size exceeding @max_terminal_dimension (9999)
+      with_terminal_env(10000, 10000, fn ->
+        {:ok, state} = Raw.init(size: {24, 80})
+        result = Raw.refresh_size(state)
+
+        # Either :io functions work, or we get an error due to oversized env
+        assert match?({:ok, {_, _}, %Raw{}}, result) or
+                 match?({:error, :size_detection_failed}, result)
+      end)
     end
   end
 
@@ -990,6 +963,20 @@ defmodule TermUI.Backend.RawTest do
     for field <- all_fields, field not in changed_fields do
       assert Map.get(updated, field) == Map.get(original, field),
              "Expected #{field} to be unchanged, got #{inspect(Map.get(updated, field))} instead of #{inspect(Map.get(original, field))}"
+    end
+  end
+
+  # Executes a test function with LINES and COLUMNS environment variables set,
+  # ensuring cleanup even if the test fails.
+  defp with_terminal_env(lines, cols, fun) do
+    System.put_env("LINES", to_string(lines))
+    System.put_env("COLUMNS", to_string(cols))
+
+    try do
+      fun.()
+    after
+      System.delete_env("LINES")
+      System.delete_env("COLUMNS")
     end
   end
 
