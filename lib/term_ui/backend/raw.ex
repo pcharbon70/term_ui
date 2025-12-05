@@ -1045,6 +1045,65 @@ defmodule TermUI.Backend.Raw do
     {:ok, %{state | mouse_mode: mode}}
   end
 
+  @doc """
+  Disables mouse tracking.
+
+  Turns off mouse event reporting, returning the terminal to normal operation
+  where mouse actions are not reported to the application.
+
+  ## Escape Sequences
+
+  This function emits:
+  1. Disable SGR extended mode (`ESC[?1006l`)
+  2. Disable the current tracking mode:
+     - `:click` → `ESC[?1000l`
+     - `:drag` → `ESC[?1002l`
+     - `:all` → `ESC[?1003l`
+
+  ## Idempotent Behavior
+
+  If mouse tracking is already disabled (`:none`), no escape sequences are
+  written and the same state is returned.
+
+  ## Returns
+
+  - `{:ok, updated_state}` with `mouse_mode` set to `:none`
+
+  ## Examples
+
+      # Disable after enabling
+      {:ok, state} = Raw.enable_mouse(state, :click)
+      {:ok, state} = Raw.disable_mouse(state)
+      state.mouse_mode  # => :none
+
+      # Idempotent - safe to call when already disabled
+      {:ok, same_state} = Raw.disable_mouse(state)
+
+  ## See Also
+
+  - `enable_mouse/2` - Enable mouse tracking
+  - `shutdown/1` - Automatically disables mouse tracking during cleanup
+  """
+  @spec disable_mouse(t()) :: {:ok, t()}
+  def disable_mouse(%__MODULE__{mouse_mode: :none} = state) do
+    # Already disabled - idempotent no-op
+    {:ok, state}
+  end
+
+  def disable_mouse(state) do
+    # Disable SGR mode first
+    write_to_terminal(ANSI.disable_sgr_mouse())
+
+    # Disable the current tracking mode
+    ansi_mode = mouse_mode_to_ansi(state.mouse_mode)
+
+    if ansi_mode do
+      write_to_terminal(ANSI.disable_mouse_tracking(ansi_mode))
+    end
+
+    {:ok, %{state | mouse_mode: :none}}
+  end
+
   @impl true
   @doc """
   Polls for input events with the specified timeout.

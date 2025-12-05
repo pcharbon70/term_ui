@@ -434,14 +434,14 @@ Note: Subtask 2.8.1.2 uses standard mode 1000 instead of X10 (mode 9) for better
 
 ### 2.8.2 Implement Mouse Tracking Disable
 
-- [ ] **Task 2.8.2 Complete**
+- [x] **Task 2.8.2 Complete**
 
 Implement mouse tracking deactivation.
 
-- [ ] 2.8.2.1 Implement `disable_mouse/1` accepting state
-- [ ] 2.8.2.2 Disable SGR mode with `\e[?1006l`
-- [ ] 2.8.2.3 Disable tracking mode with appropriate sequence (`\e[?1003l`, `\e[?1002l`, or `\e[?9l`)
-- [ ] 2.8.2.4 Update `mouse_mode` to `:none` in state
+- [x] 2.8.2.1 Implement `disable_mouse/1` accepting state
+- [x] 2.8.2.2 Disable SGR mode with `\e[?1006l`
+- [x] 2.8.2.3 Disable tracking mode with appropriate sequence (`\e[?1003l`, `\e[?1002l`, or `\e[?1000l`)
+- [x] 2.8.2.4 Update `mouse_mode` to `:none` in state
 
 ### 2.8.3 Implement Mouse Event Parsing
 

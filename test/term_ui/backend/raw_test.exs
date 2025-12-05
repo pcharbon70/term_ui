@@ -47,6 +47,7 @@ defmodule TermUI.Backend.RawTest do
       assert function_exported?(Raw, :mouse_mode_to_ansi, 1)
       assert function_exported?(Raw, :ansi_module, 0)
       assert function_exported?(Raw, :enable_mouse, 2)
+      assert function_exported?(Raw, :disable_mouse, 1)
     end
 
     test "has ANSI module aliased" do
@@ -1643,6 +1644,88 @@ defmodule TermUI.Backend.RawTest do
       {:ok, state} = Raw.init(size: {24, 80}, mouse_tracking: :all, alternate_screen: false)
       assert state.mouse_mode == :all
       assert Raw.mouse_mode_to_ansi(:all) == :all
+    end
+  end
+
+  describe "disable_mouse/1 callback" do
+    setup do
+      {:ok, state} = Raw.init(size: {24, 80}, alternate_screen: false)
+      %{state: state}
+    end
+
+    test "disables mouse tracking from click mode", %{state: state} do
+      {:ok, with_click} = Raw.enable_mouse(state, :click)
+      assert with_click.mouse_mode == :click
+
+      {:ok, disabled} = Raw.disable_mouse(with_click)
+      assert disabled.mouse_mode == :none
+    end
+
+    test "disables mouse tracking from drag mode", %{state: state} do
+      {:ok, with_drag} = Raw.enable_mouse(state, :drag)
+      {:ok, disabled} = Raw.disable_mouse(with_drag)
+      assert disabled.mouse_mode == :none
+    end
+
+    test "disables mouse tracking from all mode", %{state: state} do
+      {:ok, with_all} = Raw.enable_mouse(state, :all)
+      {:ok, disabled} = Raw.disable_mouse(with_all)
+      assert disabled.mouse_mode == :none
+    end
+
+    test "is idempotent - already disabled returns unchanged state", %{state: state} do
+      assert state.mouse_mode == :none
+      {:ok, same} = Raw.disable_mouse(state)
+      assert same == state
+    end
+
+    test "preserves all other state fields", %{state: state} do
+      {:ok, with_click} = Raw.enable_mouse(state, :click)
+      {:ok, disabled} = Raw.disable_mouse(with_click)
+      assert_state_unchanged_except(with_click, disabled, [:mouse_mode])
+    end
+
+    test "has documentation" do
+      {:docs_v1, _, _, _, _, _, docs} = Code.fetch_docs(Raw)
+
+      disable_mouse_docs =
+        Enum.find(docs, fn
+          {{:function, :disable_mouse, 1}, _, _, _, _} -> true
+          _ -> false
+        end)
+
+      assert disable_mouse_docs != nil
+      {{:function, :disable_mouse, 1}, _, _, doc, _} = disable_mouse_docs
+      assert doc != :hidden
+      assert doc != :none
+    end
+  end
+
+  describe "enable_mouse/2 and disable_mouse/1 integration" do
+    setup do
+      {:ok, state} = Raw.init(size: {24, 80}, alternate_screen: false)
+      %{state: state}
+    end
+
+    test "can enable, disable, and re-enable mouse tracking", %{state: state} do
+      # Enable click
+      {:ok, click} = Raw.enable_mouse(state, :click)
+      assert click.mouse_mode == :click
+
+      # Disable
+      {:ok, disabled} = Raw.disable_mouse(click)
+      assert disabled.mouse_mode == :none
+
+      # Re-enable with different mode
+      {:ok, all} = Raw.enable_mouse(disabled, :all)
+      assert all.mouse_mode == :all
+    end
+
+    test "enable after disable works correctly", %{state: state} do
+      {:ok, click} = Raw.enable_mouse(state, :click)
+      {:ok, disabled} = Raw.disable_mouse(click)
+      {:ok, drag} = Raw.enable_mouse(disabled, :drag)
+      assert drag.mouse_mode == :drag
     end
   end
 end
