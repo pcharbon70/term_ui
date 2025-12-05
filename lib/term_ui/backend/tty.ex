@@ -222,7 +222,19 @@ defmodule TermUI.Backend.TTY do
   Always returns `:ok`.
   """
   @spec shutdown(t()) :: :ok
-  def shutdown(_state) do
+  def shutdown(state) do
+    # Reset all attributes (colors, styles)
+    IO.write("\e[0m")
+
+    # Show cursor
+    IO.write("\e[?25h")
+
+    # Leave alternate screen if it was entered
+    if state.alternate_screen do
+      IO.write("\e[?1049l")
+    end
+
+    # Note: No cooked mode restoration needed - never left cooked mode in TTY backend
     :ok
   end
 

@@ -61,7 +61,7 @@ Define the internal state struct for tracking TTY backend state.
 
 ## 3.2 Implement Initialization and Shutdown
 
-- [ ] **Section 3.2 Complete**
+- [x] **Section 3.2 Complete**
 
 Implement lifecycle callbacks that set up the TTY backend using capabilities detected by the Selector.
 
@@ -92,26 +92,26 @@ Perform minimal terminal setup that works in TTY mode.
 
 ### 3.2.3 Implement shutdown/1 Callback
 
-- [ ] **Task 3.2.3 Complete**
+- [x] **Task 3.2.3 Complete**
 
 Implement clean shutdown that resets terminal state.
 
-- [ ] 3.2.3.1 Implement `@impl true` `shutdown/1` accepting state
-- [ ] 3.2.3.2 Reset all attributes with `\e[0m`
-- [ ] 3.2.3.3 Show cursor with `\e[?25h`
-- [ ] 3.2.3.4 Leave alternate screen with `\e[?1049l` if it was entered
-- [ ] 3.2.3.5 Note: No cooked mode restoration needed (never left cooked mode)
-- [ ] 3.2.3.6 Return `:ok`
+- [x] 3.2.3.1 Implement `@impl true` `shutdown/1` accepting state
+- [x] 3.2.3.2 Reset all attributes with `\e[0m`
+- [x] 3.2.3.3 Show cursor with `\e[?25h`
+- [x] 3.2.3.4 Leave alternate screen with `\e[?1049l` if it was entered
+- [x] 3.2.3.5 Note: No cooked mode restoration needed (never left cooked mode)
+- [x] 3.2.3.6 Return `:ok`
 
 ### Unit Tests - Section 3.2
 
-- [ ] **Unit Tests 3.2 Complete**
-- [ ] Test `init/1` with capabilities sets correct color_mode
-- [ ] Test `init/1` with capabilities sets correct character_set
-- [ ] Test `init/1` defaults to `{80, 24}` when dimensions not provided
-- [ ] Test `init/1` defaults to `:full_redraw` line_mode
-- [ ] Test `shutdown/1` returns `:ok`
-- [ ] Test shutdown is safe to call multiple times
+- [x] **Unit Tests 3.2 Complete**
+- [x] Test `init/1` with capabilities sets correct color_mode
+- [x] Test `init/1` with capabilities sets correct character_set
+- [x] Test `init/1` defaults to `{24, 80}` when dimensions not provided (rows, cols)
+- [x] Test `init/1` defaults to `:full_redraw` line_mode
+- [x] Test `shutdown/1` returns `:ok`
+- [x] Test shutdown is safe to call multiple times
 
 ---
 

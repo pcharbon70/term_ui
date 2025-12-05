@@ -176,13 +176,27 @@ defmodule TermUI.Backend.TTYTest do
   describe "shutdown/1" do
     test "returns :ok" do
       {:ok, state} = init_tty([])
-      assert :ok = TTY.shutdown(state)
+
+      result =
+        capture_io(fn ->
+          send(self(), TTY.shutdown(state))
+        end)
+
+      receive do
+        r -> assert r == :ok
+      end
+
+      # Verify some output occurred
+      assert result != ""
     end
 
     test "can be called multiple times" do
       {:ok, state} = init_tty([])
-      assert :ok = TTY.shutdown(state)
-      assert :ok = TTY.shutdown(state)
+
+      capture_io(fn ->
+        assert :ok = TTY.shutdown(state)
+        assert :ok = TTY.shutdown(state)
+      end)
     end
   end
 
@@ -336,6 +350,81 @@ defmodule TermUI.Backend.TTYTest do
 
       assert alt_start < hide_start
       assert hide_start < clear_start
+    end
+  end
+
+  # ===========================================================================
+  # Section 3.2.3 Tests - Shutdown Callback
+  # ===========================================================================
+
+  describe "shutdown sequences (Section 3.2.3)" do
+    test "shutdown outputs reset attributes sequence" do
+      {:ok, state} = init_tty([])
+
+      output =
+        capture_io(fn ->
+          TTY.shutdown(state)
+        end)
+
+      assert output =~ "\e[0m"
+    end
+
+    test "shutdown outputs show cursor sequence" do
+      {:ok, state} = init_tty([])
+
+      output =
+        capture_io(fn ->
+          TTY.shutdown(state)
+        end)
+
+      assert output =~ "\e[?25h"
+    end
+
+    test "shutdown outputs leave alternate screen when alternate_screen is true" do
+      {:ok, state} = init_tty(alternate_screen: true)
+
+      output =
+        capture_io(fn ->
+          TTY.shutdown(state)
+        end)
+
+      assert output =~ "\e[?1049l"
+    end
+
+    test "shutdown does not output leave alternate screen by default" do
+      {:ok, state} = init_tty([])
+
+      output =
+        capture_io(fn ->
+          TTY.shutdown(state)
+        end)
+
+      refute output =~ "\e[?1049l"
+    end
+
+    test "shutdown sequences are output in correct order" do
+      {:ok, state} = init_tty(alternate_screen: true)
+
+      output =
+        capture_io(fn ->
+          TTY.shutdown(state)
+        end)
+
+      reset_pos = :binary.match(output, "\e[0m")
+      show_cursor_pos = :binary.match(output, "\e[?25h")
+      leave_alt_pos = :binary.match(output, "\e[?1049l")
+
+      assert reset_pos != :nomatch
+      assert show_cursor_pos != :nomatch
+      assert leave_alt_pos != :nomatch
+
+      # reset comes before show cursor, show cursor comes before leave alternate
+      {reset_start, _} = reset_pos
+      {show_start, _} = show_cursor_pos
+      {leave_start, _} = leave_alt_pos
+
+      assert reset_start < show_start
+      assert show_start < leave_start
     end
   end
 end
