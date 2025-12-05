@@ -972,6 +972,79 @@ defmodule TermUI.Backend.Raw do
     {:ok, state}
   end
 
+  # ===========================================================================
+  # Mouse Tracking
+  # ===========================================================================
+
+  @doc """
+  Enables mouse tracking with the specified mode.
+
+  Changes the mouse tracking mode, enabling detection of mouse events.
+  This function can be called after initialization to change the tracking mode.
+
+  ## Parameters
+
+  - `state` - Current backend state
+  - `mode` - Mouse tracking mode:
+    - `:click` - Track button press/release only (ANSI "normal" mode, 1000)
+    - `:drag` - Track clicks and motion while button pressed (ANSI "button" mode, 1002)
+    - `:all` - Track all mouse movement (ANSI "any" mode, 1003)
+
+  ## Escape Sequences
+
+  This function emits:
+  1. The appropriate mouse tracking mode sequence:
+     - `:click` → `ESC[?1000h`
+     - `:drag` → `ESC[?1002h`
+     - `:all` → `ESC[?1003h`
+  2. SGR extended mode (`ESC[?1006h`) for accurate coordinate encoding
+
+  ## Idempotent Behavior
+
+  If the requested mode matches the current mode, no escape sequences are
+  written and the same state is returned.
+
+  ## Returns
+
+  - `{:ok, updated_state}` with `mouse_mode` set to the new mode
+
+  ## Examples
+
+      # Enable click tracking
+      {:ok, state} = Raw.enable_mouse(state, :click)
+
+      # Enable all movement tracking
+      {:ok, state} = Raw.enable_mouse(state, :all)
+
+  ## See Also
+
+  - `disable_mouse/1` - Disable mouse tracking
+  - `init/1` - Can set initial mouse tracking mode via `:mouse_tracking` option
+  """
+  @spec enable_mouse(t(), :click | :drag | :all) :: {:ok, t()}
+  def enable_mouse(%__MODULE__{mouse_mode: mode} = state, mode) do
+    # Already in requested mode - idempotent no-op
+    {:ok, state}
+  end
+
+  def enable_mouse(state, mode) when mode in [:click, :drag, :all] do
+    # Disable current mode if active (to avoid stacking modes)
+    if state.mouse_mode != :none do
+      current_ansi_mode = mouse_mode_to_ansi(state.mouse_mode)
+
+      if current_ansi_mode do
+        write_to_terminal(ANSI.disable_mouse_tracking(current_ansi_mode))
+      end
+    end
+
+    # Enable new mode
+    ansi_mode = mouse_mode_to_ansi(mode)
+    write_to_terminal(ANSI.enable_mouse_tracking(ansi_mode))
+    write_to_terminal(ANSI.enable_sgr_mouse())
+
+    {:ok, %{state | mouse_mode: mode}}
+  end
+
   @impl true
   @doc """
   Polls for input events with the specified timeout.

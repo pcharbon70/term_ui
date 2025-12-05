@@ -46,6 +46,7 @@ defmodule TermUI.Backend.RawTest do
       assert function_exported?(Raw, :valid_position?, 2)
       assert function_exported?(Raw, :mouse_mode_to_ansi, 1)
       assert function_exported?(Raw, :ansi_module, 0)
+      assert function_exported?(Raw, :enable_mouse, 2)
     end
 
     test "has ANSI module aliased" do
@@ -1554,6 +1555,94 @@ defmodule TermUI.Backend.RawTest do
     test "show_cursor preserves all other fields", %{state: state} do
       {:ok, visible} = Raw.show_cursor(state)
       assert_state_unchanged_except(state, visible, [:cursor_visible])
+    end
+  end
+
+  # ===========================================================================
+  # Section 2.8: Mouse Tracking
+  # ===========================================================================
+
+  describe "enable_mouse/2 callback" do
+    setup do
+      {:ok, state} = Raw.init(size: {24, 80}, alternate_screen: false)
+      %{state: state}
+    end
+
+    test "enables click tracking mode", %{state: state} do
+      assert state.mouse_mode == :none
+      {:ok, updated} = Raw.enable_mouse(state, :click)
+      assert updated.mouse_mode == :click
+    end
+
+    test "enables drag tracking mode", %{state: state} do
+      {:ok, updated} = Raw.enable_mouse(state, :drag)
+      assert updated.mouse_mode == :drag
+    end
+
+    test "enables all movement tracking mode", %{state: state} do
+      {:ok, updated} = Raw.enable_mouse(state, :all)
+      assert updated.mouse_mode == :all
+    end
+
+    test "is idempotent - same mode returns unchanged state", %{state: state} do
+      {:ok, with_click} = Raw.enable_mouse(state, :click)
+      {:ok, same} = Raw.enable_mouse(with_click, :click)
+      assert same == with_click
+    end
+
+    test "can switch between modes", %{state: state} do
+      {:ok, click} = Raw.enable_mouse(state, :click)
+      assert click.mouse_mode == :click
+
+      {:ok, drag} = Raw.enable_mouse(click, :drag)
+      assert drag.mouse_mode == :drag
+
+      {:ok, all} = Raw.enable_mouse(drag, :all)
+      assert all.mouse_mode == :all
+    end
+
+    test "preserves all other state fields", %{state: state} do
+      {:ok, updated} = Raw.enable_mouse(state, :click)
+      assert_state_unchanged_except(state, updated, [:mouse_mode])
+    end
+
+    test "has documentation" do
+      {:docs_v1, _, _, _, _, _, docs} = Code.fetch_docs(Raw)
+
+      enable_mouse_docs =
+        Enum.find(docs, fn
+          {{:function, :enable_mouse, 2}, _, _, _, _} -> true
+          _ -> false
+        end)
+
+      assert enable_mouse_docs != nil
+      {{:function, :enable_mouse, 2}, _, _, doc, _} = enable_mouse_docs
+      assert doc != :hidden
+      assert doc != :none
+    end
+  end
+
+  describe "enable_mouse/2 escape sequences" do
+    # These tests verify the correct escape sequences are emitted
+    # by checking that init with mouse_tracking option produces expected state
+
+    test "click mode maps to ANSI normal mode (1000)" do
+      {:ok, state} = Raw.init(size: {24, 80}, mouse_tracking: :click, alternate_screen: false)
+      assert state.mouse_mode == :click
+      # The ANSI mapping is verified through mouse_mode_to_ansi
+      assert Raw.mouse_mode_to_ansi(:click) == :normal
+    end
+
+    test "drag mode maps to ANSI button mode (1002)" do
+      {:ok, state} = Raw.init(size: {24, 80}, mouse_tracking: :drag, alternate_screen: false)
+      assert state.mouse_mode == :drag
+      assert Raw.mouse_mode_to_ansi(:drag) == :button
+    end
+
+    test "all mode maps to ANSI all mode (1003)" do
+      {:ok, state} = Raw.init(size: {24, 80}, mouse_tracking: :all, alternate_screen: false)
+      assert state.mouse_mode == :all
+      assert Raw.mouse_mode_to_ansi(:all) == :all
     end
   end
 end

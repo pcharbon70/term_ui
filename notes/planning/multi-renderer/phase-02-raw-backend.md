@@ -419,16 +419,18 @@ Implement optional mouse tracking for interactive applications. Mouse tracking e
 
 ### 2.8.1 Implement Mouse Tracking Enable
 
-- [ ] **Task 2.8.1 Complete**
+- [x] **Task 2.8.1 Complete**
 
 Implement mouse tracking activation with configurable modes.
 
-- [ ] 2.8.1.1 Implement `enable_mouse/2` accepting state and mode (`:click`, `:drag`, `:all`)
-- [ ] 2.8.1.2 Enable X10 mouse tracking with `\e[?9h` for basic click
-- [ ] 2.8.1.3 Enable button event tracking with `\e[?1002h` for drag
-- [ ] 2.8.1.4 Enable any event tracking with `\e[?1003h` for all movement
-- [ ] 2.8.1.5 Enable SGR extended mode with `\e[?1006h` for better coordinate handling
-- [ ] 2.8.1.6 Update `mouse_mode` in state
+- [x] 2.8.1.1 Implement `enable_mouse/2` accepting state and mode (`:click`, `:drag`, `:all`)
+- [x] 2.8.1.2 Enable X10 mouse tracking with `\e[?9h` for basic click
+- [x] 2.8.1.3 Enable button event tracking with `\e[?1002h` for drag
+- [x] 2.8.1.4 Enable any event tracking with `\e[?1003h` for all movement
+- [x] 2.8.1.5 Enable SGR extended mode with `\e[?1006h` for better coordinate handling
+- [x] 2.8.1.6 Update `mouse_mode` in state
+
+Note: Subtask 2.8.1.2 uses standard mode 1000 instead of X10 (mode 9) for better compatibility.
 
 ### 2.8.2 Implement Mouse Tracking Disable
 
