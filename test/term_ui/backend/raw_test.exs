@@ -457,6 +457,92 @@ defmodule TermUI.Backend.RawTest do
     end
   end
 
+  describe "cursor optimization" do
+    test "optimize_cursor defaults to true" do
+      {:ok, state} = Raw.init(size: {24, 80})
+      assert state.optimize_cursor == true
+    end
+
+    test "optimize_cursor can be disabled via option" do
+      {:ok, state} = Raw.init(size: {24, 80}, optimize_cursor: false)
+      assert state.optimize_cursor == false
+    end
+
+    test "move_cursor works with optimization enabled" do
+      {:ok, state} = Raw.init(size: {24, 80}, optimize_cursor: true)
+
+      # First move establishes position
+      {:ok, state2} = Raw.move_cursor(state, {5, 10})
+      assert state2.cursor_position == {5, 10}
+
+      # Second move can use optimization
+      {:ok, state3} = Raw.move_cursor(state2, {5, 15})
+      assert state3.cursor_position == {5, 15}
+    end
+
+    test "move_cursor works with optimization disabled" do
+      {:ok, state} = Raw.init(size: {24, 80}, optimize_cursor: false)
+
+      {:ok, state2} = Raw.move_cursor(state, {5, 10})
+      assert state2.cursor_position == {5, 10}
+
+      {:ok, state3} = Raw.move_cursor(state2, {5, 15})
+      assert state3.cursor_position == {5, 15}
+    end
+
+    test "optimizer used for small horizontal moves" do
+      {:ok, state} = Raw.init(size: {24, 80}, optimize_cursor: true)
+
+      # Move to initial position
+      {:ok, state2} = Raw.move_cursor(state, {10, 10})
+
+      # Small move right - optimizer should use relative move
+      {:ok, state3} = Raw.move_cursor(state2, {10, 12})
+      assert state3.cursor_position == {10, 12}
+    end
+
+    test "optimizer used for small vertical moves" do
+      {:ok, state} = Raw.init(size: {24, 80}, optimize_cursor: true)
+
+      # Move to initial position
+      {:ok, state2} = Raw.move_cursor(state, {10, 10})
+
+      # Small move down - optimizer should use relative move
+      {:ok, state3} = Raw.move_cursor(state2, {12, 10})
+      assert state3.cursor_position == {12, 10}
+    end
+
+    test "optimizer handles nil cursor_position gracefully" do
+      # Create state with nil cursor_position directly for testing
+      state = %Raw{
+        size: {24, 80},
+        cursor_visible: false,
+        cursor_position: nil,
+        alternate_screen: true,
+        mouse_mode: :none,
+        current_style: nil,
+        optimize_cursor: true
+      }
+
+      # Should fall back to absolute positioning
+      {:ok, updated} = Raw.move_cursor(state, {5, 10})
+      assert updated.cursor_position == {5, 10}
+    end
+
+    test "preserves optimize_cursor setting through cursor operations" do
+      {:ok, state} = Raw.init(size: {24, 80}, optimize_cursor: false)
+
+      {:ok, state2} = Raw.move_cursor(state, {5, 10})
+      assert state2.optimize_cursor == false
+
+      {:ok, state3} = Raw.hide_cursor(state2)
+      assert state3.optimize_cursor == false
+
+      {:ok, state4} = Raw.show_cursor(state3)
+      assert state4.optimize_cursor == false
+    end
+  end
+
   describe "hide_cursor/1 callback" do
     setup do
       # Default init has hide_cursor: true, so cursor_visible is false

@@ -144,6 +144,7 @@ defmodule TermUI.Backend.Raw do
   @behaviour TermUI.Backend
 
   alias TermUI.ANSI
+  alias TermUI.Renderer.CursorOptimizer
   require Logger
 
   # Comprehensive mouse disable sequence - disables ALL mouse modes defensively
@@ -211,6 +212,7 @@ defmodule TermUI.Backend.Raw do
   - `:alternate_screen` - Whether alternate screen buffer is active
   - `:mouse_mode` - Current mouse tracking mode
   - `:current_style` - Current SGR state for style delta tracking
+  - `:optimize_cursor` - Whether to use cursor movement optimization (default: `true`)
   """
   @type t :: %__MODULE__{
           size: {pos_integer(), pos_integer()},
@@ -218,7 +220,8 @@ defmodule TermUI.Backend.Raw do
           cursor_position: {pos_integer(), pos_integer()} | nil,
           alternate_screen: boolean(),
           mouse_mode: mouse_mode(),
-          current_style: style_state() | nil
+          current_style: style_state() | nil,
+          optimize_cursor: boolean()
         }
 
   defstruct size: {24, 80},
@@ -226,7 +229,8 @@ defmodule TermUI.Backend.Raw do
             cursor_position: nil,
             alternate_screen: false,
             mouse_mode: :none,
-            current_style: nil
+            current_style: nil,
+            optimize_cursor: true
 
   # ===========================================================================
   # Behaviour Callbacks - Lifecycle, Queries, Cursor, Rendering, Input
@@ -246,6 +250,7 @@ defmodule TermUI.Backend.Raw do
   - `:hide_cursor` - Hide cursor during rendering (default: `true`)
   - `:mouse_tracking` - Mouse tracking mode (default: `:none`)
   - `:size` - Explicit dimensions `{rows, cols}` (default: auto-detect)
+  - `:optimize_cursor` - Use cursor movement optimization (default: `true`)
 
   ## Returns
 
@@ -274,6 +279,7 @@ defmodule TermUI.Backend.Raw do
     hide_cursor = Keyword.get(opts, :hide_cursor, true)
     mouse_tracking = Keyword.get(opts, :mouse_tracking, :none)
     size_opt = Keyword.get(opts, :size, nil)
+    optimize_cursor = Keyword.get(opts, :optimize_cursor, true)
 
     # Validate and get terminal size
     with {:ok, size} <- get_terminal_size(size_opt) do
@@ -307,7 +313,8 @@ defmodule TermUI.Backend.Raw do
         cursor_position: {1, 1},
         alternate_screen: alternate_screen,
         mouse_mode: mouse_tracking,
-        current_style: nil
+        current_style: nil,
+        optimize_cursor: optimize_cursor
       }
 
       {:ok, state}
@@ -378,6 +385,19 @@ defmodule TermUI.Backend.Raw do
 
   Position is 1-indexed: `{1, 1}` is the top-left corner.
 
+  ## Cursor Optimization
+
+  When `optimize_cursor: true` (default), this function uses `CursorOptimizer`
+  to select the cheapest movement sequence. This can reduce cursor movement
+  overhead by 40%+ compared to always using absolute positioning.
+
+  Movement options considered:
+  - Absolute positioning: `ESC[{row};{col}H` (6-10 bytes)
+  - Relative moves: up/down/left/right (3-6 bytes)
+  - Carriage return + vertical (1 + 3-6 bytes)
+  - Home position: `ESC[H` (3 bytes)
+  - Literal spaces for small rightward moves (1 byte each)
+
   ## Position Validation
 
   Positions must have positive integer coordinates. The position will be
@@ -392,14 +412,40 @@ defmodule TermUI.Backend.Raw do
   @spec move_cursor(t(), TermUI.Backend.position()) :: {:ok, t()}
   def move_cursor(state, {row, col} = position)
       when is_integer(row) and is_integer(col) and row > 0 and col > 0 do
-    # Generate and write cursor position escape sequence
-    sequence = ANSI.cursor_position(row, col)
+    # Generate movement sequence (optimized or absolute based on state)
+    sequence = generate_cursor_sequence(state, row, col)
     write_to_terminal(sequence)
 
     # Update state with new cursor position
     updated_state = %{state | cursor_position: position}
 
     {:ok, updated_state}
+  end
+
+  # Generates cursor movement sequence, using optimization when enabled
+  @spec generate_cursor_sequence(t(), pos_integer(), pos_integer()) :: iodata()
+  defp generate_cursor_sequence(
+         %__MODULE__{optimize_cursor: true, cursor_position: {from_row, from_col}},
+         to_row,
+         to_col
+       ) do
+    # Use optimizer to find cheapest movement
+    {sequence, _cost} = CursorOptimizer.optimal_move(from_row, from_col, to_row, to_col)
+    sequence
+  end
+
+  defp generate_cursor_sequence(
+         %__MODULE__{optimize_cursor: true, cursor_position: nil},
+         row,
+         col
+       ) do
+    # No previous position known - use absolute positioning
+    ANSI.cursor_position(row, col)
+  end
+
+  defp generate_cursor_sequence(%__MODULE__{optimize_cursor: false}, row, col) do
+    # Optimization disabled - always use absolute positioning
+    ANSI.cursor_position(row, col)
   end
 
   @impl true

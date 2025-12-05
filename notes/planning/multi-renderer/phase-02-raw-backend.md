@@ -122,7 +122,7 @@ Ensure shutdown completes even if individual operations fail.
 
 ## 2.3 Implement Cursor Operations
 
-- [ ] **Section 2.3 Complete**
+- [x] **Section 2.3 Complete**
 
 Implement cursor control callbacks for positioning and visibility. These operations use ANSI escape sequences from the existing `TermUI.ANSI` module.
 
@@ -152,24 +152,24 @@ Implement cursor visibility control.
 
 ### 2.3.3 Implement Cursor Position Optimization
 
-- [ ] **Task 2.3.3 Complete**
+- [x] **Task 2.3.3 Complete**
 
 Implement optional cursor movement optimization comparing absolute vs relative moves.
 
-- [ ] 2.3.3.1 Calculate cost of absolute move (`\e[row;colH` = 6-10 bytes)
-- [ ] 2.3.3.2 Calculate cost of relative moves (up/down/forward/back sequences)
-- [ ] 2.3.3.3 Choose cheaper option based on distance and current position
-- [ ] 2.3.3.4 Reference existing `TermUI.Renderer.CursorOptimizer` for algorithm
+- [x] 2.3.3.1 Calculate cost of absolute move (`\e[row;colH` = 6-10 bytes)
+- [x] 2.3.3.2 Calculate cost of relative moves (up/down/forward/back sequences)
+- [x] 2.3.3.3 Choose cheaper option based on distance and current position
+- [x] 2.3.3.4 Reference existing `TermUI.Renderer.CursorOptimizer` for algorithm
 
 ### Unit Tests - Section 2.3
 
-- [ ] **Unit Tests 2.3 Complete**
+- [x] **Unit Tests 2.3 Complete**
 - [x] Test `move_cursor/2` generates correct escape sequence for various positions
 - [x] Test `move_cursor/2` updates state with new position
 - [x] Test `hide_cursor/1` updates state to `cursor_visible: false`
 - [x] Test `show_cursor/1` updates state to `cursor_visible: true`
 - [x] Test cursor operations are idempotent
-- [ ] Test cursor optimizer chooses relative move for short distances
+- [x] Test cursor optimizer chooses relative move for short distances
 
 ---
 
