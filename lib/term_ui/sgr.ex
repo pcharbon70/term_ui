@@ -326,13 +326,15 @@ defmodule TermUI.SGR do
              :bright_magenta,
              :bright_cyan,
              :bright_white
-           ], do: true
+           ],
+      do: true
 
   def valid_color?(n) when is_integer(n) and n >= 0 and n <= 255, do: true
 
   def valid_color?({r, g, b})
       when is_integer(r) and is_integer(g) and is_integer(b) and r >= 0 and r <= 255 and g >= 0 and
-             g <= 255 and b >= 0 and b <= 255, do: true
+             g <= 255 and b >= 0 and b <= 255,
+      do: true
 
   def valid_color?(_), do: false
 
