@@ -698,12 +698,193 @@ defmodule TermUI.Backend.Raw do
   - Style delta tracking (only emit changed attributes)
   - Relative cursor movement when cheaper than absolute
   - Batched I/O writes
+
+  ## Examples
+
+      # Draw a single red "A" at position {1, 1}
+      cells = [{{1, 1}, {"A", :red, :default, []}}]
+      {:ok, state} = Raw.draw_cells(state, cells)
+
+      # Draw multiple cells with different styles
+      cells = [
+        {{1, 1}, {"H", :green, :default, [:bold]}},
+        {{1, 2}, {"i", :green, :default, [:bold]}},
+        {{2, 1}, {"!", :yellow, :blue, []}}
+      ]
+      {:ok, state} = Raw.draw_cells(state, cells)
   """
   @spec draw_cells(t(), [{TermUI.Backend.position(), TermUI.Backend.cell()}]) :: {:ok, t()}
-  def draw_cells(state, _cells) do
-    # Stub - full implementation in Section 2.5
+  def draw_cells(state, []) do
+    # Empty list - no-op
     {:ok, state}
   end
+
+  def draw_cells(state, cells) when is_list(cells) do
+    # Sort cells by row then column for sequential output
+    sorted_cells = Enum.sort_by(cells, fn {{row, col}, _cell} -> {row, col} end)
+
+    # Process cells and build output
+    {output, final_pos, final_style} =
+      process_cells(sorted_cells, state.cursor_position, state.current_style)
+
+    # Write batched output to terminal
+    write_to_terminal(output)
+
+    # Update state with final cursor position and style
+    updated_state = %{state | cursor_position: final_pos, current_style: final_style}
+
+    {:ok, updated_state}
+  end
+
+  # Process a list of cells, accumulating output as iolist
+  # Returns {iolist, final_cursor_position, final_style}
+  @spec process_cells(
+          [{TermUI.Backend.position(), TermUI.Backend.cell()}],
+          {pos_integer(), pos_integer()} | nil,
+          style_state() | nil
+        ) :: {iolist(), {pos_integer(), pos_integer()}, style_state()}
+  defp process_cells(cells, current_pos, current_style) do
+    Enum.reduce(cells, {[], current_pos, current_style}, fn {{row, col} = target_pos,
+                                                             {char, fg, bg, attrs}},
+                                                            {output_acc, cursor_pos, style} ->
+      # Generate cursor movement if needed
+      cursor_output = cursor_move_output(cursor_pos, target_pos)
+
+      # Generate style delta
+      new_style = %{fg: fg, bg: bg, attrs: normalize_attrs(attrs)}
+      style_output = style_delta_output(style, new_style)
+
+      # Build cell output: [cursor_move, style_delta, character]
+      cell_output = [cursor_output, style_output, char]
+
+      # After outputting character, cursor advances one column
+      new_cursor_pos = {row, col + 1}
+
+      {[output_acc, cell_output], new_cursor_pos, new_style}
+    end)
+  end
+
+  # Normalize attributes to sorted list for consistent comparison
+  defp normalize_attrs(attrs) when is_list(attrs), do: Enum.sort(attrs)
+  defp normalize_attrs(%MapSet{} = attrs), do: attrs |> MapSet.to_list() |> Enum.sort()
+
+  # Generate cursor movement output if position has changed
+  # Returns empty list if no move needed (cursor already at target or sequential)
+  defp cursor_move_output(nil, {row, col}) do
+    # No previous position known - must use absolute
+    ANSI.cursor_position(row, col)
+  end
+
+  defp cursor_move_output({cur_row, cur_col}, {target_row, target_col})
+       when cur_row == target_row and cur_col == target_col do
+    # Already at target position - no move needed
+    []
+  end
+
+  defp cursor_move_output({_cur_row, _cur_col}, {target_row, target_col}) do
+    # Need to move cursor - use absolute positioning
+    # Note: Could use CursorOptimizer here for further optimization,
+    # but absolute positioning is simple and correct for this initial implementation
+    ANSI.cursor_position(target_row, target_col)
+  end
+
+  # Generate style delta output - only emit what has changed
+  # Returns iolist with necessary escape sequences
+  defp style_delta_output(nil, new_style) do
+    # No previous style - emit full style
+    build_full_style(new_style)
+  end
+
+  defp style_delta_output(current_style, new_style) when current_style == new_style do
+    # Styles are identical - no output needed
+    []
+  end
+
+  defp style_delta_output(current_style, new_style) do
+    # Check if we need a full reset (removing attributes is complex)
+    # Strategy: if new style has fewer or different attrs, reset and rebuild
+    current_attrs = MapSet.new(current_style.attrs)
+    new_attrs = MapSet.new(new_style.attrs)
+
+    # Attributes being removed require a reset
+    removed_attrs = MapSet.difference(current_attrs, new_attrs)
+
+    if MapSet.size(removed_attrs) > 0 do
+      # Reset and apply full new style
+      [ANSI.reset(), build_full_style(new_style)]
+    else
+      # Build delta - only add new attributes and changed colors
+      build_style_delta(current_style, new_style)
+    end
+  end
+
+  # Build full style sequence from scratch
+  defp build_full_style(%{fg: fg, bg: bg, attrs: attrs}) do
+    [
+      color_sequence(:fg, fg),
+      color_sequence(:bg, bg),
+      attr_sequences(attrs)
+    ]
+  end
+
+  # Build style delta - only emit changes
+  defp build_style_delta(current, new) do
+    fg_output = if current.fg != new.fg, do: color_sequence(:fg, new.fg), else: []
+    bg_output = if current.bg != new.bg, do: color_sequence(:bg, new.bg), else: []
+
+    # New attributes that weren't in current
+    new_attr_set = MapSet.new(new.attrs)
+    current_attr_set = MapSet.new(current.attrs)
+    added_attrs = MapSet.difference(new_attr_set, current_attr_set) |> MapSet.to_list()
+    attr_output = attr_sequences(added_attrs)
+
+    [fg_output, bg_output, attr_output]
+  end
+
+  # Generate color sequence for foreground or background
+  defp color_sequence(:fg, :default), do: ["\e[39m"]
+  defp color_sequence(:bg, :default), do: ["\e[49m"]
+
+  defp color_sequence(:fg, {r, g, b}) when is_integer(r) and is_integer(g) and is_integer(b) do
+    ANSI.foreground_rgb(r, g, b)
+  end
+
+  defp color_sequence(:bg, {r, g, b}) when is_integer(r) and is_integer(g) and is_integer(b) do
+    ANSI.background_rgb(r, g, b)
+  end
+
+  defp color_sequence(:fg, index) when is_integer(index) and index >= 0 and index <= 255 do
+    ANSI.foreground_256(index)
+  end
+
+  defp color_sequence(:bg, index) when is_integer(index) and index >= 0 and index <= 255 do
+    ANSI.background_256(index)
+  end
+
+  defp color_sequence(:fg, color) when is_atom(color) do
+    ANSI.foreground(color)
+  end
+
+  defp color_sequence(:bg, color) when is_atom(color) do
+    ANSI.background(color)
+  end
+
+  # Generate attribute sequences
+  defp attr_sequences([]), do: []
+
+  defp attr_sequences(attrs) when is_list(attrs) do
+    Enum.map(attrs, &attr_sequence/1)
+  end
+
+  defp attr_sequence(:bold), do: ANSI.bold()
+  defp attr_sequence(:dim), do: ANSI.dim()
+  defp attr_sequence(:italic), do: ANSI.italic()
+  defp attr_sequence(:underline), do: ANSI.underline()
+  defp attr_sequence(:blink), do: ANSI.blink()
+  defp attr_sequence(:reverse), do: ANSI.reverse()
+  defp attr_sequence(:hidden), do: ANSI.hidden()
+  defp attr_sequence(:strikethrough), do: ANSI.strikethrough()
+  defp attr_sequence(_unknown), do: []
 
   @impl true
   @doc """

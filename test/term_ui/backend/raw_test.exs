@@ -916,6 +916,275 @@ defmodule TermUI.Backend.RawTest do
     end
   end
 
+  # ==========================================================================
+  # draw_cells/2 Callback Tests (Section 2.5.1)
+  # ==========================================================================
+
+  describe "draw_cells/2 callback" do
+    setup do
+      {:ok, state} = Raw.init(size: {24, 80})
+      %{state: state}
+    end
+
+    test "exports draw_cells/2 function" do
+      assert function_exported?(Raw, :draw_cells, 2)
+    end
+
+    test "returns {:ok, state} tuple", %{state: state} do
+      cells = [{{1, 1}, {"A", :default, :default, []}}]
+      assert {:ok, %Raw{}} = Raw.draw_cells(state, cells)
+    end
+
+    test "with empty list returns unchanged state", %{state: state} do
+      {:ok, result} = Raw.draw_cells(state, [])
+      assert result == state
+    end
+
+    test "with single cell updates cursor position", %{state: state} do
+      cells = [{{5, 10}, {"X", :default, :default, []}}]
+      {:ok, result} = Raw.draw_cells(state, cells)
+
+      # Cursor should advance one column after drawing the character
+      assert result.cursor_position == {5, 11}
+    end
+
+    test "with single cell updates current_style", %{state: state} do
+      cells = [{{1, 1}, {"A", :red, :blue, [:bold]}}]
+      {:ok, result} = Raw.draw_cells(state, cells)
+
+      assert result.current_style == %{fg: :red, bg: :blue, attrs: [:bold]}
+    end
+
+    test "with multiple cells on same row tracks cursor sequentially", %{state: state} do
+      cells = [
+        {{1, 1}, {"H", :default, :default, []}},
+        {{1, 2}, {"i", :default, :default, []}}
+      ]
+
+      {:ok, result} = Raw.draw_cells(state, cells)
+
+      # Cursor should be after the last character
+      assert result.cursor_position == {1, 3}
+    end
+
+    test "with cells on different rows updates to final position", %{state: state} do
+      cells = [
+        {{1, 1}, {"A", :default, :default, []}},
+        {{2, 5}, {"B", :default, :default, []}},
+        {{3, 10}, {"C", :default, :default, []}}
+      ]
+
+      {:ok, result} = Raw.draw_cells(state, cells)
+
+      # Cursor should be after the last cell (row 3, col 11)
+      assert result.cursor_position == {3, 11}
+    end
+
+    test "sorts cells by position before rendering", %{state: state} do
+      # Pass cells out of order
+      cells = [
+        {{2, 5}, {"B", :default, :default, []}},
+        {{1, 1}, {"A", :default, :default, []}},
+        {{1, 10}, {"C", :default, :default, []}}
+      ]
+
+      {:ok, result} = Raw.draw_cells(state, cells)
+
+      # Should end at position after the last cell in sorted order
+      # Sorted: {1,1}, {1,10}, {2,5}
+      # Final position after {2,5} -> {2,6}
+      assert result.cursor_position == {2, 6}
+    end
+
+    test "preserves other state fields", %{state: state} do
+      cells = [{{1, 1}, {"X", :red, :default, []}}]
+      {:ok, result} = Raw.draw_cells(state, cells)
+
+      # These fields should not change
+      assert result.size == state.size
+      assert result.cursor_visible == state.cursor_visible
+      assert result.alternate_screen == state.alternate_screen
+      assert result.mouse_mode == state.mouse_mode
+      assert result.optimize_cursor == state.optimize_cursor
+    end
+
+    test "tracks style across multiple cells", %{state: state} do
+      # First cell sets style
+      cells = [
+        {{1, 1}, {"A", :red, :blue, [:bold]}},
+        {{1, 2}, {"B", :red, :blue, [:bold]}}
+      ]
+
+      {:ok, result} = Raw.draw_cells(state, cells)
+
+      # Style should reflect final cell's style
+      assert result.current_style == %{fg: :red, bg: :blue, attrs: [:bold]}
+    end
+
+    test "handles style changes between cells", %{state: state} do
+      cells = [
+        {{1, 1}, {"A", :red, :default, []}},
+        {{1, 2}, {"B", :green, :default, [:underline]}}
+      ]
+
+      {:ok, result} = Raw.draw_cells(state, cells)
+
+      # Style should be the last cell's style
+      assert result.current_style == %{fg: :green, bg: :default, attrs: [:underline]}
+    end
+
+    test "has documentation" do
+      {:docs_v1, _, :elixir, _, _, _, docs} = Code.fetch_docs(Raw)
+
+      func_docs =
+        Enum.filter(docs, fn
+          {{:function, :draw_cells, 2}, _, _, _, _} -> true
+          _ -> false
+        end)
+
+      assert length(func_docs) == 1
+      [{{:function, :draw_cells, 2}, _, _, %{"en" => doc}, _}] = func_docs
+      assert doc =~ "Draws cells"
+      assert doc =~ "Cell Format"
+    end
+  end
+
+  describe "draw_cells/2 with various color types" do
+    setup do
+      {:ok, state} = Raw.init(size: {24, 80})
+      %{state: state}
+    end
+
+    test "handles named colors", %{state: state} do
+      cells = [{{1, 1}, {"A", :red, :blue, []}}]
+      {:ok, result} = Raw.draw_cells(state, cells)
+
+      assert result.current_style.fg == :red
+      assert result.current_style.bg == :blue
+    end
+
+    test "handles :default colors", %{state: state} do
+      cells = [{{1, 1}, {"A", :default, :default, []}}]
+      {:ok, result} = Raw.draw_cells(state, cells)
+
+      assert result.current_style.fg == :default
+      assert result.current_style.bg == :default
+    end
+
+    test "handles 256-color indices", %{state: state} do
+      cells = [{{1, 1}, {"A", 196, 232, []}}]
+      {:ok, result} = Raw.draw_cells(state, cells)
+
+      assert result.current_style.fg == 196
+      assert result.current_style.bg == 232
+    end
+
+    test "handles RGB true colors", %{state: state} do
+      cells = [{{1, 1}, {"A", {255, 128, 0}, {0, 64, 128}, []}}]
+      {:ok, result} = Raw.draw_cells(state, cells)
+
+      assert result.current_style.fg == {255, 128, 0}
+      assert result.current_style.bg == {0, 64, 128}
+    end
+
+    test "handles mixed color types", %{state: state} do
+      cells = [
+        {{1, 1}, {"A", :red, 232, []}},
+        {{1, 2}, {"B", 196, {0, 255, 0}, []}},
+        {{1, 3}, {"C", {128, 128, 128}, :default, []}}
+      ]
+
+      {:ok, result} = Raw.draw_cells(state, cells)
+
+      # Final style should be from last cell
+      assert result.current_style.fg == {128, 128, 128}
+      assert result.current_style.bg == :default
+    end
+  end
+
+  describe "draw_cells/2 with various attributes" do
+    setup do
+      {:ok, state} = Raw.init(size: {24, 80})
+      %{state: state}
+    end
+
+    test "handles bold attribute", %{state: state} do
+      cells = [{{1, 1}, {"A", :default, :default, [:bold]}}]
+      {:ok, result} = Raw.draw_cells(state, cells)
+
+      assert :bold in result.current_style.attrs
+    end
+
+    test "handles multiple attributes", %{state: state} do
+      cells = [{{1, 1}, {"A", :default, :default, [:bold, :underline, :italic]}}]
+      {:ok, result} = Raw.draw_cells(state, cells)
+
+      assert :bold in result.current_style.attrs
+      assert :underline in result.current_style.attrs
+      assert :italic in result.current_style.attrs
+    end
+
+    test "handles all supported attributes", %{state: state} do
+      all_attrs = [:bold, :dim, :italic, :underline, :blink, :reverse, :hidden, :strikethrough]
+      cells = [{{1, 1}, {"A", :default, :default, all_attrs}}]
+      {:ok, result} = Raw.draw_cells(state, cells)
+
+      for attr <- all_attrs do
+        assert attr in result.current_style.attrs,
+               "Expected #{attr} to be in current_style.attrs"
+      end
+    end
+
+    test "handles empty attributes list", %{state: state} do
+      cells = [{{1, 1}, {"A", :default, :default, []}}]
+      {:ok, result} = Raw.draw_cells(state, cells)
+
+      assert result.current_style.attrs == []
+    end
+
+    test "normalizes attributes to sorted list", %{state: state} do
+      # Pass attrs in random order
+      cells = [{{1, 1}, {"A", :default, :default, [:underline, :bold, :italic]}}]
+      {:ok, result} = Raw.draw_cells(state, cells)
+
+      # Should be sorted alphabetically
+      assert result.current_style.attrs == [:bold, :italic, :underline]
+    end
+  end
+
+  describe "draw_cells/2 style delta optimization" do
+    setup do
+      {:ok, state} = Raw.init(size: {24, 80})
+      %{state: state}
+    end
+
+    test "consecutive cells with same style don't reset style tracking", %{state: state} do
+      # Draw first cell to set initial style
+      cells1 = [{{1, 1}, {"A", :red, :default, [:bold]}}]
+      {:ok, state1} = Raw.draw_cells(state, cells1)
+
+      # Draw second cell with same style
+      cells2 = [{{1, 2}, {"B", :red, :default, [:bold]}}]
+      {:ok, state2} = Raw.draw_cells(state1, cells2)
+
+      # Style should remain the same
+      assert state1.current_style == state2.current_style
+    end
+
+    test "tracks style state across multiple draw_cells calls", %{state: state} do
+      cells1 = [{{1, 1}, {"A", :red, :blue, []}}]
+      {:ok, state1} = Raw.draw_cells(state, cells1)
+
+      assert state1.current_style == %{fg: :red, bg: :blue, attrs: []}
+
+      # Change only foreground
+      cells2 = [{{1, 2}, {"B", :green, :blue, []}}]
+      {:ok, state2} = Raw.draw_cells(state1, cells2)
+
+      assert state2.current_style == %{fg: :green, bg: :blue, attrs: []}
+    end
+  end
+
   describe "stub callbacks" do
     # Use setup to avoid repeating Raw.init([]) in every test
     setup do
@@ -925,11 +1194,6 @@ defmodule TermUI.Backend.RawTest do
 
     test "shutdown/1 returns :ok", %{state: state} do
       assert :ok = Raw.shutdown(state)
-    end
-
-    test "draw_cells/2 returns {:ok, state}", %{state: state} do
-      cells = [{{1, 1}, {"A", :default, :default, []}}]
-      assert {:ok, %Raw{}} = Raw.draw_cells(state, cells)
     end
 
     test "flush/1 returns {:ok, state}", %{state: state} do

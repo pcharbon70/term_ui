@@ -232,15 +232,15 @@ Implement the core `draw_cells/2` callback for rendering. This is the primary re
 
 ### 2.5.1 Implement draw_cells/2 Callback
 
-- [ ] **Task 2.5.1 Complete**
+- [x] **Task 2.5.1 Complete**
 
 Implement the main cell drawing callback with batch optimization.
 
-- [ ] 2.5.1.1 Implement `@impl true` `draw_cells/2` accepting state and list of `{position, cell}` tuples
-- [ ] 2.5.1.2 Sort cells by row then column for sequential output
-- [ ] 2.5.1.3 Group consecutive cells on same row for efficient cursor handling
-- [ ] 2.5.1.4 Track current position and style to minimize escape sequences
-- [ ] 2.5.1.5 Build output as iolist for efficient concatenation
+- [x] 2.5.1.1 Implement `@impl true` `draw_cells/2` accepting state and list of `{position, cell}` tuples
+- [x] 2.5.1.2 Sort cells by row then column for sequential output
+- [x] 2.5.1.3 Group consecutive cells on same row for efficient cursor handling
+- [x] 2.5.1.4 Track current position and style to minimize escape sequences
+- [x] 2.5.1.5 Build output as iolist for efficient concatenation
 
 ### 2.5.2 Implement Style Application
 
