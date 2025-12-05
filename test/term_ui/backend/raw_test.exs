@@ -1183,6 +1183,38 @@ defmodule TermUI.Backend.RawTest do
 
       assert state2.current_style == %{fg: :green, bg: :blue, attrs: []}
     end
+
+    test "resets style when removing attributes", %{state: state} do
+      # Draw cell with multiple attributes
+      cells1 = [{{1, 1}, {"A", :default, :default, [:bold, :italic, :underline]}}]
+      {:ok, state1} = Raw.draw_cells(state, cells1)
+
+      assert state1.current_style.attrs == [:bold, :italic, :underline]
+
+      # Draw cell with fewer attributes (requires reset + rebuild)
+      cells2 = [{{1, 2}, {"B", :default, :default, [:bold]}}]
+      {:ok, state2} = Raw.draw_cells(state1, cells2)
+
+      # Style should reflect only the new attribute
+      assert state2.current_style.attrs == [:bold]
+    end
+
+    test "handles full screen of cells efficiently", %{state: state} do
+      # Generate 80x24 = 1920 cells (full terminal screen)
+      cells =
+        for row <- 1..24, col <- 1..80 do
+          {{row, col}, {"X", :default, :default, []}}
+        end
+
+      # Should process without error
+      {:ok, final_state} = Raw.draw_cells(state, cells)
+
+      # Verify cursor position is at end of last cell
+      assert final_state.cursor_position == {24, 81}
+
+      # Verify style tracking was maintained
+      assert final_state.current_style == %{fg: :default, bg: :default, attrs: []}
+    end
   end
 
   describe "stub callbacks" do

@@ -226,7 +226,7 @@ Implement size refresh for handling terminal resize events.
 
 ## 2.5 Implement Cell Drawing
 
-- [ ] **Section 2.5 Complete**
+- [x] **Section 2.5 Complete**
 
 Implement the core `draw_cells/2` callback for rendering. This is the primary rendering interface, taking a list of positioned cells and outputting optimized ANSI sequences.
 
@@ -244,88 +244,88 @@ Implement the main cell drawing callback with batch optimization.
 
 ### 2.5.2 Implement Style Application
 
-- [ ] **Task 2.5.2 Complete**
+- [x] **Task 2.5.2 Complete**
 
 Implement conversion of cell styles to ANSI escape sequences.
 
-- [ ] 2.5.2.1 Track `current_style` in state to emit only style changes (deltas)
-- [ ] 2.5.2.2 Reset style with `\e[0m` when transitioning to simpler style (fewer attributes)
-- [ ] 2.5.2.3 Apply foreground color using appropriate sequence based on color type
-- [ ] 2.5.2.4 Apply background color using appropriate sequence based on color type
-- [ ] 2.5.2.5 Apply text attributes (bold, italic, underline, etc.) using SGR codes
+- [x] 2.5.2.1 Track `current_style` in state to emit only style changes (deltas)
+- [x] 2.5.2.2 Reset style with `\e[0m` when transitioning to simpler style (fewer attributes)
+- [x] 2.5.2.3 Apply foreground color using appropriate sequence based on color type
+- [x] 2.5.2.4 Apply background color using appropriate sequence based on color type
+- [x] 2.5.2.5 Apply text attributes (bold, italic, underline, etc.) using SGR codes
 
 ### 2.5.3 Implement True Color Output
 
-- [ ] **Task 2.5.3 Complete**
+- [x] **Task 2.5.3 Complete**
 
 Implement true color (24-bit) output for RGB color values.
 
-- [ ] 2.5.3.1 Detect RGB tuple `{r, g, b}` color type
-- [ ] 2.5.3.2 Generate foreground sequence `\e[38;2;r;g;bm`
-- [ ] 2.5.3.3 Generate background sequence `\e[48;2;r;g;bm`
-- [ ] 2.5.3.4 Use existing `TermUI.ANSI.true_color_foreground/1` and `true_color_background/1`
+- [x] 2.5.3.1 Detect RGB tuple `{r, g, b}` color type
+- [x] 2.5.3.2 Generate foreground sequence `\e[38;2;r;g;bm`
+- [x] 2.5.3.3 Generate background sequence `\e[48;2;r;g;bm`
+- [x] 2.5.3.4 Use existing `TermUI.ANSI.true_color_foreground/1` and `true_color_background/1`
 
 ### 2.5.4 Implement 256-Color Output
 
-- [ ] **Task 2.5.4 Complete**
+- [x] **Task 2.5.4 Complete**
 
 Implement 256-color palette output for integer color indices.
 
-- [ ] 2.5.4.1 Detect integer color value `0..255`
-- [ ] 2.5.4.2 Generate foreground sequence `\e[38;5;nm`
-- [ ] 2.5.4.3 Generate background sequence `\e[48;5;nm`
-- [ ] 2.5.4.4 Use existing `TermUI.ANSI.color256_foreground/1` and `color256_background/1`
+- [x] 2.5.4.1 Detect integer color value `0..255`
+- [x] 2.5.4.2 Generate foreground sequence `\e[38;5;nm`
+- [x] 2.5.4.3 Generate background sequence `\e[48;5;nm`
+- [x] 2.5.4.4 Use existing `TermUI.ANSI.color256_foreground/1` and `color256_background/1`
 
 ### 2.5.5 Implement Named Color Output
 
-- [ ] **Task 2.5.5 Complete**
+- [x] **Task 2.5.5 Complete**
 
 Implement standard 16-color output for named color atoms.
 
-- [ ] 2.5.5.1 Detect atom color value (`:red`, `:green`, `:blue`, etc.)
-- [ ] 2.5.5.2 Map to ANSI color codes (30-37 foreground, 40-47 background, 90-97/100-107 bright)
-- [ ] 2.5.5.3 Handle `:default` by using default foreground `\e[39m` or background `\e[49m`
-- [ ] 2.5.5.4 Use existing `TermUI.ANSI.foreground/1` and `TermUI.ANSI.background/1`
+- [x] 2.5.5.1 Detect atom color value (`:red`, `:green`, `:blue`, etc.)
+- [x] 2.5.5.2 Map to ANSI color codes (30-37 foreground, 40-47 background, 90-97/100-107 bright)
+- [x] 2.5.5.3 Handle `:default` by using default foreground `\e[39m` or background `\e[49m`
+- [x] 2.5.5.4 Use existing `TermUI.ANSI.foreground/1` and `TermUI.ANSI.background/1`
 
 ### 2.5.6 Implement Attribute Handling
 
-- [ ] **Task 2.5.6 Complete**
+- [x] **Task 2.5.6 Complete**
 
 Implement text attribute application from cell attribute list.
 
-- [ ] 2.5.6.1 Handle `:bold` attribute with `\e[1m`
-- [ ] 2.5.6.2 Handle `:dim` attribute with `\e[2m`
-- [ ] 2.5.6.3 Handle `:italic` attribute with `\e[3m`
-- [ ] 2.5.6.4 Handle `:underline` attribute with `\e[4m`
-- [ ] 2.5.6.5 Handle `:blink` attribute with `\e[5m`
-- [ ] 2.5.6.6 Handle `:reverse` attribute with `\e[7m`
-- [ ] 2.5.6.7 Handle `:hidden` attribute with `\e[8m`
-- [ ] 2.5.6.8 Handle `:strikethrough` attribute with `\e[9m`
+- [x] 2.5.6.1 Handle `:bold` attribute with `\e[1m`
+- [x] 2.5.6.2 Handle `:dim` attribute with `\e[2m`
+- [x] 2.5.6.3 Handle `:italic` attribute with `\e[3m`
+- [x] 2.5.6.4 Handle `:underline` attribute with `\e[4m`
+- [x] 2.5.6.5 Handle `:blink` attribute with `\e[5m`
+- [x] 2.5.6.6 Handle `:reverse` attribute with `\e[7m`
+- [x] 2.5.6.7 Handle `:hidden` attribute with `\e[8m`
+- [x] 2.5.6.8 Handle `:strikethrough` attribute with `\e[9m`
 
 ### 2.5.7 Implement Output Batching
 
-- [ ] **Task 2.5.7 Complete**
+- [x] **Task 2.5.7 Complete**
 
 Optimize output by batching all sequences into a single write.
 
-- [ ] 2.5.7.1 Accumulate all escape sequences and characters in iolist
-- [ ] 2.5.7.2 Perform single `IO.write/1` call with complete iolist
-- [ ] 2.5.7.3 Update state with final cursor position and style
-- [ ] 2.5.7.4 Return `{:ok, updated_state}`
+- [x] 2.5.7.1 Accumulate all escape sequences and characters in iolist
+- [x] 2.5.7.2 Perform single `IO.write/1` call with complete iolist
+- [x] 2.5.7.3 Update state with final cursor position and style
+- [x] 2.5.7.4 Return `{:ok, updated_state}`
 
 ### Unit Tests - Section 2.5
 
-- [ ] **Unit Tests 2.5 Complete**
-- [ ] Test `draw_cells/2` with single cell generates correct output
-- [ ] Test `draw_cells/2` with multiple cells on same row
-- [ ] Test `draw_cells/2` with cells on different rows
-- [ ] Test true color output format `\e[38;2;r;g;bm`
-- [ ] Test 256-color output format `\e[38;5;nm`
-- [ ] Test named color output maps correctly to ANSI codes
-- [ ] Test `:default` color uses reset sequences
-- [ ] Test attribute application for all supported attributes
-- [ ] Test style delta optimization (only changed attributes emitted)
-- [ ] Test output is batched into single write
+- [x] **Unit Tests 2.5 Complete**
+- [x] Test `draw_cells/2` with single cell generates correct output
+- [x] Test `draw_cells/2` with multiple cells on same row
+- [x] Test `draw_cells/2` with cells on different rows
+- [x] Test true color output format `\e[38;2;r;g;bm`
+- [x] Test 256-color output format `\e[38;5;nm`
+- [x] Test named color output maps correctly to ANSI codes
+- [x] Test `:default` color uses reset sequences
+- [x] Test attribute application for all supported attributes
+- [x] Test style delta optimization (only changed attributes emitted)
+- [x] Test output is batched into single write
 
 ---
 
