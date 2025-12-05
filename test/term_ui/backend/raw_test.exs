@@ -657,6 +657,72 @@ defmodule TermUI.Backend.RawTest do
     end
   end
 
+  describe "clear/1 callback" do
+    setup do
+      {:ok, state} = Raw.init(size: {24, 80})
+      %{state: state}
+    end
+
+    test "returns {:ok, state}", %{state: state} do
+      assert {:ok, %Raw{}} = Raw.clear(state)
+    end
+
+    test "resets cursor_position to {1, 1}", %{state: state} do
+      # First move cursor to different position
+      {:ok, moved_state} = Raw.move_cursor(state, {10, 20})
+      assert moved_state.cursor_position == {10, 20}
+
+      # Clear should reset to home
+      {:ok, cleared_state} = Raw.clear(moved_state)
+      assert cleared_state.cursor_position == {1, 1}
+    end
+
+    test "resets current_style to nil", %{state: state} do
+      # Simulate having a style set (manually set for test)
+      state_with_style = %{state | current_style: %{fg: :red, bg: :blue, attrs: [:bold]}}
+
+      {:ok, cleared_state} = Raw.clear(state_with_style)
+      assert cleared_state.current_style == nil
+    end
+
+    test "preserves other state fields", %{state: state} do
+      # Move cursor and set some state
+      {:ok, modified_state} = Raw.move_cursor(state, {10, 20})
+
+      {:ok, cleared_state} = Raw.clear(modified_state)
+
+      # Should preserve these fields
+      assert cleared_state.size == state.size
+      assert cleared_state.cursor_visible == state.cursor_visible
+      assert cleared_state.alternate_screen == state.alternate_screen
+      assert cleared_state.mouse_mode == state.mouse_mode
+      assert cleared_state.optimize_cursor == state.optimize_cursor
+    end
+
+    test "works after multiple operations", %{state: state} do
+      # Perform various operations
+      {:ok, s1} = Raw.move_cursor(state, {5, 10})
+      {:ok, s2} = Raw.show_cursor(s1)
+      {:ok, s3} = Raw.move_cursor(s2, {20, 40})
+
+      # Clear should work and reset position
+      {:ok, cleared} = Raw.clear(s3)
+      assert cleared.cursor_position == {1, 1}
+      assert cleared.current_style == nil
+      # But cursor visibility should be preserved
+      assert cleared.cursor_visible == true
+    end
+
+    test "is idempotent (multiple clears work)", %{state: state} do
+      {:ok, s1} = Raw.clear(state)
+      {:ok, s2} = Raw.clear(s1)
+      {:ok, s3} = Raw.clear(s2)
+
+      assert s3.cursor_position == {1, 1}
+      assert s3.current_style == nil
+    end
+  end
+
   describe "stub callbacks" do
     # Use setup to avoid repeating Raw.init([]) in every test
     setup do
@@ -670,10 +736,6 @@ defmodule TermUI.Backend.RawTest do
 
     test "size/1 returns {:ok, size} tuple", %{state: state} do
       assert {:ok, {24, 80}} = Raw.size(state)
-    end
-
-    test "clear/1 returns {:ok, state}", %{state: state} do
-      assert {:ok, %Raw{}} = Raw.clear(state)
     end
 
     test "draw_cells/2 returns {:ok, state}", %{state: state} do

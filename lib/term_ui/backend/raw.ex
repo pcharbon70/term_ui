@@ -554,14 +554,34 @@ defmodule TermUI.Backend.Raw do
 
   @impl true
   @doc """
-  Clears the entire screen and moves cursor to home.
+  Clears the entire screen and moves cursor to home position.
 
-  Uses ANSI sequences `ESC[2J` (clear) and `ESC[1;1H` (home).
+  Uses ANSI sequences:
+  - `ESC[2J` - ED (Erase Display) parameter 2: clear entire screen
+  - `ESC[1;1H` - CUP (Cursor Position): move to row 1, column 1
+
+  ## State Changes
+
+  After clear:
+  - `cursor_position` is set to `{1, 1}` (home position)
+  - `current_style` is reset to `nil` (terminal style state is unknown after clear)
+
+  All other state fields are preserved.
+
+  ## See Also
+
+  - `move_cursor/2` - Move cursor to specific position
+  - `draw_cells/2` - Draw content to screen
   """
   @spec clear(t()) :: {:ok, t()}
   def clear(state) do
-    # Stub - full implementation in Section 2.4
-    {:ok, state}
+    # Write clear screen sequence followed by cursor home
+    write_to_terminal([ANSI.clear_screen(), ANSI.cursor_position(1, 1)])
+
+    # Reset style state (unknown after clear) and set cursor to home
+    updated_state = %{state | current_style: nil, cursor_position: {1, 1}}
+
+    {:ok, updated_state}
   end
 
   @impl true

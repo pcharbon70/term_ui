@@ -181,15 +181,15 @@ Implement screen clearing and the size query callback. These provide essential s
 
 ### 2.4.1 Implement clear/1 Callback
 
-- [ ] **Task 2.4.1 Complete**
+- [x] **Task 2.4.1 Complete**
 
 Implement full screen clear.
 
-- [ ] 2.4.1.1 Implement `@impl true` `clear/1` accepting state
-- [ ] 2.4.1.2 Write `\e[2J` (clear entire screen)
-- [ ] 2.4.1.3 Write `\e[1;1H` (move cursor to home position)
-- [ ] 2.4.1.4 Reset `current_style` in state (style state unknown after clear)
-- [ ] 2.4.1.5 Return `{:ok, updated_state}`
+- [x] 2.4.1.1 Implement `@impl true` `clear/1` accepting state
+- [x] 2.4.1.2 Write `\e[2J` (clear entire screen)
+- [x] 2.4.1.3 Write `\e[1;1H` (move cursor to home position)
+- [x] 2.4.1.4 Reset `current_style` in state (style state unknown after clear)
+- [x] 2.4.1.5 Return `{:ok, updated_state}`
 
 ### 2.4.2 Implement size/1 Callback
 
@@ -216,8 +216,8 @@ Implement size refresh for handling terminal resize events.
 ### Unit Tests - Section 2.4
 
 - [ ] **Unit Tests 2.4 Complete**
-- [ ] Test `clear/1` returns `{:ok, state}`
-- [ ] Test `clear/1` resets current_style in state
+- [x] Test `clear/1` returns `{:ok, state}`
+- [x] Test `clear/1` resets current_style in state
 - [ ] Test `size/1` returns cached dimensions
 - [ ] Test `refresh_size/1` updates state with new dimensions
 - [ ] Test size query handles `:io.columns/0` failure gracefully
