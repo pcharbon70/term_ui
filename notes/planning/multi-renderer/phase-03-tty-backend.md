@@ -172,7 +172,7 @@ Implement efficient row-by-row output for full redraw.
 
 ## 3.4 Implement Incremental Rendering
 
-- [ ] **Section 3.4 Complete**
+- [x] **Section 3.4 Complete**
 
 Implement the incremental rendering mode, which only updates changed cells. This reduces output and may improve perceived performance, but requires careful frame tracking.
 
@@ -223,13 +223,13 @@ Optimize cursor movement for sparse updates.
 
 ### Unit Tests - Section 3.4
 
-- [ ] **Unit Tests 3.4 Complete**
-- [ ] Test incremental mode falls back to full_redraw on first frame
-- [ ] Test frame comparison detects changed cells
-- [ ] Test frame comparison detects removed cells
-- [ ] Test unchanged cells are not re-rendered
-- [ ] Test last_frame is updated after render
-- [ ] Test resize clears last_frame
+- [x] **Unit Tests 3.4 Complete**
+- [x] Test incremental mode falls back to full_redraw on first frame
+- [x] Test frame comparison detects changed cells
+- [x] Test frame comparison detects removed cells
+- [x] Test unchanged cells are not re-rendered
+- [x] Test last_frame is updated after render
+- [x] Test resize clears last_frame
 
 ---
 
