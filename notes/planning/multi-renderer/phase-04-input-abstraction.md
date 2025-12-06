@@ -127,13 +127,13 @@ The `TermUI.Input.TTY` module provides character-by-character input using `IO.ge
 
 ### 4.3.1 Create TTY Input Module
 
-- [ ] **Task 4.3.1 Complete**
+- [x] **Task 4.3.1 Complete**
 
 Create the TTY input handler module implementing the Input behaviour.
 
-- [ ] 4.3.1.1 Create `lib/term_ui/input/tty.ex` with `@behaviour TermUI.Input`
-- [ ] 4.3.1.2 Add `@moduledoc` explaining `IO.getn/2` character input
-- [ ] 4.3.1.3 Document that arrow keys, Tab, etc. work normally
+- [x] 4.3.1.1 Create `lib/term_ui/input/tty.ex` with `@behaviour TermUI.Input`
+- [x] 4.3.1.2 Add `@moduledoc` explaining `IO.getn/2` character input
+- [x] 4.3.1.3 Document that arrow keys, Tab, etc. work normally
 
 ### 4.3.2 Implement poll/2
 
