@@ -135,17 +135,17 @@ Implement screen clearing.
 
 ### 3.3.2 Implement draw_cells/2 for Full Redraw Mode
 
-- [ ] **Task 3.3.2 Complete**
+- [x] **Task 3.3.2 Complete**
 
 Implement cell drawing that clears and redraws the entire screen.
 
-- [ ] 3.3.2.1 Implement `@impl true` `draw_cells/2` accepting state and cells list
-- [ ] 3.3.2.2 If `line_mode == :full_redraw`, start with screen clear `\e[2J\e[H`
-- [ ] 3.3.2.3 Build frame buffer from cells list, organized by row
-- [ ] 3.3.2.4 For each row, position cursor and write styled cell content
-- [ ] 3.3.2.5 Apply color degradation based on `color_mode`
-- [ ] 3.3.2.6 Use character set mapping for box-drawing characters
-- [ ] 3.3.2.7 Return `{:ok, updated_state}`
+- [x] 3.3.2.1 Implement `@impl true` `draw_cells/2` accepting state and cells list
+- [x] 3.3.2.2 If `line_mode == :full_redraw`, start with screen clear `\e[2J\e[H`
+- [x] 3.3.2.3 Build frame buffer from cells list, organized by row
+- [x] 3.3.2.4 For each row, position cursor and write styled cell content
+- [x] 3.3.2.5 Apply color degradation based on `color_mode`
+- [x] 3.3.2.6 Use character set mapping for box-drawing characters
+- [x] 3.3.2.7 Return `{:ok, updated_state}`
 
 ### 3.3.3 Implement Row-by-Row Output
 

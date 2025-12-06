@@ -325,8 +325,11 @@ defmodule TermUI.Backend.TTYTest do
 
     test "draw_cells/2 returns {:ok, state}" do
       {:ok, state} = init_tty([])
-      cells = [{{1, 1}, %{char: "A", style: %{}}}]
-      assert {:ok, _state} = TTY.draw_cells(state, cells)
+      cells = [{{1, 1}, {"A", :default, :default, []}}]
+
+      capture_io(fn ->
+        assert {:ok, _state} = TTY.draw_cells(state, cells)
+      end)
     end
 
     test "flush/1 returns {:ok, state}" do
@@ -600,6 +603,265 @@ defmodule TermUI.Backend.TTYTest do
         end)
 
       assert {:ok, %TTY{}} = result
+    end
+  end
+
+  # ===========================================================================
+  # Section 3.3.2 Tests - draw_cells/2 Callback
+  # ===========================================================================
+
+  describe "draw_cells/2 (Section 3.3.2)" do
+    test "in full_redraw mode, outputs clear screen sequence" do
+      {:ok, state} = init_tty(line_mode: :full_redraw)
+      cells = [{{1, 1}, {"A", :default, :default, []}}]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      assert output =~ "\e[2J"
+    end
+
+    test "in incremental mode, does not output clear screen sequence" do
+      {:ok, state} = init_tty(line_mode: :incremental)
+      cells = [{{1, 1}, {"A", :default, :default, []}}]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      refute output =~ "\e[2J"
+    end
+
+    test "outputs cursor positioning sequence" do
+      {:ok, state} = init_tty([])
+      cells = [{{5, 1}, {"X", :default, :default, []}}]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      assert output =~ "\e[5;1H"
+    end
+
+    test "outputs cell character" do
+      {:ok, state} = init_tty([])
+      cells = [{{1, 1}, {"Z", :default, :default, []}}]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      assert output =~ "Z"
+    end
+
+    test "outputs multiple cells in row order" do
+      {:ok, state} = init_tty([])
+
+      cells = [
+        {{2, 1}, {"B", :default, :default, []}},
+        {{1, 1}, {"A", :default, :default, []}}
+      ]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      # Row 1 should come before Row 2
+      row1_pos = :binary.match(output, "\e[1;1H")
+      row2_pos = :binary.match(output, "\e[2;1H")
+
+      assert row1_pos != :nomatch
+      assert row2_pos != :nomatch
+
+      {row1_start, _} = row1_pos
+      {row2_start, _} = row2_pos
+
+      assert row1_start < row2_start
+    end
+
+    test "outputs named foreground color" do
+      {:ok, state} = init_tty([])
+      cells = [{{1, 1}, {"X", :red, :default, []}}]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      assert output =~ "\e[31m"
+    end
+
+    test "outputs named background color" do
+      {:ok, state} = init_tty([])
+      cells = [{{1, 1}, {"X", :default, :blue, []}}]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      assert output =~ "\e[44m"
+    end
+
+    test "outputs RGB foreground in true_color mode" do
+      {:ok, state} = init_tty(capabilities: %{colors: :true_color})
+      cells = [{{1, 1}, {"X", {255, 128, 64}, :default, []}}]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      assert output =~ "\e[38;2;255;128;64m"
+    end
+
+    test "outputs RGB background in true_color mode" do
+      {:ok, state} = init_tty(capabilities: %{colors: :true_color})
+      cells = [{{1, 1}, {"X", :default, {64, 128, 255}, []}}]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      assert output =~ "\e[48;2;64;128;255m"
+    end
+
+    test "outputs bold attribute" do
+      {:ok, state} = init_tty([])
+      cells = [{{1, 1}, {"X", :default, :default, [:bold]}}]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      assert output =~ "\e[1m"
+    end
+
+    test "outputs underline attribute" do
+      {:ok, state} = init_tty([])
+      cells = [{{1, 1}, {"X", :default, :default, [:underline]}}]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      assert output =~ "\e[4m"
+    end
+
+    test "resets attributes at end of row" do
+      {:ok, state} = init_tty([])
+      cells = [{{1, 1}, {"X", :red, :default, [:bold]}}]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      # Should end with reset
+      assert output =~ "\e[0m"
+    end
+
+    test "updates last_frame in state" do
+      {:ok, state} = init_tty([])
+      cells = [{{1, 1}, {"A", :default, :default, []}}]
+
+      {:ok, new_state} =
+        capture_io(fn ->
+          send(self(), TTY.draw_cells(state, cells))
+        end)
+        |> then(fn _ ->
+          receive do
+            result -> result
+          end
+        end)
+
+      assert new_state.last_frame == %{{1, 1} => {"A", :default, :default, []}}
+    end
+
+    test "empty cells list produces no cell output" do
+      {:ok, state} = init_tty([])
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, [])
+        end)
+
+      # Should only have clear screen, no row positioning
+      refute output =~ "\e[1;1H"
+    end
+
+    test "returns {:ok, state}" do
+      {:ok, state} = init_tty([])
+      cells = [{{1, 1}, {"A", :default, :default, []}}]
+
+      result =
+        capture_io(fn ->
+          send(self(), TTY.draw_cells(state, cells))
+        end)
+        |> then(fn _ ->
+          receive do
+            result -> result
+          end
+        end)
+
+      assert {:ok, %TTY{}} = result
+    end
+  end
+
+  # ===========================================================================
+  # Color Degradation Tests (Section 3.3.2)
+  # ===========================================================================
+
+  describe "color degradation in draw_cells/2" do
+    test "256-color mode converts RGB to palette index" do
+      {:ok, state} = init_tty(capabilities: %{colors: :color_256})
+      cells = [{{1, 1}, {"X", {255, 0, 0}, :default, []}}]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      # Should use 38;5;N format, not 38;2;r;g;b
+      assert output =~ "\e[38;5;"
+      refute output =~ "\e[38;2;"
+    end
+
+    test "16-color mode converts RGB to basic color" do
+      {:ok, state} = init_tty(capabilities: %{colors: :color_16})
+      cells = [{{1, 1}, {"X", {255, 0, 0}, :default, []}}]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      # Should use basic foreground codes (31 = red or 91 = bright red)
+      assert output =~ "\e[91m" or output =~ "\e[31m"
+    end
+
+    test "monochrome mode omits color sequences" do
+      {:ok, state} = init_tty(capabilities: %{colors: :monochrome})
+      cells = [{{1, 1}, {"X", {255, 0, 0}, {0, 0, 255}, []}}]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      # Should not have any color codes
+      refute output =~ "\e[38;"
+      refute output =~ "\e[48;"
+      refute output =~ "\e[31m"
     end
   end
 end

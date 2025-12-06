@@ -360,10 +360,43 @@ defmodule TermUI.Backend.TTY do
   @impl true
   @doc """
   Draws cells to the terminal at specified positions.
+
+  In `:full_redraw` mode (default), clears the screen first then renders all cells.
+  In `:incremental` mode, only renders the provided cells without clearing.
+
+  ## Cell Format
+
+  Each cell is a tuple of `{position, cell_data}` where:
+  - `position` is `{row, col}` (1-indexed)
+  - `cell_data` is `{char, fg_color, bg_color, attrs}`
+
+  ## Rendering Process
+
+  1. In full_redraw mode, clear screen and home cursor
+  2. Group cells by row for efficient rendering
+  3. For each row, position cursor and output styled characters
+  4. Apply color degradation based on `color_mode`
+
+  ## Returns
+
+  `{:ok, updated_state}` with `last_frame` updated for incremental mode.
   """
   @spec draw_cells(t(), [{TermUI.Backend.position(), TermUI.Backend.cell()}]) :: {:ok, t()}
-  def draw_cells(state, _cells) do
-    {:ok, state}
+  def draw_cells(%__MODULE__{} = state, cells) do
+    # In full_redraw mode, clear screen first
+    if state.line_mode == :full_redraw do
+      IO.write(@clear_screen <> @cursor_home)
+    end
+
+    # Group cells by row and render
+    cells
+    |> group_cells_by_row()
+    |> render_rows(state)
+
+    # Build frame map for incremental mode tracking
+    frame = build_frame_map(cells)
+
+    {:ok, %{state | last_frame: frame, cursor_position: nil}}
   end
 
   @impl true
@@ -470,6 +503,254 @@ defmodule TermUI.Backend.TTY do
     # Update state to reflect cursor is hidden
     %{state | cursor_visible: false, cursor_position: {1, 1}}
   end
+
+  # ===========================================================================
+  # Cell Rendering Helpers
+  # ===========================================================================
+
+  # Groups cells by row number and sorts by column within each row.
+  @spec group_cells_by_row([{TermUI.Backend.position(), TermUI.Backend.cell()}]) ::
+          [{pos_integer(), [{pos_integer(), TermUI.Backend.cell()}]}]
+  defp group_cells_by_row(cells) do
+    cells
+    |> Enum.group_by(fn {{row, _col}, _cell} -> row end, fn {{_row, col}, cell} -> {col, cell} end)
+    |> Enum.sort_by(fn {row, _cells} -> row end)
+    |> Enum.map(fn {row, row_cells} ->
+      {row, Enum.sort_by(row_cells, fn {col, _cell} -> col end)}
+    end)
+  end
+
+  # Renders all rows to the terminal.
+  @spec render_rows([{pos_integer(), [{pos_integer(), TermUI.Backend.cell()}]}], t()) :: :ok
+  defp render_rows(rows, state) do
+    Enum.each(rows, fn {row, row_cells} ->
+      render_row(row, row_cells, state)
+    end)
+  end
+
+  # Renders a single row of cells.
+  @spec render_row(pos_integer(), [{pos_integer(), TermUI.Backend.cell()}], t()) :: :ok
+  defp render_row(row, cells, state) do
+    # Position cursor at start of row
+    IO.write("\e[#{row};1H")
+
+    # Track current column for gap filling
+    current_col = 1
+
+    Enum.reduce(cells, current_col, fn {col, cell}, cur_col ->
+      # Fill gap with spaces if needed
+      if col > cur_col do
+        IO.write(String.duplicate(" ", col - cur_col))
+      end
+
+      # Render the cell
+      render_cell(cell, state)
+
+      # Return next column position
+      col + 1
+    end)
+
+    # Reset attributes at end of row
+    IO.write(@reset_attrs)
+
+    :ok
+  end
+
+  # Renders a single cell with style.
+  @spec render_cell(TermUI.Backend.cell(), t()) :: :ok
+  defp render_cell({char, fg, bg, attrs}, state) do
+    # Build and output SGR sequence
+    sgr = build_sgr_sequence(fg, bg, attrs, state.color_mode)
+    IO.write(sgr)
+
+    # Output character (with potential character set mapping)
+    mapped_char = map_character(char, state.character_set)
+    IO.write(mapped_char)
+
+    :ok
+  end
+
+  # Builds SGR (Select Graphic Rendition) sequence for colors and attributes.
+  @spec build_sgr_sequence(
+          TermUI.Backend.color(),
+          TermUI.Backend.color(),
+          [atom()],
+          color_mode()
+        ) :: String.t()
+  defp build_sgr_sequence(fg, bg, attrs, color_mode) do
+    parts = [@reset_attrs]
+
+    # Add attributes
+    attr_parts = Enum.map(attrs, &attr_to_sgr/1) |> Enum.reject(&is_nil/1)
+
+    # Add foreground color
+    fg_part = color_to_sgr(fg, :fg, color_mode)
+
+    # Add background color
+    bg_part = color_to_sgr(bg, :bg, color_mode)
+
+    all_parts = (parts ++ attr_parts ++ [fg_part, bg_part]) |> Enum.reject(&(&1 == ""))
+
+    Enum.join(all_parts, "")
+  end
+
+  # Converts an attribute to its SGR sequence.
+  @spec attr_to_sgr(atom()) :: String.t() | nil
+  defp attr_to_sgr(:bold), do: "\e[1m"
+  defp attr_to_sgr(:dim), do: "\e[2m"
+  defp attr_to_sgr(:italic), do: "\e[3m"
+  defp attr_to_sgr(:underline), do: "\e[4m"
+  defp attr_to_sgr(:blink), do: "\e[5m"
+  defp attr_to_sgr(:reverse), do: "\e[7m"
+  defp attr_to_sgr(:strikethrough), do: "\e[9m"
+  defp attr_to_sgr(_), do: nil
+
+  # Converts a color to its SGR sequence based on color mode.
+  @spec color_to_sgr(TermUI.Backend.color(), :fg | :bg, color_mode()) :: String.t()
+  defp color_to_sgr(:default, :fg, _mode), do: "\e[39m"
+  defp color_to_sgr(:default, :bg, _mode), do: "\e[49m"
+  defp color_to_sgr(nil, _type, _mode), do: ""
+
+  # True color mode - output RGB directly
+  defp color_to_sgr({r, g, b}, :fg, :true_color), do: "\e[38;2;#{r};#{g};#{b}m"
+  defp color_to_sgr({r, g, b}, :bg, :true_color), do: "\e[48;2;#{r};#{g};#{b}m"
+
+  # 256-color mode - convert RGB to palette index
+  defp color_to_sgr({r, g, b}, :fg, :color_256), do: "\e[38;5;#{rgb_to_256(r, g, b)}m"
+  defp color_to_sgr({r, g, b}, :bg, :color_256), do: "\e[48;5;#{rgb_to_256(r, g, b)}m"
+
+  # 16-color mode - convert RGB to basic color
+  defp color_to_sgr({r, g, b}, :fg, :color_16), do: "\e[#{rgb_to_16_fg(r, g, b)}m"
+  defp color_to_sgr({r, g, b}, :bg, :color_16), do: "\e[#{rgb_to_16_bg(r, g, b)}m"
+
+  # Monochrome mode - skip colors entirely
+  defp color_to_sgr({_r, _g, _b}, _type, :monochrome), do: ""
+
+  # Named colors
+  defp color_to_sgr(name, :fg, _mode) when is_atom(name), do: named_color_to_sgr(name, :fg)
+  defp color_to_sgr(name, :bg, _mode) when is_atom(name), do: named_color_to_sgr(name, :bg)
+
+  # Palette index (0-255)
+  defp color_to_sgr(n, :fg, _mode) when is_integer(n) and n >= 0 and n <= 255,
+    do: "\e[38;5;#{n}m"
+
+  defp color_to_sgr(n, :bg, _mode) when is_integer(n) and n >= 0 and n <= 255,
+    do: "\e[48;5;#{n}m"
+
+  defp color_to_sgr(_, _, _), do: ""
+
+  # Named color to SGR sequence
+  @spec named_color_to_sgr(atom(), :fg | :bg) :: String.t()
+  defp named_color_to_sgr(:black, :fg), do: "\e[30m"
+  defp named_color_to_sgr(:red, :fg), do: "\e[31m"
+  defp named_color_to_sgr(:green, :fg), do: "\e[32m"
+  defp named_color_to_sgr(:yellow, :fg), do: "\e[33m"
+  defp named_color_to_sgr(:blue, :fg), do: "\e[34m"
+  defp named_color_to_sgr(:magenta, :fg), do: "\e[35m"
+  defp named_color_to_sgr(:cyan, :fg), do: "\e[36m"
+  defp named_color_to_sgr(:white, :fg), do: "\e[37m"
+  defp named_color_to_sgr(:bright_black, :fg), do: "\e[90m"
+  defp named_color_to_sgr(:bright_red, :fg), do: "\e[91m"
+  defp named_color_to_sgr(:bright_green, :fg), do: "\e[92m"
+  defp named_color_to_sgr(:bright_yellow, :fg), do: "\e[93m"
+  defp named_color_to_sgr(:bright_blue, :fg), do: "\e[94m"
+  defp named_color_to_sgr(:bright_magenta, :fg), do: "\e[95m"
+  defp named_color_to_sgr(:bright_cyan, :fg), do: "\e[96m"
+  defp named_color_to_sgr(:bright_white, :fg), do: "\e[97m"
+
+  defp named_color_to_sgr(:black, :bg), do: "\e[40m"
+  defp named_color_to_sgr(:red, :bg), do: "\e[41m"
+  defp named_color_to_sgr(:green, :bg), do: "\e[42m"
+  defp named_color_to_sgr(:yellow, :bg), do: "\e[43m"
+  defp named_color_to_sgr(:blue, :bg), do: "\e[44m"
+  defp named_color_to_sgr(:magenta, :bg), do: "\e[45m"
+  defp named_color_to_sgr(:cyan, :bg), do: "\e[46m"
+  defp named_color_to_sgr(:white, :bg), do: "\e[47m"
+  defp named_color_to_sgr(:bright_black, :bg), do: "\e[100m"
+  defp named_color_to_sgr(:bright_red, :bg), do: "\e[101m"
+  defp named_color_to_sgr(:bright_green, :bg), do: "\e[102m"
+  defp named_color_to_sgr(:bright_yellow, :bg), do: "\e[103m"
+  defp named_color_to_sgr(:bright_blue, :bg), do: "\e[104m"
+  defp named_color_to_sgr(:bright_magenta, :bg), do: "\e[105m"
+  defp named_color_to_sgr(:bright_cyan, :bg), do: "\e[106m"
+  defp named_color_to_sgr(:bright_white, :bg), do: "\e[107m"
+  defp named_color_to_sgr(_, _), do: ""
+
+  # Converts RGB to 256-color palette index.
+  # Uses 6x6x6 color cube (indices 16-231) or grayscale (232-255).
+  @spec rgb_to_256(0..255, 0..255, 0..255) :: 0..255
+  defp rgb_to_256(r, g, b) do
+    # Check if it's close to grayscale
+    if abs(r - g) < 10 and abs(g - b) < 10 and abs(r - b) < 10 do
+      # Use grayscale ramp (232-255)
+      gray = div(r + g + b, 3)
+      232 + div(gray * 23, 255)
+    else
+      # Use 6x6x6 color cube (16-231)
+      r_idx = div(r * 5, 255)
+      g_idx = div(g * 5, 255)
+      b_idx = div(b * 5, 255)
+      16 + 36 * r_idx + 6 * g_idx + b_idx
+    end
+  end
+
+  # Converts RGB to 16-color foreground code.
+  @spec rgb_to_16_fg(0..255, 0..255, 0..255) :: 30..37 | 90..97
+  defp rgb_to_16_fg(r, g, b) do
+    {base, bright} = rgb_to_16_base(r, g, b)
+    if bright, do: base + 60, else: base
+  end
+
+  # Converts RGB to 16-color background code.
+  @spec rgb_to_16_bg(0..255, 0..255, 0..255) :: 40..47 | 100..107
+  defp rgb_to_16_bg(r, g, b) do
+    {base, bright} = rgb_to_16_base(r, g, b)
+    bg_base = base + 10
+    if bright, do: bg_base + 60, else: bg_base
+  end
+
+  # Determines the base 16-color index and brightness.
+  @spec rgb_to_16_base(0..255, 0..255, 0..255) :: {30..37, boolean()}
+  defp rgb_to_16_base(r, g, b) do
+    # Calculate intensity
+    brightness = div(r + g + b, 3)
+    bright = brightness > 127
+
+    # Determine color by dominant channels
+    r_on = r > 85
+    g_on = g > 85
+    b_on = b > 85
+
+    base =
+      case {r_on, g_on, b_on} do
+        {false, false, false} -> 30
+        {true, false, false} -> 31
+        {false, true, false} -> 32
+        {true, true, false} -> 33
+        {false, false, true} -> 34
+        {true, false, true} -> 35
+        {false, true, true} -> 36
+        {true, true, true} -> 37
+      end
+
+    {base, bright}
+  end
+
+  # Maps characters based on character set.
+  # For now, passes through unchanged. Box-drawing mapping will be added in Section 3.6.
+  @spec map_character(String.t(), character_set()) :: String.t()
+  defp map_character(char, :unicode), do: char
+  defp map_character(char, :ascii), do: char
+
+  # Builds a frame map from cells for incremental mode tracking.
+  @spec build_frame_map([{TermUI.Backend.position(), TermUI.Backend.cell()}]) :: map()
+  defp build_frame_map(cells) do
+    Map.new(cells, fn {pos, cell} -> {pos, cell} end)
+  end
+
+  # ===========================================================================
+  # Terminal I/O Helpers
+  # ===========================================================================
 
   # Writes data to the terminal, ignoring any errors.
   #
