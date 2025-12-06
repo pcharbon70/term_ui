@@ -179,49 +179,49 @@ Implement the mode query function.
 
 ## 4.4 Implement Line Reader
 
-- [ ] **Section 4.4 Complete**
+- [x] **Section 4.4 Complete**
 
 The `TermUI.Input.LineReader` module provides line-based input using `IO.gets/1`. This is **only** used by `TextInput.Line` for free-form text entry where shell line editing (backspace, cursor movement) is desirable.
 
 ### 4.4.1 Create Line Reader Module
 
-- [ ] **Task 4.4.1 Complete**
+- [x] **Task 4.4.1 Complete**
 
 Create the line reader module for TextInput.Line.
 
-- [ ] 4.4.1.1 Create `lib/term_ui/input/line_reader.ex` with `@moduledoc`
-- [ ] 4.4.1.2 Document that this is for TextInput.Line only
-- [ ] 4.4.1.3 Document that it uses shell line editing
+- [x] 4.4.1.1 Create `lib/term_ui/input/line_reader.ex` with `@moduledoc`
+- [x] 4.4.1.2 Document that this is for TextInput.Line only
+- [x] 4.4.1.3 Document that it uses shell line editing
 
 ### 4.4.2 Implement read_line/1
 
-- [ ] **Task 4.4.2 Complete**
+- [x] **Task 4.4.2 Complete**
 
 Implement the line reading function.
 
-- [ ] 4.4.2.1 Implement `read_line/1` accepting optional prompt
-- [ ] 4.4.2.2 Call `IO.gets(prompt)` for line input
-- [ ] 4.4.2.3 Trim trailing newline from result
-- [ ] 4.4.2.4 Return `{:ok, line}` or `:eof`
+- [x] 4.4.2.1 Implement `read_line/1` accepting optional prompt
+- [x] 4.4.2.2 Call `IO.gets(prompt)` for line input
+- [x] 4.4.2.3 Trim trailing newline from result
+- [x] 4.4.2.4 Return `{:ok, line}` or `:eof`
 
 ### 4.4.3 Implement read_line/2 with Validation
 
-- [ ] **Task 4.4.3 Complete**
+- [x] **Task 4.4.3 Complete**
 
 Implement line reading with optional validation.
 
-- [ ] 4.4.3.1 Implement `read_line/2` accepting prompt and validator function
-- [ ] 4.4.3.2 Read line using `IO.gets/1`
-- [ ] 4.4.3.3 Apply validator function to input
-- [ ] 4.4.3.4 Return `{:ok, line}` if valid, `{:error, reason}` if invalid
+- [x] 4.4.3.1 Implement `read_line/2` accepting prompt and validator function
+- [x] 4.4.3.2 Read line using `IO.gets/1`
+- [x] 4.4.3.3 Apply validator function to input
+- [x] 4.4.3.4 Return `{:ok, line}` if valid, `{:error, reason}` if invalid
 
 ### Unit Tests - Section 4.4
 
-- [ ] **Unit Tests 4.4 Complete**
-- [ ] Test `read_line/1` returns trimmed input (mock IO.gets)
-- [ ] Test `read_line/1` returns `:eof` on EOF
-- [ ] Test `read_line/2` applies validator
-- [ ] Test `read_line/2` returns error on validation failure
+- [x] **Unit Tests 4.4 Complete**
+- [x] Test `read_line/1` returns trimmed input (mock IO.gets)
+- [x] Test `read_line/1` returns `:eof` on EOF
+- [x] Test `read_line/2` applies validator
+- [x] Test `read_line/2` returns error on validation failure
 
 ---
 
