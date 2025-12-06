@@ -442,13 +442,13 @@ Test complete backend lifecycle in full_redraw mode.
 
 ### 3.8.2 Incremental Rendering Tests
 
-- [ ] **Task 3.8.2 Complete**
+- [x] **Task 3.8.2 Complete**
 
 Test incremental rendering mode functionality.
 
-- [ ] 3.8.2.1 Test first frame falls back to full redraw
-- [ ] 3.8.2.2 Test subsequent frames only update changes
-- [ ] 3.8.2.3 Test resize triggers full redraw
+- [x] 3.8.2.1 Test first frame falls back to full redraw
+- [x] 3.8.2.2 Test subsequent frames only update changes
+- [x] 3.8.2.3 Test resize triggers full redraw
 
 ### 3.8.3 Color Degradation Tests
 
