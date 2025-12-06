@@ -318,19 +318,19 @@ Implement character set selection and mapping for box-drawing and special charac
 
 ### 3.6.1 Create Character Set Module
 
-- [ ] **Task 3.6.1 Complete**
+- [x] **Task 3.6.1 Complete**
 
 Create the `TermUI.CharacterSet` module with Unicode and ASCII character sets.
 
-- [ ] 3.6.1.1 Create `lib/term_ui/character_set.ex` with `@moduledoc`
-- [ ] 3.6.1.2 Define `get(:unicode)` returning map with Unicode box-drawing characters
-- [ ] 3.6.1.3 Define `get(:ascii)` returning map with ASCII equivalents
-- [ ] 3.6.1.4 Include box corners: `tl`, `tr`, `bl`, `br`
-- [ ] 3.6.1.5 Include lines: `h_line`, `v_line`
-- [ ] 3.6.1.6 Include junctions: `t_up`, `t_down`, `t_left`, `t_right`, `cross`
-- [ ] 3.6.1.7 Include progress/gauge characters: `bar_full`, `bar_empty`, `bar_levels`
-- [ ] 3.6.1.8 Include check marks: `check`, `cross_mark`
-- [ ] 3.6.1.9 Include arrows: `arrow_up`, `arrow_down`, `arrow_left`, `arrow_right`
+- [x] 3.6.1.1 Create `lib/term_ui/character_set.ex` with `@moduledoc`
+- [x] 3.6.1.2 Define `get(:unicode)` returning map with Unicode box-drawing characters
+- [x] 3.6.1.3 Define `get(:ascii)` returning map with ASCII equivalents
+- [x] 3.6.1.4 Include box corners: `tl`, `tr`, `bl`, `br`
+- [x] 3.6.1.5 Include lines: `h_line`, `v_line`
+- [x] 3.6.1.6 Include junctions: `t_up`, `t_down`, `t_left`, `t_right`, `cross`
+- [x] 3.6.1.7 Include progress/gauge characters: `bar_full`, `bar_empty`, `bar_levels`
+- [x] 3.6.1.8 Include check marks: `check`, `cross_mark`
+- [x] 3.6.1.9 Include arrows: `arrow_up`, `arrow_down`, `arrow_left`, `arrow_right`
 
 ### 3.6.2 Implement Character Mapping in TTY Backend
 
