@@ -1,0 +1,414 @@
+# Phase 5: Widget Adaptation
+
+## Overview
+
+Phase 5 addresses widget compatibility with both raw and TTY backends. The key insight from our architecture is that **most widgets require no changes**—keyboard navigation works identically in both modes because `IO.getn/2` provides character-by-character input regardless of terminal mode.
+
+Widgets fall into three categories based on their requirements:
+
+1. **Fully compatible** (no changes needed): List, Menu, Tabs, Table, TreeView, Dialog, CommandPalette, Toast, Gauge, BarChart, LineChart, Sparkline, Canvas, Viewport. These widgets use keyboard navigation (arrows, Tab, Enter) which works identically in both modes.
+
+2. **TextInput variants**: The existing `TextInput` widget handles its own character input. We add `TextInput.Line` as a TTY-friendly variant that uses `IO.gets/1` for shell line editing support.
+
+3. **Mouse-dependent features**: Some widgets have mouse-only features that need keyboard fallbacks:
+   - `SplitPane`: Mouse dragging for resize → keyboard shortcuts (Ctrl+arrows)
+   - `ContextMenu`: Mouse positioning → inline numbered menu
+   - Scrollbars: Click-to-scroll → already have keyboard alternatives
+
+The main work in this phase is:
+- Creating `TextInput.Line` for TTY-friendly text entry
+- Adding keyboard alternatives for mouse-dependent features
+- Ensuring all widgets query capabilities for color/character degradation
+
+---
+
+## 5.1 Create TextInput.Line Widget
+
+- [ ] **Section 5.1 Complete**
+
+Create a TTY-friendly variant of TextInput that uses `IO.gets/1` for line-based input. This widget is useful when shell line editing (backspace, history, cursor movement) is desirable.
+
+### 5.1.1 Create TextInput.Line Module
+
+- [x] **Task 5.1.1 Complete**
+
+Create the line-based text input module.
+
+- [x] 5.1.1.1 Create `lib/term_ui/widgets/text_input/line.ex` with `@moduledoc`
+- [x] 5.1.1.2 Document that this uses shell line editing via `IO.gets/1`
+- [x] 5.1.1.3 Document use case: free-form text entry where shell editing is preferred
+- [x] 5.1.1.4 Note: standard TextInput still works in TTY mode for character-by-character input
+
+### 5.1.2 Define TextInput.Line State
+
+- [ ] **Task 5.1.2 Complete**
+
+Define the state structure for line-based input.
+
+- [ ] 5.1.2.1 Define `defstruct` with field `prompt :: String.t()` for input prompt
+- [ ] 5.1.2.2 Define field `value :: String.t()` for current/last value
+- [ ] 5.1.2.3 Define field `label :: String.t()` for display label
+- [ ] 5.1.2.4 Define field `validator :: (String.t() -> :ok | {:error, String.t()}) | nil`
+- [ ] 5.1.2.5 Define field `placeholder :: String.t()` shown when empty
+
+### 5.1.3 Implement Rendering
+
+- [ ] **Task 5.1.3 Complete**
+
+Implement rendering for the line input widget.
+
+- [ ] 5.1.3.1 Render label on first line if provided
+- [ ] 5.1.3.2 Render prompt + current value on input line
+- [ ] 5.1.3.3 Render validation error below if present
+- [ ] 5.1.3.4 Support styling via theme
+
+### 5.1.4 Implement Input Handling
+
+- [ ] **Task 5.1.4 Complete**
+
+Implement the input reading flow.
+
+- [ ] 5.1.4.1 Implement `read/1` that calls `LineReader.read_line/1`
+- [ ] 5.1.4.2 Apply validator if configured
+- [ ] 5.1.4.3 Update state with new value
+- [ ] 5.1.4.4 Return `{:ok, value, state}` or `{:error, reason, state}`
+
+### 5.1.5 Implement Focus Behavior
+
+- [ ] **Task 5.1.5 Complete**
+
+Implement focus handling for the widget.
+
+- [ ] 5.1.5.1 When focused, initiate line read
+- [ ] 5.1.5.2 Block until Enter pressed (shell handles editing)
+- [ ] 5.1.5.3 Return focus to parent after input complete
+- [ ] 5.1.5.4 Handle Ctrl+C to cancel input
+
+### Unit Tests - Section 5.1
+
+- [ ] **Unit Tests 5.1 Complete**
+- [ ] Test TextInput.Line initializes with default state
+- [ ] Test rendering includes label and prompt
+- [ ] Test `read/1` returns entered value (mock LineReader)
+- [ ] Test validator is applied to input
+- [ ] Test invalid input returns error with message
+
+---
+
+## 5.2 Add Keyboard Alternatives for SplitPane
+
+- [ ] **Section 5.2 Complete**
+
+Add keyboard-based resize controls to SplitPane for environments where mouse dragging is unavailable or not preferred.
+
+### 5.2.1 Define Keyboard Resize Shortcuts
+
+- [ ] **Task 5.2.1 Complete**
+
+Define keyboard shortcuts for resizing panes.
+
+- [ ] 5.2.1.1 Ctrl+Left: Decrease left/top pane size
+- [ ] 5.2.1.2 Ctrl+Right: Increase left/top pane size
+- [ ] 5.2.1.3 Ctrl+Up: Decrease top pane size (vertical split)
+- [ ] 5.2.1.4 Ctrl+Down: Increase top pane size (vertical split)
+- [ ] 5.2.1.5 Document shortcuts in widget moduledoc
+
+### 5.2.2 Implement Keyboard Event Handling
+
+- [ ] **Task 5.2.2 Complete**
+
+Handle keyboard events for resize.
+
+- [ ] 5.2.2.1 Add `handle_key/2` clauses for Ctrl+arrow combinations
+- [ ] 5.2.2.2 Calculate new split ratio based on step size (default 5%)
+- [ ] 5.2.2.3 Clamp ratio to min/max bounds
+- [ ] 5.2.2.4 Update state with new ratio
+
+### 5.2.3 Add Resize Step Configuration
+
+- [ ] **Task 5.2.3 Complete**
+
+Allow configuring keyboard resize step size.
+
+- [ ] 5.2.3.1 Add `:resize_step` option (default 0.05 = 5%)
+- [ ] 5.2.3.2 Add `:min_ratio` option (default 0.1 = 10%)
+- [ ] 5.2.3.3 Add `:max_ratio` option (default 0.9 = 90%)
+
+### Unit Tests - Section 5.2
+
+- [ ] **Unit Tests 5.2 Complete**
+- [ ] Test Ctrl+Right increases left pane ratio
+- [ ] Test Ctrl+Left decreases left pane ratio
+- [ ] Test ratio is clamped to min/max bounds
+- [ ] Test resize_step is configurable
+- [ ] Test keyboard resize works in both modes
+
+---
+
+## 5.3 Add Keyboard Alternative for ContextMenu
+
+- [ ] **Section 5.3 Complete**
+
+ContextMenu typically appears at mouse cursor position. Add an inline numbered menu variant for keyboard-only environments.
+
+### 5.3.1 Create ContextMenu.Inline Variant
+
+- [ ] **Task 5.3.1 Complete**
+
+Create an inline context menu that doesn't require mouse positioning.
+
+- [ ] 5.3.1.1 Create `lib/term_ui/widgets/context_menu/inline.ex`
+- [ ] 5.3.1.2 Render menu items with numbers: `[1] Copy  [2] Paste  [3] Delete`
+- [ ] 5.3.1.3 Accept number keys for direct selection
+- [ ] 5.3.1.4 Support arrow key navigation as well
+
+### 5.3.2 Implement show/2 with Position Fallback
+
+- [ ] **Task 5.3.2 Complete**
+
+Implement menu display with position fallback.
+
+- [ ] 5.3.2.1 If position provided, show at position (mouse mode)
+- [ ] 5.3.2.2 If no position, show inline below current focus
+- [ ] 5.3.2.3 Auto-detect based on backend capabilities
+
+### 5.3.3 Implement Number Key Selection
+
+- [ ] **Task 5.3.3 Complete**
+
+Handle number key presses for direct item selection.
+
+- [ ] 5.3.3.1 Map number keys 1-9 to menu item indices
+- [ ] 5.3.3.2 Immediately select and close on number press
+- [ ] 5.3.3.3 Show numbers in rendering when in inline mode
+
+### Unit Tests - Section 5.3
+
+- [ ] **Unit Tests 5.3 Complete**
+- [ ] Test inline menu renders with numbers
+- [ ] Test number key selects correct item
+- [ ] Test arrow navigation still works
+- [ ] Test Enter confirms selection
+- [ ] Test Escape cancels menu
+
+---
+
+## 5.4 Ensure Color Degradation in Widgets
+
+- [ ] **Section 5.4 Complete**
+
+Ensure all widgets that use colors query backend capabilities and degrade gracefully.
+
+### 5.4.1 Audit Widget Color Usage
+
+- [ ] **Task 5.4.1 Complete**
+
+Identify all widgets that specify colors.
+
+- [ ] 5.4.1.1 List all widgets with hardcoded colors
+- [ ] 5.4.1.2 List all widgets using theme colors
+- [ ] 5.4.1.3 Identify any widgets with RGB-only colors
+
+### 5.4.2 Implement Theme-Based Colors
+
+- [ ] **Task 5.4.2 Complete**
+
+Ensure colors come from theme system.
+
+- [ ] 5.4.2.1 Verify all widgets use `Theme.color/1` or similar
+- [ ] 5.4.2.2 Ensure themes define semantic color names
+- [ ] 5.4.2.3 Theme system handles degradation via backend capabilities
+
+### 5.4.3 Add Monochrome Fallbacks
+
+- [ ] **Task 5.4.3 Complete**
+
+Ensure widgets remain usable in monochrome mode.
+
+- [ ] 5.4.3.1 Selected items use reverse video in mono mode
+- [ ] 5.4.3.2 Focused items use bold in mono mode
+- [ ] 5.4.3.3 Error states use underline in mono mode
+- [ ] 5.4.3.4 Charts use character differentiation (*, +, o, x)
+
+### Unit Tests - Section 5.4
+
+- [ ] **Unit Tests 5.4 Complete**
+- [ ] Test widgets render correctly in true_color mode
+- [ ] Test widgets render correctly in color_256 mode
+- [ ] Test widgets render correctly in color_16 mode
+- [ ] Test widgets render correctly in monochrome mode
+- [ ] Test selection is visible in all color modes
+
+---
+
+## 5.5 Ensure Character Set Handling in Widgets
+
+- [ ] **Section 5.5 Complete**
+
+Ensure all widgets that use box-drawing or special characters query the character set and use appropriate fallbacks.
+
+### 5.5.1 Audit Widget Character Usage
+
+- [ ] **Task 5.5.1 Complete**
+
+Identify all widgets using special characters.
+
+- [ ] 5.5.1.1 List widgets using box-drawing characters
+- [ ] 5.5.1.2 List widgets using arrows or symbols
+- [ ] 5.5.1.3 List widgets using progress/gauge characters
+
+### 5.5.2 Use CharacterSet Module
+
+- [ ] **Task 5.5.2 Complete**
+
+Ensure widgets use CharacterSet for special characters.
+
+- [ ] 5.5.2.1 Replace hardcoded box chars with `CharacterSet.get(:tl)` etc.
+- [ ] 5.5.2.2 Replace hardcoded arrows with `CharacterSet.get(:arrow_right)` etc.
+- [ ] 5.5.2.3 Replace hardcoded progress chars with `CharacterSet.get(:bar_full)` etc.
+
+### 5.5.3 Verify ASCII Fallbacks
+
+- [ ] **Task 5.5.3 Complete**
+
+Verify ASCII fallbacks render correctly.
+
+- [ ] 5.5.3.1 Test box borders render with +, -, | in ASCII mode
+- [ ] 5.5.3.2 Test arrows render with <, >, ^, v in ASCII mode
+- [ ] 5.5.3.3 Test progress bars render with #, - in ASCII mode
+
+### Unit Tests - Section 5.5
+
+- [ ] **Unit Tests 5.5 Complete**
+- [ ] Test widgets render correctly with Unicode character set
+- [ ] Test widgets render correctly with ASCII character set
+- [ ] Test box-drawing degrades to ASCII correctly
+- [ ] Test arrows degrade to ASCII correctly
+- [ ] Test gauges/progress degrade to ASCII correctly
+
+---
+
+## 5.6 Document Widget Compatibility
+
+- [ ] **Section 5.6 Complete**
+
+Create documentation explaining widget behavior across backends.
+
+### 5.6.1 Create Compatibility Matrix
+
+- [ ] **Task 5.6.1 Complete**
+
+Document widget compatibility.
+
+- [ ] 5.6.1.1 Create table: Widget | Raw Mode | TTY Mode | Notes
+- [ ] 5.6.1.2 List fully compatible widgets (majority)
+- [ ] 5.6.1.3 List widgets with variants (TextInput → TextInput.Line)
+- [ ] 5.6.1.4 List features requiring keyboard alternatives (SplitPane drag, ContextMenu position)
+
+### 5.6.2 Document Best Practices
+
+- [ ] **Task 5.6.2 Complete**
+
+Document best practices for widget development.
+
+- [ ] 5.6.2.1 Always use Theme for colors
+- [ ] 5.6.2.2 Always use CharacterSet for special characters
+- [ ] 5.6.2.3 Provide keyboard alternatives for mouse features
+- [ ] 5.6.2.4 Test with both backends during development
+
+### Unit Tests - Section 5.6
+
+- [ ] **Unit Tests 5.6 Complete**
+- [ ] Test documentation compiles without errors
+- [ ] Test code examples in documentation work
+
+---
+
+## 5.7 Integration Tests
+
+- [ ] **Section 5.7 Complete**
+
+Integration tests verify widgets work correctly across both backends.
+
+### 5.7.1 TextInput.Line Integration
+
+- [ ] **Task 5.7.1 Complete**
+
+Test TextInput.Line works correctly.
+
+- [ ] 5.7.1.1 Test line input with shell editing
+- [ ] 5.7.1.2 Test validation feedback
+- [ ] 5.7.1.3 Test focus flow
+
+### 5.7.2 Keyboard Navigation Tests
+
+- [ ] **Task 5.7.2 Complete**
+
+Test keyboard navigation works identically in both modes.
+
+- [ ] 5.7.2.1 Test List arrow navigation in raw mode
+- [ ] 5.7.2.2 Test List arrow navigation in TTY mode
+- [ ] 5.7.2.3 Test Menu navigation in both modes
+- [ ] 5.7.2.4 Test Tabs navigation in both modes
+- [ ] 5.7.2.5 Verify identical behavior between modes
+
+### 5.7.3 Mouse Fallback Tests
+
+- [ ] **Task 5.7.3 Complete**
+
+Test mouse feature fallbacks work correctly.
+
+- [ ] 5.7.3.1 Test SplitPane keyboard resize
+- [ ] 5.7.3.2 Test ContextMenu.Inline number selection
+- [ ] 5.7.3.3 Test scrollbar keyboard alternatives
+
+### 5.7.4 Visual Degradation Tests
+
+- [ ] **Task 5.7.4 Complete**
+
+Test visual degradation across capability levels.
+
+- [ ] 5.7.4.1 Test rendering in each color mode
+- [ ] 5.7.4.2 Test rendering with Unicode vs ASCII
+- [ ] 5.7.4.3 Test combined degradation (monochrome + ASCII)
+
+---
+
+## Success Criteria
+
+1. **TextInput.Line**: New widget provides shell line editing via `IO.gets/1`
+2. **Keyboard Alternatives**: SplitPane and ContextMenu have keyboard-only modes
+3. **Color Degradation**: All widgets use theme colors with graceful degradation
+4. **Character Sets**: All widgets use CharacterSet with ASCII fallbacks
+5. **Navigation Equivalence**: Arrow keys, Tab, Enter work identically in both modes
+6. **Documentation**: Compatibility matrix and best practices documented
+7. **Test Coverage**: All unit and integration tests pass
+
+---
+
+## Provides Foundation
+
+This phase establishes:
+- **Phase 6**: Complete widget set for runtime integration
+
+---
+
+## Key Outputs
+
+- `lib/term_ui/widgets/text_input/line.ex` - Line-based text input
+- `lib/term_ui/widgets/context_menu/inline.ex` - Inline context menu
+- Updated SplitPane with keyboard resize
+- Updated widgets using CharacterSet
+- `docs/widget-compatibility.md` - Compatibility documentation
+- `test/term_ui/widgets/` - Unit tests
+- `test/integration/widget_adaptation_test.exs` - Integration tests
+
+---
+
+## Critical Files to Reference
+
+- `lib/term_ui/widgets/text_input.ex` - Existing TextInput implementation
+- `lib/term_ui/widgets/split_pane.ex` - SplitPane for keyboard resize
+- `lib/term_ui/widgets/context_menu.ex` - ContextMenu for inline variant
+- `lib/term_ui/character_set.ex` - Character set module from Phase 3
+- `lib/term_ui/theme.ex` - Theme system for color handling
