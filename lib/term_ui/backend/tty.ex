@@ -102,6 +102,10 @@ defmodule TermUI.Backend.TTY do
   # Attribute control sequences
   @reset_attrs "\e[0m"
 
+  # Maximum input buffer size to prevent memory exhaustion from malformed
+  # input streams with unterminated escape sequences.
+  @max_input_buffer_size 1024
+
   # ===========================================================================
   # Type Definitions and State Structure
   # ===========================================================================
@@ -388,9 +392,17 @@ defmodule TermUI.Backend.TTY do
   Hides the terminal cursor.
 
   Outputs `\\e[?25l` escape sequence.
+
+  This operation is idempotent - if the cursor is already hidden,
+  no escape sequence is written.
   """
   @spec hide_cursor(t()) :: {:ok, t()}
-  def hide_cursor(state) do
+  def hide_cursor(%__MODULE__{cursor_visible: false} = state) do
+    # Already hidden - idempotent no-op
+    {:ok, state}
+  end
+
+  def hide_cursor(%__MODULE__{} = state) do
     safe_write(@cursor_hide)
     {:ok, %{state | cursor_visible: false}}
   end
@@ -400,9 +412,17 @@ defmodule TermUI.Backend.TTY do
   Shows the terminal cursor.
 
   Outputs `\\e[?25h` escape sequence.
+
+  This operation is idempotent - if the cursor is already visible,
+  no escape sequence is written.
   """
   @spec show_cursor(t()) :: {:ok, t()}
-  def show_cursor(state) do
+  def show_cursor(%__MODULE__{cursor_visible: true} = state) do
+    # Already visible - idempotent no-op
+    {:ok, state}
+  end
+
+  def show_cursor(%__MODULE__{} = state) do
     safe_write(@cursor_show)
     {:ok, %{state | cursor_visible: true}}
   end
@@ -631,9 +651,9 @@ defmodule TermUI.Backend.TTY do
         # Read a single character from input
         case read_input_char() do
           {:ok, char_data} ->
-            # Combine with buffer and parse
-            combined = buffer <> char_data
-            parse_and_return_event(state, combined)
+            # Combine with buffer (with size limit protection) and parse
+            new_state = append_to_input_buffer(state, char_data)
+            parse_and_return_event(new_state, new_state.input_buffer)
 
           :eof ->
             {:error, :eof, state}
@@ -702,7 +722,40 @@ defmodule TermUI.Backend.TTY do
       {[], remaining} ->
         # No complete event - buffer the input for next call
         # This happens with partial escape sequences
-        {:timeout, %{state | input_buffer: remaining}}
+        # Apply buffer size limit to prevent memory exhaustion
+        new_state = apply_buffer_limit(%{state | input_buffer: remaining})
+        {:timeout, new_state}
+    end
+  end
+
+  # Appends data to the input buffer with size limit protection.
+  # If the buffer exceeds @max_input_buffer_size, truncates from the beginning
+  # keeping only the most recent bytes. This prevents memory exhaustion from
+  # malformed input streams with unterminated escape sequences.
+  @spec append_to_input_buffer(t(), binary()) :: t()
+  defp append_to_input_buffer(state, data) do
+    new_buffer = state.input_buffer <> data
+    apply_buffer_limit(%{state | input_buffer: new_buffer})
+  end
+
+  # Applies buffer size limit, truncating if necessary.
+  @spec apply_buffer_limit(t()) :: t()
+  defp apply_buffer_limit(%{input_buffer: buffer} = state) do
+    buffer_size = byte_size(buffer)
+
+    if buffer_size > @max_input_buffer_size do
+      # Keep only the most recent bytes (potential partial escape sequence)
+      # We keep 256 bytes to preserve any valid partial sequence
+      keep_size = min(256, buffer_size)
+      truncated = binary_part(buffer, buffer_size - keep_size, keep_size)
+
+      Logger.warning(
+        "TTY input buffer overflow (#{buffer_size} bytes), truncating to #{keep_size} bytes"
+      )
+
+      %{state | input_buffer: truncated}
+    else
+      state
     end
   end
 
