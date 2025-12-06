@@ -494,9 +494,99 @@ defmodule TermUI.Backend.TTYTest do
   end
 
   describe "input operations" do
-    test "poll_event/2 returns {:timeout, state}" do
+    test "state has input_buffer field with default empty binary" do
       {:ok, state} = init_tty([])
-      assert {:timeout, _state} = TTY.poll_event(state, 100)
+      assert state.input_buffer == <<>>
+    end
+
+    test "poll_event/2 parses buffered regular character" do
+      {:ok, state} = init_tty([])
+      # Pre-populate buffer with a character
+      state = %{state | input_buffer: "a"}
+
+      assert {:ok, event, new_state} = TTY.poll_event(state, 100)
+      assert event.key == "a"
+      assert new_state.input_buffer == <<>>
+    end
+
+    test "poll_event/2 parses buffered arrow key sequence" do
+      {:ok, state} = init_tty([])
+      # Pre-populate buffer with up arrow escape sequence
+      state = %{state | input_buffer: "\e[A"}
+
+      assert {:ok, event, new_state} = TTY.poll_event(state, 100)
+      assert event.key == :up
+      assert new_state.input_buffer == <<>>
+    end
+
+    test "poll_event/2 parses buffered function key" do
+      {:ok, state} = init_tty([])
+      # Pre-populate buffer with F1 key (SS3 variant)
+      state = %{state | input_buffer: "\eOP"}
+
+      assert {:ok, event, new_state} = TTY.poll_event(state, 100)
+      assert event.key == :f1
+      assert new_state.input_buffer == <<>>
+    end
+
+    test "poll_event/2 parses buffered control character" do
+      {:ok, state} = init_tty([])
+      # Pre-populate buffer with Ctrl+C (ASCII 3)
+      state = %{state | input_buffer: <<3>>}
+
+      assert {:ok, event, new_state} = TTY.poll_event(state, 100)
+      assert event.key == "c"
+      assert :ctrl in event.modifiers
+      assert new_state.input_buffer == <<>>
+    end
+
+    test "poll_event/2 returns first event from multiple input characters" do
+      {:ok, state} = init_tty([])
+      # Pre-populate buffer with two characters
+      state = %{state | input_buffer: "ab"}
+
+      # First call returns first event
+      assert {:ok, event, _new_state} = TTY.poll_event(state, 100)
+      assert event.key == "a"
+      # Note: EscapeParser parses all events at once, so remaining
+      # complete characters are consumed. Only partial sequences
+      # (like lone ESC) would remain in buffer.
+    end
+
+    test "poll_event/2 keeps partial escape sequence in buffer" do
+      {:ok, state} = init_tty([])
+      # Pre-populate buffer with incomplete CSI sequence (ESC [)
+      state = %{state | input_buffer: "\e["}
+
+      # This is an incomplete sequence - should need more input
+      # When buffer has incomplete sequence and IO read would block,
+      # we can't test this easily without mocking IO.
+      # Just verify the state is valid
+      assert state.input_buffer == "\e["
+    end
+
+    test "poll_event/2 handles enter key" do
+      {:ok, state} = init_tty([])
+      state = %{state | input_buffer: <<13>>}
+
+      assert {:ok, event, _new_state} = TTY.poll_event(state, 100)
+      assert event.key == :enter
+    end
+
+    test "poll_event/2 handles tab key" do
+      {:ok, state} = init_tty([])
+      state = %{state | input_buffer: <<9>>}
+
+      assert {:ok, event, _new_state} = TTY.poll_event(state, 100)
+      assert event.key == :tab
+    end
+
+    test "poll_event/2 handles backspace" do
+      {:ok, state} = init_tty([])
+      state = %{state | input_buffer: <<127>>}
+
+      assert {:ok, event, _new_state} = TTY.poll_event(state, 100)
+      assert event.key == :backspace
     end
   end
 

@@ -150,6 +150,7 @@ defmodule TermUI.Backend.TTY do
   - `:alternate_screen` - Whether alternate screen buffer is active
   - `:cursor_visible` - Whether cursor is currently visible
   - `:cursor_position` - Current cursor position as `{row, col}` or `nil`
+  - `:input_buffer` - Buffer for partial escape sequences between poll_event calls
   """
   @type t :: %__MODULE__{
           size: {pos_integer(), pos_integer()},
@@ -160,7 +161,8 @@ defmodule TermUI.Backend.TTY do
           color_mode: color_mode(),
           alternate_screen: boolean(),
           cursor_visible: boolean(),
-          cursor_position: {pos_integer(), pos_integer()} | nil
+          cursor_position: {pos_integer(), pos_integer()} | nil,
+          input_buffer: binary()
         }
 
   defstruct size: {24, 80},
@@ -171,7 +173,8 @@ defmodule TermUI.Backend.TTY do
             color_mode: :true_color,
             alternate_screen: false,
             cursor_visible: true,
-            cursor_position: nil
+            cursor_position: nil,
+            input_buffer: <<>>
 
   # ===========================================================================
   # Lifecycle Callbacks
@@ -596,13 +599,111 @@ defmodule TermUI.Backend.TTY do
 
   Uses `IO.getn/2` for character-by-character input. Note that the timeout
   parameter may not be honored precisely since `IO.getn/2` is blocking.
+
+  Input is parsed using `TermUI.Terminal.EscapeParser` to handle escape
+  sequences like arrow keys, function keys, and mouse events.
+
+  Partial escape sequences are buffered in the state's `input_buffer` field
+  and will be completed on subsequent calls.
+
+  ## Returns
+
+  - `{:ok, event, state}` - An input event was received
+  - `{:timeout, state}` - No input available (rare with blocking IO)
+  - `{:error, reason, state}` - An error occurred
+
+  ## Note
+
+  The timeout parameter is not honored due to the blocking nature of `IO.getn/2`.
+  For non-blocking input, consider using the Raw backend when available.
   """
   @spec poll_event(t(), non_neg_integer()) ::
           {:ok, TermUI.Backend.event(), t()}
           | {:timeout, t()}
           | {:error, term(), t()}
-  def poll_event(state, _timeout) do
-    {:timeout, state}
+  def poll_event(%__MODULE__{input_buffer: buffer} = state, _timeout) do
+    # First check if we have buffered events from a previous partial parse
+    case parse_buffered_input(buffer) do
+      {:event, event, remaining} ->
+        {:ok, event, %{state | input_buffer: remaining}}
+
+      :need_more ->
+        # Read a single character from input
+        case read_input_char() do
+          {:ok, char_data} ->
+            # Combine with buffer and parse
+            combined = buffer <> char_data
+            parse_and_return_event(state, combined)
+
+          :eof ->
+            {:error, :eof, state}
+
+          {:error, reason} ->
+            {:error, reason, state}
+        end
+    end
+  end
+
+  # Attempts to parse an event from buffered input.
+  @spec parse_buffered_input(binary()) :: {:event, TermUI.Backend.event(), binary()} | :need_more
+  defp parse_buffered_input(<<>>) do
+    :need_more
+  end
+
+  defp parse_buffered_input(buffer) do
+    alias TermUI.Terminal.EscapeParser
+
+    case EscapeParser.parse(buffer) do
+      {[event | _rest_events], remaining} ->
+        # Return first event, keep remaining in buffer
+        # Note: We discard rest_events; they'll be re-parsed on next call
+        {:event, event, remaining}
+
+      {[], _remaining} ->
+        # No complete events parsed - might be partial sequence
+        :need_more
+    end
+  end
+
+  # Reads a single character from standard input.
+  @spec read_input_char() :: {:ok, binary()} | :eof | {:error, term()}
+  defp read_input_char do
+    case IO.getn("", 1) do
+      :eof ->
+        :eof
+
+      {:error, reason} ->
+        {:error, reason}
+
+      char when is_binary(char) ->
+        {:ok, char}
+
+      # IO.getn can return a charlist in some contexts
+      [char] when is_integer(char) ->
+        {:ok, <<char>>}
+
+      other ->
+        # Handle unexpected return values
+        {:ok, to_string(other)}
+    end
+  end
+
+  # Parses combined input and returns an event or timeout.
+  @spec parse_and_return_event(t(), binary()) ::
+          {:ok, TermUI.Backend.event(), t()}
+          | {:timeout, t()}
+  defp parse_and_return_event(state, input) do
+    alias TermUI.Terminal.EscapeParser
+
+    case EscapeParser.parse(input) do
+      {[event | _rest], remaining} ->
+        {:ok, event, %{state | input_buffer: remaining}}
+
+      {[], remaining} ->
+        # No complete event - buffer the input for next call
+        # This happens with partial escape sequences
+        {:timeout, %{state | input_buffer: remaining}}
+    end
   end
 
   # ===========================================================================

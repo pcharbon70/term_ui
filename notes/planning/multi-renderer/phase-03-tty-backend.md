@@ -367,7 +367,7 @@ Provide runtime access to current character set.
 
 ## 3.7 Implement Remaining Callbacks
 
-- [ ] **Section 3.7 Complete**
+- [x] **Section 3.7 Complete**
 
 Implement the remaining backend callbacks required by the behaviour.
 
@@ -402,25 +402,25 @@ Implement output flush.
 
 ### 3.7.4 Implement poll_event/2 Callback
 
-- [ ] **Task 3.7.4 Complete**
+- [x] **Task 3.7.4 Complete**
 
 Implement input polling using `IO.getn/2` for character-by-character input. Even in TTY mode, we can read individual characters and escape sequences.
 
-- [ ] 3.7.4.1 Implement `@impl true` `poll_event/2` accepting state and timeout
-- [ ] 3.7.4.2 Use `IO.getn("", 1)` to read single character (blocking)
-- [ ] 3.7.4.3 Parse escape sequences using `TermUI.Terminal.EscapeParser`
-- [ ] 3.7.4.4 Return `{:ok, event, state}` for key events
-- [ ] 3.7.4.5 Note: timeout parameter may not be honored (IO.getn is blocking)
+- [x] 3.7.4.1 Implement `@impl true` `poll_event/2` accepting state and timeout
+- [x] 3.7.4.2 Use `IO.getn("", 1)` to read single character (blocking)
+- [x] 3.7.4.3 Parse escape sequences using `TermUI.Terminal.EscapeParser`
+- [x] 3.7.4.4 Return `{:ok, event, state}` for key events
+- [x] 3.7.4.5 Note: timeout parameter may not be honored (IO.getn is blocking)
 
 ### Unit Tests - Section 3.7
 
-- [ ] **Unit Tests 3.7 Complete**
-- [ ] Test `move_cursor/2` returns `{:ok, state}`
-- [ ] Test `hide_cursor/1` returns `{:ok, state}`
-- [ ] Test `show_cursor/1` returns `{:ok, state}`
-- [ ] Test `size/1` returns configured size
-- [ ] Test `flush/1` returns `{:ok, state}`
-- [ ] Test `poll_event/2` returns `{:ok, event, state}` for key input
+- [x] **Unit Tests 3.7 Complete**
+- [x] Test `move_cursor/2` returns `{:ok, state}`
+- [x] Test `hide_cursor/1` returns `{:ok, state}`
+- [x] Test `show_cursor/1` returns `{:ok, state}`
+- [x] Test `size/1` returns configured size
+- [x] Test `flush/1` returns `{:ok, state}`
+- [x] Test `poll_event/2` returns `{:ok, event, state}` for key input
 
 ---
 
