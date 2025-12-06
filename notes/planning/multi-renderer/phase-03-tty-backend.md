@@ -393,12 +393,12 @@ Implement terminal size query.
 
 ### 3.7.3 Implement flush/1 Callback
 
-- [ ] **Task 3.7.3 Complete**
+- [x] **Task 3.7.3 Complete**
 
 Implement output flush.
 
-- [ ] 3.7.3.1 Implement `@impl true` `flush/1` returning `{:ok, state}`
-- [ ] 3.7.3.2 TTY output is synchronous, so flush is largely a no-op
+- [x] 3.7.3.1 Implement `@impl true` `flush/1` returning `{:ok, state}`
+- [x] 3.7.3.2 TTY output is synchronous, so flush is largely a no-op
 
 ### 3.7.4 Implement poll_event/2 Callback
 

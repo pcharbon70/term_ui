@@ -482,6 +482,15 @@ defmodule TermUI.Backend.TTYTest do
       {:ok, state} = init_tty([])
       assert {:ok, _state} = TTY.flush(state)
     end
+
+    test "flush/1 preserves state unchanged" do
+      {:ok, state} = init_tty(size: {50, 120}, line_mode: :incremental)
+      {:ok, flushed_state} = TTY.flush(state)
+
+      assert flushed_state.size == {50, 120}
+      assert flushed_state.line_mode == :incremental
+      assert flushed_state == state
+    end
   end
 
   describe "input operations" do
