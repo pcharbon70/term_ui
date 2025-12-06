@@ -864,4 +864,176 @@ defmodule TermUI.Backend.TTYTest do
       refute output =~ "\e[31m"
     end
   end
+
+  # ===========================================================================
+  # Section 3.3.3 Tests - Row-by-Row Output with Style Delta Tracking
+  # ===========================================================================
+
+  describe "row-by-row output (Section 3.3.3)" do
+    test "consecutive cells with same style only output style once" do
+      {:ok, state} = init_tty([])
+
+      # Two cells with identical style
+      cells = [
+        {{1, 1}, {"A", :red, :default, []}},
+        {{1, 2}, {"B", :red, :default, []}}
+      ]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      # Count occurrences of red foreground SGR
+      red_count = length(String.split(output, "\e[31m")) - 1
+
+      # Should only output red once (for first cell), not twice
+      assert red_count == 1
+    end
+
+    test "cells with different styles output style for each change" do
+      {:ok, state} = init_tty([])
+
+      # Two cells with different styles
+      cells = [
+        {{1, 1}, {"A", :red, :default, []}},
+        {{1, 2}, {"B", :blue, :default, []}}
+      ]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      # Should have both red and blue
+      assert output =~ "\e[31m"
+      assert output =~ "\e[34m"
+    end
+
+    test "style change in attributes triggers new SGR" do
+      {:ok, state} = init_tty([])
+
+      cells = [
+        {{1, 1}, {"A", :default, :default, [:bold]}},
+        {{1, 2}, {"B", :default, :default, []}}
+      ]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      # Count reset sequences - should have at least 2 (one for style change, one at end)
+      reset_count = length(String.split(output, "\e[0m")) - 1
+
+      assert reset_count >= 2
+    end
+
+    test "gap filling preserves style tracking" do
+      {:ok, state} = init_tty([])
+
+      # Cells with gap between them, same style
+      cells = [
+        {{1, 1}, {"A", :green, :default, []}},
+        {{1, 5}, {"B", :green, :default, []}}
+      ]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      # Gap should be filled with spaces
+      assert output =~ "A   "
+
+      # Green should only be output once
+      green_count = length(String.split(output, "\e[32m")) - 1
+      assert green_count == 1
+    end
+
+    test "outputs cells left-to-right" do
+      {:ok, state} = init_tty([])
+
+      # Cells given out of order
+      cells = [
+        {{1, 3}, {"C", :default, :default, []}},
+        {{1, 1}, {"A", :default, :default, []}},
+        {{1, 2}, {"B", :default, :default, []}}
+      ]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      # Characters should appear in correct order
+      a_pos = :binary.match(output, "A")
+      b_pos = :binary.match(output, "B")
+      c_pos = :binary.match(output, "C")
+
+      assert a_pos != :nomatch
+      assert b_pos != :nomatch
+      assert c_pos != :nomatch
+
+      {a_start, _} = a_pos
+      {b_start, _} = b_pos
+      {c_start, _} = c_pos
+
+      assert a_start < b_start
+      assert b_start < c_start
+    end
+
+    test "multiple rows maintain correct ordering" do
+      {:ok, state} = init_tty([])
+
+      cells = [
+        {{2, 1}, {"2", :default, :default, []}},
+        {{1, 1}, {"1", :default, :default, []}},
+        {{3, 1}, {"3", :default, :default, []}}
+      ]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      # Row positioning should be in order
+      row1_pos = :binary.match(output, "\e[1;1H")
+      row2_pos = :binary.match(output, "\e[2;1H")
+      row3_pos = :binary.match(output, "\e[3;1H")
+
+      assert row1_pos != :nomatch
+      assert row2_pos != :nomatch
+      assert row3_pos != :nomatch
+
+      {r1_start, _} = row1_pos
+      {r2_start, _} = row2_pos
+      {r3_start, _} = row3_pos
+
+      assert r1_start < r2_start
+      assert r2_start < r3_start
+    end
+
+    test "each row ends with attribute reset" do
+      {:ok, state} = init_tty([])
+
+      cells = [
+        {{1, 1}, {"A", :red, :default, []}},
+        {{2, 1}, {"B", :blue, :default, []}}
+      ]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      # Should have reset after each row
+      # Row 1: [1;1H + style + A + reset
+      # Row 2: [2;1H + style + B + reset
+      reset_count = length(String.split(output, "\e[0m")) - 1
+
+      # At least 2 resets (one per row) plus any style changes
+      assert reset_count >= 2
+    end
+  end
 end

@@ -528,26 +528,30 @@ defmodule TermUI.Backend.TTY do
     end)
   end
 
-  # Renders a single row of cells.
+  # Renders a single row of cells with style delta tracking.
+  #
+  # Tracks the current style and only outputs SGR sequences when the style
+  # changes between cells. This reduces redundant escape sequence output.
   @spec render_row(pos_integer(), [{pos_integer(), TermUI.Backend.cell()}], t()) :: :ok
   defp render_row(row, cells, state) do
     # Position cursor at start of row
     IO.write("\e[#{row};1H")
 
-    # Track current column for gap filling
-    current_col = 1
+    # Track current column and current style for delta tracking
+    # Initial style is nil (no style set yet)
+    initial_state = {1, nil}
 
-    Enum.reduce(cells, current_col, fn {col, cell}, cur_col ->
+    Enum.reduce(cells, initial_state, fn {col, cell}, {cur_col, cur_style} ->
       # Fill gap with spaces if needed
       if col > cur_col do
         IO.write(String.duplicate(" ", col - cur_col))
       end
 
-      # Render the cell
-      render_cell(cell, state)
+      # Render the cell with style delta tracking
+      new_style = render_cell_with_delta(cell, cur_style, state)
 
-      # Return next column position
-      col + 1
+      # Return next column position and new style
+      {col + 1, new_style}
     end)
 
     # Reset attributes at end of row
@@ -556,18 +560,29 @@ defmodule TermUI.Backend.TTY do
     :ok
   end
 
-  # Renders a single cell with style.
-  @spec render_cell(TermUI.Backend.cell(), t()) :: :ok
-  defp render_cell({char, fg, bg, attrs}, state) do
-    # Build and output SGR sequence
-    sgr = build_sgr_sequence(fg, bg, attrs, state.color_mode)
-    IO.write(sgr)
+  # Renders a single cell with style delta tracking.
+  #
+  # Only outputs SGR sequences when the style differs from the previous cell.
+  # Returns the new style for tracking.
+  @spec render_cell_with_delta(
+          TermUI.Backend.cell(),
+          {TermUI.Backend.color(), TermUI.Backend.color(), [atom()]} | nil,
+          t()
+        ) :: {TermUI.Backend.color(), TermUI.Backend.color(), [atom()]}
+  defp render_cell_with_delta({char, fg, bg, attrs}, cur_style, state) do
+    new_style = {fg, bg, attrs}
+
+    # Only output SGR if style changed
+    if new_style != cur_style do
+      sgr = build_sgr_sequence(fg, bg, attrs, state.color_mode)
+      IO.write(sgr)
+    end
 
     # Output character (with potential character set mapping)
     mapped_char = map_character(char, state.character_set)
     IO.write(mapped_char)
 
-    :ok
+    new_style
   end
 
   # Builds SGR (Select Graphic Rendition) sequence for colors and attributes.

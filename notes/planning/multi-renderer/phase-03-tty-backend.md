@@ -117,7 +117,7 @@ Implement clean shutdown that resets terminal state.
 
 ## 3.3 Implement Full Redraw Rendering
 
-- [ ] **Section 3.3 Complete**
+- [x] **Section 3.3 Complete**
 
 Implement the full redraw rendering mode, which clears the screen and renders all cells on each frame. This is the default mode, prioritizing reliability over performance.
 
@@ -149,24 +149,24 @@ Implement cell drawing that clears and redraws the entire screen.
 
 ### 3.3.3 Implement Row-by-Row Output
 
-- [ ] **Task 3.3.3 Complete**
+- [x] **Task 3.3.3 Complete**
 
 Implement efficient row-by-row output for full redraw.
 
-- [ ] 3.3.3.1 Group cells by row number
-- [ ] 3.3.3.2 Sort rows by row number for sequential output
-- [ ] 3.3.3.3 For each row, position cursor at start with `\e[row;1H`
-- [ ] 3.3.3.4 Output cells left-to-right, tracking style changes
-- [ ] 3.3.3.5 Fill gaps with spaces if cells are non-contiguous
+- [x] 3.3.3.1 Group cells by row number
+- [x] 3.3.3.2 Sort rows by row number for sequential output
+- [x] 3.3.3.3 For each row, position cursor at start with `\e[row;1H`
+- [x] 3.3.3.4 Output cells left-to-right, tracking style changes
+- [x] 3.3.3.5 Fill gaps with spaces if cells are non-contiguous
 
 ### Unit Tests - Section 3.3
 
-- [ ] **Unit Tests 3.3 Complete**
-- [ ] Test `clear/1` writes clear sequence
-- [ ] Test `clear/1` clears last_frame state
-- [ ] Test `draw_cells/2` in full_redraw mode starts with clear
-- [ ] Test `draw_cells/2` outputs cells by row
-- [ ] Test empty cells list renders empty screen
+- [x] **Unit Tests 3.3 Complete**
+- [x] Test `clear/1` writes clear sequence
+- [x] Test `clear/1` clears last_frame state
+- [x] Test `draw_cells/2` in full_redraw mode starts with clear
+- [x] Test `draw_cells/2` outputs cells by row
+- [x] Test empty cells list renders empty screen
 
 ---
 
