@@ -1044,6 +1044,192 @@ defmodule TermUI.Backend.TTYTest do
   end
 
   # ===========================================================================
+  # Section 3.5 Tests - Color Degradation
+  # ===========================================================================
+
+  describe "color degradation - 256-color mode (Section 3.5.2)" do
+    test "256-color mapping uses color cube for non-gray colors" do
+      {:ok, state} = init_tty(capabilities: %{colors: :color_256})
+      # Pure red should map to color cube, not grayscale
+      cells = [{{1, 1}, {"X", {255, 0, 0}, :default, []}}]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      # Should use 38;5;N format with a color cube index (16-231)
+      # Pure red (255, 0, 0) should map to index 196 (5*36 + 0*6 + 0 + 16)
+      assert output =~ "\e[38;5;196m"
+    end
+
+    test "256-color mapping uses grayscale for near-gray colors" do
+      {:ok, state} = init_tty(capabilities: %{colors: :color_256})
+      # Gray (128, 128, 128) should map to grayscale ramp
+      cells = [{{1, 1}, {"X", {128, 128, 128}, :default, []}}]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      # Should use 38;5;N format with a grayscale index (232-255)
+      # Gray (128, 128, 128) average = 128, maps to 232 + (128 * 23 / 255) = 232 + 11 = 243
+      assert output =~ "\e[38;5;243m"
+    end
+
+    test "256-color background uses palette index" do
+      {:ok, state} = init_tty(capabilities: %{colors: :color_256})
+      cells = [{{1, 1}, {"X", :default, {0, 255, 0}, []}}]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      # Pure green should map to 16 + 0*36 + 5*6 + 0 = 46
+      assert output =~ "\e[48;5;46m"
+    end
+  end
+
+  describe "color degradation - monochrome mode (Section 3.5.4)" do
+    test "monochrome mode preserves bold attribute" do
+      {:ok, state} = init_tty(capabilities: %{colors: :monochrome})
+      cells = [{{1, 1}, {"X", {255, 0, 0}, :default, [:bold]}}]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      # Color should be omitted
+      refute output =~ "\e[38;"
+      # But bold should be preserved
+      assert output =~ "\e[1m"
+    end
+
+    test "monochrome mode preserves underline attribute" do
+      {:ok, state} = init_tty(capabilities: %{colors: :monochrome})
+      cells = [{{1, 1}, {"X", :red, :blue, [:underline]}}]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      # Colors should be omitted
+      refute output =~ "\e[31m"
+      refute output =~ "\e[44m"
+      # But underline should be preserved
+      assert output =~ "\e[4m"
+    end
+
+    test "monochrome mode preserves reverse attribute for contrast" do
+      {:ok, state} = init_tty(capabilities: %{colors: :monochrome})
+      cells = [{{1, 1}, {"X", {255, 255, 255}, {0, 0, 0}, [:reverse]}}]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      # RGB colors should be omitted
+      refute output =~ "\e[38;2;"
+      refute output =~ "\e[48;2;"
+      # But reverse should be preserved for visibility
+      assert output =~ "\e[7m"
+    end
+  end
+
+  describe "color degradation - named colors (Section 3.5.5)" do
+    test "named colors work in true_color mode" do
+      {:ok, state} = init_tty(capabilities: %{colors: :true_color})
+      cells = [{{1, 1}, {"X", :cyan, :magenta, []}}]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      # Named colors should use standard SGR codes
+      assert output =~ "\e[36m"  # cyan foreground
+      assert output =~ "\e[45m"  # magenta background
+    end
+
+    test "named colors work in 256-color mode" do
+      {:ok, state} = init_tty(capabilities: %{colors: :color_256})
+      cells = [{{1, 1}, {"X", :yellow, :green, []}}]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      # Named colors should still use standard SGR codes
+      assert output =~ "\e[33m"  # yellow foreground
+      assert output =~ "\e[42m"  # green background
+    end
+
+    test "named colors work in 16-color mode" do
+      {:ok, state} = init_tty(capabilities: %{colors: :color_16})
+      cells = [{{1, 1}, {"X", :blue, :white, []}}]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      # Named colors should use standard SGR codes
+      assert output =~ "\e[34m"  # blue foreground
+      assert output =~ "\e[47m"  # white background
+    end
+
+    test "bright named colors work correctly" do
+      {:ok, state} = init_tty([])
+      cells = [{{1, 1}, {"X", :bright_red, :bright_blue, []}}]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      # Bright colors use codes 90-97 (fg) and 100-107 (bg)
+      assert output =~ "\e[91m"   # bright red foreground
+      assert output =~ "\e[104m"  # bright blue background
+    end
+
+    test ":default foreground works in all modes" do
+      for mode <- [:true_color, :color_256, :color_16] do
+        {:ok, state} = init_tty(capabilities: %{colors: mode})
+        cells = [{{1, 1}, {"X", :default, :red, []}}]
+
+        output =
+          capture_io(fn ->
+            TTY.draw_cells(state, cells)
+          end)
+
+        # Default foreground should always output \e[39m
+        assert output =~ "\e[39m", "Failed for mode #{mode}"
+      end
+    end
+
+    test ":default background works in all modes" do
+      for mode <- [:true_color, :color_256, :color_16] do
+        {:ok, state} = init_tty(capabilities: %{colors: mode})
+        cells = [{{1, 1}, {"X", :red, :default, []}}]
+
+        output =
+          capture_io(fn ->
+            TTY.draw_cells(state, cells)
+          end)
+
+        # Default background should always output \e[49m
+        assert output =~ "\e[49m", "Failed for mode #{mode}"
+      end
+    end
+  end
+
+  # ===========================================================================
   # Section 3.3.3 Tests - Row-by-Row Output with Style Delta Tracking
   # ===========================================================================
 

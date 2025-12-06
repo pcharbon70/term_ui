@@ -235,78 +235,78 @@ Optimize cursor movement for sparse updates.
 
 ## 3.5 Implement Color Degradation
 
-- [ ] **Section 3.5 Complete**
+- [x] **Section 3.5 Complete**
 
 Implement automatic color degradation based on detected terminal capabilities. Colors are downgraded from true color to 256-color to 16-color to monochrome as needed.
 
 ### 3.5.1 Implement True Color Output
 
-- [ ] **Task 3.5.1 Complete**
+- [x] **Task 3.5.1 Complete**
 
 Implement true color output when capabilities indicate support.
 
-- [ ] 3.5.1.1 Detect `color_mode == :true_color` in state
-- [ ] 3.5.1.2 Output RGB colors using `\e[38;2;r;g;bm` and `\e[48;2;r;g;bm`
-- [ ] 3.5.1.3 Pass through RGB tuples unchanged
+- [x] 3.5.1.1 Detect `color_mode == :true_color` in state
+- [x] 3.5.1.2 Output RGB colors using `\e[38;2;r;g;bm` and `\e[48;2;r;g;bm`
+- [x] 3.5.1.3 Pass through RGB tuples unchanged
 
 ### 3.5.2 Implement 256-Color Degradation
 
-- [ ] **Task 3.5.2 Complete**
+- [x] **Task 3.5.2 Complete**
 
 Implement RGB to 256-color mapping when true color unavailable.
 
-- [ ] 3.5.2.1 Detect `color_mode == :color_256` in state
-- [ ] 3.5.2.2 Implement `rgb_to_256/1` mapping RGB to 256-color palette
-- [ ] 3.5.2.3 Use 6x6x6 color cube (indices 16-231) for colors
-- [ ] 3.5.2.4 Use grayscale ramp (indices 232-255) for near-gray colors
-- [ ] 3.5.2.5 Output using `\e[38;5;nm` and `\e[48;5;nm`
+- [x] 3.5.2.1 Detect `color_mode == :color_256` in state
+- [x] 3.5.2.2 Implement `rgb_to_256/1` mapping RGB to 256-color palette
+- [x] 3.5.2.3 Use 6x6x6 color cube (indices 16-231) for colors
+- [x] 3.5.2.4 Use grayscale ramp (indices 232-255) for near-gray colors
+- [x] 3.5.2.5 Output using `\e[38;5;nm` and `\e[48;5;nm`
 
 ### 3.5.3 Implement 16-Color Degradation
 
-- [ ] **Task 3.5.3 Complete**
+- [x] **Task 3.5.3 Complete**
 
 Implement RGB to 16-color mapping for basic terminals.
 
-- [ ] 3.5.3.1 Detect `color_mode == :color_16` in state
-- [ ] 3.5.3.2 Implement `rgb_to_16/1` mapping RGB to nearest basic color
-- [ ] 3.5.3.3 Map to standard 8 colors + 8 bright variants
-- [ ] 3.5.3.4 Use Euclidean distance in RGB space for nearest match
-- [ ] 3.5.3.5 Output using standard SGR codes (30-37, 40-47, 90-97, 100-107)
+- [x] 3.5.3.1 Detect `color_mode == :color_16` in state
+- [x] 3.5.3.2 Implement `rgb_to_16/1` mapping RGB to nearest basic color
+- [x] 3.5.3.3 Map to standard 8 colors + 8 bright variants
+- [x] 3.5.3.4 Use Euclidean distance in RGB space for nearest match
+- [x] 3.5.3.5 Output using standard SGR codes (30-37, 40-47, 90-97, 100-107)
 
 ### 3.5.4 Implement Monochrome Degradation
 
-- [ ] **Task 3.5.4 Complete**
+- [x] **Task 3.5.4 Complete**
 
 Implement monochrome output when no color support detected.
 
-- [ ] 3.5.4.1 Detect `color_mode == :monochrome` in state
-- [ ] 3.5.4.2 Skip all color sequences
-- [ ] 3.5.4.3 Preserve text attributes (bold, underline, reverse) for contrast
-- [ ] 3.5.4.4 Use reverse video for highlighting where color was used
+- [x] 3.5.4.1 Detect `color_mode == :monochrome` in state
+- [x] 3.5.4.2 Skip all color sequences
+- [x] 3.5.4.3 Preserve text attributes (bold, underline, reverse) for contrast
+- [x] 3.5.4.4 Use reverse video for highlighting where color was used
 
 ### 3.5.5 Implement Named Color Handling
 
-- [ ] **Task 3.5.5 Complete**
+- [x] **Task 3.5.5 Complete**
 
 Handle named color atoms appropriately for each color mode.
 
-- [ ] 3.5.5.1 Pass named colors (`:red`, `:blue`, etc.) directly to SGR in 16-color mode
-- [ ] 3.5.5.2 Map named colors to RGB, then to palette in 256-color mode
-- [ ] 3.5.5.3 Pass named colors directly in true color mode (terminal handles mapping)
-- [ ] 3.5.5.4 Handle `:default` color in all modes with `\e[39m`/`\e[49m`
+- [x] 3.5.5.1 Pass named colors (`:red`, `:blue`, etc.) directly to SGR in 16-color mode
+- [x] 3.5.5.2 Map named colors to RGB, then to palette in 256-color mode
+- [x] 3.5.5.3 Pass named colors directly in true color mode (terminal handles mapping)
+- [x] 3.5.5.4 Handle `:default` color in all modes with `\e[39m`/`\e[49m`
 
 ### Unit Tests - Section 3.5
 
-- [ ] **Unit Tests 3.5 Complete**
-- [ ] Test true_color mode outputs RGB sequences unchanged
-- [ ] Test 256-color mode maps RGB to palette index
-- [ ] Test 256-color mapping uses color cube correctly
-- [ ] Test 256-color mapping uses grayscale for near-gray
-- [ ] Test 16-color mode maps to nearest basic color
-- [ ] Test monochrome mode omits color sequences
-- [ ] Test monochrome preserves text attributes
-- [ ] Test named colors work in all color modes
-- [ ] Test `:default` color resets in all modes
+- [x] **Unit Tests 3.5 Complete**
+- [x] Test true_color mode outputs RGB sequences unchanged
+- [x] Test 256-color mode maps RGB to palette index
+- [x] Test 256-color mapping uses color cube correctly
+- [x] Test 256-color mapping uses grayscale for near-gray
+- [x] Test 16-color mode maps to nearest basic color
+- [x] Test monochrome mode omits color sequences
+- [x] Test monochrome preserves text attributes
+- [x] Test named colors work in all color modes
+- [x] Test `:default` color resets in all modes
 
 ---
 

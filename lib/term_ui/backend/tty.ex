@@ -830,7 +830,11 @@ defmodule TermUI.Backend.TTY do
 
   # Invalid RGB values fall through to catch-all clause (returns "")
 
-  # Named colors
+  # Monochrome mode - skip all colors (named and palette)
+  defp color_to_sgr(name, _type, :monochrome) when is_atom(name), do: ""
+  defp color_to_sgr(n, _type, :monochrome) when is_integer(n), do: ""
+
+  # Named colors (for all other modes)
   defp color_to_sgr(name, :fg, _mode) when is_atom(name), do: named_color_to_sgr(name, :fg)
   defp color_to_sgr(name, :bg, _mode) when is_atom(name), do: named_color_to_sgr(name, :bg)
 
