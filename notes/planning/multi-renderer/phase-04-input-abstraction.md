@@ -73,9 +73,11 @@ Define callback for querying input mode.
 
 ## 4.2 Implement Raw Input Handler
 
-- [ ] **Section 4.2 Complete**
+- [x] **Section 4.2 Complete**
 
-The `TermUI.Input.Raw` module wraps the existing `TermUI.Terminal.InputReader` to provide input through the Input behaviour interface. This is used when the raw backend is active.
+The `TermUI.Input.Raw` module provides synchronous input polling through the Input behaviour interface using Task-based timeouts. This is used when the raw backend is active.
+
+**Note:** The original plan called for wrapping `InputReader`, but that's an async GenServer incompatible with the synchronous `poll/2` contract. The implementation uses direct `IO.getn/2` wrapped in Tasks for timeout support instead.
 
 ### 4.2.1 Create Raw Input Module
 
@@ -84,36 +86,36 @@ The `TermUI.Input.Raw` module wraps the existing `TermUI.Terminal.InputReader` t
 Create the raw input handler module implementing the Input behaviour.
 
 - [x] 4.2.1.1 Create `lib/term_ui/input/raw.ex` with `@behaviour TermUI.Input`
-- [x] 4.2.1.2 Add `@moduledoc` explaining this handler wraps InputReader
+- [x] 4.2.1.2 Add `@moduledoc` explaining synchronous polling with Tasks
 - [x] 4.2.1.3 Document that it supports non-blocking input with timeout
 
 ### 4.2.2 Implement poll/2
 
-- [ ] **Task 4.2.2 Complete**
+- [x] **Task 4.2.2 Complete**
 
 Implement the main input polling function.
 
-- [ ] 4.2.2.1 Implement `@impl true` `poll/2` accepting state and timeout
-- [ ] 4.2.2.2 Delegate to InputReader's polling mechanism
-- [ ] 4.2.2.3 Parse escape sequences using `TermUI.Terminal.EscapeParser`
-- [ ] 4.2.2.4 Return `{:ok, event}` for keyboard input
-- [ ] 4.2.2.5 Return `:timeout` when no input within timeout
+- [x] 4.2.2.1 Implement `@impl true` `poll/2` accepting state and timeout
+- [x] 4.2.2.2 Use Task.async + Task.yield for synchronous polling (not InputReader - incompatible async GenServer)
+- [x] 4.2.2.3 Parse escape sequences using `TermUI.Terminal.EscapeParser`
+- [x] 4.2.2.4 Return `{:ok, event}` for keyboard input
+- [x] 4.2.2.5 Return `:timeout` when no input within timeout
 
 ### 4.2.3 Implement mode/1
 
-- [ ] **Task 4.2.3 Complete**
+- [x] **Task 4.2.3 Complete**
 
 Implement the mode query function.
 
-- [ ] 4.2.3.1 Implement `@impl true` `mode/1` returning `:raw`
+- [x] 4.2.3.1 Implement `@impl true` `mode/1` returning `:raw`
 
 ### Unit Tests - Section 4.2
 
-- [ ] **Unit Tests 4.2 Complete**
-- [ ] Test `poll/2` returns `{:ok, event}` format (mock input)
-- [ ] Test `poll/2` returns `:timeout` when no input
-- [ ] Test `mode/1` returns `:raw`
-- [ ] Test escape sequences parse to correct key events
+- [x] **Unit Tests 4.2 Complete**
+- [x] Test `poll/2` returns `{:ok, event}` format (mock input)
+- [x] Test `poll/2` returns `:timeout` when no input
+- [x] Test `mode/1` returns `:raw`
+- [x] Test escape sequences parse to correct key events
 
 ---
 

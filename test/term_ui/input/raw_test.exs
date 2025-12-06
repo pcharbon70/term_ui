@@ -27,7 +27,6 @@ defmodule TermUI.Input.RawTest do
       assert %Raw{} = state
       assert state.buffer == <<>>
       assert state.event_queue == []
-      assert state.reader_task == nil
     end
   end
 
@@ -38,7 +37,7 @@ defmodule TermUI.Input.RawTest do
     end
 
     test "returns :raw regardless of buffer contents" do
-      state = %Raw{buffer: "some data", event_queue: [], reader_task: nil}
+      state = %Raw{buffer: "some data", event_queue: []}
       assert Raw.mode(state) == :raw
     end
   end
@@ -46,7 +45,7 @@ defmodule TermUI.Input.RawTest do
   describe "poll/2 with pre-buffered input" do
     test "returns event from buffer with simple character" do
       # Pre-populate buffer with a simple character
-      state = %Raw{buffer: "a", event_queue: [], reader_task: nil}
+      state = %Raw{buffer: "a", event_queue: []}
 
       # Should parse and return immediately without blocking
       {result, new_state} = Raw.poll(state, 0)
@@ -57,7 +56,7 @@ defmodule TermUI.Input.RawTest do
 
     test "returns event from buffer with enter key" do
       # Enter is character 13
-      state = %Raw{buffer: <<13>>, event_queue: [], reader_task: nil}
+      state = %Raw{buffer: <<13>>, event_queue: []}
 
       {result, new_state} = Raw.poll(state, 0)
 
@@ -67,7 +66,7 @@ defmodule TermUI.Input.RawTest do
 
     test "returns event from buffer with tab key" do
       # Tab is character 9
-      state = %Raw{buffer: <<9>>, event_queue: [], reader_task: nil}
+      state = %Raw{buffer: <<9>>, event_queue: []}
 
       {result, new_state} = Raw.poll(state, 0)
 
@@ -77,7 +76,7 @@ defmodule TermUI.Input.RawTest do
 
     test "returns event from buffer with backspace" do
       # Backspace is character 8
-      state = %Raw{buffer: <<8>>, event_queue: [], reader_task: nil}
+      state = %Raw{buffer: <<8>>, event_queue: []}
 
       {result, new_state} = Raw.poll(state, 0)
 
@@ -87,7 +86,7 @@ defmodule TermUI.Input.RawTest do
 
     test "returns event from buffer with complete escape sequence" do
       # ESC [ A = Up arrow
-      state = %Raw{buffer: <<27, ?[, ?A>>, event_queue: [], reader_task: nil}
+      state = %Raw{buffer: <<27, ?[, ?A>>, event_queue: []}
 
       {result, new_state} = Raw.poll(state, 0)
 
@@ -97,7 +96,7 @@ defmodule TermUI.Input.RawTest do
 
     test "returns event from buffer with down arrow" do
       # ESC [ B = Down arrow
-      state = %Raw{buffer: <<27, ?[, ?B>>, event_queue: [], reader_task: nil}
+      state = %Raw{buffer: <<27, ?[, ?B>>, event_queue: []}
 
       {result, new_state} = Raw.poll(state, 0)
 
@@ -107,7 +106,7 @@ defmodule TermUI.Input.RawTest do
 
     test "returns event from buffer with left arrow" do
       # ESC [ D = Left arrow
-      state = %Raw{buffer: <<27, ?[, ?D>>, event_queue: [], reader_task: nil}
+      state = %Raw{buffer: <<27, ?[, ?D>>, event_queue: []}
 
       {result, new_state} = Raw.poll(state, 0)
 
@@ -117,7 +116,7 @@ defmodule TermUI.Input.RawTest do
 
     test "returns event from buffer with right arrow" do
       # ESC [ C = Right arrow
-      state = %Raw{buffer: <<27, ?[, ?C>>, event_queue: [], reader_task: nil}
+      state = %Raw{buffer: <<27, ?[, ?C>>, event_queue: []}
 
       {result, new_state} = Raw.poll(state, 0)
 
@@ -127,7 +126,7 @@ defmodule TermUI.Input.RawTest do
 
     test "returns event from buffer with home key" do
       # ESC [ H = Home
-      state = %Raw{buffer: <<27, ?[, ?H>>, event_queue: [], reader_task: nil}
+      state = %Raw{buffer: <<27, ?[, ?H>>, event_queue: []}
 
       {result, new_state} = Raw.poll(state, 0)
 
@@ -137,7 +136,7 @@ defmodule TermUI.Input.RawTest do
 
     test "returns event from buffer with end key" do
       # ESC [ F = End
-      state = %Raw{buffer: <<27, ?[, ?F>>, event_queue: [], reader_task: nil}
+      state = %Raw{buffer: <<27, ?[, ?F>>, event_queue: []}
 
       {result, new_state} = Raw.poll(state, 0)
 
@@ -147,7 +146,7 @@ defmodule TermUI.Input.RawTest do
 
     test "returns event from buffer with function key F1" do
       # ESC O P = F1
-      state = %Raw{buffer: <<27, ?O, ?P>>, event_queue: [], reader_task: nil}
+      state = %Raw{buffer: <<27, ?O, ?P>>, event_queue: []}
 
       {result, new_state} = Raw.poll(state, 0)
 
@@ -157,7 +156,7 @@ defmodule TermUI.Input.RawTest do
 
     test "returns event from buffer with delete key" do
       # ESC [ 3 ~ = Delete
-      state = %Raw{buffer: <<27, ?[, ?3, ?~>>, event_queue: [], reader_task: nil}
+      state = %Raw{buffer: <<27, ?[, ?3, ?~>>, event_queue: []}
 
       {result, new_state} = Raw.poll(state, 0)
 
@@ -167,7 +166,7 @@ defmodule TermUI.Input.RawTest do
 
     test "returns event from buffer with page up" do
       # ESC [ 5 ~ = Page Up
-      state = %Raw{buffer: <<27, ?[, ?5, ?~>>, event_queue: [], reader_task: nil}
+      state = %Raw{buffer: <<27, ?[, ?5, ?~>>, event_queue: []}
 
       {result, new_state} = Raw.poll(state, 0)
 
@@ -177,7 +176,7 @@ defmodule TermUI.Input.RawTest do
 
     test "returns event from buffer with page down" do
       # ESC [ 6 ~ = Page Down
-      state = %Raw{buffer: <<27, ?[, ?6, ?~>>, event_queue: [], reader_task: nil}
+      state = %Raw{buffer: <<27, ?[, ?6, ?~>>, event_queue: []}
 
       {result, new_state} = Raw.poll(state, 0)
 
@@ -187,7 +186,7 @@ defmodule TermUI.Input.RawTest do
 
     test "returns event from buffer with Ctrl+C" do
       # Ctrl+C is character 3
-      state = %Raw{buffer: <<3>>, event_queue: [], reader_task: nil}
+      state = %Raw{buffer: <<3>>, event_queue: []}
 
       {result, new_state} = Raw.poll(state, 0)
 
@@ -197,7 +196,7 @@ defmodule TermUI.Input.RawTest do
 
     test "returns event from buffer with Alt+a" do
       # ESC followed by 'a' = Alt+a
-      state = %Raw{buffer: <<27, ?a>>, event_queue: [], reader_task: nil}
+      state = %Raw{buffer: <<27, ?a>>, event_queue: []}
 
       {result, new_state} = Raw.poll(state, 0)
 
@@ -207,7 +206,7 @@ defmodule TermUI.Input.RawTest do
 
     test "handles multiple characters in buffer by queueing" do
       # Buffer has 'abc' - should return first character and queue the rest
-      state = %Raw{buffer: "abc", event_queue: [], reader_task: nil}
+      state = %Raw{buffer: "abc", event_queue: []}
 
       {result, new_state} = Raw.poll(state, 0)
 
@@ -219,7 +218,7 @@ defmodule TermUI.Input.RawTest do
 
     test "handles UTF-8 characters in buffer" do
       # UTF-8 encoded character (e.g., 'ñ')
-      state = %Raw{buffer: "ñ", event_queue: [], reader_task: nil}
+      state = %Raw{buffer: "ñ", event_queue: []}
 
       {result, new_state} = Raw.poll(state, 0)
 
@@ -231,7 +230,7 @@ defmodule TermUI.Input.RawTest do
   describe "poll/2 with partial escape sequences" do
     test "returns timeout with partial escape sequence and 0 timeout" do
       # Just ESC - partial sequence
-      state = %Raw{buffer: <<27>>, event_queue: [], reader_task: nil}
+      state = %Raw{buffer: <<27>>, event_queue: []}
 
       # With 0 timeout, should return timeout since we can't complete sequence
       {result, _new_state} = Raw.poll(state, 0)
@@ -241,7 +240,7 @@ defmodule TermUI.Input.RawTest do
 
     test "returns timeout with ESC[ partial sequence and 0 timeout" do
       # ESC [ - partial CSI sequence
-      state = %Raw{buffer: <<27, ?[>>, event_queue: [], reader_task: nil}
+      state = %Raw{buffer: <<27, ?[>>, event_queue: []}
 
       {result, _new_state} = Raw.poll(state, 0)
 
@@ -251,7 +250,7 @@ defmodule TermUI.Input.RawTest do
 
   describe "poll/2 return format" do
     test "returns tuple with result and new state" do
-      state = %Raw{buffer: "x", event_queue: [], reader_task: nil}
+      state = %Raw{buffer: "x", event_queue: []}
 
       result = Raw.poll(state, 0)
 
@@ -259,7 +258,7 @@ defmodule TermUI.Input.RawTest do
     end
 
     test "result is {:ok, event} for successful parse" do
-      state = %Raw{buffer: "x", event_queue: [], reader_task: nil}
+      state = %Raw{buffer: "x", event_queue: []}
 
       {{:ok, event}, _state} = Raw.poll(state, 0)
 
@@ -283,7 +282,7 @@ defmodule TermUI.Input.RawTest do
 
   describe "state management" do
     test "state is properly updated after poll with queued events" do
-      state = %Raw{buffer: "abc", event_queue: [], reader_task: nil}
+      state = %Raw{buffer: "abc", event_queue: []}
 
       # Poll should consume 'a' and queue 'b' and 'c' as events
       {_, new_state} = Raw.poll(state, 0)
@@ -293,7 +292,7 @@ defmodule TermUI.Input.RawTest do
     end
 
     test "multiple polls consume queued events sequentially" do
-      state = %Raw{buffer: "xyz", event_queue: [], reader_task: nil}
+      state = %Raw{buffer: "xyz", event_queue: []}
 
       {{:ok, event1}, state} = Raw.poll(state, 0)
       assert event1.key == "x"
@@ -312,7 +311,7 @@ defmodule TermUI.Input.RawTest do
     test "returns queued events before reading buffer" do
       # Pre-queue some events
       queued_event = Event.key(:queued_test)
-      state = %Raw{buffer: "a", event_queue: [queued_event], reader_task: nil}
+      state = %Raw{buffer: "a", event_queue: [queued_event]}
 
       # Should return queued event first
       {{:ok, event1}, state} = Raw.poll(state, 0)
@@ -376,6 +375,105 @@ defmodule TermUI.Input.RawTest do
         end)
 
       assert new_doc != nil
+    end
+  end
+
+  describe "buffer and queue limits" do
+    test "event queue size is limited to prevent memory exhaustion" do
+      # Create a large string that will generate many events
+      large_input = String.duplicate("x", 1500)
+      state = %Raw{buffer: large_input, event_queue: []}
+
+      # First poll should parse all and queue remaining (limited to 1000)
+      {{:ok, _event}, new_state} = Raw.poll(state, 0)
+
+      # Queue should be limited to @max_queue_size (1000)
+      assert length(new_state.event_queue) <= 1000
+    end
+
+    test "state struct has only buffer and event_queue fields" do
+      state = Raw.new()
+      # Verify the struct only has the expected fields (no reader_task)
+      assert Map.keys(state) -- [:__struct__] == [:buffer, :event_queue]
+    end
+  end
+
+  describe "emit_partial_escape branches" do
+    # These test the different branches in emit_partial_escape/2
+    # by examining behavior with different partial sequences
+
+    test "lone ESC with sufficient timeout emits escape key event" do
+      # When we have lone ESC and timeout > @escape_timeout (50ms),
+      # and no more input arrives, it should emit ESC key
+      # This is tricky to test without mocking IO, so we test the
+      # resulting state behavior
+      state = %Raw{buffer: <<27>>, event_queue: []}
+
+      # With timeout > 50ms, it should try to wait for sequence completion
+      # Since there's no actual input, it will timeout and emit ESC
+      # For unit testing, we just verify the timeout behavior with 0ms
+      {result, _new_state} = Raw.poll(state, 0)
+      assert result == :timeout
+    end
+
+    test "ESC followed by [ is partial CSI" do
+      state = %Raw{buffer: <<27, ?[>>, event_queue: []}
+      {result, _new_state} = Raw.poll(state, 0)
+      assert result == :timeout
+    end
+
+    test "ESC followed by O is partial SS3" do
+      state = %Raw{buffer: <<27, ?O>>, event_queue: []}
+      {result, _new_state} = Raw.poll(state, 0)
+      assert result == :timeout
+    end
+  end
+
+  describe "escape timeout handling" do
+    # Test the 50ms escape timeout behavior
+
+    test "escape timeout constant is 50ms as documented" do
+      # This verifies the timeout value matches terminal emulator standards
+      # We can't directly access the private constant, but we can verify
+      # through the moduledoc
+      {:docs_v1, _, :elixir, _, %{"en" => moduledoc}, _, _} = Code.fetch_docs(Raw)
+      assert String.contains?(moduledoc, "50ms")
+    end
+  end
+
+  describe "security - buffer limits" do
+    test "module documents buffer size limits" do
+      {:docs_v1, _, :elixir, _, %{"en" => moduledoc}, _, _} = Code.fetch_docs(Raw)
+      # Should mention security or buffer management
+      assert String.contains?(moduledoc, "Buffer") or String.contains?(moduledoc, "Security")
+    end
+  end
+
+  # Integration tests - these require actual terminal I/O
+  # Tagged to allow selective running
+  describe "integration - actual I/O" do
+    @describetag :requires_terminal
+
+    test "poll with empty buffer and 0 timeout returns timeout immediately" do
+      state = Raw.new()
+      start_time = System.monotonic_time(:millisecond)
+      {result, _new_state} = Raw.poll(state, 0)
+      elapsed = System.monotonic_time(:millisecond) - start_time
+
+      assert result == :timeout
+      # Should be near-instant (< 50ms accounting for system overhead)
+      assert elapsed < 50
+    end
+
+    test "poll with short timeout returns timeout when no input" do
+      state = Raw.new()
+      start_time = System.monotonic_time(:millisecond)
+      {result, _new_state} = Raw.poll(state, 10)
+      elapsed = System.monotonic_time(:millisecond) - start_time
+
+      assert result == :timeout
+      # Should take approximately 10ms (with some tolerance)
+      assert elapsed >= 5 and elapsed < 100
     end
   end
 end

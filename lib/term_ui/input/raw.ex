@@ -13,6 +13,7 @@ defmodule TermUI.Input.Raw do
   - **Escape sequence parsing**: Handles arrow keys, function keys, mouse events,
     and other terminal escape sequences
   - **Buffer management**: Maintains partial escape sequences between poll calls
+  - **Security**: Buffer and queue size limits prevent memory exhaustion
 
   ## Usage
 
@@ -35,36 +36,60 @@ defmodule TermUI.Input.Raw do
   When an escape sequence spans multiple reads (e.g., arrow keys send multiple
   bytes), the partial sequence is buffered and completed on subsequent polls.
 
+  ## Escape Sequence Timeout
+
+  When a partial escape sequence is detected (e.g., lone ESC), the handler waits
+  up to 50ms for completion. This matches standard terminal emulator behavior
+  and distinguishes ESC key presses from escape sequences. The 50ms timeout is
+  the same value used by `TermUI.Terminal.InputReader`.
+
   ## Comparison with InputReader
 
   Unlike `TermUI.Terminal.InputReader` which is a GenServer that asynchronously
   sends events to a target process, this module provides synchronous polling
-  suitable for use with the `TermUI.Input` behaviour interface.
+  suitable for use with the `TermUI.Input` behaviour interface. This module
+  uses direct `IO.getn/2` calls wrapped in Tasks for timeout support, rather
+  than delegating to InputReader, because InputReader's async message-based
+  design is incompatible with the synchronous polling contract.
   """
 
   @behaviour TermUI.Input
 
+  require Logger
+
   alias TermUI.Event
   alias TermUI.Terminal.EscapeParser
+  alias TermUI.Backend.InputBuffer
 
-  # Timeout for escape sequence completion (ms)
+  # Escape sequence bytes
+  @esc 0x1B
+  @left_bracket ?[
+  @letter_o ?O
+
+  # Timeout for escape sequence completion (ms).
+  # This matches terminal emulator behavior for distinguishing ESC key
+  # presses from escape sequences. The same value is used by InputReader.
   @escape_timeout 50
 
+  # Maximum buffer size to prevent memory exhaustion attacks.
+  # Matches InputBuffer.max_buffer_size/0.
+  @max_buffer_size 65_536
+
+  # Maximum event queue size to prevent memory exhaustion.
+  @max_queue_size 1000
+
   defstruct buffer: <<>>,
-            event_queue: [],
-            reader_task: nil
+            event_queue: []
 
   @typedoc """
   State for the Raw input handler.
 
   - `:buffer` - Binary buffer for partial escape sequences
   - `:event_queue` - Queue of parsed events waiting to be returned
-  - `:reader_task` - Active Task reading from stdin, or nil
   """
   @type t :: %__MODULE__{
           buffer: binary(),
-          event_queue: [Event.t()],
-          reader_task: Task.t() | nil
+          event_queue: [Event.t()]
         }
 
   @doc """
@@ -78,8 +103,7 @@ defmodule TermUI.Input.Raw do
   def new do
     %__MODULE__{
       buffer: <<>>,
-      event_queue: [],
-      reader_task: nil
+      event_queue: []
     }
   end
 
@@ -154,20 +178,27 @@ defmodule TermUI.Input.Raw do
     case EscapeParser.parse(buffer) do
       {[event | rest_events], remaining} ->
         # Got at least one event
-        # Queue any additional events for subsequent polls
-        new_state = %{state | buffer: remaining, event_queue: rest_events}
+        # Queue any additional events for subsequent polls (with size limit)
+        queued_events = limit_queue(rest_events)
+        new_state = %{state | buffer: remaining, event_queue: queued_events}
         {:ok, event, new_state}
 
-      {[], remaining} ->
-        # No complete events yet
-        if EscapeParser.partial_sequence?(remaining) do
-          # Have partial escape sequence, might need timeout handling
-          :need_more
-        else
-          # Not a partial sequence, just need more input
-          :need_more
-        end
+      {[], _remaining} ->
+        # No complete events yet, need more input
+        :need_more
     end
+  end
+
+  # Limit queue size to prevent memory exhaustion
+  @spec limit_queue([Event.t()]) :: [Event.t()]
+  defp limit_queue(events) when length(events) <= @max_queue_size, do: events
+
+  defp limit_queue(events) do
+    Logger.warning(
+      "Input.Raw: Event queue overflow, dropping #{length(events) - @max_queue_size} events"
+    )
+
+    Enum.take(events, @max_queue_size)
   end
 
   # Read input with timeout using a Task
@@ -187,16 +218,13 @@ defmodule TermUI.Input.Raw do
   @spec handle_escape_timeout(t(), non_neg_integer()) :: TermUI.Input.poll_result()
   defp handle_escape_timeout(%__MODULE__{} = state, timeout) do
     # First try to complete the escape sequence with a short timeout
-    case do_read_with_timeout(state, @escape_timeout) do
-      {{:ok, _event}, _new_state} = result ->
-        result
-
-      {:timeout, state_after_short} ->
-        # Escape sequence didn't complete, emit what we have
-        emit_partial_escape(state_after_short, timeout - @escape_timeout)
-
-      {:eof, _new_state} = result ->
-        result
+    # Using `with` for cleaner flow control
+    with {:timeout, state_after_short} <- do_read_with_timeout(state, @escape_timeout) do
+      # Escape sequence didn't complete, emit what we have
+      emit_partial_escape(state_after_short, timeout - @escape_timeout)
+    else
+      # Success or EOF - return as-is
+      result -> result
     end
   end
 
@@ -206,20 +234,20 @@ defmodule TermUI.Input.Raw do
     events =
       cond do
         # Lone ESC
-        buffer == <<0x1B>> ->
+        buffer == <<@esc>> ->
           [Event.key(:escape)]
 
         # ESC[ without terminator
-        buffer == <<0x1B, ?[>> ->
+        buffer == <<@esc, @left_bracket>> ->
           [Event.key(:escape), Event.key("[", char: "[")]
 
         # ESC O without terminator
-        buffer == <<0x1B, ?O>> ->
+        buffer == <<@esc, @letter_o>> ->
           [Event.key(:escape), Event.key("O", char: "O")]
 
         # Other partial sequences starting with ESC
-        String.starts_with?(buffer, <<0x1B>>) ->
-          <<0x1B, rest::binary>> = buffer
+        String.starts_with?(buffer, <<@esc>>) ->
+          <<@esc, rest::binary>> = buffer
           {rest_events, _} = EscapeParser.parse(rest)
           [Event.key(:escape) | rest_events]
 
@@ -248,11 +276,18 @@ defmodule TermUI.Input.Raw do
     # Spawn a task to read input
     task = Task.async(fn -> read_char() end)
 
-    case Task.yield(task, timeout) || Task.shutdown(task) do
+    # Use explicit Task.yield and Task.shutdown for clarity
+    case Task.yield(task, timeout) do
       {:ok, {:ok, data}} ->
-        # Got input, add to buffer and try to parse
+        # Got input, add to buffer with size limit and try to parse
         new_buffer = state.buffer <> data
-        new_state = %{state | buffer: new_buffer}
+        {limited_buffer, truncated} = InputBuffer.apply_limit(new_buffer, max_size: @max_buffer_size)
+
+        if truncated do
+          Logger.warning("Input.Raw: Buffer overflow, truncating to #{@max_buffer_size} bytes")
+        end
+
+        new_state = %{state | buffer: limited_buffer}
 
         case try_parse_buffer(new_state) do
           {:ok, event, final_state} ->
@@ -260,23 +295,20 @@ defmodule TermUI.Input.Raw do
 
           :need_more ->
             # Still need more, but we've used our timeout
-            # Check if it's a partial escape sequence
-            if EscapeParser.partial_sequence?(new_buffer) do
-              # Return timeout, let next poll handle escape timeout
-              {:timeout, new_state}
-            else
-              {:timeout, new_state}
-            end
+            {:timeout, new_state}
         end
 
       {:ok, :eof} ->
         {:eof, state}
 
-      {:ok, {:error, _reason}} ->
+      {:ok, {:error, reason}} ->
+        # Log IO errors at debug level for troubleshooting
+        Logger.debug("Input.Raw: IO read error: #{inspect(reason)}")
         {:eof, state}
 
       nil ->
-        # Timeout - no input received
+        # Timeout - no input received, shut down the task
+        Task.shutdown(task)
         {:timeout, state}
     end
   end
