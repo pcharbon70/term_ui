@@ -973,50 +973,34 @@ defmodule TermUI.Backend.TTY do
   # ===========================================================================
 
   # Compile-time mapping from Unicode box-drawing characters to ASCII equivalents.
-  # Built from CharacterSet definitions to ensure consistency.
+  # Built from CharacterSet definitions to ensure consistency and automatic adaptation
+  # when new character keys are added.
   @unicode_chars TermUI.CharacterSet.get(:unicode)
   @ascii_chars TermUI.CharacterSet.get(:ascii)
 
-  # Build the base mapping for single-character entries (excluding bar_levels and bar_full)
-  @unicode_to_ascii_base %{
-    # Box corners
-    @unicode_chars.tl => @ascii_chars.tl,
-    @unicode_chars.tr => @ascii_chars.tr,
-    @unicode_chars.bl => @ascii_chars.bl,
-    @unicode_chars.br => @ascii_chars.br,
-    # Lines
-    @unicode_chars.h_line => @ascii_chars.h_line,
-    @unicode_chars.v_line => @ascii_chars.v_line,
-    # T-junctions
-    @unicode_chars.t_up => @ascii_chars.t_up,
-    @unicode_chars.t_down => @ascii_chars.t_down,
-    @unicode_chars.t_left => @ascii_chars.t_left,
-    @unicode_chars.t_right => @ascii_chars.t_right,
-    # Cross
-    @unicode_chars.cross => @ascii_chars.cross,
-    # Progress/gauge (bar_empty only - bar_full handled after bar_levels)
-    @unicode_chars.bar_empty => @ascii_chars.bar_empty,
-    # Check marks
-    @unicode_chars.check => @ascii_chars.check,
-    @unicode_chars.cross_mark => @ascii_chars.cross_mark,
-    # Arrows
-    @unicode_chars.arrow_up => @ascii_chars.arrow_up,
-    @unicode_chars.arrow_down => @ascii_chars.arrow_down,
-    @unicode_chars.arrow_left => @ascii_chars.arrow_left,
-    @unicode_chars.arrow_right => @ascii_chars.arrow_right
-  }
+  # Build the mapping in a single expression:
+  # 1. Map all single-character keys (excluding bar_levels) from unicode to ascii
+  # 2. Add bar_levels mapping (Unicode has 8 levels, ASCII has 5 - cycle ASCII to match)
+  # 3. Override bar_full to ensure it maps correctly (it appears in both bar_levels and standalone)
+  @unicode_to_ascii_map (
+    # Single-character keys (all keys except bar_levels)
+    single_keys = TermUI.CharacterSet.keys() -- [:bar_levels]
 
-  # Add bar_levels mapping (Unicode has 8 levels, ASCII has 5 - cycle ASCII to match)
-  # Note: bar_full (█) appears in both bar_levels and bar_full, so we add bar_full last
-  # to ensure it maps to # instead of the cycled bar_levels value
-  @unicode_to_ascii_with_levels Enum.reduce(
-                                  Enum.zip(@unicode_chars.bar_levels, Stream.cycle(@ascii_chars.bar_levels)),
-                                  @unicode_to_ascii_base,
-                                  fn {unicode, ascii}, acc -> Map.put(acc, unicode, ascii) end
-                                )
+    base =
+      Map.new(single_keys, fn key ->
+        {@unicode_chars[key], @ascii_chars[key]}
+      end)
 
-  # Override bar_full to ensure it maps to # (not the cycled value from bar_levels)
-  @unicode_to_ascii_map Map.put(@unicode_to_ascii_with_levels, @unicode_chars.bar_full, @ascii_chars.bar_full)
+    # Add bar_levels with cycling (8 Unicode levels → 5 ASCII levels cycled)
+    bar_map =
+      @unicode_chars.bar_levels
+      |> Enum.zip(Stream.cycle(@ascii_chars.bar_levels))
+      |> Map.new()
+
+    # Merge bar_map first, then base - this ensures bar_full gets the standalone value
+    # since it appears last in single_keys and overwrites the cycled bar_levels value
+    Map.merge(bar_map, base)
+  )
 
   # Maps characters based on character set.
   #

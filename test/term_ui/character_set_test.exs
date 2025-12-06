@@ -167,6 +167,29 @@ defmodule TermUI.CharacterSetTest do
     end
   end
 
+  describe "get/1 validation" do
+    test "raises ArgumentError for invalid charset" do
+      assert_raise ArgumentError, ~r/unknown character set :invalid/, fn ->
+        CharacterSet.get(:invalid)
+      end
+    end
+
+    test "raises ArgumentError for string input" do
+      assert_raise ArgumentError, ~r/unknown character set "unicode"/, fn ->
+        CharacterSet.get("unicode")
+      end
+    end
+
+    test "error message suggests valid options" do
+      error =
+        assert_raise ArgumentError, fn ->
+          CharacterSet.get(:foo)
+        end
+
+      assert error.message =~ "expected :unicode or :ascii"
+    end
+  end
+
   describe "keys/0" do
     test "returns a list of atoms" do
       keys = CharacterSet.keys()
@@ -245,6 +268,49 @@ defmodule TermUI.CharacterSetTest do
     test "returns :ascii when configured" do
       Application.put_env(:term_ui, :character_set, :ascii)
       assert CharacterSet.current() == :ascii
+    end
+  end
+
+  describe "current_charset/0" do
+    setup do
+      # Save original config
+      original = Application.get_env(:term_ui, :character_set)
+
+      on_exit(fn ->
+        # Restore original config
+        if original do
+          Application.put_env(:term_ui, :character_set, original)
+        else
+          Application.delete_env(:term_ui, :character_set)
+        end
+      end)
+
+      :ok
+    end
+
+    test "returns Unicode charset when configured as unicode" do
+      Application.put_env(:term_ui, :character_set, :unicode)
+      chars = CharacterSet.current_charset()
+      assert chars == CharacterSet.get(:unicode)
+    end
+
+    test "returns ASCII charset when configured as ascii" do
+      Application.put_env(:term_ui, :character_set, :ascii)
+      chars = CharacterSet.current_charset()
+      assert chars == CharacterSet.get(:ascii)
+    end
+
+    test "returns Unicode charset by default" do
+      Application.delete_env(:term_ui, :character_set)
+      chars = CharacterSet.current_charset()
+      assert chars == CharacterSet.get(:unicode)
+    end
+
+    test "returns a valid character map" do
+      chars = CharacterSet.current_charset()
+      assert is_map(chars)
+      assert Map.has_key?(chars, :tl)
+      assert Map.has_key?(chars, :bar_levels)
     end
   end
 

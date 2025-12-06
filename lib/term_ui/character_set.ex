@@ -20,6 +20,10 @@ defmodule TermUI.CharacterSet do
 
       chars = TermUI.CharacterSet.get(TermUI.CharacterSet.current())
 
+  Or use the convenience function `current_charset/0`:
+
+      chars = TermUI.CharacterSet.current_charset()
+
   ## Available Characters
 
   ### Box Drawing
@@ -92,6 +96,72 @@ defmodule TermUI.CharacterSet do
           arrow_right: String.t()
         }
 
+  # Define charsets as module attributes for compile-time access
+  @unicode_charset %{
+    # Box corners (light)
+    tl: "┌",
+    tr: "┐",
+    bl: "└",
+    br: "┘",
+    # Lines (light)
+    h_line: "─",
+    v_line: "│",
+    # T-junctions (light)
+    t_up: "┴",
+    t_down: "┬",
+    t_left: "┤",
+    t_right: "├",
+    # Cross junction (light)
+    cross: "┼",
+    # Progress/gauge characters
+    bar_full: "█",
+    bar_empty: "░",
+    # 8 levels of progress (1/8 to 8/8)
+    bar_levels: ["▏", "▎", "▍", "▌", "▋", "▊", "▉", "█"],
+    # Check marks
+    check: "✓",
+    cross_mark: "✗",
+    # Arrows
+    arrow_up: "↑",
+    arrow_down: "↓",
+    arrow_left: "←",
+    arrow_right: "→"
+  }
+
+  @ascii_charset %{
+    # Box corners (ASCII)
+    tl: "+",
+    tr: "+",
+    bl: "+",
+    br: "+",
+    # Lines (ASCII)
+    h_line: "-",
+    v_line: "|",
+    # T-junctions (ASCII)
+    t_up: "+",
+    t_down: "+",
+    t_left: "+",
+    t_right: "+",
+    # Cross junction (ASCII)
+    cross: "+",
+    # Progress/gauge characters (ASCII)
+    bar_full: "#",
+    bar_empty: ".",
+    # 5 levels of progress for ASCII
+    bar_levels: [" ", ".", ":", "=", "#"],
+    # Check marks (ASCII)
+    check: "x",
+    cross_mark: "X",
+    # Arrows (ASCII)
+    arrow_up: "^",
+    arrow_down: "v",
+    arrow_left: "<",
+    arrow_right: ">"
+  }
+
+  # Derive keys from the actual charset map at compile time
+  @charset_keys Map.keys(@unicode_charset)
+
   @doc """
   Returns the character set for the given type.
 
@@ -114,70 +184,11 @@ defmodule TermUI.CharacterSet do
       "+"
   """
   @spec get(charset()) :: t()
-  def get(:unicode) do
-    %{
-      # Box corners (light)
-      tl: "┌",
-      tr: "┐",
-      bl: "└",
-      br: "┘",
-      # Lines (light)
-      h_line: "─",
-      v_line: "│",
-      # T-junctions (light)
-      t_up: "┴",
-      t_down: "┬",
-      t_left: "┤",
-      t_right: "├",
-      # Cross junction (light)
-      cross: "┼",
-      # Progress/gauge characters
-      bar_full: "█",
-      bar_empty: "░",
-      # 8 levels of progress (1/8 to 8/8)
-      bar_levels: ["▏", "▎", "▍", "▌", "▋", "▊", "▉", "█"],
-      # Check marks
-      check: "✓",
-      cross_mark: "✗",
-      # Arrows
-      arrow_up: "↑",
-      arrow_down: "↓",
-      arrow_left: "←",
-      arrow_right: "→"
-    }
-  end
+  def get(:unicode), do: @unicode_charset
+  def get(:ascii), do: @ascii_charset
 
-  def get(:ascii) do
-    %{
-      # Box corners (ASCII)
-      tl: "+",
-      tr: "+",
-      bl: "+",
-      br: "+",
-      # Lines (ASCII)
-      h_line: "-",
-      v_line: "|",
-      # T-junctions (ASCII)
-      t_up: "+",
-      t_down: "+",
-      t_left: "+",
-      t_right: "+",
-      # Cross junction (ASCII)
-      cross: "+",
-      # Progress/gauge characters (ASCII)
-      bar_full: "#",
-      bar_empty: ".",
-      # 5 levels of progress for ASCII
-      bar_levels: [" ", ".", ":", "=", "#"],
-      # Check marks (ASCII)
-      check: "x",
-      cross_mark: "X",
-      # Arrows (ASCII)
-      arrow_up: "^",
-      arrow_down: "v",
-      arrow_left: "<",
-      arrow_right: ">"
-    }
+  def get(invalid) do
+    raise ArgumentError, "unknown character set #{inspect(invalid)}, expected :unicode or :ascii"
   end
 
   @doc """
@@ -205,7 +216,35 @@ defmodule TermUI.CharacterSet do
   end
 
   @doc """
+  Returns the current character set as a map.
+
+  Convenience function that combines `current/0` and `get/1`.
+
+  ## Returns
+
+  A map containing all box-drawing and special characters for the
+  currently configured character set.
+
+  ## Examples
+
+      iex> chars = TermUI.CharacterSet.current_charset()
+      iex> is_map(chars)
+      true
+
+      iex> Application.put_env(:term_ui, :character_set, :ascii)
+      iex> TermUI.CharacterSet.current_charset().tl
+      "+"
+  """
+  @spec current_charset() :: t()
+  def current_charset do
+    get(current())
+  end
+
+  @doc """
   Returns the list of all character keys available in a character set.
+
+  Keys are derived from the actual character set map at compile time,
+  ensuring they stay in sync with the character set definitions.
 
   Useful for validation and testing.
 
@@ -219,28 +258,5 @@ defmodule TermUI.CharacterSet do
       true
   """
   @spec keys() :: [atom()]
-  def keys do
-    [
-      :tl,
-      :tr,
-      :bl,
-      :br,
-      :h_line,
-      :v_line,
-      :t_up,
-      :t_down,
-      :t_left,
-      :t_right,
-      :cross,
-      :bar_full,
-      :bar_empty,
-      :bar_levels,
-      :check,
-      :cross_mark,
-      :arrow_up,
-      :arrow_down,
-      :arrow_left,
-      :arrow_right
-    ]
-  end
+  def keys, do: @charset_keys
 end
