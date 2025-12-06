@@ -6,6 +6,14 @@ defmodule TermUI.Input.LineReader do
   shell line editing features. It is specifically designed for the `TextInput.Line`
   widget, where users enter free-form text and submit with Enter.
 
+  > #### Not a Behaviour Implementation {: .info}
+  >
+  > Unlike `TermUI.Input.Raw` and `TermUI.Input.TTY`, this module does **not**
+  > implement the `TermUI.Input` behaviour. It is a standalone utility module
+  > for line-based input, not character-by-character polling. Use this module
+  > directly when you need line input with shell editing; use the behaviour
+  > implementations for immediate character input.
+
   ## When to Use LineReader
 
   Use `LineReader` when you need:
@@ -69,6 +77,26 @@ defmodule TermUI.Input.LineReader do
   - **No timeout**: Cannot interrupt or timeout the read
   - **Raw mode**: If running in raw mode, line editing may not work as expected
   - **TTY only**: Best used with the TTY backend for full shell editing support
+  - **No length limits**: This module does not enforce input length limits;
+    limits are determined by the shell/terminal. Applications should validate
+    input length if needed.
+  - **Error handling**: IO errors from `IO.gets/1` are converted to `:eof` for
+    simplified error handling. Most callers don't need to distinguish between
+    "stream ended" and "read error" scenarios.
+
+  ## Security Considerations
+
+  This module provides raw line input and does not perform sanitization:
+
+  - **Input length**: No length limits are enforced by this module. The shell
+    and terminal typically impose their own limits. If your application has
+    specific length requirements, validate after reading.
+  - **Input sanitization**: Input is returned as-is from `IO.gets/1`. The
+    application is responsible for any sanitization (escaping, filtering
+    special characters, etc.) appropriate for its use case.
+  - **No injection protection**: This module does not filter or escape input.
+    If the input will be used in shell commands, SQL queries, or other
+    security-sensitive contexts, proper escaping must be applied by the caller.
 
   ## TextInput.Line Widget
 
