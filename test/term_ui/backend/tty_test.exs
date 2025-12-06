@@ -286,9 +286,11 @@ defmodule TermUI.Backend.TTYTest do
   end
 
   describe "refresh_size/1" do
-    test "returns {:ok, state}" do
+    test "returns {:ok, size, state}" do
       {:ok, state} = init_tty([])
-      assert {:ok, _new_state} = TTY.refresh_size(state)
+      assert {:ok, {rows, cols}, _new_state} = TTY.refresh_size(state)
+      assert is_integer(rows) and rows > 0
+      assert is_integer(cols) and cols > 0
     end
 
     test "clears last_frame to force full redraw" do
@@ -296,7 +298,7 @@ defmodule TermUI.Backend.TTYTest do
       # Simulate having a last_frame
       state = %{state | last_frame: %{{1, 1} => {"A", :default, :default, []}}}
 
-      {:ok, refreshed_state} = TTY.refresh_size(state)
+      {:ok, _size, refreshed_state} = TTY.refresh_size(state)
 
       assert refreshed_state.last_frame == nil
     end
@@ -304,7 +306,7 @@ defmodule TermUI.Backend.TTYTest do
     test "preserves state structure" do
       {:ok, state} = init_tty(line_mode: :incremental, alternate_screen: true)
 
-      {:ok, refreshed_state} = TTY.refresh_size(state)
+      {:ok, _size, refreshed_state} = TTY.refresh_size(state)
 
       assert refreshed_state.line_mode == :incremental
       assert refreshed_state.alternate_screen == true
@@ -315,10 +317,10 @@ defmodule TermUI.Backend.TTYTest do
 
       # refresh_size queries :io.rows and :io.columns
       # In test environment these may or may not be available
-      {:ok, refreshed_state} = TTY.refresh_size(state)
+      {:ok, {rows, cols}, refreshed_state} = TTY.refresh_size(state)
 
-      # Size should be a valid tuple
-      {rows, cols} = refreshed_state.size
+      # Returned size should match state size
+      assert refreshed_state.size == {rows, cols}
       assert is_integer(rows) and rows > 0
       assert is_integer(cols) and cols > 0
     end
@@ -328,10 +330,10 @@ defmodule TermUI.Backend.TTYTest do
       # In that case, refresh_size should preserve the current size
       {:ok, state} = init_tty(size: {30, 100})
 
-      {:ok, refreshed_state} = TTY.refresh_size(state)
+      {:ok, {rows, cols}, refreshed_state} = TTY.refresh_size(state)
 
       # Size should still be valid (either from terminal or fallback)
-      {rows, cols} = refreshed_state.size
+      assert refreshed_state.size == {rows, cols}
       assert is_integer(rows) and rows > 0
       assert is_integer(cols) and cols > 0
     end
@@ -3007,6 +3009,7 @@ defmodule TermUI.Backend.TTYTest do
   # Section 3.8.1 Integration Tests - Full Redraw Lifecycle
   # ===========================================================================
 
+  @tag :integration
   describe "integration - full redraw lifecycle (Section 3.8.1)" do
     test "init -> draw_cells -> shutdown sequence works correctly" do
       # Initialize backend with full_redraw mode
@@ -3358,6 +3361,7 @@ defmodule TermUI.Backend.TTYTest do
   # Section 3.8.2 Integration Tests - Incremental Rendering
   # ===========================================================================
 
+  @tag :integration
   describe "integration - incremental rendering (Section 3.8.2)" do
     # -------------------------------------------------------------------------
     # 3.8.2.1 - Test first frame falls back to full redraw
@@ -3648,7 +3652,7 @@ defmodule TermUI.Backend.TTYTest do
         assert is_map(state.last_frame)
 
         # refresh_size should clear last_frame
-        {:ok, state} = TTY.refresh_size(state)
+        {:ok, _size, state} = TTY.refresh_size(state)
         assert is_nil(state.last_frame)
       end)
     end
@@ -3724,6 +3728,7 @@ defmodule TermUI.Backend.TTYTest do
   # Section 3.8.3 Integration Tests - Color Degradation
   # ===========================================================================
 
+  @tag :integration
   describe "integration - color degradation (Section 3.8.3)" do
     # -------------------------------------------------------------------------
     # 3.8.3.1 - Test rendering with true_color capabilities
@@ -4059,6 +4064,7 @@ defmodule TermUI.Backend.TTYTest do
   # Section 3.8.4 Integration Tests - Character Set Fallback
   # ===========================================================================
 
+  @tag :integration
   describe "integration - character set fallback (Section 3.8.4)" do
     # Get Unicode character set for reference in tests
     # (we test that Unicode chars are mapped to ASCII, so we only need the Unicode set)

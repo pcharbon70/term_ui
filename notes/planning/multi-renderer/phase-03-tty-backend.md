@@ -426,7 +426,7 @@ Implement input polling using `IO.getn/2` for character-by-character input. Even
 
 ## 3.8 Integration Tests
 
-- [ ] **Section 3.8 Complete**
+- [x] **Section 3.8 Complete**
 
 Integration tests verify the TTY backend works correctly in realistic scenarios and properly degrades features.
 
@@ -498,10 +498,18 @@ This phase establishes:
 ## Key Outputs
 
 - `lib/term_ui/backend/tty.ex` - Complete TTY backend implementation
+- `lib/term_ui/backend/input_buffer.ex` - Shared input buffer management
+- `lib/term_ui/color/converter.ex` - Shared color conversion algorithms
 - `lib/term_ui/character_set.ex` - Unicode/ASCII character sets
-- `test/term_ui/backend/tty_test.exs` - Unit tests
+- `test/term_ui/backend/tty_test.exs` - Unit and integration tests (tagged with `@tag :integration`)
+- `test/term_ui/backend/input_buffer_test.exs` - Input buffer tests
+- `test/term_ui/color/converter_test.exs` - Color converter tests
 - `test/term_ui/character_set_test.exs` - Character set tests
-- `test/integration/tty_backend_test.exs` - Integration tests
+
+Note: Integration tests are in the main test file with `@tag :integration`. Run with:
+```bash
+mix test --only integration
+```
 
 ---
 

@@ -152,9 +152,8 @@ defmodule TermUI.Backend.Raw do
   # This ensures cleanup even if state is inconsistent
   @all_mouse_off "\e[?1006l\e[?1003l\e[?1002l\e[?1000l"
 
-  # Maximum input buffer size (bytes) to prevent memory exhaustion from
-  # malicious or malformed input streams with unterminated escape sequences.
-  @max_input_buffer_size 1024
+  # Input buffer management is handled by TermUI.Backend.InputBuffer module
+  # which provides rate-limited logging and consistent behavior across backends.
 
   # Maximum event queue size to prevent memory exhaustion when events
   # are parsed faster than they're consumed.
@@ -234,7 +233,8 @@ defmodule TermUI.Backend.Raw do
           current_style: style_state() | nil,
           optimize_cursor: boolean(),
           input_buffer: binary(),
-          event_queue: [TermUI.Backend.event()]
+          event_queue: [TermUI.Backend.event()],
+          events_dropped: non_neg_integer()
         }
 
   defstruct size: {24, 80},
@@ -245,7 +245,8 @@ defmodule TermUI.Backend.Raw do
             current_style: nil,
             optimize_cursor: true,
             input_buffer: <<>>,
-            event_queue: []
+            event_queue: [],
+            events_dropped: 0
 
   # ===========================================================================
   # Behaviour Callbacks - Lifecycle, Queries, Cursor, Rendering, Input
@@ -1426,33 +1427,16 @@ defmodule TermUI.Backend.Raw do
   end
 
   # Appends data to the input buffer with size limit protection.
-  # If the buffer exceeds @max_input_buffer_size, truncates from the beginning
-  # keeping only the most recent bytes. This prevents memory exhaustion from
-  # malformed input streams with unterminated escape sequences.
+  # Uses the shared InputBuffer module for rate-limited logging.
   @spec append_to_input_buffer(t(), binary()) :: t()
   defp append_to_input_buffer(state, data) do
-    new_buffer = state.input_buffer <> data
-    buffer_size = byte_size(new_buffer)
-
-    if buffer_size > @max_input_buffer_size do
-      # Keep only the most recent bytes (potential partial escape sequence)
-      # We keep 256 bytes to preserve any valid partial sequence
-      keep_size = min(256, buffer_size)
-      truncated = binary_part(new_buffer, buffer_size - keep_size, keep_size)
-
-      Logger.warning(
-        "Input buffer overflow (#{buffer_size} bytes), truncating to #{keep_size} bytes"
-      )
-
-      %{state | input_buffer: truncated}
-    else
-      %{state | input_buffer: new_buffer}
-    end
+    TermUI.Backend.InputBuffer.append_with_limit(state, data, :input_buffer, source: __MODULE__)
   end
 
   # Queues events with size limit protection.
   # If the queue exceeds @max_event_queue_size, drops oldest events.
   # This prevents memory exhaustion when events are parsed faster than consumed.
+  # Dropped events are counted in the events_dropped field for monitoring.
   @spec queue_events(t(), [TermUI.Backend.event()]) :: t()
   defp queue_events(state, []), do: state
 
@@ -1463,12 +1447,16 @@ defmodule TermUI.Backend.Raw do
     if queue_size > @max_event_queue_size do
       # Keep newest events, drop oldest
       to_drop = queue_size - @max_event_queue_size
+      new_total_dropped = state.events_dropped + to_drop
 
-      Logger.warning(
-        "Event queue overflow (#{queue_size} events), dropping #{to_drop} oldest events"
-      )
+      # Only log on first drop to prevent log flooding
+      if state.events_dropped == 0 do
+        Logger.warning(
+          "Event queue overflow (#{queue_size} events), dropping #{to_drop} oldest events"
+        )
+      end
 
-      %{state | event_queue: Enum.drop(combined, to_drop)}
+      %{state | event_queue: Enum.drop(combined, to_drop), events_dropped: new_total_dropped}
     else
       %{state | event_queue: combined}
     end

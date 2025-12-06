@@ -83,8 +83,6 @@ defmodule TermUI.Backend.TTY do
 
   @behaviour TermUI.Backend
 
-  require Logger
-
   # ===========================================================================
   # ANSI Escape Sequence Constants
   # ===========================================================================
@@ -102,9 +100,8 @@ defmodule TermUI.Backend.TTY do
   # Attribute control sequences
   @reset_attrs "\e[0m"
 
-  # Maximum input buffer size to prevent memory exhaustion from malformed
-  # input streams with unterminated escape sequences.
-  @max_input_buffer_size 1024
+  # Input buffer management is handled by TermUI.Backend.InputBuffer module
+  # which provides rate-limited logging and consistent behavior across backends.
 
   # ===========================================================================
   # Type Definitions and State Structure
@@ -329,19 +326,22 @@ defmodule TermUI.Backend.TTY do
   This function also clears `last_frame` to force a full redraw, since the
   terminal dimensions may have changed.
 
+  Note: This is a TTY-specific extension function, not part of the Backend behaviour.
+  The return signature matches `TermUI.Backend.Raw.refresh_size/1` for consistency.
+
   ## Returns
 
-  `{:ok, updated_state}` with refreshed size and cleared last_frame.
+  `{:ok, {rows, cols}, updated_state}` with refreshed size and cleared last_frame.
 
   ## Example
 
-      {:ok, state} = TTY.refresh_size(state)
-      {:ok, {rows, cols}} = TTY.size(state)
+      {:ok, {rows, cols}, state} = TTY.refresh_size(state)
   """
-  @spec refresh_size(t()) :: {:ok, t()}
+  @spec refresh_size(t()) :: {:ok, TermUI.Backend.size(), t()}
   def refresh_size(%__MODULE__{} = state) do
     new_size = query_terminal_size(state.size)
-    {:ok, %{state | size: new_size, last_frame: nil}}
+    new_state = %{state | size: new_size, last_frame: nil}
+    {:ok, new_size, new_state}
   end
 
   # Queries the terminal for its current dimensions.
@@ -703,8 +703,8 @@ defmodule TermUI.Backend.TTY do
         {:ok, <<char>>}
 
       other ->
-        # Handle unexpected return values
-        {:ok, to_string(other)}
+        # Unexpected return type - return error instead of masking it
+        {:error, {:unexpected_io_return, other}}
     end
   end
 
@@ -729,34 +729,18 @@ defmodule TermUI.Backend.TTY do
   end
 
   # Appends data to the input buffer with size limit protection.
-  # If the buffer exceeds @max_input_buffer_size, truncates from the beginning
-  # keeping only the most recent bytes. This prevents memory exhaustion from
-  # malformed input streams with unterminated escape sequences.
+  # Uses the shared InputBuffer module for rate-limited logging.
   @spec append_to_input_buffer(t(), binary()) :: t()
   defp append_to_input_buffer(state, data) do
-    new_buffer = state.input_buffer <> data
-    apply_buffer_limit(%{state | input_buffer: new_buffer})
+    TermUI.Backend.InputBuffer.append_with_limit(state, data, :input_buffer, source: __MODULE__)
   end
 
   # Applies buffer size limit, truncating if necessary.
+  # Uses the shared InputBuffer module for rate-limited logging.
   @spec apply_buffer_limit(t()) :: t()
   defp apply_buffer_limit(%{input_buffer: buffer} = state) do
-    buffer_size = byte_size(buffer)
-
-    if buffer_size > @max_input_buffer_size do
-      # Keep only the most recent bytes (potential partial escape sequence)
-      # We keep 256 bytes to preserve any valid partial sequence
-      keep_size = min(256, buffer_size)
-      truncated = binary_part(buffer, buffer_size - keep_size, keep_size)
-
-      Logger.warning(
-        "TTY input buffer overflow (#{buffer_size} bytes), truncating to #{keep_size} bytes"
-      )
-
-      %{state | input_buffer: truncated}
-    else
-      state
-    end
+    {limited, _overflowed} = TermUI.Backend.InputBuffer.apply_limit(buffer, source: __MODULE__)
+    %{state | input_buffer: limited}
   end
 
   # ===========================================================================
@@ -1012,14 +996,14 @@ defmodule TermUI.Backend.TTY do
        when is_integer(r) and r >= 0 and r <= 255 and
             is_integer(g) and g >= 0 and g <= 255 and
             is_integer(b) and b >= 0 and b <= 255 do
-    "\e[38;5;#{rgb_to_256(r, g, b)}m"
+    "\e[38;5;#{TermUI.Color.Converter.rgb_to_256({r, g, b})}m"
   end
 
   defp color_to_sgr({r, g, b}, :bg, :color_256)
        when is_integer(r) and r >= 0 and r <= 255 and
             is_integer(g) and g >= 0 and g <= 255 and
             is_integer(b) and b >= 0 and b <= 255 do
-    "\e[48;5;#{rgb_to_256(r, g, b)}m"
+    "\e[48;5;#{TermUI.Color.Converter.rgb_to_256({r, g, b})}m"
   end
 
   # 16-color mode - convert RGB to basic color (with validation)
@@ -1027,14 +1011,14 @@ defmodule TermUI.Backend.TTY do
        when is_integer(r) and r >= 0 and r <= 255 and
             is_integer(g) and g >= 0 and g <= 255 and
             is_integer(b) and b >= 0 and b <= 255 do
-    "\e[#{rgb_to_16_fg(r, g, b)}m"
+    "\e[#{TermUI.Color.Converter.rgb_to_16({r, g, b}, :fg)}m"
   end
 
   defp color_to_sgr({r, g, b}, :bg, :color_16)
        when is_integer(r) and r >= 0 and r <= 255 and
             is_integer(g) and g >= 0 and g <= 255 and
             is_integer(b) and b >= 0 and b <= 255 do
-    "\e[#{rgb_to_16_bg(r, g, b)}m"
+    "\e[#{TermUI.Color.Converter.rgb_to_16({r, g, b}, :bg)}m"
   end
 
   # Monochrome mode - skip colors entirely
@@ -1091,93 +1075,9 @@ defmodule TermUI.Backend.TTY do
 
       code when type == :bg ->
         # Background codes are foreground + 10
-        bg_code = if code >= 90, do: code + 10, else: code + 10
+        bg_code = code + 10
         "\e[#{bg_code}m"
     end
-  end
-
-  # Converts RGB to 256-color palette index.
-  # Uses 6x6x6 color cube (indices 16-231) or grayscale (232-255).
-  @spec rgb_to_256(0..255, 0..255, 0..255) :: 0..255
-  defp rgb_to_256(r, g, b) do
-    # Check if it's close to grayscale
-    if abs(r - g) < 10 and abs(g - b) < 10 and abs(r - b) < 10 do
-      # Use grayscale ramp (232-255)
-      gray = div(r + g + b, 3)
-      232 + div(gray * 23, 255)
-    else
-      # Use 6x6x6 color cube (16-231)
-      r_idx = div(r * 5, 255)
-      g_idx = div(g * 5, 255)
-      b_idx = div(b * 5, 255)
-      16 + 36 * r_idx + 6 * g_idx + b_idx
-    end
-  end
-
-  # Converts RGB to 16-color foreground code.
-  @spec rgb_to_16_fg(0..255, 0..255, 0..255) :: 30..37 | 90..97
-  defp rgb_to_16_fg(r, g, b) do
-    {base, bright} = rgb_to_16_base(r, g, b)
-    if bright, do: base + 60, else: base
-  end
-
-  # Converts RGB to 16-color background code.
-  @spec rgb_to_16_bg(0..255, 0..255, 0..255) :: 40..47 | 100..107
-  defp rgb_to_16_bg(r, g, b) do
-    {base, bright} = rgb_to_16_base(r, g, b)
-    bg_base = base + 10
-    if bright, do: bg_base + 60, else: bg_base
-  end
-
-  # ANSI 16-color palette RGB values for distance calculation.
-  # Format: {color_code, {r, g, b}}
-  @ansi_16_colors [
-    # Normal colors (codes 30-37)
-    {30, {0, 0, 0}},        # black
-    {31, {128, 0, 0}},      # red
-    {32, {0, 128, 0}},      # green
-    {33, {128, 128, 0}},    # yellow
-    {34, {0, 0, 128}},      # blue
-    {35, {128, 0, 128}},    # magenta
-    {36, {0, 128, 128}},    # cyan
-    {37, {192, 192, 192}},  # white (light gray)
-    # Bright colors (codes 90-97)
-    {90, {128, 128, 128}},  # bright black (dark gray)
-    {91, {255, 0, 0}},      # bright red
-    {92, {0, 255, 0}},      # bright green
-    {93, {255, 255, 0}},    # bright yellow
-    {94, {0, 0, 255}},      # bright blue
-    {95, {255, 0, 255}},    # bright magenta
-    {96, {0, 255, 255}},    # bright cyan
-    {97, {255, 255, 255}}   # bright white
-  ]
-
-  # Determines the base 16-color index and brightness using weighted color distance.
-  # Uses perceptual weighting (human eye is more sensitive to green).
-  @spec rgb_to_16_base(0..255, 0..255, 0..255) :: {30..37 | 90..97, boolean()}
-  defp rgb_to_16_base(r, g, b) do
-    # Find closest color using weighted Euclidean distance
-    # Weights: R=0.299, G=0.587, B=0.114 (perceptual luminance weights)
-    {best_code, _best_dist} =
-      Enum.reduce(@ansi_16_colors, {30, :infinity}, fn {code, {pr, pg, pb}}, {best, dist} ->
-        # Weighted distance calculation
-        dr = (r - pr) * 0.299
-        dg = (g - pg) * 0.587
-        db = (b - pb) * 0.114
-        new_dist = dr * dr + dg * dg + db * db
-
-        if new_dist < dist do
-          {code, new_dist}
-        else
-          {best, dist}
-        end
-      end)
-
-    # Determine if it's a bright color (90-97) or normal (30-37)
-    bright = best_code >= 90
-    base = if bright, do: best_code - 60, else: best_code
-
-    {base, bright}
   end
 
   # ===========================================================================
@@ -1257,11 +1157,26 @@ defmodule TermUI.Backend.TTY do
   # Core diffing algorithm for incremental rendering. Identifies which cells
   # need to be updated (new or changed) and which positions need to be cleared.
   #
-  # Uses MapSet for efficient position lookup when finding removed cells,
-  # avoiding the need to build a full frame map just for membership testing.
-  #
-  # Public for testing, but not part of the Backend behaviour API.
-  @doc false
+  @doc """
+  Compares two frames to find changed and removed cells.
+
+  This is a testing helper function exposed for unit testing the incremental
+  rendering logic. It is not part of the Backend behaviour API.
+
+  Uses MapSet for efficient position lookup when finding removed cells,
+  avoiding the need to build a full frame map just for membership testing.
+
+  ## Parameters
+
+  - `last_frame` - Map of `{row, col}` => `{char, fg, bg, attrs}` from previous frame
+  - `current_cells` - List of `{{row, col}, {char, fg, bg, attrs}}` tuples for current frame
+
+  ## Returns
+
+  Tuple of `{changed_cells, removed_positions}`:
+  - `changed_cells` - Cells that are new or different from last frame
+  - `removed_positions` - Positions that were in last frame but not in current
+  """
   @spec compare_frames(
           map(),
           [{TermUI.Backend.position(), TermUI.Backend.cell()}]
