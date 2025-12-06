@@ -373,13 +373,13 @@ Implement the remaining backend callbacks required by the behaviour.
 
 ### 3.7.1 Implement Cursor Operations
 
-- [ ] **Task 3.7.1 Complete**
+- [x] **Task 3.7.1 Complete**
 
 Implement cursor positioning and visibility callbacks.
 
-- [ ] 3.7.1.1 Implement `@impl true` `move_cursor/2` writing `\e[row;colH`
-- [ ] 3.7.1.2 Implement `@impl true` `hide_cursor/1` writing `\e[?25l`
-- [ ] 3.7.1.3 Implement `@impl true` `show_cursor/1` writing `\e[?25h`
+- [x] 3.7.1.1 Implement `@impl true` `move_cursor/2` writing `\e[row;colH`
+- [x] 3.7.1.2 Implement `@impl true` `hide_cursor/1` writing `\e[?25l`
+- [x] 3.7.1.3 Implement `@impl true` `show_cursor/1` writing `\e[?25h`
 
 ### 3.7.2 Implement size/1 Callback
 

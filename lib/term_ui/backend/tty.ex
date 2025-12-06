@@ -322,27 +322,42 @@ defmodule TermUI.Backend.TTY do
   Moves the cursor to the specified position.
 
   Position is 1-indexed: `{1, 1}` is the top-left corner.
+  Outputs `\\e[row;colH` escape sequence.
+  Position is clamped to terminal bounds.
   """
   @spec move_cursor(t(), {pos_integer(), pos_integer()}) :: {:ok, t()}
-  def move_cursor(state, {_row, _col} = _position) do
-    {:ok, state}
+  def move_cursor(%__MODULE__{size: {max_rows, max_cols}} = state, {row, col}) do
+    # Clamp position to terminal bounds
+    clamped_row = max(1, min(row, max_rows))
+    clamped_col = max(1, min(col, max_cols))
+
+    # Output cursor positioning sequence
+    safe_write("\e[#{clamped_row};#{clamped_col}H")
+
+    {:ok, %{state | cursor_position: {clamped_row, clamped_col}}}
   end
 
   @impl true
   @doc """
   Hides the terminal cursor.
+
+  Outputs `\\e[?25l` escape sequence.
   """
   @spec hide_cursor(t()) :: {:ok, t()}
   def hide_cursor(state) do
+    safe_write(@cursor_hide)
     {:ok, %{state | cursor_visible: false}}
   end
 
   @impl true
   @doc """
   Shows the terminal cursor.
+
+  Outputs `\\e[?25h` escape sequence.
   """
   @spec show_cursor(t()) :: {:ok, t()}
   def show_cursor(state) do
+    safe_write(@cursor_show)
     {:ok, %{state | cursor_visible: true}}
   end
 

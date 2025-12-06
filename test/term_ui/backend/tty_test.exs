@@ -288,26 +288,124 @@ defmodule TermUI.Backend.TTYTest do
   describe "cursor operations" do
     test "move_cursor/2 returns {:ok, state}" do
       {:ok, state} = init_tty([])
-      assert {:ok, _state} = TTY.move_cursor(state, {10, 20})
+
+      output =
+        capture_io(fn ->
+          assert {:ok, _state} = TTY.move_cursor(state, {10, 20})
+        end)
+
+      assert output =~ "\e[10;20H"
+    end
+
+    test "move_cursor/2 updates cursor_position in state" do
+      {:ok, state} = init_tty([])
+
+      capture_io(fn ->
+        {:ok, new_state} = TTY.move_cursor(state, {5, 15})
+        send(self(), {:result, new_state})
+      end)
+
+      receive do
+        {:result, new_state} -> assert new_state.cursor_position == {5, 15}
+      end
+    end
+
+    test "move_cursor/2 clamps row to terminal bounds" do
+      {:ok, state} = init_tty(size: {24, 80})
+
+      output =
+        capture_io(fn ->
+          {:ok, new_state} = TTY.move_cursor(state, {100, 40})
+          send(self(), {:result, new_state})
+        end)
+
+      # Row should be clamped to 24 (max rows)
+      assert output =~ "\e[24;40H"
+
+      receive do
+        {:result, new_state} -> assert new_state.cursor_position == {24, 40}
+      end
+    end
+
+    test "move_cursor/2 clamps column to terminal bounds" do
+      {:ok, state} = init_tty(size: {24, 80})
+
+      output =
+        capture_io(fn ->
+          {:ok, new_state} = TTY.move_cursor(state, {10, 200})
+          send(self(), {:result, new_state})
+        end)
+
+      # Column should be clamped to 80 (max cols)
+      assert output =~ "\e[10;80H"
+
+      receive do
+        {:result, new_state} -> assert new_state.cursor_position == {10, 80}
+      end
+    end
+
+    test "move_cursor/2 clamps minimum position to 1,1" do
+      {:ok, state} = init_tty([])
+
+      output =
+        capture_io(fn ->
+          {:ok, new_state} = TTY.move_cursor(state, {0, 0})
+          send(self(), {:result, new_state})
+        end)
+
+      # Position should be clamped to 1,1
+      assert output =~ "\e[1;1H"
+
+      receive do
+        {:result, new_state} -> assert new_state.cursor_position == {1, 1}
+      end
     end
 
     test "hide_cursor/1 sets cursor_visible to false" do
       {:ok, state} = init_tty([])
       # Note: init already hides cursor, so it's false after init
       assert state.cursor_visible == false
+
       # Show first, then hide to test the transition
-      {:ok, state} = TTY.show_cursor(state)
-      assert state.cursor_visible == true
-      {:ok, state} = TTY.hide_cursor(state)
-      assert state.cursor_visible == false
+      capture_io(fn ->
+        {:ok, state} = TTY.show_cursor(state)
+        assert state.cursor_visible == true
+        {:ok, state} = TTY.hide_cursor(state)
+        assert state.cursor_visible == false
+      end)
+    end
+
+    test "hide_cursor/1 outputs hide cursor sequence" do
+      {:ok, state} = init_tty([])
+
+      output =
+        capture_io(fn ->
+          TTY.hide_cursor(state)
+        end)
+
+      assert output =~ "\e[?25l"
     end
 
     test "show_cursor/1 sets cursor_visible to true" do
       {:ok, state} = init_tty([])
       # init hides cursor, so start with false
       assert state.cursor_visible == false
-      {:ok, state} = TTY.show_cursor(state)
-      assert state.cursor_visible == true
+
+      capture_io(fn ->
+        {:ok, state} = TTY.show_cursor(state)
+        assert state.cursor_visible == true
+      end)
+    end
+
+    test "show_cursor/1 outputs show cursor sequence" do
+      {:ok, state} = init_tty([])
+
+      output =
+        capture_io(fn ->
+          TTY.show_cursor(state)
+        end)
+
+      assert output =~ "\e[?25h"
     end
   end
 
