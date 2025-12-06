@@ -445,6 +445,11 @@ defmodule TermUI.Backend.TTY do
   end
 
   # Performs incremental rendering: only updates changed/removed cells.
+  #
+  # Optimizations applied:
+  # 1. Sort cells by position (row, then col) for sequential access
+  # 2. Group adjacent cells on same row to minimize cursor moves
+  # 3. Batch render grouped cells with single cursor positioning
   @spec do_incremental_render(
           [{TermUI.Backend.position(), TermUI.Backend.cell()}],
           t()
@@ -453,20 +458,87 @@ defmodule TermUI.Backend.TTY do
     # Compare current frame with last frame
     {changed, removed} = compare_frames(state.last_frame, cells)
 
-    # Render changed cells (new or modified)
-    Enum.each(changed, fn {pos, cell} ->
-      render_cell_at(pos, cell, state)
-    end)
+    # Optimize: sort and group changed cells by row for efficient rendering
+    # This reduces cursor positioning overhead
+    changed
+    |> sort_cells_by_position()
+    |> group_cells_by_row()
+    |> render_incremental_rows(state)
 
-    # Clear removed cells (write space with default style)
-    Enum.each(removed, fn pos ->
-      clear_cell_at(pos)
-    end)
+    # Clear removed cells (sorted for sequential access)
+    removed
+    |> Enum.sort()
+    |> Enum.each(&clear_cell_at/1)
 
     # Update last_frame with current frame
     frame = build_frame_map(cells)
 
     {:ok, %{state | last_frame: frame, cursor_position: nil}}
+  end
+
+  # Sorts cells by position (row first, then column) for optimal cursor movement.
+  @spec sort_cells_by_position([{TermUI.Backend.position(), TermUI.Backend.cell()}]) ::
+          [{TermUI.Backend.position(), TermUI.Backend.cell()}]
+  defp sort_cells_by_position(cells) do
+    Enum.sort_by(cells, fn {{row, col}, _cell} -> {row, col} end)
+  end
+
+  # Renders grouped cells for incremental mode with cursor optimization.
+  #
+  # For each row, positions cursor once at the first cell, then renders
+  # cells in sequence. Adjacent cells benefit from implicit cursor advance.
+  @spec render_incremental_rows([{pos_integer(), [{pos_integer(), TermUI.Backend.cell()}]}], t()) ::
+          :ok
+  defp render_incremental_rows(grouped_rows, state) do
+    Enum.each(grouped_rows, fn {row, row_cells} ->
+      render_incremental_row(row, row_cells, state)
+    end)
+  end
+
+  # Renders a row of cells for incremental mode.
+  #
+  # Optimizes cursor movement by:
+  # 1. Positioning cursor at first cell in the row
+  # 2. Rendering cells in column order
+  # 3. Using gap filling for non-adjacent cells (cursor advances implicitly)
+  # 4. Single reset at end of row group
+  @spec render_incremental_row(
+          pos_integer(),
+          [{pos_integer(), TermUI.Backend.cell()}],
+          t()
+        ) :: :ok
+  defp render_incremental_row(row, cells, state) do
+    # Get the starting column (first cell in sorted list)
+    [{start_col, _} | _] = cells
+
+    # Track current column and build iolist
+    initial_state = {start_col, nil, []}
+
+    {_col, _style, iolist} =
+      Enum.reduce(cells, initial_state, fn {col, cell}, {cur_col, cur_style, acc} ->
+        # Fill gap with spaces if cells are not adjacent
+        gap =
+          if col > cur_col do
+            String.duplicate(" ", col - cur_col)
+          else
+            ""
+          end
+
+        # Render the cell with style delta tracking
+        {new_style, cell_io} = render_cell_with_delta(cell, cur_style, state)
+
+        # Append to iolist
+        new_acc = [cell_io, gap | acc]
+
+        {col + 1, new_style, new_acc}
+      end)
+
+    # Build final iolist: cursor position at start + content + reset
+    final_io = ["\e[#{row};#{start_col}H", Enum.reverse(iolist), @reset_attrs]
+
+    safe_write(final_io)
+
+    :ok
   end
 
   # Renders a single cell at a specific position.
