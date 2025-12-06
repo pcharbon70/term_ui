@@ -770,8 +770,82 @@ defmodule TermUI.Backend.TTYTest do
       assert output =~ "\e[0m"
     end
 
-    test "updates last_frame in state" do
+    test "outputs dim attribute" do
       {:ok, state} = init_tty([])
+      cells = [{{1, 1}, {"X", :default, :default, [:dim]}}]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      assert output =~ "\e[2m"
+    end
+
+    test "outputs italic attribute" do
+      {:ok, state} = init_tty([])
+      cells = [{{1, 1}, {"X", :default, :default, [:italic]}}]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      assert output =~ "\e[3m"
+    end
+
+    test "outputs blink attribute" do
+      {:ok, state} = init_tty([])
+      cells = [{{1, 1}, {"X", :default, :default, [:blink]}}]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      assert output =~ "\e[5m"
+    end
+
+    test "outputs reverse attribute" do
+      {:ok, state} = init_tty([])
+      cells = [{{1, 1}, {"X", :default, :default, [:reverse]}}]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      assert output =~ "\e[7m"
+    end
+
+    test "outputs strikethrough attribute" do
+      {:ok, state} = init_tty([])
+      cells = [{{1, 1}, {"X", :default, :default, [:strikethrough]}}]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      assert output =~ "\e[9m"
+    end
+
+    test "outputs multiple attributes combined" do
+      {:ok, state} = init_tty([])
+      cells = [{{1, 1}, {"X", :default, :default, [:bold, :italic, :underline]}}]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      assert output =~ "\e[1m"
+      assert output =~ "\e[3m"
+      assert output =~ "\e[4m"
+    end
+
+    test "updates last_frame in state for incremental mode" do
+      {:ok, state} = init_tty(line_mode: :incremental)
       cells = [{{1, 1}, {"A", :default, :default, []}}]
 
       {:ok, new_state} =
@@ -862,6 +936,102 @@ defmodule TermUI.Backend.TTYTest do
       refute output =~ "\e[38;"
       refute output =~ "\e[48;"
       refute output =~ "\e[31m"
+    end
+
+    test "nil foreground color produces no color sequence" do
+      {:ok, state} = init_tty([])
+      cells = [{{1, 1}, {"X", nil, :default, []}}]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      # Should not have foreground color sequences (38;2 or 38;5)
+      refute output =~ "\e[38;"
+    end
+
+    test "nil background color produces no color sequence" do
+      {:ok, state} = init_tty([])
+      cells = [{{1, 1}, {"X", :default, nil, []}}]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      # Should not have background color sequences (48;2 or 48;5)
+      refute output =~ "\e[48;"
+    end
+
+    test ":default foreground outputs reset foreground sequence" do
+      {:ok, state} = init_tty([])
+      cells = [{{1, 1}, {"X", :default, :blue, []}}]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      # Default foreground should output \e[39m
+      assert output =~ "\e[39m"
+      # And blue background
+      assert output =~ "\e[44m"
+    end
+
+    test ":default background outputs reset background sequence" do
+      {:ok, state} = init_tty([])
+      cells = [{{1, 1}, {"X", :red, :default, []}}]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      # Default background should output \e[49m
+      assert output =~ "\e[49m"
+      # And red foreground
+      assert output =~ "\e[31m"
+    end
+
+    test "palette index foreground in 256-color mode" do
+      {:ok, state} = init_tty(capabilities: %{colors: :color_256})
+      cells = [{{1, 1}, {"X", 42, :default, []}}]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      # Palette index 42 as foreground
+      assert output =~ "\e[38;5;42m"
+    end
+
+    test "palette index background in 256-color mode" do
+      {:ok, state} = init_tty(capabilities: %{colors: :color_256})
+      cells = [{{1, 1}, {"X", :default, 196, []}}]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      # Palette index 196 as background
+      assert output =~ "\e[48;5;196m"
+    end
+
+    test "palette index colors work in true_color mode" do
+      {:ok, state} = init_tty(capabilities: %{colors: :true_color})
+      cells = [{{1, 1}, {"X", 100, 200, []}}]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      # Palette indices should still work in true_color mode
+      assert output =~ "\e[38;5;100m"
+      assert output =~ "\e[48;5;200m"
     end
   end
 
@@ -1034,6 +1204,82 @@ defmodule TermUI.Backend.TTYTest do
 
       # At least 2 resets (one per row) plus any style changes
       assert reset_count >= 2
+    end
+  end
+
+  # ===========================================================================
+  # Security Tests - Character Sanitization
+  # ===========================================================================
+
+  describe "character sanitization" do
+    test "escape sequences in cell content are stripped" do
+      {:ok, state} = init_tty([])
+      # Attempt to inject an escape sequence via cell content
+      cells = [{{1, 1}, {"\e[31mEVIL", :default, :default, []}}]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      # The escape should be stripped from the cell content
+      # So we should see "EVIL" but not an extra \e[31m from the content itself
+      assert output =~ "[31mEVIL"
+      # The cell content escape was stripped, only framework escapes remain
+      # Count number of \e[31m - should only be 0 (no red from cell content)
+      refute output =~ "\e[31mEVIL"
+    end
+
+    test "normal characters are not affected by sanitization" do
+      {:ok, state} = init_tty([])
+      cells = [{{1, 1}, {"Hello!", :default, :default, []}}]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      assert output =~ "Hello!"
+    end
+  end
+
+  # ===========================================================================
+  # Frame Map Tests - Incremental Mode
+  # ===========================================================================
+
+  describe "frame map handling" do
+    test "full_redraw mode sets last_frame to nil" do
+      {:ok, state} = init_tty(line_mode: :full_redraw)
+      cells = [{{1, 1}, {"A", :default, :default, []}}]
+
+      {:ok, new_state} =
+        capture_io(fn ->
+          send(self(), TTY.draw_cells(state, cells))
+        end)
+        |> then(fn _ ->
+          receive do
+            result -> result
+          end
+        end)
+
+      assert new_state.last_frame == nil
+    end
+
+    test "incremental mode stores last_frame as map" do
+      {:ok, state} = init_tty(line_mode: :incremental)
+      cells = [{{1, 1}, {"A", :default, :default, []}}]
+
+      {:ok, new_state} =
+        capture_io(fn ->
+          send(self(), TTY.draw_cells(state, cells))
+        end)
+        |> then(fn _ ->
+          receive do
+            result -> result
+          end
+        end)
+
+      assert new_state.last_frame == %{{1, 1} => {"A", :default, :default, []}}
     end
   end
 end

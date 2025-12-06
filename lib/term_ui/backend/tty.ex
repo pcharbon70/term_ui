@@ -347,11 +347,8 @@ defmodule TermUI.Backend.TTY do
   """
   @spec clear(t()) :: {:ok, t()}
   def clear(state) do
-    # Clear entire screen
-    IO.write(@clear_screen)
-
-    # Move cursor to home position
-    IO.write(@cursor_home)
+    # Clear entire screen and move cursor to home position
+    safe_write(@clear_screen <> @cursor_home)
 
     # Update state: clear last_frame for incremental mode, reset cursor position
     {:ok, %{state | last_frame: nil, cursor_position: {1, 1}}}
@@ -385,7 +382,7 @@ defmodule TermUI.Backend.TTY do
   def draw_cells(%__MODULE__{} = state, cells) do
     # In full_redraw mode, clear screen first
     if state.line_mode == :full_redraw do
-      IO.write(@clear_screen <> @cursor_home)
+      safe_write(@clear_screen <> @cursor_home)
     end
 
     # Group cells by row and render
@@ -393,8 +390,14 @@ defmodule TermUI.Backend.TTY do
     |> group_cells_by_row()
     |> render_rows(state)
 
-    # Build frame map for incremental mode tracking
-    frame = build_frame_map(cells)
+    # Only build frame map for incremental mode (used for diff-based updates)
+    # Full redraw mode doesn't need position lookups
+    frame =
+      if state.line_mode == :incremental do
+        build_frame_map(cells)
+      else
+        nil
+      end
 
     {:ok, %{state | last_frame: frame, cursor_position: nil}}
   end
@@ -532,30 +535,38 @@ defmodule TermUI.Backend.TTY do
   #
   # Tracks the current style and only outputs SGR sequences when the style
   # changes between cells. This reduces redundant escape sequence output.
+  # Builds an iolist for the entire row and writes once for efficiency.
   @spec render_row(pos_integer(), [{pos_integer(), TermUI.Backend.cell()}], t()) :: :ok
   defp render_row(row, cells, state) do
-    # Position cursor at start of row
-    IO.write("\e[#{row};1H")
-
-    # Track current column and current style for delta tracking
+    # Track current column, current style, and accumulated iolist
     # Initial style is nil (no style set yet)
-    initial_state = {1, nil}
+    initial_state = {1, nil, []}
 
-    Enum.reduce(cells, initial_state, fn {col, cell}, {cur_col, cur_style} ->
-      # Fill gap with spaces if needed
-      if col > cur_col do
-        IO.write(String.duplicate(" ", col - cur_col))
-      end
+    {_col, _style, iolist} =
+      Enum.reduce(cells, initial_state, fn {col, cell}, {cur_col, cur_style, acc} ->
+        # Fill gap with spaces if needed
+        gap =
+          if col > cur_col do
+            String.duplicate(" ", col - cur_col)
+          else
+            ""
+          end
 
-      # Render the cell with style delta tracking
-      new_style = render_cell_with_delta(cell, cur_style, state)
+        # Render the cell with style delta tracking
+        {new_style, cell_io} = render_cell_with_delta(cell, cur_style, state)
 
-      # Return next column position and new style
-      {col + 1, new_style}
-    end)
+        # Append to iolist (prepend for efficiency, reverse at end)
+        new_acc = [cell_io, gap | acc]
 
-    # Reset attributes at end of row
-    IO.write(@reset_attrs)
+        # Return next column position and new style
+        {col + 1, new_style, new_acc}
+      end)
+
+    # Build final iolist: cursor position + reversed content + reset
+    final_io = ["\e[#{row};1H", Enum.reverse(iolist), @reset_attrs]
+
+    # Single write for entire row
+    safe_write(final_io)
 
     :ok
   end
@@ -563,29 +574,34 @@ defmodule TermUI.Backend.TTY do
   # Renders a single cell with style delta tracking.
   #
   # Only outputs SGR sequences when the style differs from the previous cell.
-  # Returns the new style for tracking.
+  # Returns the new style and the iodata for this cell.
   @spec render_cell_with_delta(
           TermUI.Backend.cell(),
           {TermUI.Backend.color(), TermUI.Backend.color(), [atom()]} | nil,
           t()
-        ) :: {TermUI.Backend.color(), TermUI.Backend.color(), [atom()]}
+        ) :: {{TermUI.Backend.color(), TermUI.Backend.color(), [atom()]}, iodata()}
   defp render_cell_with_delta({char, fg, bg, attrs}, cur_style, state) do
     new_style = {fg, bg, attrs}
 
     # Only output SGR if style changed
-    if new_style != cur_style do
-      sgr = build_sgr_sequence(fg, bg, attrs, state.color_mode)
-      IO.write(sgr)
-    end
+    sgr =
+      if new_style != cur_style do
+        build_sgr_sequence(fg, bg, attrs, state.color_mode)
+      else
+        ""
+      end
 
-    # Output character (with potential character set mapping)
+    # Map character (with potential character set mapping and sanitization)
     mapped_char = map_character(char, state.character_set)
-    IO.write(mapped_char)
+    sanitized_char = sanitize_char(mapped_char)
 
-    new_style
+    {new_style, [sgr, sanitized_char]}
   end
 
   # Builds SGR (Select Graphic Rendition) sequence for colors and attributes.
+  #
+  # Combines reset, attributes, foreground color, and background color into
+  # a single efficient escape sequence string.
   @spec build_sgr_sequence(
           TermUI.Backend.color(),
           TermUI.Backend.color(),
@@ -593,20 +609,37 @@ defmodule TermUI.Backend.TTY do
           color_mode()
         ) :: String.t()
   defp build_sgr_sequence(fg, bg, attrs, color_mode) do
-    parts = [@reset_attrs]
+    # Build each component
+    reset_part = @reset_attrs
+    attrs_part = build_attrs_sgr(attrs)
+    fg_part = build_fg_sgr(fg, color_mode)
+    bg_part = build_bg_sgr(bg, color_mode)
 
-    # Add attributes
-    attr_parts = Enum.map(attrs, &attr_to_sgr/1) |> Enum.reject(&is_nil/1)
+    # Combine non-empty parts
+    [reset_part, attrs_part, fg_part, bg_part]
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.join("")
+  end
 
-    # Add foreground color
-    fg_part = color_to_sgr(fg, :fg, color_mode)
+  # Builds SGR sequence for text attributes (bold, italic, etc.).
+  @spec build_attrs_sgr([atom()]) :: String.t()
+  defp build_attrs_sgr(attrs) do
+    attrs
+    |> Enum.map(&attr_to_sgr/1)
+    |> Enum.reject(&is_nil/1)
+    |> Enum.join("")
+  end
 
-    # Add background color
-    bg_part = color_to_sgr(bg, :bg, color_mode)
+  # Builds SGR sequence for foreground color.
+  @spec build_fg_sgr(TermUI.Backend.color(), color_mode()) :: String.t()
+  defp build_fg_sgr(color, color_mode) do
+    color_to_sgr(color, :fg, color_mode)
+  end
 
-    all_parts = (parts ++ attr_parts ++ [fg_part, bg_part]) |> Enum.reject(&(&1 == ""))
-
-    Enum.join(all_parts, "")
+  # Builds SGR sequence for background color.
+  @spec build_bg_sgr(TermUI.Backend.color(), color_mode()) :: String.t()
+  defp build_bg_sgr(color, color_mode) do
+    color_to_sgr(color, :bg, color_mode)
   end
 
   # Converts an attribute to its SGR sequence.
@@ -654,42 +687,42 @@ defmodule TermUI.Backend.TTY do
 
   defp color_to_sgr(_, _, _), do: ""
 
-  # Named color to SGR sequence
-  @spec named_color_to_sgr(atom(), :fg | :bg) :: String.t()
-  defp named_color_to_sgr(:black, :fg), do: "\e[30m"
-  defp named_color_to_sgr(:red, :fg), do: "\e[31m"
-  defp named_color_to_sgr(:green, :fg), do: "\e[32m"
-  defp named_color_to_sgr(:yellow, :fg), do: "\e[33m"
-  defp named_color_to_sgr(:blue, :fg), do: "\e[34m"
-  defp named_color_to_sgr(:magenta, :fg), do: "\e[35m"
-  defp named_color_to_sgr(:cyan, :fg), do: "\e[36m"
-  defp named_color_to_sgr(:white, :fg), do: "\e[37m"
-  defp named_color_to_sgr(:bright_black, :fg), do: "\e[90m"
-  defp named_color_to_sgr(:bright_red, :fg), do: "\e[91m"
-  defp named_color_to_sgr(:bright_green, :fg), do: "\e[92m"
-  defp named_color_to_sgr(:bright_yellow, :fg), do: "\e[93m"
-  defp named_color_to_sgr(:bright_blue, :fg), do: "\e[94m"
-  defp named_color_to_sgr(:bright_magenta, :fg), do: "\e[95m"
-  defp named_color_to_sgr(:bright_cyan, :fg), do: "\e[96m"
-  defp named_color_to_sgr(:bright_white, :fg), do: "\e[97m"
+  # Named color SGR code mappings (foreground base codes)
+  @named_color_codes %{
+    black: 30,
+    red: 31,
+    green: 32,
+    yellow: 33,
+    blue: 34,
+    magenta: 35,
+    cyan: 36,
+    white: 37,
+    bright_black: 90,
+    bright_red: 91,
+    bright_green: 92,
+    bright_yellow: 93,
+    bright_blue: 94,
+    bright_magenta: 95,
+    bright_cyan: 96,
+    bright_white: 97
+  }
 
-  defp named_color_to_sgr(:black, :bg), do: "\e[40m"
-  defp named_color_to_sgr(:red, :bg), do: "\e[41m"
-  defp named_color_to_sgr(:green, :bg), do: "\e[42m"
-  defp named_color_to_sgr(:yellow, :bg), do: "\e[43m"
-  defp named_color_to_sgr(:blue, :bg), do: "\e[44m"
-  defp named_color_to_sgr(:magenta, :bg), do: "\e[45m"
-  defp named_color_to_sgr(:cyan, :bg), do: "\e[46m"
-  defp named_color_to_sgr(:white, :bg), do: "\e[47m"
-  defp named_color_to_sgr(:bright_black, :bg), do: "\e[100m"
-  defp named_color_to_sgr(:bright_red, :bg), do: "\e[101m"
-  defp named_color_to_sgr(:bright_green, :bg), do: "\e[102m"
-  defp named_color_to_sgr(:bright_yellow, :bg), do: "\e[103m"
-  defp named_color_to_sgr(:bright_blue, :bg), do: "\e[104m"
-  defp named_color_to_sgr(:bright_magenta, :bg), do: "\e[105m"
-  defp named_color_to_sgr(:bright_cyan, :bg), do: "\e[106m"
-  defp named_color_to_sgr(:bright_white, :bg), do: "\e[107m"
-  defp named_color_to_sgr(_, _), do: ""
+  # Named color to SGR sequence using map lookup
+  @spec named_color_to_sgr(atom(), :fg | :bg) :: String.t()
+  defp named_color_to_sgr(name, type) do
+    case Map.get(@named_color_codes, name) do
+      nil ->
+        ""
+
+      code when type == :fg ->
+        "\e[#{code}m"
+
+      code when type == :bg ->
+        # Background codes are foreground + 10
+        bg_code = if code >= 90, do: code + 10, else: code + 10
+        "\e[#{bg_code}m"
+    end
+  end
 
   # Converts RGB to 256-color palette index.
   # Uses 6x6x6 color cube (indices 16-231) or grayscale (232-255).
@@ -724,29 +757,53 @@ defmodule TermUI.Backend.TTY do
     if bright, do: bg_base + 60, else: bg_base
   end
 
-  # Determines the base 16-color index and brightness.
-  @spec rgb_to_16_base(0..255, 0..255, 0..255) :: {30..37, boolean()}
+  # ANSI 16-color palette RGB values for distance calculation.
+  # Format: {color_code, {r, g, b}}
+  @ansi_16_colors [
+    # Normal colors (codes 30-37)
+    {30, {0, 0, 0}},        # black
+    {31, {128, 0, 0}},      # red
+    {32, {0, 128, 0}},      # green
+    {33, {128, 128, 0}},    # yellow
+    {34, {0, 0, 128}},      # blue
+    {35, {128, 0, 128}},    # magenta
+    {36, {0, 128, 128}},    # cyan
+    {37, {192, 192, 192}},  # white (light gray)
+    # Bright colors (codes 90-97)
+    {90, {128, 128, 128}},  # bright black (dark gray)
+    {91, {255, 0, 0}},      # bright red
+    {92, {0, 255, 0}},      # bright green
+    {93, {255, 255, 0}},    # bright yellow
+    {94, {0, 0, 255}},      # bright blue
+    {95, {255, 0, 255}},    # bright magenta
+    {96, {0, 255, 255}},    # bright cyan
+    {97, {255, 255, 255}}   # bright white
+  ]
+
+  # Determines the base 16-color index and brightness using weighted color distance.
+  # Uses perceptual weighting (human eye is more sensitive to green).
+  @spec rgb_to_16_base(0..255, 0..255, 0..255) :: {30..37 | 90..97, boolean()}
   defp rgb_to_16_base(r, g, b) do
-    # Calculate intensity
-    brightness = div(r + g + b, 3)
-    bright = brightness > 127
+    # Find closest color using weighted Euclidean distance
+    # Weights: R=0.299, G=0.587, B=0.114 (perceptual luminance weights)
+    {best_code, _best_dist} =
+      Enum.reduce(@ansi_16_colors, {30, :infinity}, fn {code, {pr, pg, pb}}, {best, dist} ->
+        # Weighted distance calculation
+        dr = (r - pr) * 0.299
+        dg = (g - pg) * 0.587
+        db = (b - pb) * 0.114
+        new_dist = dr * dr + dg * dg + db * db
 
-    # Determine color by dominant channels
-    r_on = r > 85
-    g_on = g > 85
-    b_on = b > 85
+        if new_dist < dist do
+          {code, new_dist}
+        else
+          {best, dist}
+        end
+      end)
 
-    base =
-      case {r_on, g_on, b_on} do
-        {false, false, false} -> 30
-        {true, false, false} -> 31
-        {false, true, false} -> 32
-        {true, true, false} -> 33
-        {false, false, true} -> 34
-        {true, false, true} -> 35
-        {false, true, true} -> 36
-        {true, true, true} -> 37
-      end
+    # Determine if it's a bright color (90-97) or normal (30-37)
+    bright = best_code >= 90
+    base = if bright, do: best_code - 60, else: best_code
 
     {base, bright}
   end
@@ -756,6 +813,17 @@ defmodule TermUI.Backend.TTY do
   @spec map_character(String.t(), character_set()) :: String.t()
   defp map_character(char, :unicode), do: char
   defp map_character(char, :ascii), do: char
+
+  # Sanitizes characters to prevent escape sequence injection.
+  #
+  # Removes any ESC characters from user-provided content to prevent
+  # malicious or accidental injection of terminal control sequences.
+  @spec sanitize_char(String.t()) :: String.t()
+  defp sanitize_char(char) when is_binary(char) do
+    String.replace(char, "\e", "")
+  end
+
+  defp sanitize_char(char), do: char
 
   # Builds a frame map from cells for incremental mode tracking.
   @spec build_frame_map([{TermUI.Backend.position(), TermUI.Backend.cell()}]) :: map()
