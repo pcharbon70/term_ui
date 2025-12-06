@@ -121,9 +121,11 @@ Implement the mode query function.
 
 ## 4.3 Implement TTY Input Handler
 
-- [ ] **Section 4.3 Complete**
+- [x] **Section 4.3 Complete**
 
 The `TermUI.Input.TTY` module provides character-by-character input using `IO.getn/2`. Despite running in TTY mode (with a shell present), single character reads work immediately without waiting for Enter.
+
+**Note:** Tasks 4.3.2, 4.3.3, and 4.3.4 were implemented together as part of Task 4.3.1 to maintain implementation coherence. All requirements from these tasks are present in the code.
 
 ### 4.3.1 Create TTY Input Module
 
@@ -137,43 +139,43 @@ Create the TTY input handler module implementing the Input behaviour.
 
 ### 4.3.2 Implement poll/2
 
-- [ ] **Task 4.3.2 Complete**
+- [x] **Task 4.3.2 Complete** (implemented as part of 4.3.1)
 
 Implement the main input polling function using `IO.getn/2`.
 
-- [ ] 4.3.2.1 Implement `@impl true` `poll/2` accepting state and timeout
-- [ ] 4.3.2.2 Use `IO.getn("", 1)` to read single character
-- [ ] 4.3.2.3 Note: timeout is ignored (`IO.getn` is blocking)
-- [ ] 4.3.2.4 Parse escape sequences using `TermUI.Terminal.EscapeParser`
-- [ ] 4.3.2.5 Return `{:ok, event}` for keyboard input
-- [ ] 4.3.2.6 Return `:eof` if `IO.getn` returns `:eof`
+- [x] 4.3.2.1 Implement `@impl true` `poll/2` accepting state and timeout
+- [x] 4.3.2.2 Use `IO.getn("", 1)` to read single character
+- [x] 4.3.2.3 Note: timeout is ignored (`IO.getn` is blocking)
+- [x] 4.3.2.4 Parse escape sequences using `TermUI.Terminal.EscapeParser`
+- [x] 4.3.2.5 Return `{:ok, event}` for keyboard input
+- [x] 4.3.2.6 Return `:eof` if `IO.getn` returns `:eof`
 
 ### 4.3.3 Implement Escape Sequence Buffering
 
-- [ ] **Task 4.3.3 Complete**
+- [x] **Task 4.3.3 Complete** (implemented as part of 4.3.1)
 
 Handle multi-byte escape sequences that arrive as separate characters.
 
-- [ ] 4.3.3.1 Detect escape character (27/0x1B) as start of sequence
-- [ ] 4.3.3.2 Continue reading characters to complete the sequence
-- [ ] 4.3.3.3 Use `EscapeParser` to decode complete sequence
-- [ ] 4.3.3.4 Handle incomplete sequences with timeout fallback
+- [x] 4.3.3.1 Detect escape character (27/0x1B) as start of sequence
+- [x] 4.3.3.2 Continue reading characters to complete the sequence
+- [x] 4.3.3.3 Use `EscapeParser` to decode complete sequence
+- [x] 4.3.3.4 Handle incomplete sequences with timeout fallback
 
 ### 4.3.4 Implement mode/1
 
-- [ ] **Task 4.3.4 Complete**
+- [x] **Task 4.3.4 Complete** (implemented as part of 4.3.1)
 
 Implement the mode query function.
 
-- [ ] 4.3.4.1 Implement `@impl true` `mode/1` returning `:tty`
+- [x] 4.3.4.1 Implement `@impl true` `mode/1` returning `:tty`
 
 ### Unit Tests - Section 4.3
 
-- [ ] **Unit Tests 4.3 Complete**
-- [ ] Test `poll/2` returns `{:ok, event}` for single characters (mock IO.getn)
-- [ ] Test `poll/2` handles escape sequences correctly
-- [ ] Test `poll/2` returns `:eof` on EOF
-- [ ] Test `mode/1` returns `:tty`
+- [x] **Unit Tests 4.3 Complete**
+- [x] Test `poll/2` returns `{:ok, event}` for single characters (mock IO.getn)
+- [x] Test `poll/2` handles escape sequences correctly
+- [x] Test `poll/2` returns `:eof` on EOF
+- [x] Test `mode/1` returns `:tty`
 
 ---
 

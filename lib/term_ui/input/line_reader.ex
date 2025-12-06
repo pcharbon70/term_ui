@@ -25,6 +25,28 @@ defmodule TermUI.Input.LineReader do
   for immediate key response. Use `LineReader` only for text fields that benefit
   from shell editing.
 
+  ## Security Considerations
+
+  This module provides raw line input and does not perform sanitization:
+
+  - **Input length**: No length limits are enforced by this module. The shell
+    and terminal typically impose their own limits (commonly 4KB-128KB depending
+    on configuration). If your application has specific length requirements,
+    validate after reading. For concurrent usage, consider that each pending
+    read could hold up to the shell's maximum line length in memory.
+
+  - **Input sanitization**: Input is returned as-is from `IO.gets/1`. The
+    application is responsible for any sanitization (escaping, filtering
+    special characters, etc.) appropriate for its use case.
+
+  - **No injection protection**: This module does not filter or escape input.
+    If the input will be used in shell commands, SQL queries, or other
+    security-sensitive contexts, proper escaping must be applied by the caller.
+
+  - **Blocking I/O**: `read_line/1` blocks indefinitely until input is received.
+    This could be exploited in a DoS scenario if many concurrent reads are
+    started. For server applications, consider using timeouts at a higher level.
+
   ## Shell Line Editing Features
 
   When using `LineReader`, the shell provides (depending on terminal):
@@ -77,26 +99,9 @@ defmodule TermUI.Input.LineReader do
   - **No timeout**: Cannot interrupt or timeout the read
   - **Raw mode**: If running in raw mode, line editing may not work as expected
   - **TTY only**: Best used with the TTY backend for full shell editing support
-  - **No length limits**: This module does not enforce input length limits;
-    limits are determined by the shell/terminal. Applications should validate
-    input length if needed.
   - **Error handling**: IO errors from `IO.gets/1` are converted to `:eof` for
     simplified error handling. Most callers don't need to distinguish between
     "stream ended" and "read error" scenarios.
-
-  ## Security Considerations
-
-  This module provides raw line input and does not perform sanitization:
-
-  - **Input length**: No length limits are enforced by this module. The shell
-    and terminal typically impose their own limits. If your application has
-    specific length requirements, validate after reading.
-  - **Input sanitization**: Input is returned as-is from `IO.gets/1`. The
-    application is responsible for any sanitization (escaping, filtering
-    special characters, etc.) appropriate for its use case.
-  - **No injection protection**: This module does not filter or escape input.
-    If the input will be used in shell commands, SQL queries, or other
-    security-sensitive contexts, proper escaping must be applied by the caller.
 
   ## TextInput.Line Widget
 
