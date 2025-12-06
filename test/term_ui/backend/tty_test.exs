@@ -3002,4 +3002,355 @@ defmodule TermUI.Backend.TTYTest do
       assert output =~ "+-+"
     end
   end
+
+  # ===========================================================================
+  # Section 3.8.1 Integration Tests - Full Redraw Lifecycle
+  # ===========================================================================
+
+  describe "integration - full redraw lifecycle (Section 3.8.1)" do
+    test "init -> draw_cells -> shutdown sequence works correctly" do
+      # Initialize backend with full_redraw mode
+      output =
+        capture_io(fn ->
+          {:ok, state} = TTY.init(line_mode: :full_redraw, size: {24, 80})
+
+          # Verify state is correctly initialized
+          assert state.line_mode == :full_redraw
+          assert state.size == {24, 80}
+
+          # Draw some cells
+          cells = [
+            {{1, 1}, {"H", :default, :default, []}},
+            {{1, 2}, {"i", :default, :default, []}}
+          ]
+
+          {:ok, state} = TTY.draw_cells(state, cells)
+
+          # Verify last_frame is nil (full_redraw doesn't track frames)
+          assert state.last_frame == nil
+
+          # Shutdown
+          :ok = TTY.shutdown(state)
+        end)
+
+      # Verify init sequence: hide cursor, clear screen
+      assert output =~ "\e[?25l"
+      assert output =~ "\e[2J"
+      assert output =~ "\e[H"
+
+      # Verify content was rendered
+      assert output =~ "Hi"
+
+      # Verify shutdown sequence: reset attrs, show cursor
+      assert output =~ "\e[0m"
+      assert output =~ "\e[?25h"
+    end
+
+    test "init -> draw_cells -> shutdown with alternate screen" do
+      output =
+        capture_io(fn ->
+          {:ok, state} = TTY.init(alternate_screen: true, size: {24, 80})
+
+          assert state.alternate_screen == true
+
+          cells = [{{1, 1}, {"X", :default, :default, []}}]
+          {:ok, state} = TTY.draw_cells(state, cells)
+
+          :ok = TTY.shutdown(state)
+        end)
+
+      # Verify alternate screen enter
+      assert output =~ "\e[?1049h"
+
+      # Verify content rendered
+      assert output =~ "X"
+
+      # Verify alternate screen leave on shutdown
+      assert output =~ "\e[?1049l"
+    end
+
+    test "multiple frames render correctly in full_redraw mode" do
+      output =
+        capture_io(fn ->
+          {:ok, state} = TTY.init(line_mode: :full_redraw, size: {24, 80})
+
+          # Frame 1: Render "A"
+          cells1 = [{{1, 1}, {"A", :default, :default, []}}]
+          {:ok, state} = TTY.draw_cells(state, cells1)
+
+          # Frame 2: Render "B" at different position
+          cells2 = [{{2, 1}, {"B", :default, :default, []}}]
+          {:ok, state} = TTY.draw_cells(state, cells2)
+
+          # Frame 3: Render "C" with both positions
+          cells3 = [
+            {{1, 1}, {"C", :default, :default, []}},
+            {{2, 1}, {"D", :default, :default, []}}
+          ]
+          {:ok, _state} = TTY.draw_cells(state, cells3)
+        end)
+
+      # Each frame should have a clear screen sequence
+      # Count occurrences of clear screen (init + 3 frames = 4)
+      clear_count = length(String.split(output, "\e[2J")) - 1
+      assert clear_count == 4
+
+      # Verify all content was rendered
+      assert output =~ "A"
+      assert output =~ "B"
+      assert output =~ "C"
+      assert output =~ "D"
+    end
+
+    test "state is properly maintained between frames" do
+      capture_io(fn ->
+        {:ok, state} = TTY.init(
+          line_mode: :full_redraw,
+          size: {30, 100},
+          capabilities: %{colors: :true_color}
+        )
+
+        # Verify initial state
+        assert state.size == {30, 100}
+        assert state.line_mode == :full_redraw
+        assert state.color_mode == :true_color
+
+        # Frame 1
+        cells1 = [{{1, 1}, {"X", :default, :default, []}}]
+        {:ok, state} = TTY.draw_cells(state, cells1)
+
+        # Verify state persists after frame 1
+        assert state.size == {30, 100}
+        assert state.line_mode == :full_redraw
+        assert state.color_mode == :true_color
+
+        # Frame 2
+        cells2 = [{{1, 1}, {"Y", :default, :default, []}}]
+        {:ok, state} = TTY.draw_cells(state, cells2)
+
+        # Verify state still persists after frame 2
+        assert state.size == {30, 100}
+        assert state.line_mode == :full_redraw
+        assert state.color_mode == :true_color
+      end)
+    end
+
+    test "style changes between frames render different SGR sequences" do
+      output =
+        capture_io(fn ->
+          {:ok, state} = TTY.init(line_mode: :full_redraw, size: {24, 80})
+
+          # Frame 1: Red text
+          cells1 = [{{1, 1}, {"R", :red, :default, []}}]
+          {:ok, state} = TTY.draw_cells(state, cells1)
+
+          # Frame 2: Blue text with bold
+          cells2 = [{{1, 1}, {"B", :blue, :default, [:bold]}}]
+          {:ok, state} = TTY.draw_cells(state, cells2)
+
+          # Frame 3: Green background
+          cells3 = [{{1, 1}, {"G", :default, :green, []}}]
+          {:ok, _state} = TTY.draw_cells(state, cells3)
+        end)
+
+      # Verify red foreground (SGR code 31)
+      assert output =~ "\e[31m"
+
+      # Verify blue foreground (SGR code 34)
+      assert output =~ "\e[34m"
+
+      # Verify bold attribute (SGR code 1)
+      assert output =~ "\e[1m"
+
+      # Verify green background (SGR code 42)
+      assert output =~ "\e[42m"
+
+      # Verify content
+      assert output =~ "R"
+      assert output =~ "B"
+      assert output =~ "G"
+    end
+
+    test "style changes with RGB colors in true_color mode" do
+      output =
+        capture_io(fn ->
+          {:ok, state} = TTY.init(
+            line_mode: :full_redraw,
+            size: {24, 80},
+            capabilities: %{colors: :true_color}
+          )
+
+          # Frame 1: RGB red foreground
+          cells1 = [{{1, 1}, {"1", {255, 0, 0}, :default, []}}]
+          {:ok, state} = TTY.draw_cells(state, cells1)
+
+          # Frame 2: RGB blue background
+          cells2 = [{{1, 1}, {"2", :default, {0, 0, 255}, []}}]
+          {:ok, _state} = TTY.draw_cells(state, cells2)
+        end)
+
+      # Verify true color foreground sequence
+      assert output =~ "\e[38;2;255;0;0m"
+
+      # Verify true color background sequence
+      assert output =~ "\e[48;2;0;0;255m"
+    end
+
+    test "style changes with multiple attributes" do
+      output =
+        capture_io(fn ->
+          {:ok, state} = TTY.init(line_mode: :full_redraw, size: {24, 80})
+
+          # Frame 1: Bold + underline
+          cells1 = [{{1, 1}, {"A", :default, :default, [:bold, :underline]}}]
+          {:ok, state} = TTY.draw_cells(state, cells1)
+
+          # Frame 2: Italic + reverse
+          cells2 = [{{1, 1}, {"B", :default, :default, [:italic, :reverse]}}]
+          {:ok, state} = TTY.draw_cells(state, cells2)
+
+          # Frame 3: Dim + strikethrough
+          cells3 = [{{1, 1}, {"C", :default, :default, [:dim, :strikethrough]}}]
+          {:ok, _state} = TTY.draw_cells(state, cells3)
+        end)
+
+      # Verify bold (SGR 1) and underline (SGR 4)
+      assert output =~ "\e[1m"
+      assert output =~ "\e[4m"
+
+      # Verify italic (SGR 3) and reverse (SGR 7)
+      assert output =~ "\e[3m"
+      assert output =~ "\e[7m"
+
+      # Verify dim (SGR 2) and strikethrough (SGR 9)
+      assert output =~ "\e[2m"
+      assert output =~ "\e[9m"
+    end
+
+    test "combined color and attribute changes between frames" do
+      output =
+        capture_io(fn ->
+          {:ok, state} = TTY.init(line_mode: :full_redraw, size: {24, 80})
+
+          # Frame 1: Red + bold
+          cells1 = [{{1, 1}, {"X", :red, :default, [:bold]}}]
+          {:ok, state} = TTY.draw_cells(state, cells1)
+
+          # Frame 2: Blue background + italic
+          cells2 = [{{1, 1}, {"Y", :white, :blue, [:italic]}}]
+          {:ok, state} = TTY.draw_cells(state, cells2)
+
+          # Frame 3: RGB color + underline
+          cells3 = [{{1, 1}, {"Z", {128, 128, 0}, {64, 64, 64}, [:underline]}}]
+          {:ok, _state} = TTY.draw_cells(state, cells3)
+        end)
+
+      # Frame 1: red (31) + bold (1)
+      assert output =~ "\e[31m"
+      assert output =~ "\e[1m"
+
+      # Frame 2: white fg (37) + blue bg (44) + italic (3)
+      assert output =~ "\e[37m"
+      assert output =~ "\e[44m"
+      assert output =~ "\e[3m"
+
+      # Frame 3: RGB colors + underline (4)
+      assert output =~ "\e[38;2;128;128;0m"
+      assert output =~ "\e[48;2;64;64;64m"
+      assert output =~ "\e[4m"
+
+      # Verify content
+      assert output =~ "X"
+      assert output =~ "Y"
+      assert output =~ "Z"
+    end
+
+    test "each row ends with attribute reset" do
+      output =
+        capture_io(fn ->
+          {:ok, state} = TTY.init(line_mode: :full_redraw, size: {24, 80})
+
+          # Multiple rows with different styles
+          cells = [
+            {{1, 1}, {"A", :red, :default, [:bold]}},
+            {{2, 1}, {"B", :blue, :default, [:italic]}},
+            {{3, 1}, {"C", :green, :default, [:underline]}}
+          ]
+
+          {:ok, _state} = TTY.draw_cells(state, cells)
+        end)
+
+      # Each row should have reset sequence after content
+      # Count reset sequences (excluding final reset from last row)
+      reset_count = length(String.split(output, "\e[0m")) - 1
+
+      # Should have at least 3 resets (one per row) plus init
+      assert reset_count >= 3
+    end
+
+    test "cursor position is updated after draw_cells" do
+      capture_io(fn ->
+        {:ok, state} = TTY.init(line_mode: :full_redraw, size: {24, 80})
+
+        # Initial cursor position after init should be {1, 1}
+        assert state.cursor_position == {1, 1}
+
+        # Draw cells
+        cells = [{{5, 10}, {"X", :default, :default, []}}]
+        {:ok, state} = TTY.draw_cells(state, cells)
+
+        # After draw_cells, cursor_position is nil (rendering doesn't track final position)
+        assert state.cursor_position == nil
+      end)
+    end
+
+    test "full lifecycle with clear operation" do
+      output =
+        capture_io(fn ->
+          {:ok, state} = TTY.init(line_mode: :full_redraw, size: {24, 80})
+
+          # Draw initial content
+          cells1 = [{{1, 1}, {"A", :default, :default, []}}]
+          {:ok, state} = TTY.draw_cells(state, cells1)
+
+          # Explicit clear
+          {:ok, state} = TTY.clear(state)
+
+          # Draw new content
+          cells2 = [{{1, 1}, {"B", :default, :default, []}}]
+          {:ok, state} = TTY.draw_cells(state, cells2)
+
+          :ok = TTY.shutdown(state)
+        end)
+
+      # Count clear sequences: init + frame1 + explicit clear + frame2 = 4
+      clear_count = length(String.split(output, "\e[2J")) - 1
+      assert clear_count == 4
+
+      # Both characters rendered
+      assert output =~ "A"
+      assert output =~ "B"
+    end
+
+    test "full lifecycle maintains correct line_mode throughout" do
+      capture_io(fn ->
+        {:ok, state} = TTY.init(line_mode: :full_redraw, size: {24, 80})
+        assert state.line_mode == :full_redraw
+
+        # After multiple operations, line_mode should remain unchanged
+        cells = [{{1, 1}, {"X", :default, :default, []}}]
+        {:ok, state} = TTY.draw_cells(state, cells)
+        assert state.line_mode == :full_redraw
+
+        {:ok, state} = TTY.clear(state)
+        assert state.line_mode == :full_redraw
+
+        {:ok, state} = TTY.move_cursor(state, {5, 5})
+        assert state.line_mode == :full_redraw
+
+        {:ok, state} = TTY.flush(state)
+        assert state.line_mode == :full_redraw
+      end)
+    end
+  end
 end

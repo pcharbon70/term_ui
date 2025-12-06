@@ -432,13 +432,13 @@ Integration tests verify the TTY backend works correctly in realistic scenarios 
 
 ### 3.8.1 Full Redraw Lifecycle Tests
 
-- [ ] **Task 3.8.1 Complete**
+- [x] **Task 3.8.1 Complete**
 
 Test complete backend lifecycle in full_redraw mode.
 
-- [ ] 3.8.1.1 Test init → draw_cells → shutdown sequence
-- [ ] 3.8.1.2 Test multiple frames render correctly
-- [ ] 3.8.1.3 Test style changes between frames
+- [x] 3.8.1.1 Test init → draw_cells → shutdown sequence
+- [x] 3.8.1.2 Test multiple frames render correctly
+- [x] 3.8.1.3 Test style changes between frames
 
 ### 3.8.2 Incremental Rendering Tests
 
