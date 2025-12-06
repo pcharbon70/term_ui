@@ -293,6 +293,29 @@ defmodule TermUI.Backend.TTY do
     {:ok, size}
   end
 
+  @doc """
+  Updates the terminal size and clears the frame buffer.
+
+  When the terminal is resized, the previous frame is no longer valid since
+  positions may now be out of bounds or content may need to be reflowed.
+  This function updates the size and clears `last_frame` to force a full
+  redraw on the next `draw_cells/2` call.
+
+  ## Parameters
+
+  - `state` - Current backend state
+  - `new_size` - New terminal dimensions as `{rows, cols}`
+
+  ## Returns
+
+  `{:ok, updated_state}` with new size and cleared last_frame.
+  """
+  @spec set_size(t(), {pos_integer(), pos_integer()}) :: {:ok, t()}
+  def set_size(%__MODULE__{} = state, {rows, cols} = new_size)
+      when is_integer(rows) and rows > 0 and is_integer(cols) and cols > 0 do
+    {:ok, %{state | size: new_size, last_frame: nil}}
+  end
+
   # ===========================================================================
   # Cursor Callbacks
   # ===========================================================================
@@ -380,8 +403,15 @@ defmodule TermUI.Backend.TTY do
   """
   @spec draw_cells(t(), [{TermUI.Backend.position(), TermUI.Backend.cell()}]) :: {:ok, t()}
   def draw_cells(%__MODULE__{} = state, cells) do
-    # In full_redraw mode, clear screen first
-    if state.line_mode == :full_redraw do
+    # Determine if we need to do a full redraw
+    # Full redraw is needed when:
+    # 1. line_mode is :full_redraw (always)
+    # 2. line_mode is :incremental but last_frame is nil (first frame)
+    needs_full_redraw =
+      state.line_mode == :full_redraw or
+        (state.line_mode == :incremental and is_nil(state.last_frame))
+
+    if needs_full_redraw do
       safe_write(@clear_screen <> @cursor_home)
     end
 

@@ -178,13 +178,13 @@ Implement the incremental rendering mode, which only updates changed cells. This
 
 ### 3.4.1 Implement Frame Tracking
 
-- [ ] **Task 3.4.1 Complete**
+- [x] **Task 3.4.1 Complete**
 
 Implement frame state tracking for incremental comparison.
 
-- [ ] 3.4.1.1 Store `last_frame` as map of `{row, col} => cell` after each render
-- [ ] 3.4.1.2 On first frame (nil last_frame), fall back to full redraw
-- [ ] 3.4.1.3 Clear last_frame on resize or explicit clear
+- [x] 3.4.1.1 Store `last_frame` as map of `{row, col} => cell` after each render
+- [x] 3.4.1.2 On first frame (nil last_frame), fall back to full redraw
+- [x] 3.4.1.3 Clear last_frame on resize or explicit clear
 
 ### 3.4.2 Implement Frame Comparison
 

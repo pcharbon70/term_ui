@@ -623,13 +623,25 @@ defmodule TermUI.Backend.TTYTest do
       assert output =~ "\e[2J"
     end
 
-    test "in incremental mode, does not output clear screen sequence" do
+    test "in incremental mode with existing frame, does not output clear screen sequence" do
       {:ok, state} = init_tty(line_mode: :incremental)
       cells = [{{1, 1}, {"A", :default, :default, []}}]
 
+      # First frame sets last_frame (will clear screen)
+      {:ok, state_with_frame} =
+        capture_io(fn ->
+          send(self(), TTY.draw_cells(state, cells))
+        end)
+        |> then(fn _ ->
+          receive do
+            result -> result
+          end
+        end)
+
+      # Subsequent frame should NOT clear screen
       output =
         capture_io(fn ->
-          TTY.draw_cells(state, cells)
+          TTY.draw_cells(state_with_frame, cells)
         end)
 
       refute output =~ "\e[2J"
@@ -1280,6 +1292,141 @@ defmodule TermUI.Backend.TTYTest do
         end)
 
       assert new_state.last_frame == %{{1, 1} => {"A", :default, :default, []}}
+    end
+
+    test "incremental mode first frame (nil last_frame) triggers full redraw" do
+      {:ok, state} = init_tty(line_mode: :incremental)
+      # Verify last_frame starts as nil
+      assert state.last_frame == nil
+
+      cells = [{{1, 1}, {"X", :default, :default, []}}]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      # First frame should include clear screen sequence
+      assert output =~ "\e[2J"
+    end
+
+    test "incremental mode subsequent frame does not clear screen" do
+      {:ok, state} = init_tty(line_mode: :incremental)
+      cells = [{{1, 1}, {"A", :default, :default, []}}]
+
+      # First frame - sets last_frame
+      {:ok, state_with_frame} =
+        capture_io(fn ->
+          send(self(), TTY.draw_cells(state, cells))
+        end)
+        |> then(fn _ ->
+          receive do
+            result -> result
+          end
+        end)
+
+      # Verify last_frame is now set
+      assert state_with_frame.last_frame != nil
+
+      # Second frame - should NOT clear screen
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state_with_frame, cells)
+        end)
+
+      # Should NOT include clear screen sequence
+      refute output =~ "\e[2J"
+    end
+
+    test "clear/1 clears last_frame" do
+      {:ok, state} = init_tty(line_mode: :incremental)
+      cells = [{{1, 1}, {"A", :default, :default, []}}]
+
+      # First draw to set last_frame
+      {:ok, state_with_frame} =
+        capture_io(fn ->
+          send(self(), TTY.draw_cells(state, cells))
+        end)
+        |> then(fn _ ->
+          receive do
+            result -> result
+          end
+        end)
+
+      assert state_with_frame.last_frame != nil
+
+      # Clear should reset last_frame
+      {:ok, cleared_state} =
+        capture_io(fn ->
+          send(self(), TTY.clear(state_with_frame))
+        end)
+        |> then(fn _ ->
+          receive do
+            result -> result
+          end
+        end)
+
+      assert cleared_state.last_frame == nil
+    end
+
+    test "set_size/2 clears last_frame" do
+      {:ok, state} = init_tty(line_mode: :incremental)
+      cells = [{{1, 1}, {"A", :default, :default, []}}]
+
+      # First draw to set last_frame
+      {:ok, state_with_frame} =
+        capture_io(fn ->
+          send(self(), TTY.draw_cells(state, cells))
+        end)
+        |> then(fn _ ->
+          receive do
+            result -> result
+          end
+        end)
+
+      assert state_with_frame.last_frame != nil
+
+      # set_size should clear last_frame
+      {:ok, resized_state} = TTY.set_size(state_with_frame, {50, 120})
+
+      assert resized_state.last_frame == nil
+      assert resized_state.size == {50, 120}
+    end
+
+    test "set_size/2 updates size correctly" do
+      {:ok, state} = init_tty([])
+
+      {:ok, resized_state} = TTY.set_size(state, {100, 200})
+
+      assert resized_state.size == {100, 200}
+    end
+
+    test "after resize, next draw in incremental mode triggers full redraw" do
+      {:ok, state} = init_tty(line_mode: :incremental)
+      cells = [{{1, 1}, {"A", :default, :default, []}}]
+
+      # First draw to set last_frame
+      {:ok, state_with_frame} =
+        capture_io(fn ->
+          send(self(), TTY.draw_cells(state, cells))
+        end)
+        |> then(fn _ ->
+          receive do
+            result -> result
+          end
+        end)
+
+      # Resize clears last_frame
+      {:ok, resized_state} = TTY.set_size(state_with_frame, {50, 120})
+      assert resized_state.last_frame == nil
+
+      # Next draw should trigger full redraw (clear screen)
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(resized_state, cells)
+        end)
+
+      assert output =~ "\e[2J"
     end
   end
 end
