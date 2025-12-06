@@ -150,7 +150,6 @@ defmodule TermUI.Backend.TTY do
   - `:alternate_screen` - Whether alternate screen buffer is active
   - `:cursor_visible` - Whether cursor is currently visible
   - `:cursor_position` - Current cursor position as `{row, col}` or `nil`
-  - `:current_style` - Current SGR state for style delta tracking
   """
   @type t :: %__MODULE__{
           size: {pos_integer(), pos_integer()},
@@ -161,8 +160,7 @@ defmodule TermUI.Backend.TTY do
           color_mode: color_mode(),
           alternate_screen: boolean(),
           cursor_visible: boolean(),
-          cursor_position: {pos_integer(), pos_integer()} | nil,
-          current_style: map() | nil
+          cursor_position: {pos_integer(), pos_integer()} | nil
         }
 
   defstruct size: {24, 80},
@@ -173,8 +171,7 @@ defmodule TermUI.Backend.TTY do
             color_mode: :true_color,
             alternate_screen: false,
             cursor_visible: true,
-            cursor_position: nil,
-            current_style: nil
+            cursor_position: nil
 
   # ===========================================================================
   # Lifecycle Callbacks
@@ -468,7 +465,7 @@ defmodule TermUI.Backend.TTY do
     # Clear removed cells (sorted for sequential access)
     removed
     |> Enum.sort()
-    |> Enum.each(&clear_cell_at/1)
+    |> Enum.each(&clear_cell_at(&1, state))
 
     # Update last_frame with current frame
     frame = build_frame_map(cells)
@@ -487,93 +484,35 @@ defmodule TermUI.Backend.TTY do
   #
   # For each row, positions cursor once at the first cell, then renders
   # cells in sequence. Adjacent cells benefit from implicit cursor advance.
+  # Rows outside terminal bounds are skipped.
   @spec render_incremental_rows([{pos_integer(), [{pos_integer(), TermUI.Backend.cell()}]}], t()) ::
           :ok
   defp render_incremental_rows(grouped_rows, state) do
+    {max_rows, _max_cols} = state.size
+
     Enum.each(grouped_rows, fn {row, row_cells} ->
-      render_incremental_row(row, row_cells, state)
+      # Skip rows outside terminal bounds
+      if row >= 1 and row <= max_rows do
+        [{start_col, _} | _] = row_cells
+        render_row_at_column(row, start_col, row_cells, state)
+      end
     end)
-  end
-
-  # Renders a row of cells for incremental mode.
-  #
-  # Optimizes cursor movement by:
-  # 1. Positioning cursor at first cell in the row
-  # 2. Rendering cells in column order
-  # 3. Using gap filling for non-adjacent cells (cursor advances implicitly)
-  # 4. Single reset at end of row group
-  @spec render_incremental_row(
-          pos_integer(),
-          [{pos_integer(), TermUI.Backend.cell()}],
-          t()
-        ) :: :ok
-  defp render_incremental_row(row, cells, state) do
-    # Get the starting column (first cell in sorted list)
-    [{start_col, _} | _] = cells
-
-    # Track current column and build iolist
-    initial_state = {start_col, nil, []}
-
-    {_col, _style, iolist} =
-      Enum.reduce(cells, initial_state, fn {col, cell}, {cur_col, cur_style, acc} ->
-        # Fill gap with spaces if cells are not adjacent
-        gap =
-          if col > cur_col do
-            String.duplicate(" ", col - cur_col)
-          else
-            ""
-          end
-
-        # Render the cell with style delta tracking
-        {new_style, cell_io} = render_cell_with_delta(cell, cur_style, state)
-
-        # Append to iolist
-        new_acc = [cell_io, gap | acc]
-
-        {col + 1, new_style, new_acc}
-      end)
-
-    # Build final iolist: cursor position at start + content + reset
-    final_io = ["\e[#{row};#{start_col}H", Enum.reverse(iolist), @reset_attrs]
-
-    safe_write(final_io)
-
-    :ok
-  end
-
-  # Renders a single cell at a specific position.
-  #
-  # Used for incremental rendering where cells are rendered individually
-  # at arbitrary positions rather than row-by-row.
-  @spec render_cell_at(
-          TermUI.Backend.position(),
-          TermUI.Backend.cell(),
-          t()
-        ) :: :ok
-  defp render_cell_at({row, col}, {char, fg, bg, attrs}, state) do
-    # Position cursor at the cell location
-    cursor = "\e[#{row};#{col}H"
-
-    # Build styled character
-    sgr = build_sgr_sequence(fg, bg, attrs, state.color_mode)
-    mapped_char = map_character(char, state.character_set)
-    sanitized_char = sanitize_char(mapped_char)
-
-    # Write cursor position + style + character + reset
-    safe_write([cursor, sgr, sanitized_char, @reset_attrs])
-
-    :ok
   end
 
   # Clears a cell at a specific position by writing a space.
   #
   # Used for incremental rendering to clear cells that were in the
-  # previous frame but not in the current frame.
-  @spec clear_cell_at(TermUI.Backend.position()) :: :ok
-  defp clear_cell_at({row, col}) do
-    # Position cursor and write space with reset attributes
-    cursor = "\e[#{row};#{col}H"
-    safe_write([cursor, @reset_attrs, " "])
+  # previous frame but not in the current frame. Positions outside
+  # terminal bounds are silently skipped.
+  @spec clear_cell_at(TermUI.Backend.position(), t()) :: :ok
+  defp clear_cell_at({row, col}, state) do
+    {max_rows, max_cols} = state.size
+
+    # Validate position is within terminal bounds
+    if row >= 1 and row <= max_rows and col >= 1 and col <= max_cols do
+      cursor = "\e[#{row};#{col}H"
+      safe_write([cursor, @reset_attrs, " "])
+    end
 
     :ok
   end
@@ -703,20 +642,26 @@ defmodule TermUI.Backend.TTY do
   @spec render_rows([{pos_integer(), [{pos_integer(), TermUI.Backend.cell()}]}], t()) :: :ok
   defp render_rows(rows, state) do
     Enum.each(rows, fn {row, row_cells} ->
-      render_row(row, row_cells, state)
+      render_row_at_column(row, 1, row_cells, state)
     end)
   end
 
-  # Renders a single row of cells with style delta tracking.
+  # Shared row rendering function for both full redraw and incremental modes.
   #
+  # Renders a row of cells starting at a specified column with style delta tracking.
   # Tracks the current style and only outputs SGR sequences when the style
-  # changes between cells. This reduces redundant escape sequence output.
-  # Builds an iolist for the entire row and writes once for efficiency.
-  @spec render_row(pos_integer(), [{pos_integer(), TermUI.Backend.cell()}], t()) :: :ok
-  defp render_row(row, cells, state) do
+  # changes between cells. Uses iolist append pattern (no reverse needed).
+  #
+  # Parameters:
+  # - row: The row number (1-indexed)
+  # - start_col: The column to position cursor at (1 for full redraw, first cell col for incremental)
+  # - cells: List of {col, cell} tuples sorted by column
+  # - state: Backend state with color_mode and character_set
+  @spec render_row_at_column(pos_integer(), pos_integer(), [{pos_integer(), TermUI.Backend.cell()}], t()) :: :ok
+  defp render_row_at_column(row, start_col, cells, state) do
     # Track current column, current style, and accumulated iolist
     # Initial style is nil (no style set yet)
-    initial_state = {1, nil, []}
+    initial_state = {start_col, nil, []}
 
     {_col, _style, iolist} =
       Enum.reduce(cells, initial_state, fn {col, cell}, {cur_col, cur_style, acc} ->
@@ -731,15 +676,15 @@ defmodule TermUI.Backend.TTY do
         # Render the cell with style delta tracking
         {new_style, cell_io} = render_cell_with_delta(cell, cur_style, state)
 
-        # Append to iolist (prepend for efficiency, reverse at end)
-        new_acc = [cell_io, gap | acc]
+        # Append to iolist (append pattern - no reverse needed for iolists)
+        new_acc = [acc, gap, cell_io]
 
         # Return next column position and new style
         {col + 1, new_style, new_acc}
       end)
 
-    # Build final iolist: cursor position + reversed content + reset
-    final_io = ["\e[#{row};1H", Enum.reverse(iolist), @reset_attrs]
+    # Build final iolist: cursor position + content + reset
+    final_io = ["\e[#{row};#{start_col}H", iolist, @reset_attrs]
 
     # Single write for entire row
     safe_write(final_io)
@@ -835,20 +780,55 @@ defmodule TermUI.Backend.TTY do
   defp color_to_sgr(:default, :bg, _mode), do: "\e[49m"
   defp color_to_sgr(nil, _type, _mode), do: ""
 
-  # True color mode - output RGB directly
-  defp color_to_sgr({r, g, b}, :fg, :true_color), do: "\e[38;2;#{r};#{g};#{b}m"
-  defp color_to_sgr({r, g, b}, :bg, :true_color), do: "\e[48;2;#{r};#{g};#{b}m"
+  # True color mode - output RGB directly (with validation)
+  defp color_to_sgr({r, g, b}, :fg, :true_color)
+       when is_integer(r) and r >= 0 and r <= 255 and
+            is_integer(g) and g >= 0 and g <= 255 and
+            is_integer(b) and b >= 0 and b <= 255 do
+    "\e[38;2;#{r};#{g};#{b}m"
+  end
 
-  # 256-color mode - convert RGB to palette index
-  defp color_to_sgr({r, g, b}, :fg, :color_256), do: "\e[38;5;#{rgb_to_256(r, g, b)}m"
-  defp color_to_sgr({r, g, b}, :bg, :color_256), do: "\e[48;5;#{rgb_to_256(r, g, b)}m"
+  defp color_to_sgr({r, g, b}, :bg, :true_color)
+       when is_integer(r) and r >= 0 and r <= 255 and
+            is_integer(g) and g >= 0 and g <= 255 and
+            is_integer(b) and b >= 0 and b <= 255 do
+    "\e[48;2;#{r};#{g};#{b}m"
+  end
 
-  # 16-color mode - convert RGB to basic color
-  defp color_to_sgr({r, g, b}, :fg, :color_16), do: "\e[#{rgb_to_16_fg(r, g, b)}m"
-  defp color_to_sgr({r, g, b}, :bg, :color_16), do: "\e[#{rgb_to_16_bg(r, g, b)}m"
+  # 256-color mode - convert RGB to palette index (with validation)
+  defp color_to_sgr({r, g, b}, :fg, :color_256)
+       when is_integer(r) and r >= 0 and r <= 255 and
+            is_integer(g) and g >= 0 and g <= 255 and
+            is_integer(b) and b >= 0 and b <= 255 do
+    "\e[38;5;#{rgb_to_256(r, g, b)}m"
+  end
+
+  defp color_to_sgr({r, g, b}, :bg, :color_256)
+       when is_integer(r) and r >= 0 and r <= 255 and
+            is_integer(g) and g >= 0 and g <= 255 and
+            is_integer(b) and b >= 0 and b <= 255 do
+    "\e[48;5;#{rgb_to_256(r, g, b)}m"
+  end
+
+  # 16-color mode - convert RGB to basic color (with validation)
+  defp color_to_sgr({r, g, b}, :fg, :color_16)
+       when is_integer(r) and r >= 0 and r <= 255 and
+            is_integer(g) and g >= 0 and g <= 255 and
+            is_integer(b) and b >= 0 and b <= 255 do
+    "\e[#{rgb_to_16_fg(r, g, b)}m"
+  end
+
+  defp color_to_sgr({r, g, b}, :bg, :color_16)
+       when is_integer(r) and r >= 0 and r <= 255 and
+            is_integer(g) and g >= 0 and g <= 255 and
+            is_integer(b) and b >= 0 and b <= 255 do
+    "\e[#{rgb_to_16_bg(r, g, b)}m"
+  end
 
   # Monochrome mode - skip colors entirely
   defp color_to_sgr({_r, _g, _b}, _type, :monochrome), do: ""
+
+  # Invalid RGB values fall through to catch-all clause (returns "")
 
   # Named colors
   defp color_to_sgr(name, :fg, _mode) when is_atom(name), do: named_color_to_sgr(name, :fg)
@@ -990,10 +970,15 @@ defmodule TermUI.Backend.TTY do
   defp map_character(char, :unicode), do: char
   defp map_character(char, :ascii), do: char
 
-  # Sanitizes characters to prevent escape sequence injection.
+  # Sanitizes characters to prevent escape sequence injection (defense-in-depth).
   #
-  # Removes any ESC characters from user-provided content to prevent
-  # malicious or accidental injection of terminal control sequences.
+  # This is the last line of defense against terminal escape injection.
+  # Cells should be pre-sanitized by TermUI.Renderer.Cell which provides
+  # comprehensive sanitization (CSI sequences, OSC sequences, control chars).
+  # This function provides minimal ESC removal as a safety net in case
+  # unsanitized content somehow reaches the rendering layer.
+  #
+  # For comprehensive sanitization, see TermUI.Renderer.Cell.sanitize/1.
   @spec sanitize_char(String.t()) :: String.t()
   defp sanitize_char(char) when is_binary(char) do
     String.replace(char, "\e", "")
@@ -1011,56 +996,21 @@ defmodule TermUI.Backend.TTY do
   # Frame Comparison for Incremental Rendering
   # ===========================================================================
 
-  @doc """
-  Compares the current frame with the previous frame to identify changes.
-
-  This function is the core diffing algorithm for incremental rendering.
-  It identifies which cells need to be updated (new or changed) and which
-  positions need to be cleared (removed from the current frame).
-
-  ## Parameters
-
-  - `last_frame` - Previous frame as a position-keyed map `%{{row, col} => cell}`
-  - `current_cells` - Current frame as a list of `{position, cell}` tuples
-
-  ## Returns
-
-  A tuple of `{changed, removed}` where:
-  - `changed` - List of `{position, cell}` tuples that are new or different
-  - `removed` - List of positions `{row, col}` that were in last frame but not current
-
-  ## Examples
-
-      # Cell added
-      iex> compare_frames(%{}, [{{1, 1}, {"A", :default, :default, []}}])
-      {[{{1, 1}, {"A", :default, :default, []}}], []}
-
-      # Cell removed
-      iex> compare_frames(%{{1, 1} => {"A", :default, :default, []}}, [])
-      {[], [{1, 1}]}
-
-      # Cell changed
-      iex> compare_frames(
-      ...>   %{{1, 1} => {"A", :default, :default, []}},
-      ...>   [{{1, 1}, {"B", :default, :default, []}}]
-      ...> )
-      {[{{1, 1}, {"B", :default, :default, []}}], []}
-
-      # Cell unchanged (not in output)
-      iex> compare_frames(
-      ...>   %{{1, 1} => {"A", :default, :default, []}},
-      ...>   [{{1, 1}, {"A", :default, :default, []}}]
-      ...> )
-      {[], []}
-  """
+  # Compares the current frame with the previous frame to identify changes.
+  #
+  # Core diffing algorithm for incremental rendering. Identifies which cells
+  # need to be updated (new or changed) and which positions need to be cleared.
+  #
+  # Uses MapSet for efficient position lookup when finding removed cells,
+  # avoiding the need to build a full frame map just for membership testing.
+  #
+  # Public for testing, but not part of the Backend behaviour API.
+  @doc false
   @spec compare_frames(
           map(),
           [{TermUI.Backend.position(), TermUI.Backend.cell()}]
         ) :: {[{TermUI.Backend.position(), TermUI.Backend.cell()}], [TermUI.Backend.position()]}
   def compare_frames(last_frame, current_cells) do
-    # Build current frame map for efficient lookup
-    current_frame = build_frame_map(current_cells)
-
     # Find changed cells: new or different from last frame
     changed =
       Enum.filter(current_cells, fn {pos, cell} ->
@@ -1071,11 +1021,14 @@ defmodule TermUI.Backend.TTY do
         end
       end)
 
+    # Build position set for efficient membership testing (cheaper than full frame map)
+    current_positions = MapSet.new(current_cells, fn {pos, _cell} -> pos end)
+
     # Find removed positions: in last frame but not in current
     removed =
       last_frame
       |> Map.keys()
-      |> Enum.filter(fn pos -> not Map.has_key?(current_frame, pos) end)
+      |> Enum.reject(&MapSet.member?(current_positions, &1))
 
     {changed, removed}
   end

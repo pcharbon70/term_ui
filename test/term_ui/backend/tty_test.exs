@@ -78,10 +78,6 @@ defmodule TermUI.Backend.TTYTest do
       assert state.cursor_position == nil
     end
 
-    test "has current_style field with default nil" do
-      state = %TTY{}
-      assert state.current_style == nil
-    end
   end
 
   describe "init/1" do
