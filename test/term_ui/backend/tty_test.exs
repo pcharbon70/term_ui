@@ -3721,6 +3721,341 @@ defmodule TermUI.Backend.TTYTest do
   end
 
   # ===========================================================================
+  # Section 3.8.3 Integration Tests - Color Degradation
+  # ===========================================================================
+
+  describe "integration - color degradation (Section 3.8.3)" do
+    # -------------------------------------------------------------------------
+    # 3.8.3.1 - Test rendering with true_color capabilities
+    # -------------------------------------------------------------------------
+
+    test "RGB colors render with full 24-bit sequences in true_color mode" do
+      output =
+        capture_io(fn ->
+          {:ok, state} = TTY.init(
+            line_mode: :full_redraw,
+            size: {24, 80},
+            capabilities: %{colors: :true_color}
+          )
+
+          # Cell with RGB foreground color
+          cells = [{{1, 1}, {"X", {255, 128, 64}, :default, []}}]
+          {:ok, _state} = TTY.draw_cells(state, cells)
+        end)
+
+      # Should contain true color sequence: \e[38;2;r;g;bm
+      assert output =~ "\e[38;2;255;128;64m"
+    end
+
+    test "multiple RGB colors in same frame render correctly in true_color mode" do
+      output =
+        capture_io(fn ->
+          {:ok, state} = TTY.init(
+            line_mode: :full_redraw,
+            size: {24, 80},
+            capabilities: %{colors: :true_color}
+          )
+
+          # Multiple cells with different RGB colors
+          cells = [
+            {{1, 1}, {"R", {255, 0, 0}, :default, []}},
+            {{1, 2}, {"G", {0, 255, 0}, :default, []}},
+            {{1, 3}, {"B", {0, 0, 255}, :default, []}}
+          ]
+          {:ok, _state} = TTY.draw_cells(state, cells)
+        end)
+
+      # All three RGB sequences should be present
+      assert output =~ "\e[38;2;255;0;0m"
+      assert output =~ "\e[38;2;0;255;0m"
+      assert output =~ "\e[38;2;0;0;255m"
+    end
+
+    test "RGB foreground and background combinations in true_color mode" do
+      output =
+        capture_io(fn ->
+          {:ok, state} = TTY.init(
+            line_mode: :full_redraw,
+            size: {24, 80},
+            capabilities: %{colors: :true_color}
+          )
+
+          # Cell with RGB foreground and background
+          cells = [{{1, 1}, {"X", {100, 150, 200}, {50, 75, 100}, []}}]
+          {:ok, _state} = TTY.draw_cells(state, cells)
+        end)
+
+      # Should contain both foreground and background true color sequences
+      assert output =~ "\e[38;2;100;150;200m"  # foreground
+      assert output =~ "\e[48;2;50;75;100m"    # background
+    end
+
+    # -------------------------------------------------------------------------
+    # 3.8.3.2 - Test rendering with color_256 capabilities
+    # -------------------------------------------------------------------------
+
+    test "RGB colors are mapped to 256-color palette in color_256 mode" do
+      output =
+        capture_io(fn ->
+          {:ok, state} = TTY.init(
+            line_mode: :full_redraw,
+            size: {24, 80},
+            capabilities: %{colors: :color_256}
+          )
+
+          # Bright red should map to a palette index
+          cells = [{{1, 1}, {"X", {255, 0, 0}, :default, []}}]
+          {:ok, _state} = TTY.draw_cells(state, cells)
+        end)
+
+      # Should contain 256-color sequence: \e[38;5;nm (not true color)
+      assert output =~ ~r/\e\[38;5;\d+m/
+      # Should NOT contain true color sequence
+      refute output =~ ~r/\e\[38;2;\d+;\d+;\d+m/
+    end
+
+    test "color cube mapping (16-231) in color_256 mode" do
+      output =
+        capture_io(fn ->
+          {:ok, state} = TTY.init(
+            line_mode: :full_redraw,
+            size: {24, 80},
+            capabilities: %{colors: :color_256}
+          )
+
+          # Non-gray color maps to 6x6x6 color cube (indices 16-231)
+          # RGB(255, 0, 0) -> red in color cube
+          cells = [{{1, 1}, {"X", {255, 0, 0}, :default, []}}]
+          {:ok, _state} = TTY.draw_cells(state, cells)
+        end)
+
+      # Should map to color cube (16 + 36*5 + 6*0 + 0 = 196 for pure red)
+      assert output =~ "\e[38;5;196m"
+    end
+
+    test "grayscale mapping (232-255) in color_256 mode" do
+      output =
+        capture_io(fn ->
+          {:ok, state} = TTY.init(
+            line_mode: :full_redraw,
+            size: {24, 80},
+            capabilities: %{colors: :color_256}
+          )
+
+          # Gray color (128, 128, 128) should map to grayscale ramp
+          cells = [{{1, 1}, {"X", {128, 128, 128}, :default, []}}]
+          {:ok, _state} = TTY.draw_cells(state, cells)
+        end)
+
+      # Should map to grayscale ramp (232 + div(128*23, 255) = 232 + 11 = 243)
+      assert output =~ "\e[38;5;243m"
+    end
+
+    test "palette indices pass through directly in color_256 mode" do
+      output =
+        capture_io(fn ->
+          {:ok, state} = TTY.init(
+            line_mode: :full_redraw,
+            size: {24, 80},
+            capabilities: %{colors: :color_256}
+          )
+
+          # Use direct palette index 42
+          cells = [{{1, 1}, {"X", 42, :default, []}}]
+          {:ok, _state} = TTY.draw_cells(state, cells)
+        end)
+
+      # Palette index should pass through unchanged
+      assert output =~ "\e[38;5;42m"
+    end
+
+    # -------------------------------------------------------------------------
+    # 3.8.3.3 - Test rendering with color_16 capabilities
+    # -------------------------------------------------------------------------
+
+    test "RGB colors are mapped to nearest basic color in color_16 mode" do
+      output =
+        capture_io(fn ->
+          {:ok, state} = TTY.init(
+            line_mode: :full_redraw,
+            size: {24, 80},
+            capabilities: %{colors: :color_16}
+          )
+
+          # Bright red (255, 0, 0) should map to basic red
+          cells = [{{1, 1}, {"X", {255, 0, 0}, :default, []}}]
+          {:ok, _state} = TTY.draw_cells(state, cells)
+        end)
+
+      # Should contain basic color code (30-37 or 90-97)
+      assert output =~ ~r/\e\[(3[0-7]|9[0-7])m/
+      # Should NOT contain 256-color or true color sequences
+      refute output =~ ~r/\e\[38;5;\d+m/
+      refute output =~ ~r/\e\[38;2;\d+;\d+;\d+m/
+    end
+
+    test "bright vs normal color selection in color_16 mode" do
+      output =
+        capture_io(fn ->
+          {:ok, state} = TTY.init(
+            line_mode: :full_redraw,
+            size: {24, 80},
+            capabilities: %{colors: :color_16}
+          )
+
+          # High intensity color should map to bright variant (90-97)
+          # Low intensity color should map to normal variant (30-37)
+          cells = [
+            {{1, 1}, {"B", {255, 255, 255}, :default, []}},  # Bright white
+            {{1, 2}, {"D", {64, 64, 64}, :default, []}}      # Dark gray -> black range
+          ]
+          {:ok, _state} = TTY.draw_cells(state, cells)
+        end)
+
+      # Bright white should map to 97 (bright white)
+      assert output =~ "\e[97m"
+      # Dark gray should map to dim range (30-37 range)
+      assert output =~ ~r/\e\[3[0-7]m/
+    end
+
+    test "named colors work directly in color_16 mode" do
+      output =
+        capture_io(fn ->
+          {:ok, state} = TTY.init(
+            line_mode: :full_redraw,
+            size: {24, 80},
+            capabilities: %{colors: :color_16}
+          )
+
+          # Named colors should pass through
+          cells = [
+            {{1, 1}, {"R", :red, :default, []}},
+            {{1, 2}, {"G", :green, :default, []}},
+            {{1, 3}, {"B", :bright_blue, :default, []}}
+          ]
+          {:ok, _state} = TTY.draw_cells(state, cells)
+        end)
+
+      # Named colors should produce their standard codes
+      assert output =~ "\e[31m"   # red
+      assert output =~ "\e[32m"   # green
+      assert output =~ "\e[94m"   # bright_blue
+    end
+
+    # -------------------------------------------------------------------------
+    # 3.8.3.4 - Test rendering with monochrome capabilities
+    # -------------------------------------------------------------------------
+
+    test "color sequences are omitted in monochrome mode" do
+      output =
+        capture_io(fn ->
+          {:ok, state} = TTY.init(
+            line_mode: :full_redraw,
+            size: {24, 80},
+            capabilities: %{colors: :monochrome}
+          )
+
+          # RGB colors should be omitted entirely
+          cells = [{{1, 1}, {"X", {255, 128, 64}, {0, 128, 255}, []}}]
+          {:ok, _state} = TTY.draw_cells(state, cells)
+        end)
+
+      # Should NOT contain any color sequences
+      refute output =~ ~r/\e\[38;2;\d+;\d+;\d+m/  # No true color
+      refute output =~ ~r/\e\[48;2;\d+;\d+;\d+m/  # No true color bg
+      refute output =~ ~r/\e\[38;5;\d+m/           # No 256-color
+      refute output =~ ~r/\e\[48;5;\d+m/           # No 256-color bg
+      # Named colors are also omitted (but 39m/49m for :default are allowed)
+      refute output =~ ~r/\e\[3[1-7]m/             # No named fg colors
+      refute output =~ ~r/\e\[4[1-7]m/             # No named bg colors
+    end
+
+    test "text attributes are preserved in monochrome mode" do
+      output =
+        capture_io(fn ->
+          {:ok, state} = TTY.init(
+            line_mode: :full_redraw,
+            size: {24, 80},
+            capabilities: %{colors: :monochrome}
+          )
+
+          # Cell with color (should be ignored) and attributes (should be preserved)
+          cells = [{{1, 1}, {"X", {255, 0, 0}, :default, [:bold, :underline]}}]
+          {:ok, _state} = TTY.draw_cells(state, cells)
+        end)
+
+      # Attributes should be present
+      assert output =~ "\e[1m"  # bold
+      assert output =~ "\e[4m"  # underline
+      # Color should NOT be present
+      refute output =~ ~r/\e\[38;2;\d+;\d+;\d+m/
+    end
+
+    test "content still renders correctly in monochrome mode" do
+      output =
+        capture_io(fn ->
+          {:ok, state} = TTY.init(
+            line_mode: :full_redraw,
+            size: {24, 80},
+            capabilities: %{colors: :monochrome}
+          )
+
+          # Multiple cells with colors should render content without color codes
+          cells = [
+            {{1, 1}, {"H", {255, 0, 0}, :default, []}},
+            {{1, 2}, {"e", {0, 255, 0}, :default, []}},
+            {{1, 3}, {"l", {0, 0, 255}, :default, []}},
+            {{1, 4}, {"l", :cyan, :default, []}},
+            {{1, 5}, {"o", 42, :default, []}}
+          ]
+          {:ok, _state} = TTY.draw_cells(state, cells)
+        end)
+
+      # Each character should be present (separated by SGR sequences in output)
+      assert output =~ "H"
+      assert output =~ "e"
+      assert output =~ "l"
+      assert output =~ "o"
+    end
+
+    test "named colors are omitted in monochrome mode" do
+      output =
+        capture_io(fn ->
+          {:ok, state} = TTY.init(
+            line_mode: :full_redraw,
+            size: {24, 80},
+            capabilities: %{colors: :monochrome}
+          )
+
+          cells = [{{1, 1}, {"X", :red, :blue, []}}]
+          {:ok, _state} = TTY.draw_cells(state, cells)
+        end)
+
+      # Named colors should be omitted
+      refute output =~ "\e[31m"  # no red
+      refute output =~ "\e[44m"  # no blue background
+    end
+
+    test "palette indices are omitted in monochrome mode" do
+      output =
+        capture_io(fn ->
+          {:ok, state} = TTY.init(
+            line_mode: :full_redraw,
+            size: {24, 80},
+            capabilities: %{colors: :monochrome}
+          )
+
+          cells = [{{1, 1}, {"X", 42, 100, []}}]
+          {:ok, _state} = TTY.draw_cells(state, cells)
+        end)
+
+      # Palette indices should be omitted
+      refute output =~ "\e[38;5;42m"
+      refute output =~ "\e[48;5;100m"
+    end
+  end
+
+  # ===========================================================================
   # Section 3.8.4 Integration Tests - Character Set Fallback
   # ===========================================================================
 
