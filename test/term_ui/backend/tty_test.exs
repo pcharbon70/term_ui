@@ -1793,16 +1793,21 @@ defmodule TermUI.Backend.TTYTest do
       # Should NOT render unchanged cell {1, 1}
       refute output =~ "\e[1;1H"
 
-      # Should render changed cell {1, 2}
+      # Should render changed cell {1, 2} - cursor positioned there
       assert output =~ "\e[1;2H"
       assert output =~ "X"
 
-      # Should clear removed cell {1, 3}
+      # Should clear removed cell {1, 3} (separate cursor positioning for clear)
       assert output =~ "\e[1;3H"
 
       # Should render new cell {1, 4}
-      assert output =~ "\e[1;4H"
+      # With optimization, cells on same row are grouped, so D is rendered
+      # after X with a space gap (X at col 2, space fills col 3, D at col 4)
       assert output =~ "D"
+
+      # The output should show the grouped rendering: X + space + D
+      # (X at col 2, gap fills col 3 to reach col 4, then D)
+      assert output =~ "X D"
     end
 
     test "style change triggers re-render" do
@@ -1890,6 +1895,336 @@ defmodule TermUI.Backend.TTYTest do
 
       # Should ALWAYS have clear screen in full_redraw mode
       assert output =~ "\e[2J"
+    end
+  end
+
+  # ===========================================================================
+  # Cursor Movement Optimization Tests (Section 3.4.4)
+  # ===========================================================================
+
+  describe "cursor movement optimization" do
+    test "changed cells are sorted by position for rendering" do
+      {:ok, state} = init_tty(line_mode: :incremental)
+
+      # First frame
+      cells1 = [
+        {{1, 1}, {"A", :default, :default, []}},
+        {{1, 5}, {"E", :default, :default, []}},
+        {{1, 3}, {"C", :default, :default, []}}
+      ]
+
+      {:ok, state1} =
+        capture_io(fn ->
+          send(self(), TTY.draw_cells(state, cells1))
+        end)
+        |> then(fn _ ->
+          receive do
+            result -> result
+          end
+        end)
+
+      # Second frame: change all cells (order doesn't match position order)
+      cells2 = [
+        {{1, 5}, {"X", :default, :default, []}},
+        {{1, 1}, {"Y", :default, :default, []}},
+        {{1, 3}, {"Z", :default, :default, []}}
+      ]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state1, cells2)
+        end)
+
+      # All cells changed so they should all be rendered
+      # They should be grouped by row and sorted by column
+      assert output =~ "Y"
+      assert output =~ "Z"
+      assert output =~ "X"
+
+      # Characters should appear in column order (Y at 1, Z at 3, X at 5)
+      y_pos = :binary.match(output, "Y")
+      z_pos = :binary.match(output, "Z")
+      x_pos = :binary.match(output, "X")
+
+      assert y_pos != :nomatch
+      assert z_pos != :nomatch
+      assert x_pos != :nomatch
+
+      {y_start, _} = y_pos
+      {z_start, _} = z_pos
+      {x_start, _} = x_pos
+
+      assert y_start < z_start
+      assert z_start < x_start
+    end
+
+    test "adjacent cells on same row use single cursor positioning" do
+      {:ok, state} = init_tty(line_mode: :incremental)
+
+      # First frame - empty
+      {:ok, state1} =
+        capture_io(fn ->
+          send(self(), TTY.draw_cells(state, []))
+        end)
+        |> then(fn _ ->
+          receive do
+            result -> result
+          end
+        end)
+
+      # Second frame: add adjacent cells on row 1
+      cells2 = [
+        {{1, 1}, {"A", :default, :default, []}},
+        {{1, 2}, {"B", :default, :default, []}},
+        {{1, 3}, {"C", :default, :default, []}}
+      ]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state1, cells2)
+        end)
+
+      # Should only have ONE cursor positioning for row 1 (at start)
+      # Count cursor positioning sequences for row 1
+      row1_positions =
+        output
+        |> String.split("\e[1;")
+        |> length()
+
+      # Should position only once at the start of the row
+      # (one more element than actual occurrences due to split behavior)
+      assert row1_positions == 2
+    end
+
+    test "non-adjacent cells on same row fill gaps with spaces" do
+      {:ok, state} = init_tty(line_mode: :incremental)
+
+      # First frame - empty
+      {:ok, state1} =
+        capture_io(fn ->
+          send(self(), TTY.draw_cells(state, []))
+        end)
+        |> then(fn _ ->
+          receive do
+            result -> result
+          end
+        end)
+
+      # Second frame: cells at columns 1 and 4 (gap of 2)
+      cells2 = [
+        {{1, 1}, {"A", :default, :default, []}},
+        {{1, 4}, {"D", :default, :default, []}}
+      ]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state1, cells2)
+        end)
+
+      # Should have A followed by spaces, then D
+      # The pattern should be: cursor positioning + A + spaces + style + D
+      assert output =~ "A"
+      assert output =~ "D"
+
+      # Gap should be filled with spaces (columns 2, 3 = 2 spaces between A and D)
+      # But actually we're going from col 1 (A takes col 1) to col 4
+      # So gap is col 2, 3 = 2 spaces
+      # Actually after rendering A at col 1, cursor advances to col 2
+      # Then we need to fill col 2, 3 to reach col 4 = 2 spaces
+      assert output =~ "A  "
+    end
+
+    test "cells on different rows get separate cursor positioning" do
+      {:ok, state} = init_tty(line_mode: :incremental)
+
+      # First frame - empty
+      {:ok, state1} =
+        capture_io(fn ->
+          send(self(), TTY.draw_cells(state, []))
+        end)
+        |> then(fn _ ->
+          receive do
+            result -> result
+          end
+        end)
+
+      # Second frame: cells on rows 1 and 3
+      cells2 = [
+        {{1, 1}, {"A", :default, :default, []}},
+        {{3, 1}, {"C", :default, :default, []}}
+      ]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state1, cells2)
+        end)
+
+      # Should have cursor positioning for both rows
+      assert output =~ "\e[1;1H"
+      assert output =~ "\e[3;1H"
+    end
+
+    test "style delta tracking works within grouped row cells" do
+      {:ok, state} = init_tty(line_mode: :incremental)
+
+      # First frame - empty
+      {:ok, state1} =
+        capture_io(fn ->
+          send(self(), TTY.draw_cells(state, []))
+        end)
+        |> then(fn _ ->
+          receive do
+            result -> result
+          end
+        end)
+
+      # Second frame: adjacent cells with same style
+      cells2 = [
+        {{1, 1}, {"A", :red, :default, []}},
+        {{1, 2}, {"B", :red, :default, []}},
+        {{1, 3}, {"C", :red, :default, []}}
+      ]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state1, cells2)
+        end)
+
+      # Red color should only appear once (delta tracking)
+      red_count = length(String.split(output, "\e[31m")) - 1
+      assert red_count == 1
+    end
+
+    test "multiple rows are processed in order" do
+      {:ok, state} = init_tty(line_mode: :incremental)
+
+      # First frame - empty
+      {:ok, state1} =
+        capture_io(fn ->
+          send(self(), TTY.draw_cells(state, []))
+        end)
+        |> then(fn _ ->
+          receive do
+            result -> result
+          end
+        end)
+
+      # Second frame: cells on rows 3, 1, 2 (out of order)
+      cells2 = [
+        {{3, 1}, {"3", :default, :default, []}},
+        {{1, 1}, {"1", :default, :default, []}},
+        {{2, 1}, {"2", :default, :default, []}}
+      ]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state1, cells2)
+        end)
+
+      # Rows should be processed in order 1, 2, 3
+      row1_pos = :binary.match(output, "\e[1;1H")
+      row2_pos = :binary.match(output, "\e[2;1H")
+      row3_pos = :binary.match(output, "\e[3;1H")
+
+      assert row1_pos != :nomatch
+      assert row2_pos != :nomatch
+      assert row3_pos != :nomatch
+
+      {r1_start, _} = row1_pos
+      {r2_start, _} = row2_pos
+      {r3_start, _} = row3_pos
+
+      assert r1_start < r2_start
+      assert r2_start < r3_start
+    end
+
+    test "removed cells are sorted for sequential clearing" do
+      {:ok, state} = init_tty(line_mode: :incremental)
+
+      # First frame: cells at various positions
+      cells1 = [
+        {{2, 3}, {"X", :default, :default, []}},
+        {{1, 1}, {"A", :default, :default, []}},
+        {{2, 1}, {"B", :default, :default, []}}
+      ]
+
+      {:ok, state1} =
+        capture_io(fn ->
+          send(self(), TTY.draw_cells(state, cells1))
+        end)
+        |> then(fn _ ->
+          receive do
+            result -> result
+          end
+        end)
+
+      # Second frame: remove all cells
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state1, [])
+        end)
+
+      # All positions should be cleared
+      assert output =~ "\e[1;1H"
+      assert output =~ "\e[2;1H"
+      assert output =~ "\e[2;3H"
+
+      # Positions should be cleared in sorted order
+      pos_1_1 = :binary.match(output, "\e[1;1H")
+      pos_2_1 = :binary.match(output, "\e[2;1H")
+      pos_2_3 = :binary.match(output, "\e[2;3H")
+
+      {p1_start, _} = pos_1_1
+      {p2_start, _} = pos_2_1
+      {p3_start, _} = pos_2_3
+
+      # {1, 1} < {2, 1} < {2, 3} in tuple comparison order
+      assert p1_start < p2_start
+      assert p2_start < p3_start
+    end
+
+    test "mixed changed and removed cells both optimized" do
+      {:ok, state} = init_tty(line_mode: :incremental)
+
+      # First frame
+      cells1 = [
+        {{1, 1}, {"A", :default, :default, []}},
+        {{1, 2}, {"B", :default, :default, []}},
+        {{2, 1}, {"C", :default, :default, []}}
+      ]
+
+      {:ok, state1} =
+        capture_io(fn ->
+          send(self(), TTY.draw_cells(state, cells1))
+        end)
+        |> then(fn _ ->
+          receive do
+            result -> result
+          end
+        end)
+
+      # Second frame: change {1, 1} and {1, 2}, remove {2, 1}
+      cells2 = [
+        {{1, 1}, {"X", :default, :default, []}},
+        {{1, 2}, {"Y", :default, :default, []}}
+      ]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state1, cells2)
+        end)
+
+      # Changed cells on row 1 should be grouped (single cursor positioning)
+      # Should have cursor position for row 1
+      assert output =~ "\e[1;1H"
+
+      # Should have both changed characters
+      assert output =~ "X"
+      assert output =~ "Y"
+
+      # Should clear removed cell at {2, 1}
+      assert output =~ "\e[2;1H"
+      assert output =~ "\e[0m "
     end
   end
 end

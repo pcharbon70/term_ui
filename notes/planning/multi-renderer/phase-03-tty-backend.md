@@ -212,14 +212,14 @@ Implement incremental cell drawing.
 
 ### 3.4.4 Implement Cursor Movement Optimization
 
-- [ ] **Task 3.4.4 Complete**
+- [x] **Task 3.4.4 Complete**
 
 Optimize cursor movement for sparse updates.
 
-- [ ] 3.4.4.1 Sort changed cells by position (row, then col)
-- [ ] 3.4.4.2 Track current cursor position
-- [ ] 3.4.4.3 Use relative moves when cheaper than absolute positioning
-- [ ] 3.4.4.4 Group adjacent cells to minimize cursor operations
+- [x] 3.4.4.1 Sort changed cells by position (row, then col)
+- [x] 3.4.4.2 Track current cursor position
+- [x] 3.4.4.3 Use relative moves when cheaper than absolute positioning
+- [x] 3.4.4.4 Group adjacent cells to minimize cursor operations
 
 ### Unit Tests - Section 3.4
 
