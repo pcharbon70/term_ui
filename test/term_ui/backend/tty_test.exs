@@ -1608,4 +1608,288 @@ defmodule TermUI.Backend.TTYTest do
       assert removed == []
     end
   end
+
+  # ===========================================================================
+  # Incremental Rendering Tests (Section 3.4.3)
+  # ===========================================================================
+
+  describe "incremental rendering" do
+    test "only renders changed cells on subsequent frames" do
+      {:ok, state} = init_tty(line_mode: :incremental)
+
+      # First frame with two cells
+      cells1 = [
+        {{1, 1}, {"A", :default, :default, []}},
+        {{1, 2}, {"B", :default, :default, []}}
+      ]
+
+      {:ok, state1} =
+        capture_io(fn ->
+          send(self(), TTY.draw_cells(state, cells1))
+        end)
+        |> then(fn _ ->
+          receive do
+            result -> result
+          end
+        end)
+
+      # Second frame: change one cell, keep one the same
+      cells2 = [
+        {{1, 1}, {"A", :default, :default, []}},
+        {{1, 2}, {"X", :default, :default, []}}
+      ]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state1, cells2)
+        end)
+
+      # Should NOT have clear screen (incremental)
+      refute output =~ "\e[2J"
+
+      # Should have cursor positioning for the changed cell {1, 2}
+      assert output =~ "\e[1;2H"
+
+      # Should contain the changed character X
+      assert output =~ "X"
+    end
+
+    test "unchanged cells are not re-rendered" do
+      {:ok, state} = init_tty(line_mode: :incremental)
+
+      cells = [
+        {{1, 1}, {"A", :default, :default, []}},
+        {{1, 2}, {"B", :default, :default, []}}
+      ]
+
+      {:ok, state1} =
+        capture_io(fn ->
+          send(self(), TTY.draw_cells(state, cells))
+        end)
+        |> then(fn _ ->
+          receive do
+            result -> result
+          end
+        end)
+
+      # Same cells - nothing should be rendered
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state1, cells)
+        end)
+
+      # No clear screen
+      refute output =~ "\e[2J"
+
+      # No cursor positioning (nothing to render)
+      refute output =~ "\e[1;1H"
+      refute output =~ "\e[1;2H"
+    end
+
+    test "removed cells are cleared with space" do
+      {:ok, state} = init_tty(line_mode: :incremental)
+
+      # First frame with two cells
+      cells1 = [
+        {{1, 1}, {"A", :default, :default, []}},
+        {{1, 2}, {"B", :default, :default, []}}
+      ]
+
+      {:ok, state1} =
+        capture_io(fn ->
+          send(self(), TTY.draw_cells(state, cells1))
+        end)
+        |> then(fn _ ->
+          receive do
+            result -> result
+          end
+        end)
+
+      # Second frame: remove one cell
+      cells2 = [{{1, 1}, {"A", :default, :default, []}}]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state1, cells2)
+        end)
+
+      # Should position cursor at removed cell location {1, 2}
+      assert output =~ "\e[1;2H"
+
+      # Should write a space to clear it (with reset)
+      assert output =~ "\e[0m "
+    end
+
+    test "new cells are rendered" do
+      {:ok, state} = init_tty(line_mode: :incremental)
+
+      # First frame with one cell
+      cells1 = [{{1, 1}, {"A", :default, :default, []}}]
+
+      {:ok, state1} =
+        capture_io(fn ->
+          send(self(), TTY.draw_cells(state, cells1))
+        end)
+        |> then(fn _ ->
+          receive do
+            result -> result
+          end
+        end)
+
+      # Second frame: add a new cell
+      cells2 = [
+        {{1, 1}, {"A", :default, :default, []}},
+        {{1, 2}, {"B", :default, :default, []}}
+      ]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state1, cells2)
+        end)
+
+      # Should position cursor at new cell location {1, 2}
+      assert output =~ "\e[1;2H"
+
+      # Should render the new cell
+      assert output =~ "B"
+    end
+
+    test "mixed changes: add, modify, remove in single frame" do
+      {:ok, state} = init_tty(line_mode: :incremental)
+
+      # First frame
+      cells1 = [
+        {{1, 1}, {"A", :default, :default, []}},
+        {{1, 2}, {"B", :default, :default, []}},
+        {{1, 3}, {"C", :default, :default, []}}
+      ]
+
+      {:ok, state1} =
+        capture_io(fn ->
+          send(self(), TTY.draw_cells(state, cells1))
+        end)
+        |> then(fn _ ->
+          receive do
+            result -> result
+          end
+        end)
+
+      # Second frame:
+      # - {1, 1} unchanged (A)
+      # - {1, 2} changed (B -> X)
+      # - {1, 3} removed
+      # - {1, 4} added (D)
+      cells2 = [
+        {{1, 1}, {"A", :default, :default, []}},
+        {{1, 2}, {"X", :default, :default, []}},
+        {{1, 4}, {"D", :default, :default, []}}
+      ]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state1, cells2)
+        end)
+
+      # Should NOT render unchanged cell {1, 1}
+      refute output =~ "\e[1;1H"
+
+      # Should render changed cell {1, 2}
+      assert output =~ "\e[1;2H"
+      assert output =~ "X"
+
+      # Should clear removed cell {1, 3}
+      assert output =~ "\e[1;3H"
+
+      # Should render new cell {1, 4}
+      assert output =~ "\e[1;4H"
+      assert output =~ "D"
+    end
+
+    test "style change triggers re-render" do
+      {:ok, state} = init_tty(line_mode: :incremental)
+
+      # First frame
+      cells1 = [{{1, 1}, {"A", :red, :default, []}}]
+
+      {:ok, state1} =
+        capture_io(fn ->
+          send(self(), TTY.draw_cells(state, cells1))
+        end)
+        |> then(fn _ ->
+          receive do
+            result -> result
+          end
+        end)
+
+      # Second frame: change color
+      cells2 = [{{1, 1}, {"A", :blue, :default, []}}]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state1, cells2)
+        end)
+
+      # Should re-render the cell
+      assert output =~ "\e[1;1H"
+
+      # Should have blue color code
+      assert output =~ "\e[34m"
+    end
+
+    test "last_frame is updated after incremental render" do
+      {:ok, state} = init_tty(line_mode: :incremental)
+
+      cells1 = [{{1, 1}, {"A", :default, :default, []}}]
+
+      {:ok, state1} =
+        capture_io(fn ->
+          send(self(), TTY.draw_cells(state, cells1))
+        end)
+        |> then(fn _ ->
+          receive do
+            result -> result
+          end
+        end)
+
+      cells2 = [{{1, 1}, {"B", :default, :default, []}}]
+
+      {:ok, state2} =
+        capture_io(fn ->
+          send(self(), TTY.draw_cells(state1, cells2))
+        end)
+        |> then(fn _ ->
+          receive do
+            result -> result
+          end
+        end)
+
+      # last_frame should now contain B, not A
+      assert state2.last_frame == %{{1, 1} => {"B", :default, :default, []}}
+    end
+
+    test "full_redraw mode always clears screen" do
+      {:ok, state} = init_tty(line_mode: :full_redraw)
+
+      cells1 = [{{1, 1}, {"A", :default, :default, []}}]
+
+      {:ok, state1} =
+        capture_io(fn ->
+          send(self(), TTY.draw_cells(state, cells1))
+        end)
+        |> then(fn _ ->
+          receive do
+            result -> result
+          end
+        end)
+
+      # Even identical cells should trigger full redraw
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state1, cells1)
+        end)
+
+      # Should ALWAYS have clear screen in full_redraw mode
+      assert output =~ "\e[2J"
+    end
+  end
 end

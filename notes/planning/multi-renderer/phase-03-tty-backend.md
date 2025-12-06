@@ -200,15 +200,15 @@ Implement comparison between current and previous frames.
 
 ### 3.4.3 Implement draw_cells/2 for Incremental Mode
 
-- [ ] **Task 3.4.3 Complete**
+- [x] **Task 3.4.3 Complete**
 
 Implement incremental cell drawing.
 
-- [ ] 3.4.3.1 If `line_mode == :incremental` and `last_frame` exists, compute diff
-- [ ] 3.4.3.2 For each changed cell, position cursor and write cell
-- [ ] 3.4.3.3 For removed cells, position cursor and write space with default style
-- [ ] 3.4.3.4 Update `last_frame` with current frame
-- [ ] 3.4.3.5 If no last_frame, delegate to full_redraw logic
+- [x] 3.4.3.1 If `line_mode == :incremental` and `last_frame` exists, compute diff
+- [x] 3.4.3.2 For each changed cell, position cursor and write cell
+- [x] 3.4.3.3 For removed cells, position cursor and write space with default style
+- [x] 3.4.3.4 Update `last_frame` with current frame
+- [x] 3.4.3.5 If no last_frame, delegate to full_redraw logic
 
 ### 3.4.4 Implement Cursor Movement Optimization
 

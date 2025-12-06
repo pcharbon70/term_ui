@@ -403,25 +403,37 @@ defmodule TermUI.Backend.TTY do
   """
   @spec draw_cells(t(), [{TermUI.Backend.position(), TermUI.Backend.cell()}]) :: {:ok, t()}
   def draw_cells(%__MODULE__{} = state, cells) do
-    # Determine if we need to do a full redraw
-    # Full redraw is needed when:
-    # 1. line_mode is :full_redraw (always)
-    # 2. line_mode is :incremental but last_frame is nil (first frame)
-    needs_full_redraw =
-      state.line_mode == :full_redraw or
-        (state.line_mode == :incremental and is_nil(state.last_frame))
+    case state.line_mode do
+      :full_redraw ->
+        # Always clear and redraw everything
+        do_full_redraw(cells, state)
 
-    if needs_full_redraw do
-      safe_write(@clear_screen <> @cursor_home)
+      :incremental ->
+        if is_nil(state.last_frame) do
+          # First frame in incremental mode - do full redraw to establish baseline
+          do_full_redraw(cells, state)
+        else
+          # Subsequent frames - only render changes
+          do_incremental_render(cells, state)
+        end
     end
+  end
+
+  # Performs a full redraw: clears screen and renders all cells.
+  @spec do_full_redraw(
+          [{TermUI.Backend.position(), TermUI.Backend.cell()}],
+          t()
+        ) :: {:ok, t()}
+  defp do_full_redraw(cells, state) do
+    # Clear screen and home cursor
+    safe_write(@clear_screen <> @cursor_home)
 
     # Group cells by row and render
     cells
     |> group_cells_by_row()
     |> render_rows(state)
 
-    # Only build frame map for incremental mode (used for diff-based updates)
-    # Full redraw mode doesn't need position lookups
+    # Build frame map for incremental mode tracking
     frame =
       if state.line_mode == :incremental do
         build_frame_map(cells)
@@ -430,6 +442,68 @@ defmodule TermUI.Backend.TTY do
       end
 
     {:ok, %{state | last_frame: frame, cursor_position: nil}}
+  end
+
+  # Performs incremental rendering: only updates changed/removed cells.
+  @spec do_incremental_render(
+          [{TermUI.Backend.position(), TermUI.Backend.cell()}],
+          t()
+        ) :: {:ok, t()}
+  defp do_incremental_render(cells, state) do
+    # Compare current frame with last frame
+    {changed, removed} = compare_frames(state.last_frame, cells)
+
+    # Render changed cells (new or modified)
+    Enum.each(changed, fn {pos, cell} ->
+      render_cell_at(pos, cell, state)
+    end)
+
+    # Clear removed cells (write space with default style)
+    Enum.each(removed, fn pos ->
+      clear_cell_at(pos)
+    end)
+
+    # Update last_frame with current frame
+    frame = build_frame_map(cells)
+
+    {:ok, %{state | last_frame: frame, cursor_position: nil}}
+  end
+
+  # Renders a single cell at a specific position.
+  #
+  # Used for incremental rendering where cells are rendered individually
+  # at arbitrary positions rather than row-by-row.
+  @spec render_cell_at(
+          TermUI.Backend.position(),
+          TermUI.Backend.cell(),
+          t()
+        ) :: :ok
+  defp render_cell_at({row, col}, {char, fg, bg, attrs}, state) do
+    # Position cursor at the cell location
+    cursor = "\e[#{row};#{col}H"
+
+    # Build styled character
+    sgr = build_sgr_sequence(fg, bg, attrs, state.color_mode)
+    mapped_char = map_character(char, state.character_set)
+    sanitized_char = sanitize_char(mapped_char)
+
+    # Write cursor position + style + character + reset
+    safe_write([cursor, sgr, sanitized_char, @reset_attrs])
+
+    :ok
+  end
+
+  # Clears a cell at a specific position by writing a space.
+  #
+  # Used for incremental rendering to clear cells that were in the
+  # previous frame but not in the current frame.
+  @spec clear_cell_at(TermUI.Backend.position()) :: :ok
+  defp clear_cell_at({row, col}) do
+    # Position cursor and write space with reset attributes
+    cursor = "\e[#{row};#{col}H"
+    safe_write([cursor, @reset_attrs, " "])
+
+    :ok
   end
 
   @impl true
