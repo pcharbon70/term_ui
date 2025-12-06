@@ -71,9 +71,10 @@ defmodule TermUI.Input.Raw do
   # presses from escape sequences. The same value is used by InputReader.
   @escape_timeout 50
 
-  # Maximum buffer size to prevent memory exhaustion attacks.
-  # Matches InputBuffer.max_buffer_size/0.
-  @max_buffer_size 65_536
+  # Note: InputBuffer.apply_limit/2 uses its own limit (1KB) and truncates
+  # to 256 bytes when exceeded. This provides security against memory
+  # exhaustion from malformed escape sequences. We don't need a separate
+  # buffer size constant here since InputBuffer handles the limiting.
 
   # Maximum event queue size to prevent memory exhaustion.
   @max_queue_size 1000
@@ -256,9 +257,10 @@ defmodule TermUI.Input.Raw do
       end
 
     case events do
-      [event | _rest] ->
-        # Return first event, clear buffer
-        {{:ok, event}, %{state | buffer: <<>>}}
+      [event | rest] ->
+        # Return first event, queue remaining events, clear buffer
+        queued_events = limit_queue(rest)
+        {{:ok, event}, %{state | buffer: <<>>, event_queue: queued_events}}
 
       [] ->
         # No events to emit, continue waiting with remaining timeout
@@ -281,11 +283,8 @@ defmodule TermUI.Input.Raw do
       {:ok, {:ok, data}} ->
         # Got input, add to buffer with size limit and try to parse
         new_buffer = state.buffer <> data
-        {limited_buffer, truncated} = InputBuffer.apply_limit(new_buffer, max_size: @max_buffer_size)
-
-        if truncated do
-          Logger.warning("Input.Raw: Buffer overflow, truncating to #{@max_buffer_size} bytes")
-        end
+        # InputBuffer.apply_limit uses rate-limited logging via the :source option
+        {limited_buffer, _truncated} = InputBuffer.apply_limit(new_buffer, source: :input_raw)
 
         new_state = %{state | buffer: limited_buffer}
 

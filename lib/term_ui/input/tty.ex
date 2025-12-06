@@ -80,15 +80,35 @@ defmodule TermUI.Input.TTY do
   When a partial escape sequence is detected (e.g., lone ESC), the handler waits
   up to 50ms for completion using a blocking read. This matches standard terminal
   emulator behavior and distinguishes ESC key presses from escape sequences.
+
+  ## Security
+
+  This module implements several security measures to prevent resource exhaustion:
+
+  - **Buffer size limit**: Input buffer is limited by `InputBuffer.apply_limit/2`
+    (1KB max, truncates to 256 bytes when exceeded). This prevents memory
+    exhaustion from malformed or malicious escape sequences.
+
+  - **Event queue limit**: Maximum 1000 events can be queued. Excess events are
+    dropped with a warning. This prevents memory exhaustion from rapid input.
+
+  - **Rate-limited logging**: Buffer overflow warnings use rate-limited logging
+    (via `InputBuffer`) to prevent log flooding attacks.
+
+  - **Escape sequence timeout**: Partial sequences timeout after 50ms, preventing
+    indefinite buffering of incomplete sequences.
+
+  For concurrent usage, each handler instance maintains independent state, so
+  memory usage scales linearly with the number of concurrent handlers.
   """
 
   @behaviour TermUI.Input
 
   require Logger
 
+  alias TermUI.Backend.InputBuffer
   alias TermUI.Event
   alias TermUI.Terminal.EscapeParser
-  alias TermUI.Backend.InputBuffer
 
   # Escape sequence bytes
   @esc 0x1B
@@ -100,9 +120,10 @@ defmodule TermUI.Input.TTY do
   # presses from escape sequences. The same value is used by InputReader.
   @escape_timeout 50
 
-  # Maximum buffer size to prevent memory exhaustion attacks.
-  # Matches InputBuffer.max_buffer_size/0.
-  @max_buffer_size 65_536
+  # Note: InputBuffer.apply_limit/2 uses its own limit (1KB) and truncates
+  # to 256 bytes when exceeded. This provides security against memory
+  # exhaustion from malformed escape sequences. We don't need a separate
+  # buffer size constant here since InputBuffer handles the limiting.
 
   # Maximum event queue size to prevent memory exhaustion.
   @max_queue_size 1000
@@ -323,11 +344,8 @@ defmodule TermUI.Input.TTY do
   @spec process_input(t(), binary()) :: TermUI.Input.poll_result()
   defp process_input(%__MODULE__{} = state, data) do
     new_buffer = state.buffer <> data
-    {limited_buffer, truncated} = InputBuffer.apply_limit(new_buffer, max_size: @max_buffer_size)
-
-    if truncated do
-      Logger.warning("Input.TTY: Buffer overflow, truncating to #{@max_buffer_size} bytes")
-    end
+    # InputBuffer.apply_limit uses rate-limited logging via the :source option
+    {limited_buffer, _truncated} = InputBuffer.apply_limit(new_buffer, source: :input_tty)
 
     new_state = %{state | buffer: limited_buffer}
 
