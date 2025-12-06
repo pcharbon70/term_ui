@@ -188,15 +188,15 @@ Implement frame state tracking for incremental comparison.
 
 ### 3.4.2 Implement Frame Comparison
 
-- [ ] **Task 3.4.2 Complete**
+- [x] **Task 3.4.2 Complete**
 
 Implement comparison between current and previous frames.
 
-- [ ] 3.4.2.1 Convert current cells list to position-keyed map
-- [ ] 3.4.2.2 Compare each position in current frame to last_frame
-- [ ] 3.4.2.3 Identify changed cells (different content or style)
-- [ ] 3.4.2.4 Identify removed cells (in last_frame but not current)
-- [ ] 3.4.2.5 Return list of cells to update
+- [x] 3.4.2.1 Convert current cells list to position-keyed map
+- [x] 3.4.2.2 Compare each position in current frame to last_frame
+- [x] 3.4.2.3 Identify changed cells (different content or style)
+- [x] 3.4.2.4 Identify removed cells (in last_frame but not current)
+- [x] 3.4.2.5 Return list of cells to update
 
 ### 3.4.3 Implement draw_cells/2 for Incremental Mode
 

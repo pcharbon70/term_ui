@@ -862,6 +862,79 @@ defmodule TermUI.Backend.TTY do
   end
 
   # ===========================================================================
+  # Frame Comparison for Incremental Rendering
+  # ===========================================================================
+
+  @doc """
+  Compares the current frame with the previous frame to identify changes.
+
+  This function is the core diffing algorithm for incremental rendering.
+  It identifies which cells need to be updated (new or changed) and which
+  positions need to be cleared (removed from the current frame).
+
+  ## Parameters
+
+  - `last_frame` - Previous frame as a position-keyed map `%{{row, col} => cell}`
+  - `current_cells` - Current frame as a list of `{position, cell}` tuples
+
+  ## Returns
+
+  A tuple of `{changed, removed}` where:
+  - `changed` - List of `{position, cell}` tuples that are new or different
+  - `removed` - List of positions `{row, col}` that were in last frame but not current
+
+  ## Examples
+
+      # Cell added
+      iex> compare_frames(%{}, [{{1, 1}, {"A", :default, :default, []}}])
+      {[{{1, 1}, {"A", :default, :default, []}}], []}
+
+      # Cell removed
+      iex> compare_frames(%{{1, 1} => {"A", :default, :default, []}}, [])
+      {[], [{1, 1}]}
+
+      # Cell changed
+      iex> compare_frames(
+      ...>   %{{1, 1} => {"A", :default, :default, []}},
+      ...>   [{{1, 1}, {"B", :default, :default, []}}]
+      ...> )
+      {[{{1, 1}, {"B", :default, :default, []}}], []}
+
+      # Cell unchanged (not in output)
+      iex> compare_frames(
+      ...>   %{{1, 1} => {"A", :default, :default, []}},
+      ...>   [{{1, 1}, {"A", :default, :default, []}}]
+      ...> )
+      {[], []}
+  """
+  @spec compare_frames(
+          map(),
+          [{TermUI.Backend.position(), TermUI.Backend.cell()}]
+        ) :: {[{TermUI.Backend.position(), TermUI.Backend.cell()}], [TermUI.Backend.position()]}
+  def compare_frames(last_frame, current_cells) do
+    # Build current frame map for efficient lookup
+    current_frame = build_frame_map(current_cells)
+
+    # Find changed cells: new or different from last frame
+    changed =
+      Enum.filter(current_cells, fn {pos, cell} ->
+        case Map.get(last_frame, pos) do
+          nil -> true
+          ^cell -> false
+          _different -> true
+        end
+      end)
+
+    # Find removed positions: in last frame but not in current
+    removed =
+      last_frame
+      |> Map.keys()
+      |> Enum.filter(fn pos -> not Map.has_key?(current_frame, pos) end)
+
+    {changed, removed}
+  end
+
+  # ===========================================================================
   # Terminal I/O Helpers
   # ===========================================================================
 

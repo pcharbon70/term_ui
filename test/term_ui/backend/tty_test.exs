@@ -1429,4 +1429,183 @@ defmodule TermUI.Backend.TTYTest do
       assert output =~ "\e[2J"
     end
   end
+
+  # ===========================================================================
+  # Frame Comparison Tests (Section 3.4.2)
+  # ===========================================================================
+
+  describe "compare_frames/2" do
+    test "empty last frame and empty current returns no changes" do
+      {changed, removed} = TTY.compare_frames(%{}, [])
+
+      assert changed == []
+      assert removed == []
+    end
+
+    test "new cell is detected as changed" do
+      last_frame = %{}
+      current_cells = [{{1, 1}, {"A", :default, :default, []}}]
+
+      {changed, removed} = TTY.compare_frames(last_frame, current_cells)
+
+      assert changed == [{{1, 1}, {"A", :default, :default, []}}]
+      assert removed == []
+    end
+
+    test "multiple new cells are all detected as changed" do
+      last_frame = %{}
+
+      current_cells = [
+        {{1, 1}, {"A", :default, :default, []}},
+        {{1, 2}, {"B", :default, :default, []}},
+        {{2, 1}, {"C", :default, :default, []}}
+      ]
+
+      {changed, removed} = TTY.compare_frames(last_frame, current_cells)
+
+      assert length(changed) == 3
+      assert removed == []
+    end
+
+    test "removed cell is detected" do
+      last_frame = %{{1, 1} => {"A", :default, :default, []}}
+      current_cells = []
+
+      {changed, removed} = TTY.compare_frames(last_frame, current_cells)
+
+      assert changed == []
+      assert removed == [{1, 1}]
+    end
+
+    test "multiple removed cells are all detected" do
+      last_frame = %{
+        {1, 1} => {"A", :default, :default, []},
+        {1, 2} => {"B", :default, :default, []},
+        {2, 1} => {"C", :default, :default, []}
+      }
+
+      current_cells = []
+
+      {changed, removed} = TTY.compare_frames(last_frame, current_cells)
+
+      assert changed == []
+      assert length(removed) == 3
+      assert {1, 1} in removed
+      assert {1, 2} in removed
+      assert {2, 1} in removed
+    end
+
+    test "unchanged cell is not in changed or removed" do
+      cell = {"A", :default, :default, []}
+      last_frame = %{{1, 1} => cell}
+      current_cells = [{{1, 1}, cell}]
+
+      {changed, removed} = TTY.compare_frames(last_frame, current_cells)
+
+      assert changed == []
+      assert removed == []
+    end
+
+    test "changed character is detected" do
+      last_frame = %{{1, 1} => {"A", :default, :default, []}}
+      current_cells = [{{1, 1}, {"B", :default, :default, []}}]
+
+      {changed, removed} = TTY.compare_frames(last_frame, current_cells)
+
+      assert changed == [{{1, 1}, {"B", :default, :default, []}}]
+      assert removed == []
+    end
+
+    test "changed foreground color is detected" do
+      last_frame = %{{1, 1} => {"A", :red, :default, []}}
+      current_cells = [{{1, 1}, {"A", :blue, :default, []}}]
+
+      {changed, removed} = TTY.compare_frames(last_frame, current_cells)
+
+      assert changed == [{{1, 1}, {"A", :blue, :default, []}}]
+      assert removed == []
+    end
+
+    test "changed background color is detected" do
+      last_frame = %{{1, 1} => {"A", :default, :red, []}}
+      current_cells = [{{1, 1}, {"A", :default, :blue, []}}]
+
+      {changed, removed} = TTY.compare_frames(last_frame, current_cells)
+
+      assert changed == [{{1, 1}, {"A", :default, :blue, []}}]
+      assert removed == []
+    end
+
+    test "changed attributes are detected" do
+      last_frame = %{{1, 1} => {"A", :default, :default, [:bold]}}
+      current_cells = [{{1, 1}, {"A", :default, :default, [:underline]}}]
+
+      {changed, removed} = TTY.compare_frames(last_frame, current_cells)
+
+      assert changed == [{{1, 1}, {"A", :default, :default, [:underline]}}]
+      assert removed == []
+    end
+
+    test "added attribute is detected as change" do
+      last_frame = %{{1, 1} => {"A", :default, :default, []}}
+      current_cells = [{{1, 1}, {"A", :default, :default, [:bold]}}]
+
+      {changed, removed} = TTY.compare_frames(last_frame, current_cells)
+
+      assert changed == [{{1, 1}, {"A", :default, :default, [:bold]}}]
+      assert removed == []
+    end
+
+    test "mixed scenario: some changed, some removed, some unchanged" do
+      last_frame = %{
+        {1, 1} => {"A", :default, :default, []},
+        {1, 2} => {"B", :default, :default, []},
+        {1, 3} => {"C", :default, :default, []}
+      }
+
+      current_cells = [
+        {{1, 1}, {"A", :default, :default, []}},
+        {{1, 2}, {"X", :default, :default, []}},
+        {{1, 4}, {"D", :default, :default, []}}
+      ]
+
+      {changed, removed} = TTY.compare_frames(last_frame, current_cells)
+
+      # {1, 1} unchanged - not in changed
+      # {1, 2} changed from B to X
+      # {1, 3} removed
+      # {1, 4} new
+      assert length(changed) == 2
+
+      assert {{1, 2}, {"X", :default, :default, []}} in changed
+      assert {{1, 4}, {"D", :default, :default, []}} in changed
+
+      assert removed == [{1, 3}]
+    end
+
+    test "position order is preserved in changed list" do
+      last_frame = %{}
+
+      current_cells = [
+        {{1, 1}, {"A", :default, :default, []}},
+        {{2, 1}, {"B", :default, :default, []}},
+        {{1, 2}, {"C", :default, :default, []}}
+      ]
+
+      {changed, _removed} = TTY.compare_frames(last_frame, current_cells)
+
+      # Order should match input order
+      assert changed == current_cells
+    end
+
+    test "RGB color change is detected" do
+      last_frame = %{{1, 1} => {"A", {255, 0, 0}, :default, []}}
+      current_cells = [{{1, 1}, {"A", {0, 255, 0}, :default, []}}]
+
+      {changed, removed} = TTY.compare_frames(last_frame, current_cells)
+
+      assert changed == [{{1, 1}, {"A", {0, 255, 0}, :default, []}}]
+      assert removed == []
+    end
+  end
 end
