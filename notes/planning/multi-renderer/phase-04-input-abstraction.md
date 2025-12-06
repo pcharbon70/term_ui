@@ -79,13 +79,13 @@ The `TermUI.Input.Raw` module wraps the existing `TermUI.Terminal.InputReader` t
 
 ### 4.2.1 Create Raw Input Module
 
-- [ ] **Task 4.2.1 Complete**
+- [x] **Task 4.2.1 Complete**
 
 Create the raw input handler module implementing the Input behaviour.
 
-- [ ] 4.2.1.1 Create `lib/term_ui/input/raw.ex` with `@behaviour TermUI.Input`
-- [ ] 4.2.1.2 Add `@moduledoc` explaining this handler wraps InputReader
-- [ ] 4.2.1.3 Document that it supports non-blocking input with timeout
+- [x] 4.2.1.1 Create `lib/term_ui/input/raw.ex` with `@behaviour TermUI.Input`
+- [x] 4.2.1.2 Add `@moduledoc` explaining this handler wraps InputReader
+- [x] 4.2.1.3 Document that it supports non-blocking input with timeout
 
 ### 4.2.2 Implement poll/2
 
