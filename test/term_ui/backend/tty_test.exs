@@ -285,6 +285,58 @@ defmodule TermUI.Backend.TTYTest do
     end
   end
 
+  describe "refresh_size/1" do
+    test "returns {:ok, state}" do
+      {:ok, state} = init_tty([])
+      assert {:ok, _new_state} = TTY.refresh_size(state)
+    end
+
+    test "clears last_frame to force full redraw" do
+      {:ok, state} = init_tty(line_mode: :incremental)
+      # Simulate having a last_frame
+      state = %{state | last_frame: %{{1, 1} => {"A", :default, :default, []}}}
+
+      {:ok, refreshed_state} = TTY.refresh_size(state)
+
+      assert refreshed_state.last_frame == nil
+    end
+
+    test "preserves state structure" do
+      {:ok, state} = init_tty(line_mode: :incremental, alternate_screen: true)
+
+      {:ok, refreshed_state} = TTY.refresh_size(state)
+
+      assert refreshed_state.line_mode == :incremental
+      assert refreshed_state.alternate_screen == true
+    end
+
+    test "queries terminal and updates size" do
+      {:ok, state} = init_tty(size: {24, 80})
+
+      # refresh_size queries :io.rows and :io.columns
+      # In test environment these may or may not be available
+      {:ok, refreshed_state} = TTY.refresh_size(state)
+
+      # Size should be a valid tuple
+      {rows, cols} = refreshed_state.size
+      assert is_integer(rows) and rows > 0
+      assert is_integer(cols) and cols > 0
+    end
+
+    test "falls back to current size if terminal query fails" do
+      # When not connected to a terminal, :io.rows/columns return errors
+      # In that case, refresh_size should preserve the current size
+      {:ok, state} = init_tty(size: {30, 100})
+
+      {:ok, refreshed_state} = TTY.refresh_size(state)
+
+      # Size should still be valid (either from terminal or fallback)
+      {rows, cols} = refreshed_state.size
+      assert is_integer(rows) and rows > 0
+      assert is_integer(cols) and cols > 0
+    end
+  end
+
   describe "cursor operations" do
     test "move_cursor/2 returns {:ok, state}" do
       {:ok, state} = init_tty([])

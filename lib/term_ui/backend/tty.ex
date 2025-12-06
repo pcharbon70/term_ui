@@ -313,6 +313,49 @@ defmodule TermUI.Backend.TTY do
     {:ok, %{state | size: new_size, last_frame: nil}}
   end
 
+  @doc """
+  Queries the terminal for its current size and updates state.
+
+  Uses `:io.rows/0` and `:io.columns/0` to get the current terminal dimensions.
+  If the query fails (e.g., not connected to a terminal), the current size is preserved.
+
+  This function also clears `last_frame` to force a full redraw, since the
+  terminal dimensions may have changed.
+
+  ## Returns
+
+  `{:ok, updated_state}` with refreshed size and cleared last_frame.
+
+  ## Example
+
+      {:ok, state} = TTY.refresh_size(state)
+      {:ok, {rows, cols}} = TTY.size(state)
+  """
+  @spec refresh_size(t()) :: {:ok, t()}
+  def refresh_size(%__MODULE__{} = state) do
+    new_size = query_terminal_size(state.size)
+    {:ok, %{state | size: new_size, last_frame: nil}}
+  end
+
+  # Queries the terminal for its current dimensions.
+  # Falls back to the provided default if the query fails.
+  @spec query_terminal_size({pos_integer(), pos_integer()}) :: {pos_integer(), pos_integer()}
+  defp query_terminal_size(default) do
+    rows =
+      case :io.rows() do
+        {:ok, r} when is_integer(r) and r > 0 -> r
+        _ -> elem(default, 0)
+      end
+
+    cols =
+      case :io.columns() do
+        {:ok, c} when is_integer(c) and c > 0 -> c
+        _ -> elem(default, 1)
+      end
+
+    {rows, cols}
+  end
+
   # ===========================================================================
   # Cursor Callbacks
   # ===========================================================================

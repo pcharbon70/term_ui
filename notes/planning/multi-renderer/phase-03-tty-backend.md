@@ -383,13 +383,13 @@ Implement cursor positioning and visibility callbacks.
 
 ### 3.7.2 Implement size/1 Callback
 
-- [ ] **Task 3.7.2 Complete**
+- [x] **Task 3.7.2 Complete**
 
 Implement terminal size query.
 
-- [ ] 3.7.2.1 Implement `@impl true` `size/1` returning `{:ok, state.size}`
-- [ ] 3.7.2.2 Size is determined at init from capabilities
-- [ ] 3.7.2.3 Provide `refresh_size/1` for manual size update
+- [x] 3.7.2.1 Implement `@impl true` `size/1` returning `{:ok, state.size}`
+- [x] 3.7.2.2 Size is determined at init from capabilities
+- [x] 3.7.2.3 Provide `refresh_size/1` for manual size update
 
 ### 3.7.3 Implement flush/1 Callback
 
