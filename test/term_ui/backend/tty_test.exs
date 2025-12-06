@@ -2409,4 +2409,222 @@ defmodule TermUI.Backend.TTYTest do
       assert output =~ "\e[0m "
     end
   end
+
+  # ===========================================================================
+  # Section 3.6.2 Tests - Character Mapping
+  # ===========================================================================
+
+  describe "character mapping (Section 3.6.2)" do
+    test "unicode mode passes through box-drawing characters unchanged" do
+      {:ok, state} = init_tty(capabilities: %{unicode: true})
+      assert state.character_set == :unicode
+
+      # Unicode box-drawing character
+      cells = [{{1, 1}, {"┌", :default, :default, []}}]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      # Should contain the Unicode character unchanged
+      assert output =~ "┌"
+    end
+
+    test "ascii mode converts box corners to +" do
+      {:ok, state} = init_tty(capabilities: %{unicode: false})
+      assert state.character_set == :ascii
+
+      # Unicode corners should become +
+      cells = [
+        {{1, 1}, {"┌", :default, :default, []}},
+        {{1, 2}, {"┐", :default, :default, []}},
+        {{1, 3}, {"└", :default, :default, []}},
+        {{1, 4}, {"┘", :default, :default, []}}
+      ]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      # Should have + characters, not Unicode corners
+      assert output =~ "++++"
+      refute output =~ "┌"
+      refute output =~ "┐"
+      refute output =~ "└"
+      refute output =~ "┘"
+    end
+
+    test "ascii mode converts horizontal line to -" do
+      {:ok, state} = init_tty(capabilities: %{unicode: false})
+
+      cells = [{{1, 1}, {"─", :default, :default, []}}]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      assert output =~ "-"
+      refute output =~ "─"
+    end
+
+    test "ascii mode converts vertical line to |" do
+      {:ok, state} = init_tty(capabilities: %{unicode: false})
+
+      cells = [{{1, 1}, {"│", :default, :default, []}}]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      assert output =~ "|"
+      refute output =~ "│"
+    end
+
+    test "ascii mode converts T-junctions to +" do
+      {:ok, state} = init_tty(capabilities: %{unicode: false})
+
+      cells = [
+        {{1, 1}, {"┬", :default, :default, []}},
+        {{1, 2}, {"┴", :default, :default, []}},
+        {{1, 3}, {"├", :default, :default, []}},
+        {{1, 4}, {"┤", :default, :default, []}}
+      ]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      # Should have + characters
+      assert output =~ "++++"
+      refute output =~ "┬"
+      refute output =~ "┴"
+      refute output =~ "├"
+      refute output =~ "┤"
+    end
+
+    test "ascii mode converts cross junction to +" do
+      {:ok, state} = init_tty(capabilities: %{unicode: false})
+
+      cells = [{{1, 1}, {"┼", :default, :default, []}}]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      assert output =~ "+"
+      refute output =~ "┼"
+    end
+
+    test "ascii mode converts progress bar characters" do
+      {:ok, state} = init_tty(capabilities: %{unicode: false})
+
+      cells = [
+        {{1, 1}, {"█", :default, :default, []}},
+        {{1, 2}, {"░", :default, :default, []}}
+      ]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      # Full block becomes #, empty becomes .
+      assert output =~ "#."
+      refute output =~ "█"
+      refute output =~ "░"
+    end
+
+    test "ascii mode converts check marks" do
+      {:ok, state} = init_tty(capabilities: %{unicode: false})
+
+      cells = [
+        {{1, 1}, {"✓", :default, :default, []}},
+        {{1, 2}, {"✗", :default, :default, []}}
+      ]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      # Check becomes x, cross becomes X
+      assert output =~ "xX"
+      refute output =~ "✓"
+      refute output =~ "✗"
+    end
+
+    test "ascii mode converts arrows" do
+      {:ok, state} = init_tty(capabilities: %{unicode: false})
+
+      cells = [
+        {{1, 1}, {"↑", :default, :default, []}},
+        {{1, 2}, {"↓", :default, :default, []}},
+        {{1, 3}, {"←", :default, :default, []}},
+        {{1, 4}, {"→", :default, :default, []}}
+      ]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      # Up=^, Down=v, Left=<, Right=>
+      assert output =~ "^v<>"
+      refute output =~ "↑"
+      refute output =~ "↓"
+      refute output =~ "←"
+      refute output =~ "→"
+    end
+
+    test "regular characters pass through unchanged in ascii mode" do
+      {:ok, state} = init_tty(capabilities: %{unicode: false})
+
+      cells = [{{1, 1}, {"Hello", :default, :default, []}}]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      assert output =~ "Hello"
+    end
+
+    test "regular characters pass through unchanged in unicode mode" do
+      {:ok, state} = init_tty(capabilities: %{unicode: true})
+
+      cells = [{{1, 1}, {"World", :default, :default, []}}]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      assert output =~ "World"
+    end
+
+    test "mixed content with box drawing in ascii mode" do
+      {:ok, state} = init_tty(capabilities: %{unicode: false})
+
+      # Simulate a simple box: ┌─┐
+      cells = [
+        {{1, 1}, {"┌", :default, :default, []}},
+        {{1, 2}, {"─", :default, :default, []}},
+        {{1, 3}, {"┐", :default, :default, []}}
+      ]
+
+      output =
+        capture_io(fn ->
+          TTY.draw_cells(state, cells)
+        end)
+
+      # Should render as +-+
+      assert output =~ "+-+"
+    end
+  end
 end

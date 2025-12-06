@@ -312,7 +312,7 @@ Handle named color atoms appropriately for each color mode.
 
 ## 3.6 Implement Character Set Handling
 
-- [ ] **Section 3.6 Complete**
+- [x] **Section 3.6 Complete**
 
 Implement character set selection and mapping for box-drawing and special characters. This enables ASCII fallback when Unicode is unavailable.
 
@@ -334,34 +334,34 @@ Create the `TermUI.CharacterSet` module with Unicode and ASCII character sets.
 
 ### 3.6.2 Implement Character Mapping in TTY Backend
 
-- [ ] **Task 3.6.2 Complete**
+- [x] **Task 3.6.2 Complete**
 
 Integrate character set selection into TTY backend rendering.
 
-- [ ] 3.6.2.1 Store selected `character_set` in state from capabilities
-- [ ] 3.6.2.2 Implement `map_character/2` accepting character and character_set
-- [ ] 3.6.2.3 Replace Unicode box-drawing with ASCII equivalents when `character_set == :ascii`
-- [ ] 3.6.2.4 Pass through regular characters unchanged
+- [x] 3.6.2.1 Store selected `character_set` in state from capabilities
+- [x] 3.6.2.2 Implement `map_character/2` accepting character and character_set
+- [x] 3.6.2.3 Replace Unicode box-drawing with ASCII equivalents when `character_set == :ascii`
+- [x] 3.6.2.4 Pass through regular characters unchanged
 
 ### 3.6.3 Implement Runtime Character Set Query
 
-- [ ] **Task 3.6.3 Complete**
+- [x] **Task 3.6.3 Complete**
 
 Provide runtime access to current character set.
 
-- [ ] 3.6.3.1 Implement `CharacterSet.current/0` reading from application config
-- [ ] 3.6.3.2 Fall back to `:unicode` if not configured
-- [ ] 3.6.3.3 Document that widgets should use `CharacterSet.current/0` for box drawing
+- [x] 3.6.3.1 Implement `CharacterSet.current/0` reading from application config
+- [x] 3.6.3.2 Fall back to `:unicode` if not configured
+- [x] 3.6.3.3 Document that widgets should use `CharacterSet.current/0` for box drawing
 
 ### Unit Tests - Section 3.6
 
-- [ ] **Unit Tests 3.6 Complete**
-- [ ] Test `CharacterSet.get(:unicode)` returns Unicode characters
-- [ ] Test `CharacterSet.get(:ascii)` returns ASCII equivalents
-- [ ] Test all expected keys present in character sets
-- [ ] Test `map_character/2` replaces Unicode with ASCII when configured
-- [ ] Test `map_character/2` passes through regular characters
-- [ ] Test `CharacterSet.current/0` reads configuration
+- [x] **Unit Tests 3.6 Complete**
+- [x] Test `CharacterSet.get(:unicode)` returns Unicode characters
+- [x] Test `CharacterSet.get(:ascii)` returns ASCII equivalents
+- [x] Test all expected keys present in character sets
+- [x] Test `map_character/2` replaces Unicode with ASCII when configured
+- [x] Test `map_character/2` passes through regular characters
+- [x] Test `CharacterSet.current/0` reads configuration
 
 ---
 

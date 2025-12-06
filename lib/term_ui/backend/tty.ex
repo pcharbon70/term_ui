@@ -968,11 +968,67 @@ defmodule TermUI.Backend.TTY do
     {base, bright}
   end
 
+  # ===========================================================================
+  # Character Set Mapping (Unicode to ASCII)
+  # ===========================================================================
+
+  # Compile-time mapping from Unicode box-drawing characters to ASCII equivalents.
+  # Built from CharacterSet definitions to ensure consistency.
+  @unicode_chars TermUI.CharacterSet.get(:unicode)
+  @ascii_chars TermUI.CharacterSet.get(:ascii)
+
+  # Build the base mapping for single-character entries (excluding bar_levels and bar_full)
+  @unicode_to_ascii_base %{
+    # Box corners
+    @unicode_chars.tl => @ascii_chars.tl,
+    @unicode_chars.tr => @ascii_chars.tr,
+    @unicode_chars.bl => @ascii_chars.bl,
+    @unicode_chars.br => @ascii_chars.br,
+    # Lines
+    @unicode_chars.h_line => @ascii_chars.h_line,
+    @unicode_chars.v_line => @ascii_chars.v_line,
+    # T-junctions
+    @unicode_chars.t_up => @ascii_chars.t_up,
+    @unicode_chars.t_down => @ascii_chars.t_down,
+    @unicode_chars.t_left => @ascii_chars.t_left,
+    @unicode_chars.t_right => @ascii_chars.t_right,
+    # Cross
+    @unicode_chars.cross => @ascii_chars.cross,
+    # Progress/gauge (bar_empty only - bar_full handled after bar_levels)
+    @unicode_chars.bar_empty => @ascii_chars.bar_empty,
+    # Check marks
+    @unicode_chars.check => @ascii_chars.check,
+    @unicode_chars.cross_mark => @ascii_chars.cross_mark,
+    # Arrows
+    @unicode_chars.arrow_up => @ascii_chars.arrow_up,
+    @unicode_chars.arrow_down => @ascii_chars.arrow_down,
+    @unicode_chars.arrow_left => @ascii_chars.arrow_left,
+    @unicode_chars.arrow_right => @ascii_chars.arrow_right
+  }
+
+  # Add bar_levels mapping (Unicode has 8 levels, ASCII has 5 - cycle ASCII to match)
+  # Note: bar_full (█) appears in both bar_levels and bar_full, so we add bar_full last
+  # to ensure it maps to # instead of the cycled bar_levels value
+  @unicode_to_ascii_with_levels Enum.reduce(
+                                  Enum.zip(@unicode_chars.bar_levels, Stream.cycle(@ascii_chars.bar_levels)),
+                                  @unicode_to_ascii_base,
+                                  fn {unicode, ascii}, acc -> Map.put(acc, unicode, ascii) end
+                                )
+
+  # Override bar_full to ensure it maps to # (not the cycled value from bar_levels)
+  @unicode_to_ascii_map Map.put(@unicode_to_ascii_with_levels, @unicode_chars.bar_full, @ascii_chars.bar_full)
+
   # Maps characters based on character set.
-  # For now, passes through unchanged. Box-drawing mapping will be added in Section 3.6.
+  #
+  # When character_set is :unicode, passes through unchanged.
+  # When character_set is :ascii, replaces Unicode box-drawing and special
+  # characters with their ASCII equivalents for terminals that don't support Unicode.
   @spec map_character(String.t(), character_set()) :: String.t()
   defp map_character(char, :unicode), do: char
-  defp map_character(char, :ascii), do: char
+
+  defp map_character(char, :ascii) do
+    Map.get(@unicode_to_ascii_map, char, char)
+  end
 
   # Sanitizes characters to prevent escape sequence injection (defense-in-depth).
   #
