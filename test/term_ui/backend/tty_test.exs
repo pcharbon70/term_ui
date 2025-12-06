@@ -504,4 +504,102 @@ defmodule TermUI.Backend.TTYTest do
       assert show_start < leave_start
     end
   end
+
+  # ===========================================================================
+  # Section 3.3.1 Tests - clear/1 Callback
+  # ===========================================================================
+
+  describe "clear/1 (Section 3.3.1)" do
+    test "outputs clear screen sequence" do
+      {:ok, state} = init_tty([])
+
+      output =
+        capture_io(fn ->
+          TTY.clear(state)
+        end)
+
+      assert output =~ "\e[2J"
+    end
+
+    test "outputs cursor home sequence" do
+      {:ok, state} = init_tty([])
+
+      output =
+        capture_io(fn ->
+          TTY.clear(state)
+        end)
+
+      assert output =~ "\e[H"
+    end
+
+    test "clear screen comes before cursor home" do
+      {:ok, state} = init_tty([])
+
+      output =
+        capture_io(fn ->
+          TTY.clear(state)
+        end)
+
+      clear_pos = :binary.match(output, "\e[2J")
+      home_pos = :binary.match(output, "\e[H")
+
+      assert clear_pos != :nomatch
+      assert home_pos != :nomatch
+
+      {clear_start, _} = clear_pos
+      {home_start, _} = home_pos
+
+      assert clear_start < home_start
+    end
+
+    test "clears last_frame in state" do
+      {:ok, state} = init_tty([])
+      state = %{state | last_frame: %{some: :data}}
+
+      {:ok, new_state} =
+        capture_io(fn ->
+          send(self(), TTY.clear(state))
+        end)
+        |> then(fn _ ->
+          receive do
+            result -> result
+          end
+        end)
+
+      assert new_state.last_frame == nil
+    end
+
+    test "sets cursor_position to {1, 1}" do
+      {:ok, state} = init_tty([])
+      state = %{state | cursor_position: {10, 20}}
+
+      {:ok, new_state} =
+        capture_io(fn ->
+          send(self(), TTY.clear(state))
+        end)
+        |> then(fn _ ->
+          receive do
+            result -> result
+          end
+        end)
+
+      assert new_state.cursor_position == {1, 1}
+    end
+
+    test "returns {:ok, state}" do
+      {:ok, state} = init_tty([])
+
+      result =
+        capture_io(fn ->
+          send(self(), TTY.clear(state))
+        end)
+        |> then(fn _ ->
+          receive do
+            result -> result
+          end
+        end)
+
+      assert {:ok, %TTY{}} = result
+    end
+  end
 end

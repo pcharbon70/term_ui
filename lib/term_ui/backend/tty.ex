@@ -332,12 +332,29 @@ defmodule TermUI.Backend.TTY do
 
   @impl true
   @doc """
-  Clears the entire screen.
+  Clears the entire screen and moves cursor to home position.
+
+  Outputs the following escape sequences:
+  1. `\\e[2J` - Clear entire screen
+  2. `\\e[H` - Move cursor to home position (1,1)
+
+  Also clears `last_frame` in state, which forces a full redraw on the next
+  `draw_cells/2` call when in incremental mode.
+
+  ## Returns
+
+  `{:ok, updated_state}` with cursor_position set to `{1, 1}` and last_frame cleared.
   """
   @spec clear(t()) :: {:ok, t()}
   def clear(state) do
-    # Clear last_frame for incremental mode
-    {:ok, %{state | last_frame: nil}}
+    # Clear entire screen
+    IO.write(@clear_screen)
+
+    # Move cursor to home position
+    IO.write(@cursor_home)
+
+    # Update state: clear last_frame for incremental mode, reset cursor position
+    {:ok, %{state | last_frame: nil, cursor_position: {1, 1}}}
   end
 
   @impl true

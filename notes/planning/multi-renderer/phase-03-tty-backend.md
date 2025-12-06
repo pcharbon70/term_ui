@@ -123,15 +123,15 @@ Implement the full redraw rendering mode, which clears the screen and renders al
 
 ### 3.3.1 Implement clear/1 Callback
 
-- [ ] **Task 3.3.1 Complete**
+- [x] **Task 3.3.1 Complete**
 
 Implement screen clearing.
 
-- [ ] 3.3.1.1 Implement `@impl true` `clear/1` accepting state
-- [ ] 3.3.1.2 Write `\e[2J` (clear entire screen)
-- [ ] 3.3.1.3 Write `\e[H` (cursor to home position)
-- [ ] 3.3.1.4 Clear `last_frame` in state if incremental mode
-- [ ] 3.3.1.5 Return `{:ok, updated_state}`
+- [x] 3.3.1.1 Implement `@impl true` `clear/1` accepting state
+- [x] 3.3.1.2 Write `\e[2J` (clear entire screen)
+- [x] 3.3.1.3 Write `\e[H` (cursor to home position)
+- [x] 3.3.1.4 Clear `last_frame` in state if incremental mode
+- [x] 3.3.1.5 Return `{:ok, updated_state}`
 
 ### 3.3.2 Implement draw_cells/2 for Full Redraw Mode
 
