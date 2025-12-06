@@ -265,39 +265,39 @@ Implement input handler selection.
 
 ## 4.6 Integration Tests
 
-- [ ] **Section 4.6 Complete**
+- [x] **Section 4.6 Complete**
 
 Integration tests verify the input abstraction works correctly with both backends.
 
 ### 4.6.1 Input Mode Selection Tests
 
-- [ ] **Task 4.6.1 Complete**
+- [x] **Task 4.6.1 Complete**
 
 Test input handler selection based on backend mode.
 
-- [ ] 4.6.1.1 Test Raw handler selected when backend is raw
-- [ ] 4.6.1.2 Test TTY handler selected when backend is tty
+- [x] 4.6.1.1 Test Raw handler selected when backend is raw
+- [x] 4.6.1.2 Test TTY handler selected when backend is tty
 
 ### 4.6.2 Input Equivalence Tests
 
-- [ ] **Task 4.6.2 Complete**
+- [x] **Task 4.6.2 Complete**
 
 Test that both input handlers produce equivalent results.
 
-- [ ] 4.6.2.1 Test arrow key produces same event in both modes
-- [ ] 4.6.2.2 Test Enter key produces same event in both modes
-- [ ] 4.6.2.3 Test Tab key produces same event in both modes
-- [ ] 4.6.2.4 Test printable characters produce same events
+- [x] 4.6.2.1 Test arrow key produces same event in both modes
+- [x] 4.6.2.2 Test Enter key produces same event in both modes
+- [x] 4.6.2.3 Test Tab key produces same event in both modes
+- [x] 4.6.2.4 Test printable characters produce same events
 
 ### 4.6.3 Line Reader Tests
 
-- [ ] **Task 4.6.3 Complete**
+- [x] **Task 4.6.3 Complete**
 
 Test line reader for TextInput.Line usage.
 
-- [ ] 4.6.3.1 Test line input with shell editing
-- [ ] 4.6.3.2 Test validation callback works
-- [ ] 4.6.3.3 Test EOF handling
+- [x] 4.6.3.1 Test line input with shell editing
+- [x] 4.6.3.2 Test validation callback works
+- [x] 4.6.3.3 Test EOF handling
 
 ---
 
