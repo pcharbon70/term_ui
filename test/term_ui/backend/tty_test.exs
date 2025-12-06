@@ -198,6 +198,83 @@ defmodule TermUI.Backend.TTYTest do
         assert :ok = TTY.shutdown(state)
       end)
     end
+
+    test "requires TTY struct as argument" do
+      # Verify shutdown pattern matches on the struct type
+      assert_raise FunctionClauseError, fn ->
+        capture_io(fn ->
+          TTY.shutdown(%{alternate_screen: false})
+        end)
+      end
+    end
+  end
+
+  # ===========================================================================
+  # Edge Case Tests - Invalid Inputs
+  # ===========================================================================
+
+  describe "edge cases - invalid size values" do
+    test "zero rows defaults to {24, 80}" do
+      {:ok, state} = init_tty(size: {0, 80})
+      assert state.size == {24, 80}
+    end
+
+    test "negative rows defaults to {24, 80}" do
+      {:ok, state} = init_tty(size: {-1, 80})
+      assert state.size == {24, 80}
+    end
+
+    test "zero cols defaults to {24, 80}" do
+      {:ok, state} = init_tty(size: {24, 0})
+      assert state.size == {24, 80}
+    end
+
+    test "negative cols defaults to {24, 80}" do
+      {:ok, state} = init_tty(size: {24, -1})
+      assert state.size == {24, 80}
+    end
+
+    test "non-integer size defaults to {24, 80}" do
+      {:ok, state} = init_tty(size: {"24", "80"})
+      assert state.size == {24, 80}
+    end
+
+    test "nil size defaults to {24, 80}" do
+      {:ok, state} = init_tty(size: nil)
+      assert state.size == {24, 80}
+    end
+  end
+
+  describe "edge cases - malformed capabilities" do
+    test "unknown color mode defaults to :true_color" do
+      {:ok, state} = init_tty(capabilities: %{colors: :unknown_mode})
+      assert state.color_mode == :true_color
+    end
+
+    test "string color value defaults to :true_color" do
+      {:ok, state} = init_tty(capabilities: %{colors: "256"})
+      assert state.color_mode == :true_color
+    end
+
+    test "negative integer color value defaults to :true_color" do
+      {:ok, state} = init_tty(capabilities: %{colors: -1})
+      assert state.color_mode == :true_color
+    end
+
+    test "non-boolean unicode capability defaults to :unicode" do
+      {:ok, state} = init_tty(capabilities: %{unicode: "yes"})
+      assert state.character_set == :unicode
+    end
+
+    test "invalid dimensions in capabilities defaults to {24, 80}" do
+      {:ok, state} = init_tty(capabilities: %{dimensions: {0, 0}})
+      assert state.size == {24, 80}
+    end
+
+    test "string dimensions in capabilities defaults to {24, 80}" do
+      {:ok, state} = init_tty(capabilities: %{dimensions: {"30", "100"}})
+      assert state.size == {24, 80}
+    end
   end
 
   describe "size/1" do

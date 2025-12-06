@@ -86,6 +86,23 @@ defmodule TermUI.Backend.TTY do
   require Logger
 
   # ===========================================================================
+  # ANSI Escape Sequence Constants
+  # ===========================================================================
+
+  # Cursor control sequences
+  @cursor_hide "\e[?25l"
+  @cursor_show "\e[?25h"
+
+  # Screen control sequences
+  @clear_screen "\e[2J"
+  @cursor_home "\e[H"
+  @alt_screen_enter "\e[?1049h"
+  @alt_screen_leave "\e[?1049l"
+
+  # Attribute control sequences
+  @reset_attrs "\e[0m"
+
+  # ===========================================================================
   # Type Definitions and State Structure
   # ===========================================================================
 
@@ -215,26 +232,47 @@ defmodule TermUI.Backend.TTY do
   @doc """
   Shuts down the TTY backend and restores terminal state.
 
-  Resets terminal attributes and cursor visibility. Safe to call multiple times.
+  Performs the following cleanup sequence:
+  1. Reset all text attributes (colors, bold, underline, etc.)
+  2. Show the cursor (in case it was hidden)
+  3. Leave alternate screen buffer (if it was entered)
+
+  ## Idempotent Behavior
+
+  This function is safe to call multiple times. Each call will emit the same
+  cleanup sequences, which is harmless since terminal state converges to the
+  same result regardless of prior state.
+
+  ## Error Handling
+
+  All terminal writes use `safe_write/1` which catches and ignores errors.
+  This ensures cleanup completes even if the terminal is in an error state
+  or has been disconnected. We prioritize best-effort cleanup over failing
+  on individual write errors.
+
+  ## No Cooked Mode Restoration
+
+  Unlike the Raw backend, the TTY backend never takes the terminal out of
+  cooked mode (the shell is already running). Therefore, no mode restoration
+  is needed during shutdown.
 
   ## Returns
 
   Always returns `:ok`.
   """
   @spec shutdown(t()) :: :ok
-  def shutdown(state) do
+  def shutdown(%__MODULE__{} = state) do
     # Reset all attributes (colors, styles)
-    IO.write("\e[0m")
+    safe_write(@reset_attrs)
 
     # Show cursor
-    IO.write("\e[?25h")
+    safe_write(@cursor_show)
 
     # Leave alternate screen if it was entered
     if state.alternate_screen do
-      IO.write("\e[?1049l")
+      safe_write(@alt_screen_leave)
     end
 
-    # Note: No cooked mode restoration needed - never left cooked mode in TTY backend
     :ok
   end
 
@@ -403,16 +441,32 @@ defmodule TermUI.Backend.TTY do
   defp setup_terminal(state) do
     # Enter alternate screen if configured
     if state.alternate_screen do
-      IO.write("\e[?1049h")
+      IO.write(@alt_screen_enter)
     end
 
     # Hide cursor for cleaner rendering
-    IO.write("\e[?25l")
+    IO.write(@cursor_hide)
 
     # Clear screen and move cursor to home position
-    IO.write("\e[2J\e[H")
+    IO.write(@clear_screen <> @cursor_home)
 
     # Update state to reflect cursor is hidden
     %{state | cursor_visible: false, cursor_position: {1, 1}}
+  end
+
+  # Writes data to the terminal, ignoring any errors.
+  #
+  # This provides bulletproof writes for shutdown sequences where we want
+  # to attempt terminal cleanup even if the terminal is in an error state.
+  # Errors are silently ignored since we're cleaning up anyway.
+  @spec safe_write(iodata()) :: :ok
+  defp safe_write(data) do
+    try do
+      IO.write(data)
+    rescue
+      _ -> :ok
+    end
+
+    :ok
   end
 end
