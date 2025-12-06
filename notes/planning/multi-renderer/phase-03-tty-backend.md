@@ -463,13 +463,13 @@ Test color degradation across all modes.
 
 ### 3.8.4 Character Set Fallback Tests
 
-- [ ] **Task 3.8.4 Complete**
+- [x] **Task 3.8.4 Complete**
 
 Test character set selection and fallback.
 
-- [ ] 3.8.4.1 Test Unicode box-drawing renders correctly
-- [ ] 3.8.4.2 Test ASCII fallback renders correctly
-- [ ] 3.8.4.3 Test mixed content (Unicode text with ASCII boxes)
+- [x] 3.8.4.1 Test Unicode box-drawing renders correctly
+- [x] 3.8.4.2 Test ASCII fallback renders correctly
+- [x] 3.8.4.3 Test mixed content (Unicode text with ASCII boxes)
 
 ---
 

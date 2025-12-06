@@ -3353,4 +3353,445 @@ defmodule TermUI.Backend.TTYTest do
       end)
     end
   end
+
+  # ===========================================================================
+  # Section 3.8.4 Integration Tests - Character Set Fallback
+  # ===========================================================================
+
+  describe "integration - character set fallback (Section 3.8.4)" do
+    # Get Unicode character set for reference in tests
+    # (we test that Unicode chars are mapped to ASCII, so we only need the Unicode set)
+    @unicode_chars TermUI.CharacterSet.get(:unicode)
+
+    # -------------------------------------------------------------------------
+    # 3.8.4.1 - Test Unicode box-drawing renders correctly
+    # -------------------------------------------------------------------------
+
+    test "Unicode box corners render correctly in unicode mode" do
+      output =
+        capture_io(fn ->
+          {:ok, state} = TTY.init(
+            line_mode: :full_redraw,
+            size: {24, 80},
+            capabilities: %{unicode: true}
+          )
+
+          # Render all four corners
+          cells = [
+            {{1, 1}, {@unicode_chars.tl, :default, :default, []}},
+            {{1, 2}, {@unicode_chars.tr, :default, :default, []}},
+            {{2, 1}, {@unicode_chars.bl, :default, :default, []}},
+            {{2, 2}, {@unicode_chars.br, :default, :default, []}}
+          ]
+          {:ok, _state} = TTY.draw_cells(state, cells)
+        end)
+
+      # All Unicode corners should be present
+      assert output =~ "┌"
+      assert output =~ "┐"
+      assert output =~ "└"
+      assert output =~ "┘"
+    end
+
+    test "Unicode horizontal and vertical lines render correctly" do
+      output =
+        capture_io(fn ->
+          {:ok, state} = TTY.init(
+            line_mode: :full_redraw,
+            size: {24, 80},
+            capabilities: %{unicode: true}
+          )
+
+          cells = [
+            {{1, 1}, {@unicode_chars.h_line, :default, :default, []}},
+            {{1, 2}, {@unicode_chars.h_line, :default, :default, []}},
+            {{2, 1}, {@unicode_chars.v_line, :default, :default, []}}
+          ]
+          {:ok, _state} = TTY.draw_cells(state, cells)
+        end)
+
+      assert output =~ "─"
+      assert output =~ "│"
+    end
+
+    test "Unicode T-junctions and cross render correctly" do
+      output =
+        capture_io(fn ->
+          {:ok, state} = TTY.init(
+            line_mode: :full_redraw,
+            size: {24, 80},
+            capabilities: %{unicode: true}
+          )
+
+          cells = [
+            {{1, 1}, {@unicode_chars.t_up, :default, :default, []}},
+            {{1, 2}, {@unicode_chars.t_down, :default, :default, []}},
+            {{1, 3}, {@unicode_chars.t_left, :default, :default, []}},
+            {{1, 4}, {@unicode_chars.t_right, :default, :default, []}},
+            {{1, 5}, {@unicode_chars.cross, :default, :default, []}}
+          ]
+          {:ok, _state} = TTY.draw_cells(state, cells)
+        end)
+
+      assert output =~ "┴"
+      assert output =~ "┬"
+      assert output =~ "┤"
+      assert output =~ "├"
+      assert output =~ "┼"
+    end
+
+    test "Unicode progress bar characters render correctly" do
+      output =
+        capture_io(fn ->
+          {:ok, state} = TTY.init(
+            line_mode: :full_redraw,
+            size: {24, 80},
+            capabilities: %{unicode: true}
+          )
+
+          cells = [
+            {{1, 1}, {@unicode_chars.bar_full, :default, :default, []}},
+            {{1, 2}, {@unicode_chars.bar_empty, :default, :default, []}}
+          ]
+          {:ok, _state} = TTY.draw_cells(state, cells)
+        end)
+
+      assert output =~ "█"
+      assert output =~ "░"
+    end
+
+    test "Unicode check marks and arrows render correctly" do
+      output =
+        capture_io(fn ->
+          {:ok, state} = TTY.init(
+            line_mode: :full_redraw,
+            size: {24, 80},
+            capabilities: %{unicode: true}
+          )
+
+          cells = [
+            {{1, 1}, {@unicode_chars.check, :default, :default, []}},
+            {{1, 2}, {@unicode_chars.cross_mark, :default, :default, []}},
+            {{1, 3}, {@unicode_chars.arrow_up, :default, :default, []}},
+            {{1, 4}, {@unicode_chars.arrow_down, :default, :default, []}},
+            {{1, 5}, {@unicode_chars.arrow_left, :default, :default, []}},
+            {{1, 6}, {@unicode_chars.arrow_right, :default, :default, []}}
+          ]
+          {:ok, _state} = TTY.draw_cells(state, cells)
+        end)
+
+      assert output =~ "✓"
+      assert output =~ "✗"
+      assert output =~ "↑"
+      assert output =~ "↓"
+      assert output =~ "←"
+      assert output =~ "→"
+    end
+
+    # -------------------------------------------------------------------------
+    # 3.8.4.2 - Test ASCII fallback renders correctly
+    # -------------------------------------------------------------------------
+
+    test "ASCII fallback maps box corners to +" do
+      output =
+        capture_io(fn ->
+          {:ok, state} = TTY.init(
+            line_mode: :full_redraw,
+            size: {24, 80},
+            capabilities: %{unicode: false}
+          )
+
+          # Unicode corners should be mapped to +
+          cells = [
+            {{1, 1}, {@unicode_chars.tl, :default, :default, []}},
+            {{1, 2}, {@unicode_chars.tr, :default, :default, []}},
+            {{2, 1}, {@unicode_chars.bl, :default, :default, []}},
+            {{2, 2}, {@unicode_chars.br, :default, :default, []}}
+          ]
+          {:ok, _state} = TTY.draw_cells(state, cells)
+        end)
+
+      # Unicode corners should NOT appear
+      refute output =~ "┌"
+      refute output =~ "┐"
+      refute output =~ "└"
+      refute output =~ "┘"
+
+      # ASCII + should appear instead (multiple times for corners)
+      # Count + characters (excluding those in escape sequences)
+      plus_count = output |> String.graphemes() |> Enum.count(&(&1 == "+"))
+      assert plus_count >= 4
+    end
+
+    test "ASCII fallback maps horizontal line to - and vertical to |" do
+      output =
+        capture_io(fn ->
+          {:ok, state} = TTY.init(
+            line_mode: :full_redraw,
+            size: {24, 80},
+            capabilities: %{unicode: false}
+          )
+
+          cells = [
+            {{1, 1}, {@unicode_chars.h_line, :default, :default, []}},
+            {{1, 2}, {@unicode_chars.h_line, :default, :default, []}},
+            {{2, 1}, {@unicode_chars.v_line, :default, :default, []}}
+          ]
+          {:ok, _state} = TTY.draw_cells(state, cells)
+        end)
+
+      # Unicode should NOT appear
+      refute output =~ "─"
+      refute output =~ "│"
+
+      # ASCII equivalents should appear
+      assert output =~ "-"
+      assert output =~ "|"
+    end
+
+    test "ASCII fallback maps T-junctions and cross to +" do
+      output =
+        capture_io(fn ->
+          {:ok, state} = TTY.init(
+            line_mode: :full_redraw,
+            size: {24, 80},
+            capabilities: %{unicode: false}
+          )
+
+          cells = [
+            {{1, 1}, {@unicode_chars.t_up, :default, :default, []}},
+            {{1, 2}, {@unicode_chars.t_down, :default, :default, []}},
+            {{1, 3}, {@unicode_chars.t_left, :default, :default, []}},
+            {{1, 4}, {@unicode_chars.t_right, :default, :default, []}},
+            {{1, 5}, {@unicode_chars.cross, :default, :default, []}}
+          ]
+          {:ok, _state} = TTY.draw_cells(state, cells)
+        end)
+
+      # Unicode should NOT appear
+      refute output =~ "┴"
+      refute output =~ "┬"
+      refute output =~ "┤"
+      refute output =~ "├"
+      refute output =~ "┼"
+
+      # ASCII + should appear (5 junctions)
+      plus_count = output |> String.graphemes() |> Enum.count(&(&1 == "+"))
+      assert plus_count >= 5
+    end
+
+    test "ASCII fallback maps progress bar characters" do
+      output =
+        capture_io(fn ->
+          {:ok, state} = TTY.init(
+            line_mode: :full_redraw,
+            size: {24, 80},
+            capabilities: %{unicode: false}
+          )
+
+          cells = [
+            {{1, 1}, {@unicode_chars.bar_full, :default, :default, []}},
+            {{1, 2}, {@unicode_chars.bar_empty, :default, :default, []}}
+          ]
+          {:ok, _state} = TTY.draw_cells(state, cells)
+        end)
+
+      # Unicode should NOT appear
+      refute output =~ "█"
+      refute output =~ "░"
+
+      # ASCII equivalents
+      assert output =~ "#"
+      assert output =~ "."
+    end
+
+    test "ASCII fallback maps check marks and arrows" do
+      output =
+        capture_io(fn ->
+          {:ok, state} = TTY.init(
+            line_mode: :full_redraw,
+            size: {24, 80},
+            capabilities: %{unicode: false}
+          )
+
+          cells = [
+            {{1, 1}, {@unicode_chars.check, :default, :default, []}},
+            {{1, 2}, {@unicode_chars.cross_mark, :default, :default, []}},
+            {{1, 3}, {@unicode_chars.arrow_up, :default, :default, []}},
+            {{1, 4}, {@unicode_chars.arrow_down, :default, :default, []}},
+            {{1, 5}, {@unicode_chars.arrow_left, :default, :default, []}},
+            {{1, 6}, {@unicode_chars.arrow_right, :default, :default, []}}
+          ]
+          {:ok, _state} = TTY.draw_cells(state, cells)
+        end)
+
+      # Unicode should NOT appear
+      refute output =~ "✓"
+      refute output =~ "✗"
+      refute output =~ "↑"
+      refute output =~ "↓"
+      refute output =~ "←"
+      refute output =~ "→"
+
+      # ASCII equivalents (check is x, cross_mark is X)
+      assert output =~ "x"
+      assert output =~ "X"
+      assert output =~ "^"
+      assert output =~ "v"
+      assert output =~ "<"
+      assert output =~ ">"
+    end
+
+    # -------------------------------------------------------------------------
+    # 3.8.4.3 - Test mixed content (Unicode text with ASCII boxes)
+    # -------------------------------------------------------------------------
+
+    test "regular ASCII text passes through unchanged in both modes" do
+      for unicode_mode <- [true, false] do
+        output =
+          capture_io(fn ->
+            {:ok, state} = TTY.init(
+              line_mode: :full_redraw,
+              size: {24, 80},
+              capabilities: %{unicode: unicode_mode}
+            )
+
+            cells = [
+              {{1, 1}, {"H", :default, :default, []}},
+              {{1, 2}, {"e", :default, :default, []}},
+              {{1, 3}, {"l", :default, :default, []}},
+              {{1, 4}, {"l", :default, :default, []}},
+              {{1, 5}, {"o", :default, :default, []}}
+            ]
+            {:ok, _state} = TTY.draw_cells(state, cells)
+          end)
+
+        assert output =~ "H"
+        assert output =~ "e"
+        assert output =~ "l"
+        assert output =~ "o"
+      end
+    end
+
+    test "Unicode text passes through unchanged in unicode mode" do
+      output =
+        capture_io(fn ->
+          {:ok, state} = TTY.init(
+            line_mode: :full_redraw,
+            size: {24, 80},
+            capabilities: %{unicode: true}
+          )
+
+          # Unicode text that is NOT box-drawing (should pass through)
+          cells = [
+            {{1, 1}, {"日", :default, :default, []}},
+            {{1, 2}, {"本", :default, :default, []}},
+            {{1, 3}, {"語", :default, :default, []}}
+          ]
+          {:ok, _state} = TTY.draw_cells(state, cells)
+        end)
+
+      assert output =~ "日"
+      assert output =~ "本"
+      assert output =~ "語"
+    end
+
+    test "non-box-drawing Unicode passes through unchanged in ascii mode" do
+      output =
+        capture_io(fn ->
+          {:ok, state} = TTY.init(
+            line_mode: :full_redraw,
+            size: {24, 80},
+            capabilities: %{unicode: false}
+          )
+
+          # Unicode text that is NOT in our box-drawing map should pass through
+          # (the terminal may or may not display it, but we don't modify it)
+          cells = [
+            {{1, 1}, {"日", :default, :default, []}},
+            {{1, 2}, {"本", :default, :default, []}}
+          ]
+          {:ok, _state} = TTY.draw_cells(state, cells)
+        end)
+
+      # Non-box-drawing Unicode should pass through even in ASCII mode
+      # (we only map the specific box-drawing characters)
+      assert output =~ "日"
+      assert output =~ "本"
+    end
+
+    test "mixed content: text with box-drawing on same row in unicode mode" do
+      output =
+        capture_io(fn ->
+          {:ok, state} = TTY.init(
+            line_mode: :full_redraw,
+            size: {24, 80},
+            capabilities: %{unicode: true}
+          )
+
+          # Mixed: box corner, text, box corner
+          cells = [
+            {{1, 1}, {@unicode_chars.tl, :default, :default, []}},
+            {{1, 2}, {"T", :default, :default, []}},
+            {{1, 3}, {"e", :default, :default, []}},
+            {{1, 4}, {"s", :default, :default, []}},
+            {{1, 5}, {"t", :default, :default, []}},
+            {{1, 6}, {@unicode_chars.tr, :default, :default, []}}
+          ]
+          {:ok, _state} = TTY.draw_cells(state, cells)
+        end)
+
+      # Both Unicode box-drawing and text should appear
+      assert output =~ "┌"
+      assert output =~ "Test"
+      assert output =~ "┐"
+    end
+
+    test "mixed content: text with box-drawing on same row in ascii mode" do
+      output =
+        capture_io(fn ->
+          {:ok, state} = TTY.init(
+            line_mode: :full_redraw,
+            size: {24, 80},
+            capabilities: %{unicode: false}
+          )
+
+          # Mixed: box corner, text, box corner (should map corners to +)
+          cells = [
+            {{1, 1}, {@unicode_chars.tl, :default, :default, []}},
+            {{1, 2}, {"T", :default, :default, []}},
+            {{1, 3}, {"e", :default, :default, []}},
+            {{1, 4}, {"s", :default, :default, []}},
+            {{1, 5}, {"t", :default, :default, []}},
+            {{1, 6}, {@unicode_chars.tr, :default, :default, []}}
+          ]
+          {:ok, _state} = TTY.draw_cells(state, cells)
+        end)
+
+      # Box-drawing should be mapped to ASCII
+      refute output =~ "┌"
+      refute output =~ "┐"
+
+      # Text should be unchanged
+      assert output =~ "Test"
+
+      # ASCII + for corners
+      plus_count = output |> String.graphemes() |> Enum.count(&(&1 == "+"))
+      assert plus_count >= 2
+    end
+
+    test "character_set state is set correctly based on capabilities" do
+      capture_io(fn ->
+        {:ok, unicode_state} = TTY.init(capabilities: %{unicode: true})
+        assert unicode_state.character_set == :unicode
+
+        {:ok, ascii_state} = TTY.init(capabilities: %{unicode: false})
+        assert ascii_state.character_set == :ascii
+
+        # Default should be unicode
+        {:ok, default_state} = TTY.init(capabilities: %{})
+        assert default_state.character_set == :unicode
+      end)
+    end
+  end
 end
