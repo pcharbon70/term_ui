@@ -653,38 +653,45 @@ defmodule TermUI.Widgets.SplitPane do
     pane_before = Enum.at(state.panes, divider_idx)
     pane_after = Enum.at(state.panes, divider_idx + 1)
 
-    if pane_before && pane_after && not pane_before.collapsed && not pane_after.collapsed do
-      # Calculate current ratio of first pane
-      total_ratio = pane_before.size + pane_after.size
-      current_ratio = pane_before.size / total_ratio
-
-      # Apply the delta
-      new_ratio = current_ratio + ratio_delta
-
-      # Clamp to min/max bounds
-      clamped_ratio = new_ratio |> max(state.min_ratio) |> min(state.max_ratio)
-
-      if clamped_ratio != current_ratio do
-        # Update pane sizes while preserving total
-        panes =
-          state.panes
-          |> Enum.with_index()
-          |> Enum.map(fn {pane, idx} ->
-            cond do
-              idx == divider_idx -> %{pane | size: clamped_ratio * total_ratio}
-              idx == divider_idx + 1 -> %{pane | size: (1.0 - clamped_ratio) * total_ratio}
-              true -> pane
-            end
-          end)
-
-        state = %{state | panes: panes}
-        maybe_call_resize_callback(state)
-      else
+    cond do
+      is_nil(pane_before) or is_nil(pane_after) ->
         {:ok, state}
-      end
-    else
-      {:ok, state}
+
+      pane_before.collapsed or pane_after.collapsed ->
+        {:ok, state}
+
+      true ->
+        apply_ratio_resize(state, divider_idx, pane_before, pane_after, ratio_delta)
     end
+  end
+
+  defp apply_ratio_resize(state, divider_idx, pane_before, pane_after, ratio_delta) do
+    total_ratio = pane_before.size + pane_after.size
+    current_ratio = pane_before.size / total_ratio
+    new_ratio = current_ratio + ratio_delta
+    clamped_ratio = new_ratio |> max(state.min_ratio) |> min(state.max_ratio)
+
+    if clamped_ratio == current_ratio do
+      {:ok, state}
+    else
+      panes = update_pane_ratios(state.panes, divider_idx, clamped_ratio, total_ratio)
+      maybe_call_resize_callback(%{state | panes: panes})
+    end
+  end
+
+  defp update_pane_ratios(panes, divider_idx, new_ratio, total_ratio) do
+    panes
+    |> Enum.with_index()
+    |> Enum.map(fn
+      {pane, idx} when idx == divider_idx ->
+        %{pane | size: new_ratio * total_ratio}
+
+      {pane, idx} when idx == divider_idx + 1 ->
+        %{pane | size: (1.0 - new_ratio) * total_ratio}
+
+      {pane, _idx} ->
+        pane
+    end)
   end
 
   defp move_divider(state, _divider_idx, delta) when delta == 0 do
