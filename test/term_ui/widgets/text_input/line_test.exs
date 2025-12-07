@@ -409,4 +409,109 @@ defmodule TermUI.Widgets.TextInput.LineTest do
       assert %RenderNode{type: :text, content: "Required"} = error_node
     end
   end
+
+  describe "focus behavior" do
+    test "is_focused? returns false by default" do
+      {:ok, state} = Line.init(Line.new(prompt: "> "))
+
+      refute Line.is_focused?(state)
+    end
+
+    test "set_focused/2 sets focus state to true" do
+      {:ok, state} = Line.init(Line.new(prompt: "> "))
+
+      state = Line.set_focused(state, true)
+
+      assert Line.is_focused?(state)
+    end
+
+    test "set_focused/2 sets focus state to false" do
+      {:ok, state} = Line.init(Line.new(prompt: "> "))
+      state = Line.set_focused(state, true)
+
+      state = Line.set_focused(state, false)
+
+      refute Line.is_focused?(state)
+    end
+
+    test "blur/1 clears focus state" do
+      {:ok, state} = Line.init(Line.new(prompt: "> "))
+      state = Line.set_focused(state, true)
+
+      state = Line.blur(state)
+
+      refute Line.is_focused?(state)
+    end
+
+    test "blur/1 calls on_blur callback" do
+      test_pid = self()
+      on_blur = fn state -> send(test_pid, {:blurred, state}) end
+      {:ok, state} = Line.init(Line.new(prompt: "> ", on_blur: on_blur))
+      state = Line.set_focused(state, true)
+
+      Line.blur(state)
+
+      assert_receive {:blurred, %Line{focused: false}}
+    end
+
+    test "handle_focus/1 reads input and returns unfocused state" do
+      {:ok, state} = Line.init(Line.new(prompt: "> "))
+
+      capture_io([input: "hello\n", capture_prompt: false], fn ->
+        result = Line.handle_focus(state)
+        send(self(), {:result, result})
+      end)
+
+      assert_receive {:result, {:ok, "hello", result_state}}
+      refute result_state.focused
+      assert result_state.value == "hello"
+    end
+
+    test "handle_focus/1 with validator applies validation" do
+      validator = fn input ->
+        if String.length(input) >= 3, do: :ok, else: {:error, "too short"}
+      end
+
+      {:ok, state} = Line.init(Line.new(prompt: "> ", validator: validator))
+
+      capture_io([input: "hi\n", capture_prompt: false], fn ->
+        result = Line.handle_focus(state)
+        send(self(), {:result, result})
+      end)
+
+      assert_receive {:result, {:error, "too short", result_state}}
+      refute result_state.focused
+      assert result_state.error == "too short"
+    end
+
+    test "handle_focus/1 calls on_blur callback after read" do
+      test_pid = self()
+      on_blur = fn state -> send(test_pid, {:blurred, state.value}) end
+      {:ok, state} = Line.init(Line.new(prompt: "> ", on_blur: on_blur))
+
+      capture_io([input: "world\n", capture_prompt: false], fn ->
+        Line.handle_focus(state)
+      end)
+
+      assert_receive {:blurred, "world"}
+    end
+
+    test "state includes on_blur callback from props" do
+      on_blur = fn _state -> :ok end
+      props = Line.new(prompt: "> ", on_blur: on_blur)
+
+      assert props.on_blur == on_blur
+
+      {:ok, state} = Line.init(props)
+
+      assert state.on_blur == on_blur
+    end
+
+    test "focused state is tracked in struct" do
+      {:ok, state} = Line.init(Line.new(prompt: "> "))
+
+      assert Map.has_key?(state, :focused)
+      assert state.focused == false
+    end
+  end
 end

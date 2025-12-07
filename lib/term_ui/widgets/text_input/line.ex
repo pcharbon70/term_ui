@@ -112,6 +112,8 @@ defmodule TermUI.Widgets.TextInput.Line do
   - `:validator` - Optional validation function
   - `:placeholder` - Text shown when value is empty
   - `:error` - Current validation error message, if any
+  - `:focused` - Whether the widget currently has focus
+  - `:on_blur` - Optional callback when widget loses focus or completes input
   """
   @type t :: %__MODULE__{
           prompt: String.t(),
@@ -119,7 +121,9 @@ defmodule TermUI.Widgets.TextInput.Line do
           label: String.t() | nil,
           validator: validator() | nil,
           placeholder: String.t(),
-          error: String.t() | nil
+          error: String.t() | nil,
+          focused: boolean(),
+          on_blur: (t() -> any()) | nil
         }
 
   @typedoc """
@@ -137,11 +141,13 @@ defmodule TermUI.Widgets.TextInput.Line do
 
   - `{:ok, value, state}` - Successfully read and validated input
   - `{:error, reason, state}` - Read succeeded but validation failed
+  - `{:cancelled, state}` - Input was cancelled (Ctrl+C)
   - `{:eof, state}` - End of input stream
   """
   @type read_result ::
           {:ok, term(), t()}
           | {:error, term(), t()}
+          | {:cancelled, t()}
           | {:eof, t()}
 
   defstruct prompt: "",
@@ -149,7 +155,9 @@ defmodule TermUI.Widgets.TextInput.Line do
             label: nil,
             validator: nil,
             placeholder: "",
-            error: nil
+            error: nil,
+            focused: false,
+            on_blur: nil
 
   @doc """
   Creates new TextInput.Line props.
@@ -161,6 +169,7 @@ defmodule TermUI.Widgets.TextInput.Line do
   - `:label` - Optional label to display above input (default: nil)
   - `:validator` - Validation function (default: nil)
   - `:placeholder` - Text shown when value is empty (default: "")
+  - `:on_blur` - Callback when widget loses focus or completes input (default: nil)
 
   ## Examples
 
@@ -192,7 +201,8 @@ defmodule TermUI.Widgets.TextInput.Line do
       value: Keyword.get(opts, :value, ""),
       label: Keyword.get(opts, :label),
       validator: Keyword.get(opts, :validator),
-      placeholder: Keyword.get(opts, :placeholder, "")
+      placeholder: Keyword.get(opts, :placeholder, ""),
+      on_blur: Keyword.get(opts, :on_blur)
     }
   end
 
@@ -212,7 +222,9 @@ defmodule TermUI.Widgets.TextInput.Line do
       label: props.label,
       validator: props.validator,
       placeholder: props.placeholder,
-      error: nil
+      error: nil,
+      focused: false,
+      on_blur: Map.get(props, :on_blur)
     }
 
     {:ok, state}
@@ -383,6 +395,129 @@ defmodule TermUI.Widgets.TextInput.Line do
   """
   @spec get_placeholder(t()) :: String.t()
   def get_placeholder(%__MODULE__{placeholder: placeholder}), do: placeholder
+
+  # ----------------------------------------------------------------------------
+  # Focus Behavior
+  # ----------------------------------------------------------------------------
+
+  @doc """
+  Handles focus gain by initiating a line read.
+
+  When the widget gains focus, this function:
+  1. Sets the focused state to true
+  2. Initiates a blocking line read
+  3. Returns the result with updated state
+  4. Calls on_blur callback if configured
+
+  The function blocks until the user presses Enter or cancels with Ctrl+C.
+
+  ## Return Values
+
+  - `{:ok, value, state}` - Successfully read and validated input
+  - `{:error, reason, state}` - Validation failed
+  - `{:cancelled, state}` - User cancelled with Ctrl+C (EOF)
+
+  ## Examples
+
+      {:ok, state} = TextInput.Line.init(TextInput.Line.new(prompt: "> "))
+      result = TextInput.Line.handle_focus(state)
+      # User types "hello" and presses Enter
+      # => {:ok, "hello", %TextInput.Line{value: "hello", focused: false, ...}}
+  """
+  @spec handle_focus(t()) :: read_result()
+  def handle_focus(%__MODULE__{} = state) do
+    # Set focused state
+    state = %{state | focused: true}
+
+    # Perform the read (blocks until Enter or Ctrl+C)
+    result = do_focused_read(state)
+
+    # Clear focus and call on_blur callback
+    result = unfocus_result(result)
+    call_on_blur(result)
+
+    result
+  end
+
+  # Performs the read while focused
+  defp do_focused_read(state) do
+    case state.validator do
+      nil ->
+        case LineReader.read_line(state.prompt) do
+          {:ok, line} ->
+            new_state = %{state | value: line, error: nil}
+            {:ok, line, new_state}
+
+          :eof ->
+            {:cancelled, state}
+        end
+
+      validator when is_function(validator, 1) ->
+        case LineReader.read_line(state.prompt, validator) do
+          {:ok, value} ->
+            string_value = if is_binary(value), do: value, else: inspect(value)
+            new_state = %{state | value: string_value, error: nil}
+            {:ok, value, new_state}
+
+          {:error, reason} ->
+            error_msg = if is_binary(reason), do: reason, else: inspect(reason)
+            new_state = %{state | error: error_msg}
+            {:error, reason, new_state}
+
+          :eof ->
+            {:cancelled, state}
+        end
+    end
+  end
+
+  # Clear focused state in result
+  defp unfocus_result({:ok, value, state}), do: {:ok, value, %{state | focused: false}}
+  defp unfocus_result({:error, reason, state}), do: {:error, reason, %{state | focused: false}}
+  defp unfocus_result({:cancelled, state}), do: {:cancelled, %{state | focused: false}}
+
+  # Call on_blur callback if configured
+  defp call_on_blur({_, _, state}) when is_function(state.on_blur, 1), do: state.on_blur.(state)
+  defp call_on_blur({:cancelled, state}) when is_function(state.on_blur, 1), do: state.on_blur.(state)
+  defp call_on_blur(_), do: :ok
+
+  @doc """
+  Checks if the widget is currently focused.
+
+  ## Examples
+
+      TextInput.Line.is_focused?(state)  # => true or false
+  """
+  @spec is_focused?(t()) :: boolean()
+  def is_focused?(%__MODULE__{focused: focused}), do: focused
+
+  @doc """
+  Sets the focus state directly.
+
+  Typically you should use `handle_focus/1` instead, which initiates a read.
+  This function is useful for testing or manual focus management.
+
+  ## Examples
+
+      state = TextInput.Line.set_focused(state, true)
+  """
+  @spec set_focused(t(), boolean()) :: t()
+  def set_focused(%__MODULE__{} = state, focused) when is_boolean(focused) do
+    %{state | focused: focused}
+  end
+
+  @doc """
+  Clears focus and calls the on_blur callback if configured.
+
+  ## Examples
+
+      state = TextInput.Line.blur(state)
+  """
+  @spec blur(t()) :: t()
+  def blur(%__MODULE__{} = state) do
+    new_state = %{state | focused: false}
+    if is_function(state.on_blur, 1), do: state.on_blur.(new_state)
+    new_state
+  end
 
   # ----------------------------------------------------------------------------
   # Rendering

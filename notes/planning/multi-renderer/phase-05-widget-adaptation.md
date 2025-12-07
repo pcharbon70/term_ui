@@ -75,14 +75,14 @@ Implement the input reading flow.
 
 ### 5.1.5 Implement Focus Behavior
 
-- [ ] **Task 5.1.5 Complete**
+- [x] **Task 5.1.5 Complete**
 
 Implement focus handling for the widget.
 
-- [ ] 5.1.5.1 When focused, initiate line read
-- [ ] 5.1.5.2 Block until Enter pressed (shell handles editing)
-- [ ] 5.1.5.3 Return focus to parent after input complete
-- [ ] 5.1.5.4 Handle Ctrl+C to cancel input
+- [x] 5.1.5.1 When focused, initiate line read
+- [x] 5.1.5.2 Block until Enter pressed (shell handles editing)
+- [x] 5.1.5.3 Return focus to parent after input complete
+- [x] 5.1.5.4 Handle Ctrl+C to cancel input
 
 ### Unit Tests - Section 5.1
 
