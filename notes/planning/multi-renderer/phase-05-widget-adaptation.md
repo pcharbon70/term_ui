@@ -103,15 +103,15 @@ Add keyboard-based resize controls to SplitPane for environments where mouse dra
 
 ### 5.2.1 Define Keyboard Resize Shortcuts
 
-- [ ] **Task 5.2.1 Complete**
+- [x] **Task 5.2.1 Complete**
 
 Define keyboard shortcuts for resizing panes.
 
-- [ ] 5.2.1.1 Ctrl+Left: Decrease left/top pane size
-- [ ] 5.2.1.2 Ctrl+Right: Increase left/top pane size
-- [ ] 5.2.1.3 Ctrl+Up: Decrease top pane size (vertical split)
-- [ ] 5.2.1.4 Ctrl+Down: Increase top pane size (vertical split)
-- [ ] 5.2.1.5 Document shortcuts in widget moduledoc
+- [x] 5.2.1.1 Ctrl+Left: Decrease left/top pane size
+- [x] 5.2.1.2 Ctrl+Right: Increase left/top pane size
+- [x] 5.2.1.3 Ctrl+Up: Decrease top pane size (vertical split)
+- [x] 5.2.1.4 Ctrl+Down: Increase top pane size (vertical split)
+- [x] 5.2.1.5 Document shortcuts in widget moduledoc
 
 ### 5.2.2 Implement Keyboard Event Handling
 

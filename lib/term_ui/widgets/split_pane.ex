@@ -26,6 +26,8 @@ defmodule TermUI.Widgets.SplitPane do
 
   ## Keyboard Controls
 
+  ### With Focused Divider (use Tab to focus)
+
   - Tab: Move focus between dividers
   - Left/Up: Move divider left/up (decrease pane before)
   - Right/Down: Move divider right/down (increase pane before)
@@ -34,6 +36,16 @@ defmodule TermUI.Widgets.SplitPane do
   - Enter: Toggle collapse of pane after divider
   - Home: Move divider to minimum position
   - End: Move divider to maximum position
+
+  ### Without Focused Divider (TTY-friendly)
+
+  - Ctrl+Left: Decrease first pane width (horizontal split)
+  - Ctrl+Right: Increase first pane width (horizontal split)
+  - Ctrl+Up: Decrease first pane height (vertical split)
+  - Ctrl+Down: Increase first pane height (vertical split)
+
+  These Ctrl+arrow shortcuts always target the first divider, making them
+  useful in TTY mode where mouse interaction may not be available.
   """
 
   use TermUI.StatefulComponent
@@ -175,7 +187,7 @@ defmodule TermUI.Widgets.SplitPane do
     end
   end
 
-  # Arrow keys for resizing
+  # Arrow keys for resizing (focused divider)
   def handle_event(%Event.Key{key: key, modifiers: modifiers}, state)
       when key in [:left, :up] and state.focused_divider != nil and state.resizable do
     step = if :shift in modifiers, do: @large_resize_step, else: @resize_step
@@ -186,6 +198,28 @@ defmodule TermUI.Widgets.SplitPane do
       when key in [:right, :down] and state.focused_divider != nil and state.resizable do
     step = if :shift in modifiers, do: @large_resize_step, else: @resize_step
     move_divider(state, state.focused_divider, step)
+  end
+
+  # Ctrl+Arrow keys for resizing (no focus required - targets first divider)
+  # Useful in TTY mode where mouse click to focus divider may not be available
+  def handle_event(%Event.Key{key: key, modifiers: modifiers}, state)
+      when key in [:left, :up] and state.focused_divider == nil and state.resizable do
+    if :ctrl in modifiers do
+      # Ctrl+Left/Up: decrease first pane size
+      move_divider(state, 0, -@resize_step)
+    else
+      {:ok, state}
+    end
+  end
+
+  def handle_event(%Event.Key{key: key, modifiers: modifiers}, state)
+      when key in [:right, :down] and state.focused_divider == nil and state.resizable do
+    if :ctrl in modifiers do
+      # Ctrl+Right/Down: increase first pane size
+      move_divider(state, 0, @resize_step)
+    else
+      {:ok, state}
+    end
   end
 
   # Home/End for min/max positions

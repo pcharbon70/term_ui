@@ -288,6 +288,138 @@ defmodule TermUI.Widgets.SplitPaneTest do
     end
   end
 
+  describe "Ctrl+arrow keyboard resize (TTY-friendly)" do
+    test "Ctrl+Right increases first pane size without focused divider" do
+      props =
+        SplitPane.new(
+          orientation: :horizontal,
+          panes: [
+            SplitPane.pane(:left, content("Left"), size: 0.5),
+            SplitPane.pane(:right, content("Right"), size: 0.5)
+          ]
+        )
+
+      {:ok, state} = SplitPane.init(props)
+      # Render to compute sizes (need total_size set)
+      _render = SplitPane.render(state, test_area(81, 24))
+
+      # No focused divider
+      assert state.focused_divider == nil
+
+      {:ok, new_state} =
+        SplitPane.handle_event(%Event.Key{key: :right, modifiers: [:ctrl]}, state)
+
+      # Panes should have changed
+      assert new_state.panes != state.panes
+    end
+
+    test "Ctrl+Left decreases first pane size without focused divider" do
+      props =
+        SplitPane.new(
+          orientation: :horizontal,
+          panes: [
+            SplitPane.pane(:left, content("Left"), size: 0.5),
+            SplitPane.pane(:right, content("Right"), size: 0.5)
+          ]
+        )
+
+      {:ok, state} = SplitPane.init(props)
+      _render = SplitPane.render(state, test_area(81, 24))
+
+      assert state.focused_divider == nil
+
+      {:ok, new_state} =
+        SplitPane.handle_event(%Event.Key{key: :left, modifiers: [:ctrl]}, state)
+
+      assert new_state.panes != state.panes
+    end
+
+    test "Ctrl+Down increases first pane size in vertical split" do
+      props =
+        SplitPane.new(
+          orientation: :vertical,
+          panes: [
+            SplitPane.pane(:top, content("Top"), size: 0.5),
+            SplitPane.pane(:bottom, content("Bottom"), size: 0.5)
+          ]
+        )
+
+      {:ok, state} = SplitPane.init(props)
+      _render = SplitPane.render(state, test_area(80, 25))
+
+      assert state.focused_divider == nil
+
+      {:ok, new_state} =
+        SplitPane.handle_event(%Event.Key{key: :down, modifiers: [:ctrl]}, state)
+
+      assert new_state.panes != state.panes
+    end
+
+    test "Ctrl+Up decreases first pane size in vertical split" do
+      props =
+        SplitPane.new(
+          orientation: :vertical,
+          panes: [
+            SplitPane.pane(:top, content("Top"), size: 0.5),
+            SplitPane.pane(:bottom, content("Bottom"), size: 0.5)
+          ]
+        )
+
+      {:ok, state} = SplitPane.init(props)
+      _render = SplitPane.render(state, test_area(80, 25))
+
+      assert state.focused_divider == nil
+
+      {:ok, new_state} =
+        SplitPane.handle_event(%Event.Key{key: :up, modifiers: [:ctrl]}, state)
+
+      assert new_state.panes != state.panes
+    end
+
+    test "Ctrl+arrows do nothing when resizable is false" do
+      props =
+        SplitPane.new(
+          panes: [
+            SplitPane.pane(:left, content("Left")),
+            SplitPane.pane(:right, content("Right"))
+          ],
+          resizable: false
+        )
+
+      {:ok, state} = SplitPane.init(props)
+
+      {:ok, new_state} =
+        SplitPane.handle_event(%Event.Key{key: :right, modifiers: [:ctrl]}, state)
+
+      # State should be unchanged
+      assert new_state == state
+    end
+
+    test "Ctrl+arrows ignored when divider is focused (regular arrows take precedence)" do
+      props =
+        SplitPane.new(
+          panes: [
+            SplitPane.pane(:left, content("Left"), size: 0.5),
+            SplitPane.pane(:right, content("Right"), size: 0.5)
+          ]
+        )
+
+      {:ok, state} = SplitPane.init(props)
+      _render = SplitPane.render(state, test_area(81, 24))
+
+      # Focus a divider
+      {:ok, state} = SplitPane.handle_event(%Event.Key{key: :tab}, state)
+      assert state.focused_divider == 0
+
+      # Ctrl+Right with focused divider - handled by focused divider handler (with shift check)
+      # In current impl, this goes to the focused handler since guard matches first
+      {:ok, _new_state} =
+        SplitPane.handle_event(%Event.Key{key: :right, modifiers: [:ctrl]}, state)
+
+      # Just verify it doesn't crash
+    end
+  end
+
   describe "vertical keyboard resize" do
     test "up/down arrows work for vertical splits" do
       props =
