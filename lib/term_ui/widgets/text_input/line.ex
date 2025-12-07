@@ -100,6 +100,9 @@ defmodule TermUI.Widgets.TextInput.Line do
 
   alias TermUI.Input.LineReader
 
+  import TermUI.Component.RenderNode
+  alias TermUI.Renderer.Style
+
   @typedoc """
   TextInput.Line state structure.
 
@@ -380,4 +383,91 @@ defmodule TermUI.Widgets.TextInput.Line do
   """
   @spec get_placeholder(t()) :: String.t()
   def get_placeholder(%__MODULE__{placeholder: placeholder}), do: placeholder
+
+  # ----------------------------------------------------------------------------
+  # Rendering
+  # ----------------------------------------------------------------------------
+
+  @doc """
+  Renders the widget state as a render node tree.
+
+  The render output consists of:
+  1. Label (if provided) - displayed on first line
+  2. Prompt + value (or placeholder if empty) - the input line
+  3. Error message (if present) - displayed below in error styling
+
+  ## Examples
+
+      state = %TextInput.Line{prompt: "> ", value: "hello", label: "Name"}
+      node = TextInput.Line.render(state)
+
+  ## Styling
+
+  - Label: default foreground color
+  - Prompt: default foreground color
+  - Value: default foreground color
+  - Placeholder: dim/muted style (bright_black)
+  - Error: error style (red)
+  """
+  @spec render(t()) :: TermUI.Component.RenderNode.t()
+  def render(%__MODULE__{} = state) do
+    parts = []
+
+    # 1. Add label if present
+    parts =
+      if state.label do
+        [render_label(state.label) | parts]
+      else
+        parts
+      end
+
+    # 2. Add prompt + value/placeholder line
+    parts = [render_input_line(state) | parts]
+
+    # 3. Add error if present
+    parts =
+      if state.error do
+        [render_error(state.error) | parts]
+      else
+        parts
+      end
+
+    # Reverse to get correct order and build vertical stack
+    parts = Enum.reverse(parts)
+
+    case parts do
+      [single] -> single
+      multiple -> stack(:vertical, multiple)
+    end
+  end
+
+  # Renders the label line
+  defp render_label(label) do
+    text(label)
+  end
+
+  # Renders the prompt + value or placeholder
+  defp render_input_line(state) do
+    display_text =
+      if state.value == "" and state.placeholder != "" do
+        # Show placeholder with muted style
+        placeholder_style = Style.new(fg: :bright_black)
+
+        stack(:horizontal, [
+          text(state.prompt),
+          text(state.placeholder, placeholder_style)
+        ])
+      else
+        # Show prompt + value
+        text(state.prompt <> state.value)
+      end
+
+    display_text
+  end
+
+  # Renders the error message
+  defp render_error(error) do
+    error_style = Style.new(fg: :red)
+    text(error, error_style)
+  end
 end

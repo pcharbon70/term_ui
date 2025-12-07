@@ -303,4 +303,110 @@ defmodule TermUI.Widgets.TextInput.LineTest do
       assert String.contains?(moduledoc, "LineReader")
     end
   end
+
+  describe "render/1" do
+    alias TermUI.Component.RenderNode
+
+    test "renders just prompt and value when no label or error" do
+      {:ok, state} = Line.init(Line.new(prompt: "> ", value: "hello"))
+
+      node = Line.render(state)
+
+      assert %RenderNode{type: :text, content: "> hello"} = node
+    end
+
+    test "renders empty prompt and value" do
+      {:ok, state} = Line.init(Line.new(prompt: "", value: ""))
+
+      node = Line.render(state)
+
+      assert %RenderNode{type: :text, content: ""} = node
+    end
+
+    test "renders with label on separate line" do
+      {:ok, state} = Line.init(Line.new(prompt: "> ", value: "test", label: "Name"))
+
+      node = Line.render(state)
+
+      # Should be a vertical stack with label and input line
+      assert %RenderNode{type: :stack, direction: :vertical, children: children} = node
+      assert length(children) == 2
+
+      [label_node, input_node] = children
+      assert %RenderNode{type: :text, content: "Name"} = label_node
+      assert %RenderNode{type: :text, content: "> test"} = input_node
+    end
+
+    test "renders placeholder when value is empty" do
+      {:ok, state} = Line.init(Line.new(prompt: "> ", placeholder: "Type here"))
+
+      node = Line.render(state)
+
+      # Should be a horizontal stack with prompt and styled placeholder
+      assert %RenderNode{type: :stack, direction: :horizontal, children: children} = node
+      assert length(children) == 2
+
+      [prompt_node, placeholder_node] = children
+      assert %RenderNode{type: :text, content: "> "} = prompt_node
+      assert %RenderNode{type: :text, content: "Type here"} = placeholder_node
+      assert placeholder_node.style.fg == :bright_black
+    end
+
+    test "renders value instead of placeholder when value exists" do
+      {:ok, state} = Line.init(Line.new(prompt: "> ", value: "actual", placeholder: "Type here"))
+
+      node = Line.render(state)
+
+      # Value takes precedence over placeholder
+      assert %RenderNode{type: :text, content: "> actual"} = node
+    end
+
+    test "renders error below input" do
+      {:ok, state} = Line.init(Line.new(prompt: "> ", value: "bad"))
+      state = %{state | error: "Invalid input"}
+
+      node = Line.render(state)
+
+      # Should be a vertical stack with input line and error
+      assert %RenderNode{type: :stack, direction: :vertical, children: children} = node
+      assert length(children) == 2
+
+      [input_node, error_node] = children
+      assert %RenderNode{type: :text, content: "> bad"} = input_node
+      assert %RenderNode{type: :text, content: "Invalid input"} = error_node
+      assert error_node.style.fg == :red
+    end
+
+    test "renders label, input, and error all together" do
+      {:ok, state} = Line.init(Line.new(prompt: "> ", value: "x", label: "Input"))
+      state = %{state | error: "Too short"}
+
+      node = Line.render(state)
+
+      # Should be a vertical stack with all three components
+      assert %RenderNode{type: :stack, direction: :vertical, children: children} = node
+      assert length(children) == 3
+
+      [label_node, input_node, error_node] = children
+      assert %RenderNode{type: :text, content: "Input"} = label_node
+      assert %RenderNode{type: :text, content: "> x"} = input_node
+      assert %RenderNode{type: :text, content: "Too short"} = error_node
+    end
+
+    test "renders label with placeholder and error" do
+      {:ok, state} = Line.init(Line.new(prompt: "> ", label: "Name", placeholder: "Enter name"))
+      state = %{state | error: "Required"}
+
+      node = Line.render(state)
+
+      assert %RenderNode{type: :stack, direction: :vertical, children: children} = node
+      assert length(children) == 3
+
+      [label_node, input_node, error_node] = children
+      assert %RenderNode{type: :text, content: "Name"} = label_node
+      # Input should be horizontal stack with prompt and placeholder
+      assert %RenderNode{type: :stack, direction: :horizontal} = input_node
+      assert %RenderNode{type: :text, content: "Required"} = error_node
+    end
+  end
 end

@@ -41,26 +41,26 @@ Create the line-based text input module.
 
 ### 5.1.2 Define TextInput.Line State
 
-- [ ] **Task 5.1.2 Complete**
+- [x] **Task 5.1.2 Complete** *(Completed as part of Task 5.1.1)*
 
 Define the state structure for line-based input.
 
-- [ ] 5.1.2.1 Define `defstruct` with field `prompt :: String.t()` for input prompt
-- [ ] 5.1.2.2 Define field `value :: String.t()` for current/last value
-- [ ] 5.1.2.3 Define field `label :: String.t()` for display label
-- [ ] 5.1.2.4 Define field `validator :: (String.t() -> :ok | {:error, String.t()}) | nil`
-- [ ] 5.1.2.5 Define field `placeholder :: String.t()` shown when empty
+- [x] 5.1.2.1 Define `defstruct` with field `prompt :: String.t()` for input prompt
+- [x] 5.1.2.2 Define field `value :: String.t()` for current/last value
+- [x] 5.1.2.3 Define field `label :: String.t()` for display label
+- [x] 5.1.2.4 Define field `validator :: (String.t() -> :ok | {:error, String.t()}) | nil`
+- [x] 5.1.2.5 Define field `placeholder :: String.t()` shown when empty
 
 ### 5.1.3 Implement Rendering
 
-- [ ] **Task 5.1.3 Complete**
+- [x] **Task 5.1.3 Complete**
 
 Implement rendering for the line input widget.
 
-- [ ] 5.1.3.1 Render label on first line if provided
-- [ ] 5.1.3.2 Render prompt + current value on input line
-- [ ] 5.1.3.3 Render validation error below if present
-- [ ] 5.1.3.4 Support styling via theme
+- [x] 5.1.3.1 Render label on first line if provided
+- [x] 5.1.3.2 Render prompt + current value on input line
+- [x] 5.1.3.3 Render validation error below if present
+- [x] 5.1.3.4 Support styling via theme
 
 ### 5.1.4 Implement Input Handling
 
