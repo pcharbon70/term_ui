@@ -153,14 +153,14 @@ ContextMenu typically appears at mouse cursor position. Add an inline numbered m
 
 ### 5.3.1 Create ContextMenu.Inline Variant
 
-- [ ] **Task 5.3.1 Complete**
+- [x] **Task 5.3.1 Complete**
 
 Create an inline context menu that doesn't require mouse positioning.
 
-- [ ] 5.3.1.1 Create `lib/term_ui/widgets/context_menu/inline.ex`
-- [ ] 5.3.1.2 Render menu items with numbers: `[1] Copy  [2] Paste  [3] Delete`
-- [ ] 5.3.1.3 Accept number keys for direct selection
-- [ ] 5.3.1.4 Support arrow key navigation as well
+- [x] 5.3.1.1 Create `lib/term_ui/widgets/context_menu/inline.ex`
+- [x] 5.3.1.2 Render menu items with numbers: `[1] Copy  [2] Paste  [3] Delete`
+- [x] 5.3.1.3 Accept number keys for direct selection
+- [x] 5.3.1.4 Support arrow key navigation as well
 
 ### 5.3.2 Implement show/2 with Position Fallback
 
