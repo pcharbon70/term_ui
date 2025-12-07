@@ -139,6 +139,14 @@ defmodule TermUI.Widgets.SplitPane do
   """
   @spec new(keyword()) :: map()
   def new(opts) do
+    # Validate and normalize Ctrl+arrow resize configuration
+    {ctrl_resize_step, min_ratio, max_ratio} =
+      validate_resize_config(
+        Keyword.get(opts, :ctrl_resize_step, @default_ctrl_resize_step),
+        Keyword.get(opts, :min_ratio, @default_min_ratio),
+        Keyword.get(opts, :max_ratio, @default_max_ratio)
+      )
+
     %{
       orientation: Keyword.get(opts, :orientation, :horizontal),
       panes: Keyword.fetch!(opts, :panes),
@@ -149,10 +157,29 @@ defmodule TermUI.Widgets.SplitPane do
       on_resize: Keyword.get(opts, :on_resize),
       on_collapse: Keyword.get(opts, :on_collapse),
       persist_key: Keyword.get(opts, :persist_key),
-      ctrl_resize_step: Keyword.get(opts, :ctrl_resize_step, @default_ctrl_resize_step),
-      min_ratio: Keyword.get(opts, :min_ratio, @default_min_ratio),
-      max_ratio: Keyword.get(opts, :max_ratio, @default_max_ratio)
+      ctrl_resize_step: ctrl_resize_step,
+      min_ratio: min_ratio,
+      max_ratio: max_ratio
     }
+  end
+
+  # Validates and normalizes resize configuration options.
+  # Returns defaults if values are invalid.
+  @spec validate_resize_config(term(), term(), term()) :: {float(), float(), float()}
+  defp validate_resize_config(step, min_r, max_r) do
+    # Ensure step is in valid range (0.001 to 1.0)
+    step = if is_number(step) and step > 0 and step <= 1.0, do: step, else: @default_ctrl_resize_step
+
+    # Ensure ratios are in valid range (0.0 to 1.0)
+    min_r = if is_number(min_r) and min_r >= 0.0 and min_r < 1.0, do: min_r, else: @default_min_ratio
+    max_r = if is_number(max_r) and max_r > 0.0 and max_r <= 1.0, do: max_r, else: @default_max_ratio
+
+    # Ensure min < max, otherwise reset to defaults
+    if min_r >= max_r do
+      {@default_ctrl_resize_step, @default_min_ratio, @default_max_ratio}
+    else
+      {step, min_r, max_r}
+    end
   end
 
   # ----------------------------------------------------------------------------
@@ -181,10 +208,10 @@ defmodule TermUI.Widgets.SplitPane do
       on_resize: props.on_resize,
       on_collapse: props.on_collapse,
       persist_key: props.persist_key,
-      # Ctrl+arrow resize configuration
-      ctrl_resize_step: Map.get(props, :ctrl_resize_step, @default_ctrl_resize_step),
-      min_ratio: Map.get(props, :min_ratio, @default_min_ratio),
-      max_ratio: Map.get(props, :max_ratio, @default_max_ratio),
+      # Ctrl+arrow resize configuration (validated in new/1)
+      ctrl_resize_step: props.ctrl_resize_step,
+      min_ratio: props.min_ratio,
+      max_ratio: props.max_ratio,
       # Will be set on first render
       total_size: 0,
       last_area: nil
@@ -547,16 +574,20 @@ defmodule TermUI.Widgets.SplitPane do
   # ----------------------------------------------------------------------------
 
   defp render_horizontal(state, area) do
-    children = build_horizontal_children(state, area)
+    children = build_children(state, area, &render_vertical_divider/3, area.height)
     stack(:horizontal, children)
   end
 
   defp render_vertical(state, area) do
-    children = build_vertical_children(state, area)
+    children = build_children(state, area, &render_horizontal_divider/3, area.width)
     stack(:vertical, children)
   end
 
-  defp build_horizontal_children(state, area) do
+  # Consolidated child building - parameterized by divider renderer and size
+  @spec build_children(map(), map(), function(), non_neg_integer()) :: [term()]
+  defp build_children(state, area, divider_fn, divider_size) do
+    pane_count = length(state.panes)
+
     state.panes
     |> Enum.with_index()
     |> Enum.flat_map(fn {pane, idx} ->
@@ -569,31 +600,8 @@ defmodule TermUI.Widgets.SplitPane do
 
       # Add divider after each pane except the last
       divider_element =
-        if idx < length(state.panes) - 1 do
-          [render_vertical_divider(state, idx, area.height)]
-        else
-          []
-        end
-
-      pane_element ++ divider_element
-    end)
-  end
-
-  defp build_vertical_children(state, area) do
-    state.panes
-    |> Enum.with_index()
-    |> Enum.flat_map(fn {pane, idx} ->
-      pane_element =
-        if pane.collapsed do
-          []
-        else
-          [render_pane_content(pane, area, state.orientation)]
-        end
-
-      # Add divider after each pane except the last
-      divider_element =
-        if idx < length(state.panes) - 1 do
-          [render_horizontal_divider(state, idx, area.width)]
+        if idx < pane_count - 1 do
+          [divider_fn.(state, idx, divider_size)]
         else
           []
         end
@@ -649,6 +657,7 @@ defmodule TermUI.Widgets.SplitPane do
 
   # Moves divider by a ratio (0.0-1.0) of total space, enforcing min/max ratio bounds.
   # Used by Ctrl+arrow shortcuts.
+  @spec move_divider_by_ratio(map(), non_neg_integer(), float()) :: {:ok, map()}
   defp move_divider_by_ratio(state, divider_idx, ratio_delta) do
     pane_before = Enum.at(state.panes, divider_idx)
     pane_after = Enum.at(state.panes, divider_idx + 1)
@@ -665,20 +674,28 @@ defmodule TermUI.Widgets.SplitPane do
     end
   end
 
+  @spec apply_ratio_resize(map(), non_neg_integer(), pane(), pane(), float()) :: {:ok, map()}
   defp apply_ratio_resize(state, divider_idx, pane_before, pane_after, ratio_delta) do
     total_ratio = pane_before.size + pane_after.size
-    current_ratio = pane_before.size / total_ratio
-    new_ratio = current_ratio + ratio_delta
-    clamped_ratio = new_ratio |> max(state.min_ratio) |> min(state.max_ratio)
 
-    if clamped_ratio == current_ratio do
+    # Guard against division by zero
+    if total_ratio <= 0 do
       {:ok, state}
     else
-      panes = update_pane_ratios(state.panes, divider_idx, clamped_ratio, total_ratio)
-      maybe_call_resize_callback(%{state | panes: panes})
+      current_ratio = pane_before.size / total_ratio
+      new_ratio = current_ratio + ratio_delta
+      clamped_ratio = new_ratio |> max(state.min_ratio) |> min(state.max_ratio)
+
+      if clamped_ratio == current_ratio do
+        {:ok, state}
+      else
+        panes = update_pane_ratios(state.panes, divider_idx, clamped_ratio, total_ratio)
+        maybe_call_resize_callback(%{state | panes: panes})
+      end
     end
   end
 
+  @spec update_pane_ratios([pane()], non_neg_integer(), float(), float()) :: [pane()]
   defp update_pane_ratios(panes, divider_idx, new_ratio, total_ratio) do
     panes
     |> Enum.with_index()
@@ -819,44 +836,23 @@ defmodule TermUI.Widgets.SplitPane do
   # ----------------------------------------------------------------------------
 
   defp divider_at(state, x, y) do
-    case state.orientation do
-      :horizontal -> divider_at_horizontal(state, x)
-      :vertical -> divider_at_vertical(state, y)
-    end
+    pos = if state.orientation == :horizontal, do: x, else: y
+    find_divider_at_position(state, pos)
   end
 
-  defp divider_at_horizontal(state, x) do
-    # Calculate cumulative positions
+  # Consolidated divider hit testing - works for both orientations
+  @spec find_divider_at_position(map(), integer()) :: non_neg_integer() | nil
+  defp find_divider_at_position(state, pos) do
     {_, result} =
       state.panes
       |> Enum.take(length(state.panes) - 1)
       |> Enum.with_index()
-      |> Enum.reduce({0, nil}, fn {pane, idx}, {pos, found} ->
-        pane_end = pos + pane.computed_size
+      |> Enum.reduce({0, nil}, fn {pane, idx}, {cumulative_pos, found} ->
+        pane_end = cumulative_pos + pane.computed_size
         divider_start = pane_end
         divider_end = divider_start + state.divider_size
 
-        if found == nil && x >= divider_start && x < divider_end do
-          {divider_end, idx}
-        else
-          {divider_end, found}
-        end
-      end)
-
-    result
-  end
-
-  defp divider_at_vertical(state, y) do
-    {_, result} =
-      state.panes
-      |> Enum.take(length(state.panes) - 1)
-      |> Enum.with_index()
-      |> Enum.reduce({0, nil}, fn {pane, idx}, {pos, found} ->
-        pane_end = pos + pane.computed_size
-        divider_start = pane_end
-        divider_end = divider_start + state.divider_size
-
-        if found == nil && y >= divider_start && y < divider_end do
+        if found == nil && pos >= divider_start && pos < divider_end do
           {divider_end, idx}
         else
           {divider_end, found}
