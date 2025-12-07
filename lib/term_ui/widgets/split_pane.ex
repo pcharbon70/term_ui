@@ -114,6 +114,11 @@ defmodule TermUI.Widgets.SplitPane do
   # Props
   # ----------------------------------------------------------------------------
 
+  # Default configuration for Ctrl+arrow resize
+  @default_ctrl_resize_step 0.05
+  @default_min_ratio 0.1
+  @default_max_ratio 0.9
+
   @doc """
   Creates new SplitPane widget props.
 
@@ -128,6 +133,9 @@ defmodule TermUI.Widgets.SplitPane do
   - `:on_resize` - Callback when panes are resized: `fn panes -> ... end`
   - `:on_collapse` - Callback when pane is collapsed/expanded: `fn {id, collapsed} -> ... end`
   - `:persist_key` - Key for layout persistence (optional)
+  - `:ctrl_resize_step` - Step size for Ctrl+arrow resize as ratio 0.0-1.0 (default: 0.05 = 5%)
+  - `:min_ratio` - Minimum ratio for first pane when using Ctrl+arrows (default: 0.1 = 10%)
+  - `:max_ratio` - Maximum ratio for first pane when using Ctrl+arrows (default: 0.9 = 90%)
   """
   @spec new(keyword()) :: map()
   def new(opts) do
@@ -140,7 +148,10 @@ defmodule TermUI.Widgets.SplitPane do
       resizable: Keyword.get(opts, :resizable, true),
       on_resize: Keyword.get(opts, :on_resize),
       on_collapse: Keyword.get(opts, :on_collapse),
-      persist_key: Keyword.get(opts, :persist_key)
+      persist_key: Keyword.get(opts, :persist_key),
+      ctrl_resize_step: Keyword.get(opts, :ctrl_resize_step, @default_ctrl_resize_step),
+      min_ratio: Keyword.get(opts, :min_ratio, @default_min_ratio),
+      max_ratio: Keyword.get(opts, :max_ratio, @default_max_ratio)
     }
   end
 
@@ -170,6 +181,10 @@ defmodule TermUI.Widgets.SplitPane do
       on_resize: props.on_resize,
       on_collapse: props.on_collapse,
       persist_key: props.persist_key,
+      # Ctrl+arrow resize configuration
+      ctrl_resize_step: Map.get(props, :ctrl_resize_step, @default_ctrl_resize_step),
+      min_ratio: Map.get(props, :min_ratio, @default_min_ratio),
+      max_ratio: Map.get(props, :max_ratio, @default_max_ratio),
       # Will be set on first render
       total_size: 0,
       last_area: nil
@@ -206,7 +221,7 @@ defmodule TermUI.Widgets.SplitPane do
       when key in [:left, :up] and state.focused_divider == nil and state.resizable do
     if :ctrl in modifiers do
       # Ctrl+Left/Up: decrease first pane size
-      move_divider(state, 0, -@resize_step)
+      move_divider_by_ratio(state, 0, -state.ctrl_resize_step)
     else
       {:ok, state}
     end
@@ -216,7 +231,7 @@ defmodule TermUI.Widgets.SplitPane do
       when key in [:right, :down] and state.focused_divider == nil and state.resizable do
     if :ctrl in modifiers do
       # Ctrl+Right/Down: increase first pane size
-      move_divider(state, 0, @resize_step)
+      move_divider_by_ratio(state, 0, state.ctrl_resize_step)
     else
       {:ok, state}
     end
@@ -631,6 +646,46 @@ defmodule TermUI.Widgets.SplitPane do
   # ----------------------------------------------------------------------------
   # Private: Divider Movement
   # ----------------------------------------------------------------------------
+
+  # Moves divider by a ratio (0.0-1.0) of total space, enforcing min/max ratio bounds.
+  # Used by Ctrl+arrow shortcuts.
+  defp move_divider_by_ratio(state, divider_idx, ratio_delta) do
+    pane_before = Enum.at(state.panes, divider_idx)
+    pane_after = Enum.at(state.panes, divider_idx + 1)
+
+    if pane_before && pane_after && not pane_before.collapsed && not pane_after.collapsed do
+      # Calculate current ratio of first pane
+      total_ratio = pane_before.size + pane_after.size
+      current_ratio = pane_before.size / total_ratio
+
+      # Apply the delta
+      new_ratio = current_ratio + ratio_delta
+
+      # Clamp to min/max bounds
+      clamped_ratio = new_ratio |> max(state.min_ratio) |> min(state.max_ratio)
+
+      if clamped_ratio != current_ratio do
+        # Update pane sizes while preserving total
+        panes =
+          state.panes
+          |> Enum.with_index()
+          |> Enum.map(fn {pane, idx} ->
+            cond do
+              idx == divider_idx -> %{pane | size: clamped_ratio * total_ratio}
+              idx == divider_idx + 1 -> %{pane | size: (1.0 - clamped_ratio) * total_ratio}
+              true -> pane
+            end
+          end)
+
+        state = %{state | panes: panes}
+        maybe_call_resize_callback(state)
+      else
+        {:ok, state}
+      end
+    else
+      {:ok, state}
+    end
+  end
 
   defp move_divider(state, _divider_idx, delta) when delta == 0 do
     {:ok, state}

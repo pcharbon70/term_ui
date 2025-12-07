@@ -97,7 +97,7 @@ Implement focus handling for the widget.
 
 ## 5.2 Add Keyboard Alternatives for SplitPane
 
-- [ ] **Section 5.2 Complete**
+- [x] **Section 5.2 Complete**
 
 Add keyboard-based resize controls to SplitPane for environments where mouse dragging is unavailable or not preferred.
 
@@ -115,33 +115,33 @@ Define keyboard shortcuts for resizing panes.
 
 ### 5.2.2 Implement Keyboard Event Handling
 
-- [ ] **Task 5.2.2 Complete**
+- [x] **Task 5.2.2 Complete** *(Completed as part of Task 5.2.1)*
 
 Handle keyboard events for resize.
 
-- [ ] 5.2.2.1 Add `handle_key/2` clauses for Ctrl+arrow combinations
-- [ ] 5.2.2.2 Calculate new split ratio based on step size (default 5%)
-- [ ] 5.2.2.3 Clamp ratio to min/max bounds
-- [ ] 5.2.2.4 Update state with new ratio
+- [x] 5.2.2.1 Add `handle_key/2` clauses for Ctrl+arrow combinations
+- [x] 5.2.2.2 Calculate new split ratio based on step size (default 5%)
+- [x] 5.2.2.3 Clamp ratio to min/max bounds
+- [x] 5.2.2.4 Update state with new ratio
 
 ### 5.2.3 Add Resize Step Configuration
 
-- [ ] **Task 5.2.3 Complete**
+- [x] **Task 5.2.3 Complete**
 
 Allow configuring keyboard resize step size.
 
-- [ ] 5.2.3.1 Add `:resize_step` option (default 0.05 = 5%)
-- [ ] 5.2.3.2 Add `:min_ratio` option (default 0.1 = 10%)
-- [ ] 5.2.3.3 Add `:max_ratio` option (default 0.9 = 90%)
+- [x] 5.2.3.1 Add `:ctrl_resize_step` option (default 0.05 = 5%)
+- [x] 5.2.3.2 Add `:min_ratio` option (default 0.1 = 10%)
+- [x] 5.2.3.3 Add `:max_ratio` option (default 0.9 = 90%)
 
 ### Unit Tests - Section 5.2
 
-- [ ] **Unit Tests 5.2 Complete**
-- [ ] Test Ctrl+Right increases left pane ratio
-- [ ] Test Ctrl+Left decreases left pane ratio
-- [ ] Test ratio is clamped to min/max bounds
-- [ ] Test resize_step is configurable
-- [ ] Test keyboard resize works in both modes
+- [x] **Unit Tests 5.2 Complete**
+- [x] Test Ctrl+Right increases left pane ratio
+- [x] Test Ctrl+Left decreases left pane ratio
+- [x] Test ratio is clamped to min/max bounds
+- [x] Test resize_step is configurable
+- [x] Test keyboard resize works in both modes
 
 ---
 
