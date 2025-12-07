@@ -64,14 +64,14 @@ Implement rendering for the line input widget.
 
 ### 5.1.4 Implement Input Handling
 
-- [ ] **Task 5.1.4 Complete**
+- [x] **Task 5.1.4 Complete** *(Completed as part of Task 5.1.1)*
 
 Implement the input reading flow.
 
-- [ ] 5.1.4.1 Implement `read/1` that calls `LineReader.read_line/1`
-- [ ] 5.1.4.2 Apply validator if configured
-- [ ] 5.1.4.3 Update state with new value
-- [ ] 5.1.4.4 Return `{:ok, value, state}` or `{:error, reason, state}`
+- [x] 5.1.4.1 Implement `read/1` that calls `LineReader.read_line/1`
+- [x] 5.1.4.2 Apply validator if configured
+- [x] 5.1.4.3 Update state with new value
+- [x] 5.1.4.4 Return `{:ok, value, state}` or `{:error, reason, state}`
 
 ### 5.1.5 Implement Focus Behavior
 
