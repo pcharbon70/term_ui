@@ -190,7 +190,13 @@ defmodule TermUI.Widgets.ContextMenu.Behavior do
   """
   @spec select_at_cursor(map()) :: map()
   def select_at_cursor(state) do
-    case Enum.find(state.items, fn item -> item.id == state.cursor end) do
+    # Use O(1) map lookup if available, otherwise fall back to O(n) list search
+    item = case Map.get(state, :item_map) do
+      nil -> Enum.find(state.items, fn item -> item.id == state.cursor end)
+      item_map -> Map.get(item_map, state.cursor)
+    end
+
+    case item do
       %{type: :action} = item ->
         if state.on_select && not Map.get(item, :disabled, false) do
           state.on_select.(item.id)

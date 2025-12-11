@@ -28,6 +28,28 @@ defmodule TermUI.Widgets.ContextMenu do
   - Closes on selection or escape
   - Closes on click outside menu bounds
   - Z-order above other content
+
+  ## Callback Error Handling
+
+  The `on_select` and `on_close` callbacks are executed synchronously within
+  the menu's event handling process. If a callback raises an exception, the
+  widget process will crash and be restarted by its supervisor.
+
+  **Best Practices:**
+  - Callbacks should not raise exceptions
+  - Use try/catch within callbacks for error handling
+  - Return quickly to avoid blocking the UI
+  - Dispatch long-running work to separate processes
+
+  Example:
+
+      on_select: fn id ->
+        try do
+          handle_menu_action(id)
+        rescue
+          e -> Logger.error("Menu action failed: \#{inspect(e)}")
+        end
+      end
   """
 
   use TermUI.StatefulComponent
@@ -66,8 +88,10 @@ defmodule TermUI.Widgets.ContextMenu do
 
   - `:items` - List of menu items (required)
   - `:position` - {x, y} tuple for menu position (required)
-  - `:on_select` - Callback when item is selected
-  - `:on_close` - Callback when menu is closed
+  - `:on_select` - Callback when item is selected: `fn item_id -> ... end`
+    Called synchronously. Should not raise exceptions.
+  - `:on_close` - Callback when menu is closed: `fn -> ... end`
+    Called synchronously. Should not raise exceptions.
   - `:item_style` - Style for normal items
   - `:selected_style` - Style for focused item
   - `:disabled_style` - Style for disabled items
@@ -87,8 +111,12 @@ defmodule TermUI.Widgets.ContextMenu do
 
   @impl true
   def init(props) do
+    # Build ID-to-item map for O(1) lookups
+    item_map = Map.new(props.items, fn item -> {item.id, item} end)
+
     state = %{
       items: props.items,
+      item_map: item_map,
       position: props.position,
       cursor: Behavior.find_first_selectable(props.items),
       on_select: props.on_select,

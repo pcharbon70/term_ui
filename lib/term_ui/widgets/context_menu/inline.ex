@@ -42,6 +42,14 @@ defmodule TermUI.Widgets.ContextMenu.Inline do
   - Separators and disabled items are not numbered
   - Maximum of 9 items can be numbered (items 10+ require arrow navigation)
   - Only selectable items (non-disabled actions) get numbers
+
+  ## Callback Error Handling
+
+  Callbacks (`on_select`, `on_close`) are executed synchronously. If a callback
+  raises an exception, the widget process will crash and restart. Callbacks
+  should handle their own errors to avoid disrupting the UI.
+
+  See `TermUI.Widgets.ContextMenu` moduledoc for callback best practices.
   """
 
   use TermUI.StatefulComponent
@@ -63,7 +71,9 @@ defmodule TermUI.Widgets.ContextMenu.Inline do
   - `:items` - List of menu items (required). Use `ContextMenu.action/3` and
     `ContextMenu.separator/0` to create items.
   - `:on_select` - Callback when item is selected: `fn id -> ... end`
+    Executed synchronously. Should not raise exceptions.
   - `:on_close` - Callback when menu is closed without selection: `fn -> ... end`
+    Executed synchronously. Should not raise exceptions.
   - `:orientation` - `:horizontal` (side by side) or `:vertical` (stacked).
     Default: `:horizontal`
   - `:item_style` - Style for normal items
@@ -94,8 +104,12 @@ defmodule TermUI.Widgets.ContextMenu.Inline do
     # Build number-to-item mapping for selectable items (1-9 only)
     {number_map, _} = build_number_map(props.items)
 
+    # Build ID-to-item map for O(1) lookups
+    item_map = Map.new(props.items, fn item -> {item.id, item} end)
+
     state = %{
       items: props.items,
+      item_map: item_map,
       cursor: Behavior.find_first_selectable(props.items),
       on_select: props.on_select,
       on_close: props.on_close,
@@ -249,8 +263,8 @@ defmodule TermUI.Widgets.ContextMenu.Inline do
         state
 
       item_id ->
-        # Find and select the item
-        case Enum.find(state.items, fn item -> item.id == item_id end) do
+        # Use O(1) map lookup instead of O(n) Enum.find
+        case Map.get(state.item_map, item_id) do
           %{type: :action} = item ->
             if state.on_select && not Map.get(item, :disabled, false) do
               state.on_select.(item.id)

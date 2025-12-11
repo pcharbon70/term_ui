@@ -4,6 +4,7 @@ defmodule TermUI.Widgets.ContextMenu.InlineTest do
   alias TermUI.Widgets.ContextMenu
   alias TermUI.Widgets.ContextMenu.Inline
   alias TermUI.Event
+  alias TermUI.Renderer.Style
 
   # Test helpers
 
@@ -149,6 +150,222 @@ defmodule TermUI.Widgets.ContextMenu.InlineTest do
 
       # Should have Copy, spacing, separator, spacing, Paste
       assert render.type == :stack
+    end
+
+    test "applies item_style to normal items" do
+      item_style = Style.new(fg: :white, bg: :black)
+      props = Inline.new(
+        items: [ContextMenu.action(:copy, "Copy")],
+        item_style: item_style
+      )
+      {:ok, state} = Inline.init(props)
+      # Move cursor away from first item to make it normal
+      state = %{state | cursor: :other}
+
+      render = Inline.render(state, test_area(80, 24))
+
+      # Extract first item from horizontal stack
+      [first_item | _] = render.children
+      assert first_item.type == :box
+      assert first_item.style == item_style
+    end
+
+    test "applies selected_style to cursor item" do
+      selected_style = Style.new(fg: :black, bg: :cyan)
+      props = Inline.new(
+        items: [
+          ContextMenu.action(:copy, "Copy"),
+          ContextMenu.action(:paste, "Paste")
+        ],
+        selected_style: selected_style
+      )
+      {:ok, state} = Inline.init(props)
+      # Cursor starts at first item (:copy)
+
+      render = Inline.render(state, test_area(80, 24))
+
+      # First item should have selected_style
+      [first_item | _] = render.children
+      assert first_item.type == :box
+      assert first_item.style == selected_style
+    end
+
+    test "applies disabled_style to disabled items" do
+      disabled_style = Style.new(fg: :bright_black, bg: :black)
+      props = Inline.new(
+        items: [
+          ContextMenu.action(:copy, "Copy"),
+          ContextMenu.action(:paste, "Paste", disabled: true)
+        ],
+        disabled_style: disabled_style
+      )
+      {:ok, state} = Inline.init(props)
+
+      render = Inline.render(state, test_area(80, 24))
+
+      # Second item (after spacing) should have disabled_style
+      [_first, _spacing, second_item | _] = render.children
+      assert second_item.type == :box
+      assert second_item.style == disabled_style
+    end
+
+    test "style priority: disabled overrides selected" do
+      selected_style = Style.new(fg: :black, bg: :cyan)
+      disabled_style = Style.new(fg: :bright_black, bg: :black)
+
+      props = Inline.new(
+        items: [ContextMenu.action(:paste, "Paste", disabled: true)],
+        selected_style: selected_style,
+        disabled_style: disabled_style
+      )
+      {:ok, state} = Inline.init(props)
+      # Try to select disabled item
+      state = %{state | cursor: :paste}
+
+      render = Inline.render(state, test_area(80, 24))
+
+      # Should use disabled_style, not selected_style
+      [first_item | _] = render.children
+      assert first_item.type == :box
+      assert first_item.style == disabled_style
+    end
+
+    test "renders without styles when none provided" do
+      props = Inline.new(
+        items: [ContextMenu.action(:copy, "Copy")]
+      )
+      {:ok, state} = Inline.init(props)
+
+      render = Inline.render(state, test_area(80, 24))
+
+      # Should still render, but without styled wrapper
+      [first_item | _] = render.children
+      assert first_item.type == :text
+    end
+  end
+
+  # ----------------------------------------------------------------------------
+  # Rendering Content Tests
+  # ----------------------------------------------------------------------------
+
+  describe "render/2 content" do
+    defp extract_text_content(node) do
+      case node.type do
+        :text -> node.content
+        :box -> extract_text_content(hd(node.children))
+        _ -> nil
+      end
+    end
+
+    test "renders items with correct number prefixes" do
+      props = create_test_props()
+      {:ok, state} = Inline.init(props)
+
+      render = Inline.render(state, test_area(80, 24))
+
+      # Extract text from first three items (skip spacing elements)
+      [item1, _space1, item2, _space2, item3] = render.children
+
+      assert extract_text_content(item1) == "[1] Copy"
+      assert extract_text_content(item2) == "[2] Paste"
+      assert extract_text_content(item3) == "[3] Delete"
+    end
+
+    test "renders separators as vertical lines in horizontal mode" do
+      items = [
+        ContextMenu.action(:copy, "Copy"),
+        ContextMenu.separator(),
+        ContextMenu.action(:paste, "Paste")
+      ]
+      props = create_test_props(items: items)
+      {:ok, state} = Inline.init(props)
+
+      render = Inline.render(state, test_area(80, 24))
+
+      # Separator should be between items
+      [_item1, _space1, separator, _space2, _item2] = render.children
+
+      assert separator.type == :text
+      assert separator.content == "|"
+    end
+
+    test "renders separators as horizontal lines in vertical mode" do
+      items = [
+        ContextMenu.action(:copy, "Copy"),
+        ContextMenu.separator(),
+        ContextMenu.action(:paste, "Paste")
+      ]
+      props = create_test_props(items: items, orientation: :vertical)
+      {:ok, state} = Inline.init(props)
+
+      render = Inline.render(state, test_area(80, 24))
+
+      # Get middle item (separator)
+      [_item1, separator, _item2] = render.children
+
+      assert separator.type == :text
+      assert separator.content == "───"
+    end
+
+    test "skips numbers for disabled items" do
+      items = [
+        ContextMenu.action(:copy, "Copy"),
+        ContextMenu.action(:paste, "Paste", disabled: true),
+        ContextMenu.action(:delete, "Delete")
+      ]
+      props = create_test_props(items: items)
+      {:ok, state} = Inline.init(props)
+
+      render = Inline.render(state, test_area(80, 24))
+
+      # paste should have no number (just spaces)
+      [_item1, _space1, item2, _space2, _item3] = render.children
+
+      assert extract_text_content(item2) == "    Paste"
+    end
+
+    test "skips numbers for separators" do
+      items = [
+        ContextMenu.action(:copy, "Copy"),
+        ContextMenu.separator()
+      ]
+      props = create_test_props(items: items)
+      {:ok, state} = Inline.init(props)
+
+      render = Inline.render(state, test_area(80, 24))
+
+      # Separator has no number
+      [_item1, _space, separator] = render.children
+
+      assert separator.type == :text
+      assert separator.content == "|"
+    end
+
+    test "limits numbers to 1-9" do
+      # Create 10 items
+      items = for i <- 1..10 do
+        ContextMenu.action(:"item_#{i}", "Item #{i}")
+      end
+      props = create_test_props(items: items)
+      {:ok, state} = Inline.init(props)
+
+      render = Inline.render(state, test_area(80, 24))
+
+      # First 9 items should have numbers, 10th should not
+      children = render.children
+      # Get every odd element (skip spacing)
+      items_only = Enum.take_every(children, 2)
+
+      first_nine = Enum.take(items_only, 9)
+      tenth = Enum.at(items_only, 9)
+
+      # Verify first 9 have numbers [1] through [9]
+      Enum.each(Enum.with_index(first_nine, 1), fn {item, idx} ->
+        assert extract_text_content(item) == "[#{idx}] Item #{idx}"
+      end)
+
+      # 10th item should have no number (just spaces)
+      assert extract_text_content(tenth) == "    Item 10"
     end
   end
 
