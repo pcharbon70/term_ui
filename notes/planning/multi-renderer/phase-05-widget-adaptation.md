@@ -147,7 +147,7 @@ Allow configuring keyboard resize step size.
 
 ## 5.3 Add Keyboard Alternative for ContextMenu
 
-- [ ] **Section 5.3 Complete**
+- [x] **Section 5.3 Complete**
 
 ContextMenu typically appears at mouse cursor position. Add an inline numbered menu variant for keyboard-only environments.
 
@@ -164,32 +164,34 @@ Create an inline context menu that doesn't require mouse positioning.
 
 ### 5.3.2 Implement show/2 with Position Fallback
 
-- [ ] **Task 5.3.2 Complete**
+- [x] **Task 5.3.2 Complete**
 
 Implement menu display with position fallback.
 
-- [ ] 5.3.2.1 If position provided, show at position (mouse mode)
-- [ ] 5.3.2.2 If no position, show inline below current focus
-- [ ] 5.3.2.3 Auto-detect based on backend capabilities
+- [x] 5.3.2.1 If position provided, show at position (mouse mode)
+- [x] 5.3.2.2 If no position, show inline below current focus
+- [x] 5.3.2.3 Auto-detect based on backend capabilities
 
 ### 5.3.3 Implement Number Key Selection
 
-- [ ] **Task 5.3.3 Complete**
+- [x] **Task 5.3.3 Complete**
 
 Handle number key presses for direct item selection.
 
-- [ ] 5.3.3.1 Map number keys 1-9 to menu item indices
-- [ ] 5.3.3.2 Immediately select and close on number press
-- [ ] 5.3.3.3 Show numbers in rendering when in inline mode
+- [x] 5.3.3.1 Map number keys 1-9 to menu item indices
+- [x] 5.3.3.2 Immediately select and close on number press
+- [x] 5.3.3.3 Show numbers in rendering when in inline mode
+
+Note: Completed as part of Task 5.3.1 (ContextMenu.Inline implementation)
 
 ### Unit Tests - Section 5.3
 
-- [ ] **Unit Tests 5.3 Complete**
-- [ ] Test inline menu renders with numbers
-- [ ] Test number key selects correct item
-- [ ] Test arrow navigation still works
-- [ ] Test Enter confirms selection
-- [ ] Test Escape cancels menu
+- [x] **Unit Tests 5.3 Complete**
+- [x] Test inline menu renders with numbers
+- [x] Test number key selects correct item
+- [x] Test arrow navigation still works
+- [x] Test Enter confirms selection
+- [x] Test Escape cancels menu
 
 ---
 
