@@ -57,6 +57,7 @@ defmodule TermUI.Widgets.TreeView do
 
   use TermUI.StatefulComponent
 
+  alias TermUI.CharacterSet
   alias TermUI.Event
   alias TermUI.Renderer.Style
   alias TermUI.Theme
@@ -72,12 +73,16 @@ defmodule TermUI.Widgets.TreeView do
           metadata: map()
         }
 
-  @default_icons %{
-    expanded: "▼",
-    collapsed: "▶",
-    leaf: " ",
-    loading: "⟳"
-  }
+  # Default icons - function instead of module attribute to support runtime charset
+  defp get_default_icons do
+    chars = CharacterSet.current_charset()
+    %{
+      expanded: chars.arrow_down,
+      collapsed: chars.arrow_right,
+      leaf: " ",
+      loading: "o"  # ASCII fallback for loading spinner
+    }
+  end
 
   # ----------------------------------------------------------------------------
   # Node Constructors
@@ -159,7 +164,7 @@ defmodule TermUI.Widgets.TreeView do
       selection_mode: Keyword.get(opts, :selection_mode, :single),
       show_root: Keyword.get(opts, :show_root, true),
       indent_size: Keyword.get(opts, :indent_size, 2),
-      icons: Map.merge(@default_icons, Keyword.get(opts, :icons, %{})),
+      icons: Map.merge(get_default_icons(), Keyword.get(opts, :icons, %{})),
       initially_expanded: Keyword.get(opts, :initially_expanded, []),
       initially_selected: Keyword.get(opts, :initially_selected, [])
     }

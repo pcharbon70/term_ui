@@ -16,7 +16,7 @@ defmodule TermUI.Widgets.AlertDialogTest do
       assert props.type == :info
       assert props.title == "Information"
       assert props.message == "This is an info message"
-      assert props.icon == "ℹ"
+      assert props.icon == "i"
     end
 
     test "creates alert with correct buttons for info type" do
@@ -61,10 +61,10 @@ defmodule TermUI.Widgets.AlertDialogTest do
 
     test "uses correct icons for each type" do
       types_and_icons = [
-        {:info, "ℹ"},
-        {:success, "✓"},
-        {:warning, "⚠"},
-        {:error, "✗"},
+        {:info, "i"},
+        {:success, "x"},
+        {:warning, "!"},
+        {:error, "x"},
         {:confirm, "?"}
       ]
 

@@ -44,6 +44,7 @@ defmodule TermUI.Widgets.Table do
 
   use TermUI.StatefulComponent
 
+  alias TermUI.CharacterSet
   alias TermUI.Event
   alias TermUI.Layout.Constraint
   alias TermUI.Widgets.Table.Column
@@ -340,11 +341,14 @@ defmodule TermUI.Widgets.Table do
   end
 
   defp render_header(state, column_widths) do
+    # Get character set for sort arrows
+    chars = CharacterSet.current_charset()
+
     cells =
       state.columns
       |> Enum.zip(column_widths)
       |> Enum.map(fn {column, width} ->
-        header_text = format_header_text(column.header, column.key, state)
+        header_text = format_header_text(column.header, column.key, state, chars)
         Column.align_text(header_text, width, column.align)
       end)
 
@@ -357,15 +361,15 @@ defmodule TermUI.Widgets.Table do
     end
   end
 
-  defp format_header_text(header, column_key, %{sort_column: column_key, sort_direction: :asc}) do
-    header <> " ▲"
+  defp format_header_text(header, column_key, %{sort_column: column_key, sort_direction: :asc}, chars) do
+    header <> " " <> chars.arrow_up
   end
 
-  defp format_header_text(header, column_key, %{sort_column: column_key, sort_direction: :desc}) do
-    header <> " ▼"
+  defp format_header_text(header, column_key, %{sort_column: column_key, sort_direction: :desc}, chars) do
+    header <> " " <> chars.arrow_down
   end
 
-  defp format_header_text(header, _column_key, _state) do
+  defp format_header_text(header, _column_key, _state, _chars) do
     header
   end
 

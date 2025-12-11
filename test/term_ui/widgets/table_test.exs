@@ -432,7 +432,7 @@ defmodule TermUI.Widgets.TableTest do
 
       # Header should contain sort indicator
       header = hd(result.children)
-      assert String.contains?(header.content, "▲")
+      assert String.contains?(header.content, "↑")
     end
   end
 
