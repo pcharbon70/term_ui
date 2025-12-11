@@ -42,6 +42,17 @@ defmodule TermUI.Widgets.TreeView do
   - Shift+Up/Down: Extend selection (multi-select mode)
   - /: Start search filter
   - Escape: Clear filter or deselect
+
+  ## Monochrome Compatibility
+
+  This widget is fully functional in monochrome terminals:
+  - Selected nodes use reverse video for visibility
+  - Cursor position uses bold text for focus indication
+  - Disabled nodes use dim text for de-emphasis
+  - Search matches highlighted with bold
+  - All interactive states remain distinguishable without color
+
+  The widget uses theme component styles for monochrome support.
   """
 
   use TermUI.StatefulComponent

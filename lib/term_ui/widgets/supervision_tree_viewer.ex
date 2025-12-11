@@ -35,6 +35,21 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
   - R: Refresh tree
   - /: Filter by name
   - Escape: Clear filter/close panel
+
+  ## Monochrome Compatibility
+
+  This widget is fully functional in monochrome terminals:
+  - Process status indicated by both color AND text markers:
+    - `[R]` for running processes
+    - `[Y]` for restarting processes
+    - `[T]` for terminated processes
+    - `[U]` for undefined status
+  - Selected items use reverse video for visibility
+  - Error states (terminated) use underline for emphasis
+  - All critical information remains accessible without color
+
+  The widget uses both theme component styles and explicit text indicators
+  for complete monochrome compatibility.
   """
 
   use TermUI.StatefulComponent

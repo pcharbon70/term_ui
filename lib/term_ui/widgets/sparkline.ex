@@ -17,6 +17,13 @@ defmodule TermUI.Widgets.Sparkline do
 
   The sparkline uses 8 levels of vertical bar characters:
   ▁ (1/8), ▂ (2/8), ▃ (3/8), ▄ (4/8), ▅ (5/8), ▆ (6/8), ▇ (7/8), █ (8/8)
+
+  ## Monochrome Compatibility
+
+  Sparklines are inherently monochrome-compatible as they use character height
+  to convey value magnitude. The 8-level bar characters provide clear visual
+  differentiation without requiring color. Optional `:color_ranges` enhance
+  readability in color terminals but are not required for functionality.
   """
 
   import TermUI.Component.RenderNode
