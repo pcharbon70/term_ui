@@ -354,7 +354,7 @@ defmodule TermUI.Backend.StateTest do
       end
 
       assert_raise FunctionClauseError, fn ->
-        State.new_tty([colors: :true_color])
+        State.new_tty(colors: :true_color)
       end
     end
 
@@ -542,7 +542,7 @@ defmodule TermUI.Backend.StateTest do
       end
 
       assert_raise FunctionClauseError, fn ->
-        State.put_capabilities(state, [colors: :true_color])
+        State.put_capabilities(state, colors: :true_color)
       end
     end
 

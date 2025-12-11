@@ -47,6 +47,7 @@ defmodule TermUI.Widgets.ContextMenu.Inline do
   use TermUI.StatefulComponent
 
   alias TermUI.Event
+  alias TermUI.Widgets.ContextMenu.Behavior
 
   @type orientation :: :horizontal | :vertical
 
@@ -95,7 +96,7 @@ defmodule TermUI.Widgets.ContextMenu.Inline do
 
     state = %{
       items: props.items,
-      cursor: find_first_selectable(props.items),
+      cursor: Behavior.find_first_selectable(props.items),
       on_select: props.on_select,
       on_close: props.on_close,
       orientation: props.orientation,
@@ -113,23 +114,23 @@ defmodule TermUI.Widgets.ContextMenu.Inline do
   @impl true
   def handle_event(%Event.Key{key: key}, state)
       when key in [:up, :left] do
-    state = move_cursor(state, -1)
+    state = Behavior.move_cursor(state, -1)
     {:ok, state}
   end
 
   def handle_event(%Event.Key{key: key}, state)
       when key in [:down, :right] do
-    state = move_cursor(state, 1)
+    state = Behavior.move_cursor(state, 1)
     {:ok, state}
   end
 
   def handle_event(%Event.Key{key: key}, state) when key in [:enter, " "] do
-    state = select_at_cursor(state)
+    state = Behavior.select_at_cursor(state)
     {:ok, state}
   end
 
   def handle_event(%Event.Key{key: :escape}, state) do
-    state = close_menu(state)
+    state = Behavior.close_menu(state)
     {:ok, state}
   end
 
@@ -148,12 +149,11 @@ defmodule TermUI.Widgets.ContextMenu.Inline do
   @impl true
   def render(state, _area) do
     if state.visible do
-      {number_map, _} = build_number_map(state.items)
-
+      # Use cached number_map from state (built during init/1)
       items_with_numbers =
         state.items
         |> Enum.map(fn item ->
-          number = find_number_for_item(number_map, item)
+          number = find_number_for_item(state.number_map, item)
           render_item(state, item, number)
         end)
 
@@ -220,7 +220,7 @@ defmodule TermUI.Widgets.ContextMenu.Inline do
   defp build_number_map(items) do
     items
     |> Enum.reduce({%{}, 1}, fn item, {map, num} ->
-      if selectable?(item) and num <= 9 do
+      if Behavior.selectable?(item) and num <= 9 do
         {Map.put(map, num, item.id), num + 1}
       else
         {map, num}
@@ -231,63 +231,15 @@ defmodule TermUI.Widgets.ContextMenu.Inline do
   # Finds the number assigned to an item (or nil if not numbered)
   @spec find_number_for_item(%{pos_integer() => term()}, map()) :: pos_integer() | nil
   defp find_number_for_item(number_map, item) do
-    number_map
-    |> Enum.find(fn {_num, id} -> id == item.id end)
-    |> case do
-      {num, _id} -> num
-      nil -> nil
-    end
+    Enum.find_value(number_map, fn
+      {num, id} when id == item.id -> num
+      _ -> nil
+    end)
   end
 
   # ----------------------------------------------------------------------------
   # Private: Selection
   # ----------------------------------------------------------------------------
-
-  @spec selectable?(map()) :: boolean()
-  defp selectable?(item) do
-    item.type == :action and not Map.get(item, :disabled, false)
-  end
-
-  @spec find_first_selectable([map()]) :: term() | nil
-  defp find_first_selectable(items) do
-    items
-    |> Enum.find(&selectable?/1)
-    |> case do
-      nil -> nil
-      item -> item.id
-    end
-  end
-
-  @spec move_cursor(map(), integer()) :: map()
-  defp move_cursor(state, direction) do
-    selectable_items = Enum.filter(state.items, &selectable?/1)
-
-    case Enum.find_index(selectable_items, fn item -> item.id == state.cursor end) do
-      nil ->
-        state
-
-      current_idx ->
-        new_idx = current_idx + direction
-        new_idx = max(0, min(new_idx, length(selectable_items) - 1))
-        item = Enum.at(selectable_items, new_idx)
-        %{state | cursor: item.id}
-    end
-  end
-
-  @spec select_at_cursor(map()) :: map()
-  defp select_at_cursor(state) do
-    case Enum.find(state.items, fn item -> item.id == state.cursor end) do
-      %{type: :action} = item ->
-        if state.on_select && not Map.get(item, :disabled, false) do
-          state.on_select.(item.id)
-        end
-
-        close_menu(state)
-
-      _ ->
-        state
-    end
-  end
 
   @spec select_by_number(map(), pos_integer()) :: map()
   defp select_by_number(state, number) do
@@ -304,21 +256,12 @@ defmodule TermUI.Widgets.ContextMenu.Inline do
               state.on_select.(item.id)
             end
 
-            close_menu(state)
+            Behavior.close_menu(state)
 
           _ ->
             state
         end
     end
-  end
-
-  @spec close_menu(map()) :: map()
-  defp close_menu(state) do
-    if state.on_close do
-      state.on_close.()
-    end
-
-    %{state | visible: false}
   end
 
   # ----------------------------------------------------------------------------

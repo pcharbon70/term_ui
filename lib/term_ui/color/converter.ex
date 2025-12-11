@@ -51,23 +51,39 @@ defmodule TermUI.Color.Converter do
   # Format: {color_code, {r, g, b}}
   @ansi_16_colors [
     # Normal colors (codes 30-37)
-    {30, {0, 0, 0}},        # black
-    {31, {128, 0, 0}},      # red
-    {32, {0, 128, 0}},      # green
-    {33, {128, 128, 0}},    # yellow
-    {34, {0, 0, 128}},      # blue
-    {35, {128, 0, 128}},    # magenta
-    {36, {0, 128, 128}},    # cyan
-    {37, {192, 192, 192}},  # white (light gray)
+    # black
+    {30, {0, 0, 0}},
+    # red
+    {31, {128, 0, 0}},
+    # green
+    {32, {0, 128, 0}},
+    # yellow
+    {33, {128, 128, 0}},
+    # blue
+    {34, {0, 0, 128}},
+    # magenta
+    {35, {128, 0, 128}},
+    # cyan
+    {36, {0, 128, 128}},
+    # white (light gray)
+    {37, {192, 192, 192}},
     # Bright colors (codes 90-97)
-    {90, {128, 128, 128}},  # bright black (dark gray)
-    {91, {255, 0, 0}},      # bright red
-    {92, {0, 255, 0}},      # bright green
-    {93, {255, 255, 0}},    # bright yellow
-    {94, {0, 0, 255}},      # bright blue
-    {95, {255, 0, 255}},    # bright magenta
-    {96, {0, 255, 255}},    # bright cyan
-    {97, {255, 255, 255}}   # bright white
+    # bright black (dark gray)
+    {90, {128, 128, 128}},
+    # bright red
+    {91, {255, 0, 0}},
+    # bright green
+    {92, {0, 255, 0}},
+    # bright yellow
+    {93, {255, 255, 0}},
+    # bright blue
+    {94, {0, 0, 255}},
+    # bright magenta
+    {95, {255, 0, 255}},
+    # bright cyan
+    {96, {0, 255, 255}},
+    # bright white
+    {97, {255, 255, 255}}
   ]
 
   # Threshold for grayscale detection.
@@ -106,12 +122,12 @@ defmodule TermUI.Color.Converter do
   @spec rgb_to_256({0..255, 0..255, 0..255}) :: 0..255
   def rgb_to_256({r, g, b})
       when is_integer(r) and r >= 0 and r <= 255 and
-           is_integer(g) and g >= 0 and g <= 255 and
-           is_integer(b) and b >= 0 and b <= 255 do
+             is_integer(g) and g >= 0 and g <= 255 and
+             is_integer(b) and b >= 0 and b <= 255 do
     # Check if it's close to grayscale
     if abs(r - g) < @grayscale_threshold and
-       abs(g - b) < @grayscale_threshold and
-       abs(r - b) < @grayscale_threshold do
+         abs(g - b) < @grayscale_threshold and
+         abs(r - b) < @grayscale_threshold do
       # Use grayscale ramp (232-255)
       gray = div(r + g + b, 3)
       232 + div(gray * 23, 255)
@@ -155,9 +171,9 @@ defmodule TermUI.Color.Converter do
   @spec rgb_to_16({0..255, 0..255, 0..255}, :fg | :bg) :: 30..37 | 40..47 | 90..97 | 100..107
   def rgb_to_16({r, g, b}, type)
       when is_integer(r) and r >= 0 and r <= 255 and
-           is_integer(g) and g >= 0 and g <= 255 and
-           is_integer(b) and b >= 0 and b <= 255 and
-           type in [:fg, :bg] do
+             is_integer(g) and g >= 0 and g <= 255 and
+             is_integer(b) and b >= 0 and b <= 255 and
+             type in [:fg, :bg] do
     {base_code, bright} = find_closest_16_color(r, g, b)
 
     case type do
@@ -198,11 +214,11 @@ defmodule TermUI.Color.Converter do
   @spec grayscale?({0..255, 0..255, 0..255}) :: boolean()
   def grayscale?({r, g, b})
       when is_integer(r) and r >= 0 and r <= 255 and
-           is_integer(g) and g >= 0 and g <= 255 and
-           is_integer(b) and b >= 0 and b <= 255 do
+             is_integer(g) and g >= 0 and g <= 255 and
+             is_integer(b) and b >= 0 and b <= 255 do
     abs(r - g) < @grayscale_threshold and
-    abs(g - b) < @grayscale_threshold and
-    abs(r - b) < @grayscale_threshold
+      abs(g - b) < @grayscale_threshold and
+      abs(r - b) < @grayscale_threshold
   end
 
   @doc """

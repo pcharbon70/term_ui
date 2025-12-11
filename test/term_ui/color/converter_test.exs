@@ -181,17 +181,20 @@ defmodule TermUI.Color.ConverterTest do
 
     test "yellow maps to yellow" do
       result = Converter.rgb_to_16({255, 255, 0}, :fg)
-      assert result == 93  # bright yellow
+      # bright yellow
+      assert result == 93
     end
 
     test "magenta maps to magenta" do
       result = Converter.rgb_to_16({255, 0, 255}, :fg)
-      assert result == 95  # bright magenta
+      # bright magenta
+      assert result == 95
     end
 
     test "cyan maps to cyan" do
       result = Converter.rgb_to_16({0, 255, 255}, :fg)
-      assert result == 96  # bright cyan
+      # bright cyan
+      assert result == 96
     end
   end
 
@@ -211,7 +214,8 @@ defmodule TermUI.Color.ConverterTest do
       assert result256 >= 232 and result256 <= 255
 
       result16 = Converter.rgb_to_16({127, 127, 127}, :fg)
-      assert result16 in [37, 90]  # Could be light gray or dark gray
+      # Could be light gray or dark gray
+      assert result16 in [37, 90]
     end
   end
 end

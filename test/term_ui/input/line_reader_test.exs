@@ -100,11 +100,15 @@ defmodule TermUI.Input.LineReaderTest do
       end
 
       # Valid integer
-      result = capture_line_input("42\n", fn -> LineReader.read_line("Number: ", int_validator) end)
+      result =
+        capture_line_input("42\n", fn -> LineReader.read_line("Number: ", int_validator) end)
+
       assert result == {:ok, 42}
 
       # Invalid integer
-      result = capture_line_input("abc\n", fn -> LineReader.read_line("Number: ", int_validator) end)
+      result =
+        capture_line_input("abc\n", fn -> LineReader.read_line("Number: ", int_validator) end)
+
       assert result == {:error, "not an integer"}
     end
 
@@ -118,11 +122,17 @@ defmodule TermUI.Input.LineReaderTest do
       end
 
       # Valid length
-      result = capture_line_input("abc\n", fn -> LineReader.read_line("Input: ", min_length_validator) end)
+      result =
+        capture_line_input("abc\n", fn ->
+          LineReader.read_line("Input: ", min_length_validator)
+        end)
+
       assert result == {:ok, "abc"}
 
       # Too short
-      result = capture_line_input("ab\n", fn -> LineReader.read_line("Input: ", min_length_validator) end)
+      result =
+        capture_line_input("ab\n", fn -> LineReader.read_line("Input: ", min_length_validator) end)
+
       assert result == {:error, "must be at least 3 characters"}
     end
 
@@ -136,11 +146,17 @@ defmodule TermUI.Input.LineReaderTest do
       end
 
       # Non-empty
-      result = capture_line_input("something\n", fn -> LineReader.read_line("Input: ", non_empty_validator) end)
+      result =
+        capture_line_input("something\n", fn ->
+          LineReader.read_line("Input: ", non_empty_validator)
+        end)
+
       assert result == {:ok, "something"}
 
       # Empty
-      result = capture_line_input("\n", fn -> LineReader.read_line("Input: ", non_empty_validator) end)
+      result =
+        capture_line_input("\n", fn -> LineReader.read_line("Input: ", non_empty_validator) end)
+
       assert result == {:error, "cannot be empty"}
     end
   end

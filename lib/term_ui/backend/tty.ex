@@ -853,7 +853,12 @@ defmodule TermUI.Backend.TTY do
   # - start_col: The column to position cursor at (1 for full redraw, first cell col for incremental)
   # - cells: List of {col, cell} tuples sorted by column
   # - state: Backend state with color_mode and character_set
-  @spec render_row_at_column(pos_integer(), pos_integer(), [{pos_integer(), TermUI.Backend.cell()}], t()) :: :ok
+  @spec render_row_at_column(
+          pos_integer(),
+          pos_integer(),
+          [{pos_integer(), TermUI.Backend.cell()}],
+          t()
+        ) :: :ok
   defp render_row_at_column(row, start_col, cells, state) do
     # Track current column, current style, and accumulated iolist
     # Initial style is nil (no style set yet)
@@ -979,45 +984,45 @@ defmodule TermUI.Backend.TTY do
   # True color mode - output RGB directly (with validation)
   defp color_to_sgr({r, g, b}, :fg, :true_color)
        when is_integer(r) and r >= 0 and r <= 255 and
-            is_integer(g) and g >= 0 and g <= 255 and
-            is_integer(b) and b >= 0 and b <= 255 do
+              is_integer(g) and g >= 0 and g <= 255 and
+              is_integer(b) and b >= 0 and b <= 255 do
     "\e[38;2;#{r};#{g};#{b}m"
   end
 
   defp color_to_sgr({r, g, b}, :bg, :true_color)
        when is_integer(r) and r >= 0 and r <= 255 and
-            is_integer(g) and g >= 0 and g <= 255 and
-            is_integer(b) and b >= 0 and b <= 255 do
+              is_integer(g) and g >= 0 and g <= 255 and
+              is_integer(b) and b >= 0 and b <= 255 do
     "\e[48;2;#{r};#{g};#{b}m"
   end
 
   # 256-color mode - convert RGB to palette index (with validation)
   defp color_to_sgr({r, g, b}, :fg, :color_256)
        when is_integer(r) and r >= 0 and r <= 255 and
-            is_integer(g) and g >= 0 and g <= 255 and
-            is_integer(b) and b >= 0 and b <= 255 do
+              is_integer(g) and g >= 0 and g <= 255 and
+              is_integer(b) and b >= 0 and b <= 255 do
     "\e[38;5;#{TermUI.Color.Converter.rgb_to_256({r, g, b})}m"
   end
 
   defp color_to_sgr({r, g, b}, :bg, :color_256)
        when is_integer(r) and r >= 0 and r <= 255 and
-            is_integer(g) and g >= 0 and g <= 255 and
-            is_integer(b) and b >= 0 and b <= 255 do
+              is_integer(g) and g >= 0 and g <= 255 and
+              is_integer(b) and b >= 0 and b <= 255 do
     "\e[48;5;#{TermUI.Color.Converter.rgb_to_256({r, g, b})}m"
   end
 
   # 16-color mode - convert RGB to basic color (with validation)
   defp color_to_sgr({r, g, b}, :fg, :color_16)
        when is_integer(r) and r >= 0 and r <= 255 and
-            is_integer(g) and g >= 0 and g <= 255 and
-            is_integer(b) and b >= 0 and b <= 255 do
+              is_integer(g) and g >= 0 and g <= 255 and
+              is_integer(b) and b >= 0 and b <= 255 do
     "\e[#{TermUI.Color.Converter.rgb_to_16({r, g, b}, :fg)}m"
   end
 
   defp color_to_sgr({r, g, b}, :bg, :color_16)
        when is_integer(r) and r >= 0 and r <= 255 and
-            is_integer(g) and g >= 0 and g <= 255 and
-            is_integer(b) and b >= 0 and b <= 255 do
+              is_integer(g) and g >= 0 and g <= 255 and
+              is_integer(b) and b >= 0 and b <= 255 do
     "\e[#{TermUI.Color.Converter.rgb_to_16({r, g, b}, :bg)}m"
   end
 
@@ -1095,24 +1100,24 @@ defmodule TermUI.Backend.TTY do
   # 2. Add bar_levels mapping (Unicode has 8 levels, ASCII has 5 - cycle ASCII to match)
   # 3. Override bar_full to ensure it maps correctly (it appears in both bar_levels and standalone)
   @unicode_to_ascii_map (
-    # Single-character keys (all keys except bar_levels)
-    single_keys = TermUI.CharacterSet.keys() -- [:bar_levels]
+                          # Single-character keys (all keys except bar_levels)
+                          single_keys = TermUI.CharacterSet.keys() -- [:bar_levels]
 
-    base =
-      Map.new(single_keys, fn key ->
-        {@unicode_chars[key], @ascii_chars[key]}
-      end)
+                          base =
+                            Map.new(single_keys, fn key ->
+                              {@unicode_chars[key], @ascii_chars[key]}
+                            end)
 
-    # Add bar_levels with cycling (8 Unicode levels → 5 ASCII levels cycled)
-    bar_map =
-      @unicode_chars.bar_levels
-      |> Enum.zip(Stream.cycle(@ascii_chars.bar_levels))
-      |> Map.new()
+                          # Add bar_levels with cycling (8 Unicode levels → 5 ASCII levels cycled)
+                          bar_map =
+                            @unicode_chars.bar_levels
+                            |> Enum.zip(Stream.cycle(@ascii_chars.bar_levels))
+                            |> Map.new()
 
-    # Merge bar_map first, then base - this ensures bar_full gets the standalone value
-    # since it appears last in single_keys and overwrites the cycled bar_levels value
-    Map.merge(bar_map, base)
-  )
+                          # Merge bar_map first, then base - this ensures bar_full gets the standalone value
+                          # since it appears last in single_keys and overwrites the cycled bar_levels value
+                          Map.merge(bar_map, base)
+                        )
 
   # Maps characters based on character set.
   #

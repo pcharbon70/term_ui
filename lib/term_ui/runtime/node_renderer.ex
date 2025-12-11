@@ -49,7 +49,9 @@ defmodule TermUI.Runtime.NodeRenderer do
          parent_style
        ) do
     effective_style = merge_styles(parent_style, style)
-    {rendered_width, rendered_height} = render_children_vertical(children, buffer, row, col, effective_style)
+
+    {rendered_width, rendered_height} =
+      render_children_vertical(children, buffer, row, col, effective_style)
 
     # Return specified dimensions if provided, otherwise use rendered dimensions
     final_width = width || rendered_width

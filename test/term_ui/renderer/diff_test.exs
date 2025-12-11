@@ -236,7 +236,13 @@ defmodule TermUI.Renderer.DiffTest do
       span2 = %{row: 1, start_col: 4, end_col: 5, cells: [Cell.new("D"), Cell.new("E")]}
 
       # Provide the actual cell for column 3 (the gap)
-      current_cells_map = %{1 => Cell.new("A"), 2 => Cell.new("B"), 3 => Cell.new("C"), 4 => Cell.new("D"), 5 => Cell.new("E")}
+      current_cells_map = %{
+        1 => Cell.new("A"),
+        2 => Cell.new("B"),
+        3 => Cell.new("C"),
+        4 => Cell.new("D"),
+        5 => Cell.new("E")
+      }
 
       merged = Diff.merge_spans([span1, span2], current_cells_map)
 

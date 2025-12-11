@@ -337,6 +337,7 @@ defmodule TermUI.Input.RawTest do
 
     test "moduledoc mentions escape sequences" do
       {:docs_v1, _, :elixir, _, %{"en" => moduledoc}, _, _} = Code.fetch_docs(Raw)
+
       assert String.contains?(moduledoc, "escape sequence") or
                String.contains?(moduledoc, "Escape sequence")
     end

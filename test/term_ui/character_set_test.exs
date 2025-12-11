@@ -372,7 +372,8 @@ defmodule TermUI.CharacterSetTest do
         case key do
           :bar_levels ->
             for {level, _} <- Enum.with_index(value) do
-              assert String.printable?(level), "bar_levels contains non-printable: #{inspect(level)}"
+              assert String.printable?(level),
+                     "bar_levels contains non-printable: #{inspect(level)}"
             end
 
           _ ->

@@ -164,7 +164,12 @@ defmodule TermUI.Backend.InputBufferTest do
 
     test "truncates when buffer exceeds limit" do
       state = %{input_buffer: String.duplicate("x", 1000)}
-      new_state = InputBuffer.append_with_limit(state, String.duplicate("y", 500), :input_buffer, log: false)
+
+      new_state =
+        InputBuffer.append_with_limit(state, String.duplicate("y", 500), :input_buffer,
+          log: false
+        )
+
       assert byte_size(new_state.input_buffer) == 256
     end
 
@@ -240,7 +245,8 @@ defmodule TermUI.Backend.InputBufferTest do
     test "handles UTF-8 content" do
       # Unicode characters (varying byte sizes)
       # Using a 3-byte UTF-8 character repeated 400 times = 1200 bytes
-      buffer = String.duplicate("\u{2764}", 400)  # Heart symbol, 3 bytes each
+      # Heart symbol, 3 bytes each
+      buffer = String.duplicate("\u{2764}", 400)
       {result, overflowed} = InputBuffer.apply_limit(buffer, log: false)
       # 400 * 3 = 1200 bytes, exceeds 1024 limit
       assert overflowed == true

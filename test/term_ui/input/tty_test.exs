@@ -322,7 +322,9 @@ defmodule TermUI.Input.TTYTest do
 
     test "moduledoc explains arrow keys work normally" do
       {:docs_v1, _, :elixir, _, %{"en" => moduledoc}, _, _} = Code.fetch_docs(TTY)
-      assert String.contains?(moduledoc, "Arrow keys") or String.contains?(moduledoc, "arrow keys")
+
+      assert String.contains?(moduledoc, "Arrow keys") or
+               String.contains?(moduledoc, "arrow keys")
     end
 
     test "moduledoc explains Tab works" do

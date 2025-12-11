@@ -477,7 +477,10 @@ defmodule TermUI.Widgets.TextInput.Line do
 
   # Call on_blur callback if configured
   defp call_on_blur({_, _, state}) when is_function(state.on_blur, 1), do: state.on_blur.(state)
-  defp call_on_blur({:cancelled, state}) when is_function(state.on_blur, 1), do: state.on_blur.(state)
+
+  defp call_on_blur({:cancelled, state}) when is_function(state.on_blur, 1),
+    do: state.on_blur.(state)
+
   defp call_on_blur(_), do: :ok
 
   @doc """

@@ -77,7 +77,6 @@ defmodule TermUI.Backend.TTYTest do
       state = %TTY{}
       assert state.cursor_position == nil
     end
-
   end
 
   describe "init/1" do
@@ -1529,8 +1528,10 @@ defmodule TermUI.Backend.TTYTest do
         end)
 
       # Named colors should use standard SGR codes
-      assert output =~ "\e[36m"  # cyan foreground
-      assert output =~ "\e[45m"  # magenta background
+      # cyan foreground
+      assert output =~ "\e[36m"
+      # magenta background
+      assert output =~ "\e[45m"
     end
 
     test "named colors work in 256-color mode" do
@@ -1543,8 +1544,10 @@ defmodule TermUI.Backend.TTYTest do
         end)
 
       # Named colors should still use standard SGR codes
-      assert output =~ "\e[33m"  # yellow foreground
-      assert output =~ "\e[42m"  # green background
+      # yellow foreground
+      assert output =~ "\e[33m"
+      # green background
+      assert output =~ "\e[42m"
     end
 
     test "named colors work in 16-color mode" do
@@ -1557,8 +1560,10 @@ defmodule TermUI.Backend.TTYTest do
         end)
 
       # Named colors should use standard SGR codes
-      assert output =~ "\e[34m"  # blue foreground
-      assert output =~ "\e[47m"  # white background
+      # blue foreground
+      assert output =~ "\e[34m"
+      # white background
+      assert output =~ "\e[47m"
     end
 
     test "bright named colors work correctly" do
@@ -1571,8 +1576,10 @@ defmodule TermUI.Backend.TTYTest do
         end)
 
       # Bright colors use codes 90-97 (fg) and 100-107 (bg)
-      assert output =~ "\e[91m"   # bright red foreground
-      assert output =~ "\e[104m"  # bright blue background
+      # bright red foreground
+      assert output =~ "\e[91m"
+      # bright blue background
+      assert output =~ "\e[104m"
     end
 
     test ":default foreground works in all modes" do
@@ -3090,6 +3097,7 @@ defmodule TermUI.Backend.TTYTest do
             {{1, 1}, {"C", :default, :default, []}},
             {{2, 1}, {"D", :default, :default, []}}
           ]
+
           {:ok, _state} = TTY.draw_cells(state, cells3)
         end)
 
@@ -3107,11 +3115,12 @@ defmodule TermUI.Backend.TTYTest do
 
     test "state is properly maintained between frames" do
       capture_io(fn ->
-        {:ok, state} = TTY.init(
-          line_mode: :full_redraw,
-          size: {30, 100},
-          capabilities: %{colors: :true_color}
-        )
+        {:ok, state} =
+          TTY.init(
+            line_mode: :full_redraw,
+            size: {30, 100},
+            capabilities: %{colors: :true_color}
+          )
 
         # Verify initial state
         assert state.size == {30, 100}
@@ -3177,11 +3186,12 @@ defmodule TermUI.Backend.TTYTest do
     test "style changes with RGB colors in true_color mode" do
       output =
         capture_io(fn ->
-          {:ok, state} = TTY.init(
-            line_mode: :full_redraw,
-            size: {24, 80},
-            capabilities: %{colors: :true_color}
-          )
+          {:ok, state} =
+            TTY.init(
+              line_mode: :full_redraw,
+              size: {24, 80},
+              capabilities: %{colors: :true_color}
+            )
 
           # Frame 1: RGB red foreground
           cells1 = [{{1, 1}, {"1", {255, 0, 0}, :default, []}}]
@@ -3408,12 +3418,15 @@ defmodule TermUI.Backend.TTYTest do
             {{1, 1}, {"H", :default, :default, []}},
             {{1, 2}, {"i", :default, :default, []}}
           ]
+
           {:ok, _state} = TTY.draw_cells(state, cells)
         end)
 
       # Full redraw behavior: clear screen, home cursor, render content
-      assert output =~ "\e[2J"     # clear screen
-      assert output =~ "\e[H"      # cursor home
+      # clear screen
+      assert output =~ "\e[2J"
+      # cursor home
+      assert output =~ "\e[H"
       assert output =~ "H"
       assert output =~ "i"
     end
@@ -3479,15 +3492,19 @@ defmodule TermUI.Backend.TTYTest do
           {{1, 1}, {"A", :default, :default, []}},
           {{1, 2}, {"B", :default, :default, []}}
         ]
+
         {:ok, state} = TTY.draw_cells(state, cells1)
 
         # Second frame - only change one cell, keep the other same
         second_output =
           capture_io(fn ->
             cells2 = [
-              {{1, 1}, {"A", :default, :default, []}},  # unchanged
-              {{1, 2}, {"X", :default, :default, []}}   # changed
+              # unchanged
+              {{1, 1}, {"A", :default, :default, []}},
+              # changed
+              {{1, 2}, {"X", :default, :default, []}}
             ]
+
             {:ok, _state} = TTY.draw_cells(state, cells2)
           end)
 
@@ -3534,8 +3551,10 @@ defmodule TermUI.Backend.TTYTest do
           capture_io(fn ->
             cells2 = [
               {{1, 1}, {"A", :default, :default, []}},
-              {{1, 2}, {"B", :default, :default, []}}  # new cell
+              # new cell
+              {{1, 2}, {"B", :default, :default, []}}
             ]
+
             {:ok, _state} = TTY.draw_cells(state, cells2)
           end)
 
@@ -3553,6 +3572,7 @@ defmodule TermUI.Backend.TTYTest do
           {{1, 1}, {"A", :default, :default, []}},
           {{1, 2}, {"B", :default, :default, []}}
         ]
+
         {:ok, state} = TTY.draw_cells(state, cells1)
 
         # Second frame - remove second cell
@@ -3565,7 +3585,8 @@ defmodule TermUI.Backend.TTYTest do
         # Should contain cursor positioning for removed cell and a space
         # The cleared position should have cursor move to {1, 2}
         assert second_output =~ "\e[1;2H"
-        assert second_output =~ " "  # Space to clear
+        # Space to clear
+        assert second_output =~ " "
       end)
     end
 
@@ -3579,6 +3600,7 @@ defmodule TermUI.Backend.TTYTest do
           {{1, 2}, {"B", :default, :default, []}},
           {{1, 3}, {"C", :default, :default, []}}
         ]
+
         {:ok, state} = TTY.draw_cells(state, cells1)
 
         # Second frame - change all cells
@@ -3589,6 +3611,7 @@ defmodule TermUI.Backend.TTYTest do
               {{1, 2}, {"Y", :default, :default, []}},
               {{1, 3}, {"Z", :default, :default, []}}
             ]
+
             {:ok, _state} = TTY.draw_cells(state, cells2)
           end)
 
@@ -3737,11 +3760,12 @@ defmodule TermUI.Backend.TTYTest do
     test "RGB colors render with full 24-bit sequences in true_color mode" do
       output =
         capture_io(fn ->
-          {:ok, state} = TTY.init(
-            line_mode: :full_redraw,
-            size: {24, 80},
-            capabilities: %{colors: :true_color}
-          )
+          {:ok, state} =
+            TTY.init(
+              line_mode: :full_redraw,
+              size: {24, 80},
+              capabilities: %{colors: :true_color}
+            )
 
           # Cell with RGB foreground color
           cells = [{{1, 1}, {"X", {255, 128, 64}, :default, []}}]
@@ -3755,11 +3779,12 @@ defmodule TermUI.Backend.TTYTest do
     test "multiple RGB colors in same frame render correctly in true_color mode" do
       output =
         capture_io(fn ->
-          {:ok, state} = TTY.init(
-            line_mode: :full_redraw,
-            size: {24, 80},
-            capabilities: %{colors: :true_color}
-          )
+          {:ok, state} =
+            TTY.init(
+              line_mode: :full_redraw,
+              size: {24, 80},
+              capabilities: %{colors: :true_color}
+            )
 
           # Multiple cells with different RGB colors
           cells = [
@@ -3767,6 +3792,7 @@ defmodule TermUI.Backend.TTYTest do
             {{1, 2}, {"G", {0, 255, 0}, :default, []}},
             {{1, 3}, {"B", {0, 0, 255}, :default, []}}
           ]
+
           {:ok, _state} = TTY.draw_cells(state, cells)
         end)
 
@@ -3779,11 +3805,12 @@ defmodule TermUI.Backend.TTYTest do
     test "RGB foreground and background combinations in true_color mode" do
       output =
         capture_io(fn ->
-          {:ok, state} = TTY.init(
-            line_mode: :full_redraw,
-            size: {24, 80},
-            capabilities: %{colors: :true_color}
-          )
+          {:ok, state} =
+            TTY.init(
+              line_mode: :full_redraw,
+              size: {24, 80},
+              capabilities: %{colors: :true_color}
+            )
 
           # Cell with RGB foreground and background
           cells = [{{1, 1}, {"X", {100, 150, 200}, {50, 75, 100}, []}}]
@@ -3791,8 +3818,10 @@ defmodule TermUI.Backend.TTYTest do
         end)
 
       # Should contain both foreground and background true color sequences
-      assert output =~ "\e[38;2;100;150;200m"  # foreground
-      assert output =~ "\e[48;2;50;75;100m"    # background
+      # foreground
+      assert output =~ "\e[38;2;100;150;200m"
+      # background
+      assert output =~ "\e[48;2;50;75;100m"
     end
 
     # -------------------------------------------------------------------------
@@ -3802,11 +3831,12 @@ defmodule TermUI.Backend.TTYTest do
     test "RGB colors are mapped to 256-color palette in color_256 mode" do
       output =
         capture_io(fn ->
-          {:ok, state} = TTY.init(
-            line_mode: :full_redraw,
-            size: {24, 80},
-            capabilities: %{colors: :color_256}
-          )
+          {:ok, state} =
+            TTY.init(
+              line_mode: :full_redraw,
+              size: {24, 80},
+              capabilities: %{colors: :color_256}
+            )
 
           # Bright red should map to a palette index
           cells = [{{1, 1}, {"X", {255, 0, 0}, :default, []}}]
@@ -3822,11 +3852,12 @@ defmodule TermUI.Backend.TTYTest do
     test "color cube mapping (16-231) in color_256 mode" do
       output =
         capture_io(fn ->
-          {:ok, state} = TTY.init(
-            line_mode: :full_redraw,
-            size: {24, 80},
-            capabilities: %{colors: :color_256}
-          )
+          {:ok, state} =
+            TTY.init(
+              line_mode: :full_redraw,
+              size: {24, 80},
+              capabilities: %{colors: :color_256}
+            )
 
           # Non-gray color maps to 6x6x6 color cube (indices 16-231)
           # RGB(255, 0, 0) -> red in color cube
@@ -3841,11 +3872,12 @@ defmodule TermUI.Backend.TTYTest do
     test "grayscale mapping (232-255) in color_256 mode" do
       output =
         capture_io(fn ->
-          {:ok, state} = TTY.init(
-            line_mode: :full_redraw,
-            size: {24, 80},
-            capabilities: %{colors: :color_256}
-          )
+          {:ok, state} =
+            TTY.init(
+              line_mode: :full_redraw,
+              size: {24, 80},
+              capabilities: %{colors: :color_256}
+            )
 
           # Gray color (128, 128, 128) should map to grayscale ramp
           cells = [{{1, 1}, {"X", {128, 128, 128}, :default, []}}]
@@ -3859,11 +3891,12 @@ defmodule TermUI.Backend.TTYTest do
     test "palette indices pass through directly in color_256 mode" do
       output =
         capture_io(fn ->
-          {:ok, state} = TTY.init(
-            line_mode: :full_redraw,
-            size: {24, 80},
-            capabilities: %{colors: :color_256}
-          )
+          {:ok, state} =
+            TTY.init(
+              line_mode: :full_redraw,
+              size: {24, 80},
+              capabilities: %{colors: :color_256}
+            )
 
           # Use direct palette index 42
           cells = [{{1, 1}, {"X", 42, :default, []}}]
@@ -3881,11 +3914,12 @@ defmodule TermUI.Backend.TTYTest do
     test "RGB colors are mapped to nearest basic color in color_16 mode" do
       output =
         capture_io(fn ->
-          {:ok, state} = TTY.init(
-            line_mode: :full_redraw,
-            size: {24, 80},
-            capabilities: %{colors: :color_16}
-          )
+          {:ok, state} =
+            TTY.init(
+              line_mode: :full_redraw,
+              size: {24, 80},
+              capabilities: %{colors: :color_16}
+            )
 
           # Bright red (255, 0, 0) should map to basic red
           cells = [{{1, 1}, {"X", {255, 0, 0}, :default, []}}]
@@ -3902,18 +3936,22 @@ defmodule TermUI.Backend.TTYTest do
     test "bright vs normal color selection in color_16 mode" do
       output =
         capture_io(fn ->
-          {:ok, state} = TTY.init(
-            line_mode: :full_redraw,
-            size: {24, 80},
-            capabilities: %{colors: :color_16}
-          )
+          {:ok, state} =
+            TTY.init(
+              line_mode: :full_redraw,
+              size: {24, 80},
+              capabilities: %{colors: :color_16}
+            )
 
           # High intensity color should map to bright variant (90-97)
           # Low intensity color should map to normal variant (30-37)
           cells = [
-            {{1, 1}, {"B", {255, 255, 255}, :default, []}},  # Bright white
-            {{1, 2}, {"D", {64, 64, 64}, :default, []}}      # Dark gray -> black range
+            # Bright white
+            {{1, 1}, {"B", {255, 255, 255}, :default, []}},
+            # Dark gray -> black range
+            {{1, 2}, {"D", {64, 64, 64}, :default, []}}
           ]
+
           {:ok, _state} = TTY.draw_cells(state, cells)
         end)
 
@@ -3926,11 +3964,12 @@ defmodule TermUI.Backend.TTYTest do
     test "named colors work directly in color_16 mode" do
       output =
         capture_io(fn ->
-          {:ok, state} = TTY.init(
-            line_mode: :full_redraw,
-            size: {24, 80},
-            capabilities: %{colors: :color_16}
-          )
+          {:ok, state} =
+            TTY.init(
+              line_mode: :full_redraw,
+              size: {24, 80},
+              capabilities: %{colors: :color_16}
+            )
 
           # Named colors should pass through
           cells = [
@@ -3938,13 +3977,17 @@ defmodule TermUI.Backend.TTYTest do
             {{1, 2}, {"G", :green, :default, []}},
             {{1, 3}, {"B", :bright_blue, :default, []}}
           ]
+
           {:ok, _state} = TTY.draw_cells(state, cells)
         end)
 
       # Named colors should produce their standard codes
-      assert output =~ "\e[31m"   # red
-      assert output =~ "\e[32m"   # green
-      assert output =~ "\e[94m"   # bright_blue
+      # red
+      assert output =~ "\e[31m"
+      # green
+      assert output =~ "\e[32m"
+      # bright_blue
+      assert output =~ "\e[94m"
     end
 
     # -------------------------------------------------------------------------
@@ -3954,11 +3997,12 @@ defmodule TermUI.Backend.TTYTest do
     test "color sequences are omitted in monochrome mode" do
       output =
         capture_io(fn ->
-          {:ok, state} = TTY.init(
-            line_mode: :full_redraw,
-            size: {24, 80},
-            capabilities: %{colors: :monochrome}
-          )
+          {:ok, state} =
+            TTY.init(
+              line_mode: :full_redraw,
+              size: {24, 80},
+              capabilities: %{colors: :monochrome}
+            )
 
           # RGB colors should be omitted entirely
           cells = [{{1, 1}, {"X", {255, 128, 64}, {0, 128, 255}, []}}]
@@ -3966,23 +4010,30 @@ defmodule TermUI.Backend.TTYTest do
         end)
 
       # Should NOT contain any color sequences
-      refute output =~ ~r/\e\[38;2;\d+;\d+;\d+m/  # No true color
-      refute output =~ ~r/\e\[48;2;\d+;\d+;\d+m/  # No true color bg
-      refute output =~ ~r/\e\[38;5;\d+m/           # No 256-color
-      refute output =~ ~r/\e\[48;5;\d+m/           # No 256-color bg
+      # No true color
+      refute output =~ ~r/\e\[38;2;\d+;\d+;\d+m/
+      # No true color bg
+      refute output =~ ~r/\e\[48;2;\d+;\d+;\d+m/
+      # No 256-color
+      refute output =~ ~r/\e\[38;5;\d+m/
+      # No 256-color bg
+      refute output =~ ~r/\e\[48;5;\d+m/
       # Named colors are also omitted (but 39m/49m for :default are allowed)
-      refute output =~ ~r/\e\[3[1-7]m/             # No named fg colors
-      refute output =~ ~r/\e\[4[1-7]m/             # No named bg colors
+      # No named fg colors
+      refute output =~ ~r/\e\[3[1-7]m/
+      # No named bg colors
+      refute output =~ ~r/\e\[4[1-7]m/
     end
 
     test "text attributes are preserved in monochrome mode" do
       output =
         capture_io(fn ->
-          {:ok, state} = TTY.init(
-            line_mode: :full_redraw,
-            size: {24, 80},
-            capabilities: %{colors: :monochrome}
-          )
+          {:ok, state} =
+            TTY.init(
+              line_mode: :full_redraw,
+              size: {24, 80},
+              capabilities: %{colors: :monochrome}
+            )
 
           # Cell with color (should be ignored) and attributes (should be preserved)
           cells = [{{1, 1}, {"X", {255, 0, 0}, :default, [:bold, :underline]}}]
@@ -3990,8 +4041,10 @@ defmodule TermUI.Backend.TTYTest do
         end)
 
       # Attributes should be present
-      assert output =~ "\e[1m"  # bold
-      assert output =~ "\e[4m"  # underline
+      # bold
+      assert output =~ "\e[1m"
+      # underline
+      assert output =~ "\e[4m"
       # Color should NOT be present
       refute output =~ ~r/\e\[38;2;\d+;\d+;\d+m/
     end
@@ -3999,11 +4052,12 @@ defmodule TermUI.Backend.TTYTest do
     test "content still renders correctly in monochrome mode" do
       output =
         capture_io(fn ->
-          {:ok, state} = TTY.init(
-            line_mode: :full_redraw,
-            size: {24, 80},
-            capabilities: %{colors: :monochrome}
-          )
+          {:ok, state} =
+            TTY.init(
+              line_mode: :full_redraw,
+              size: {24, 80},
+              capabilities: %{colors: :monochrome}
+            )
 
           # Multiple cells with colors should render content without color codes
           cells = [
@@ -4013,6 +4067,7 @@ defmodule TermUI.Backend.TTYTest do
             {{1, 4}, {"l", :cyan, :default, []}},
             {{1, 5}, {"o", 42, :default, []}}
           ]
+
           {:ok, _state} = TTY.draw_cells(state, cells)
         end)
 
@@ -4026,29 +4081,33 @@ defmodule TermUI.Backend.TTYTest do
     test "named colors are omitted in monochrome mode" do
       output =
         capture_io(fn ->
-          {:ok, state} = TTY.init(
-            line_mode: :full_redraw,
-            size: {24, 80},
-            capabilities: %{colors: :monochrome}
-          )
+          {:ok, state} =
+            TTY.init(
+              line_mode: :full_redraw,
+              size: {24, 80},
+              capabilities: %{colors: :monochrome}
+            )
 
           cells = [{{1, 1}, {"X", :red, :blue, []}}]
           {:ok, _state} = TTY.draw_cells(state, cells)
         end)
 
       # Named colors should be omitted
-      refute output =~ "\e[31m"  # no red
-      refute output =~ "\e[44m"  # no blue background
+      # no red
+      refute output =~ "\e[31m"
+      # no blue background
+      refute output =~ "\e[44m"
     end
 
     test "palette indices are omitted in monochrome mode" do
       output =
         capture_io(fn ->
-          {:ok, state} = TTY.init(
-            line_mode: :full_redraw,
-            size: {24, 80},
-            capabilities: %{colors: :monochrome}
-          )
+          {:ok, state} =
+            TTY.init(
+              line_mode: :full_redraw,
+              size: {24, 80},
+              capabilities: %{colors: :monochrome}
+            )
 
           cells = [{{1, 1}, {"X", 42, 100, []}}]
           {:ok, _state} = TTY.draw_cells(state, cells)
@@ -4077,11 +4136,12 @@ defmodule TermUI.Backend.TTYTest do
     test "Unicode box corners render correctly in unicode mode" do
       output =
         capture_io(fn ->
-          {:ok, state} = TTY.init(
-            line_mode: :full_redraw,
-            size: {24, 80},
-            capabilities: %{unicode: true}
-          )
+          {:ok, state} =
+            TTY.init(
+              line_mode: :full_redraw,
+              size: {24, 80},
+              capabilities: %{unicode: true}
+            )
 
           # Render all four corners
           cells = [
@@ -4090,6 +4150,7 @@ defmodule TermUI.Backend.TTYTest do
             {{2, 1}, {@unicode_chars.bl, :default, :default, []}},
             {{2, 2}, {@unicode_chars.br, :default, :default, []}}
           ]
+
           {:ok, _state} = TTY.draw_cells(state, cells)
         end)
 
@@ -4103,17 +4164,19 @@ defmodule TermUI.Backend.TTYTest do
     test "Unicode horizontal and vertical lines render correctly" do
       output =
         capture_io(fn ->
-          {:ok, state} = TTY.init(
-            line_mode: :full_redraw,
-            size: {24, 80},
-            capabilities: %{unicode: true}
-          )
+          {:ok, state} =
+            TTY.init(
+              line_mode: :full_redraw,
+              size: {24, 80},
+              capabilities: %{unicode: true}
+            )
 
           cells = [
             {{1, 1}, {@unicode_chars.h_line, :default, :default, []}},
             {{1, 2}, {@unicode_chars.h_line, :default, :default, []}},
             {{2, 1}, {@unicode_chars.v_line, :default, :default, []}}
           ]
+
           {:ok, _state} = TTY.draw_cells(state, cells)
         end)
 
@@ -4124,11 +4187,12 @@ defmodule TermUI.Backend.TTYTest do
     test "Unicode T-junctions and cross render correctly" do
       output =
         capture_io(fn ->
-          {:ok, state} = TTY.init(
-            line_mode: :full_redraw,
-            size: {24, 80},
-            capabilities: %{unicode: true}
-          )
+          {:ok, state} =
+            TTY.init(
+              line_mode: :full_redraw,
+              size: {24, 80},
+              capabilities: %{unicode: true}
+            )
 
           cells = [
             {{1, 1}, {@unicode_chars.t_up, :default, :default, []}},
@@ -4137,6 +4201,7 @@ defmodule TermUI.Backend.TTYTest do
             {{1, 4}, {@unicode_chars.t_right, :default, :default, []}},
             {{1, 5}, {@unicode_chars.cross, :default, :default, []}}
           ]
+
           {:ok, _state} = TTY.draw_cells(state, cells)
         end)
 
@@ -4150,16 +4215,18 @@ defmodule TermUI.Backend.TTYTest do
     test "Unicode progress bar characters render correctly" do
       output =
         capture_io(fn ->
-          {:ok, state} = TTY.init(
-            line_mode: :full_redraw,
-            size: {24, 80},
-            capabilities: %{unicode: true}
-          )
+          {:ok, state} =
+            TTY.init(
+              line_mode: :full_redraw,
+              size: {24, 80},
+              capabilities: %{unicode: true}
+            )
 
           cells = [
             {{1, 1}, {@unicode_chars.bar_full, :default, :default, []}},
             {{1, 2}, {@unicode_chars.bar_empty, :default, :default, []}}
           ]
+
           {:ok, _state} = TTY.draw_cells(state, cells)
         end)
 
@@ -4170,11 +4237,12 @@ defmodule TermUI.Backend.TTYTest do
     test "Unicode check marks and arrows render correctly" do
       output =
         capture_io(fn ->
-          {:ok, state} = TTY.init(
-            line_mode: :full_redraw,
-            size: {24, 80},
-            capabilities: %{unicode: true}
-          )
+          {:ok, state} =
+            TTY.init(
+              line_mode: :full_redraw,
+              size: {24, 80},
+              capabilities: %{unicode: true}
+            )
 
           cells = [
             {{1, 1}, {@unicode_chars.check, :default, :default, []}},
@@ -4184,6 +4252,7 @@ defmodule TermUI.Backend.TTYTest do
             {{1, 5}, {@unicode_chars.arrow_left, :default, :default, []}},
             {{1, 6}, {@unicode_chars.arrow_right, :default, :default, []}}
           ]
+
           {:ok, _state} = TTY.draw_cells(state, cells)
         end)
 
@@ -4202,11 +4271,12 @@ defmodule TermUI.Backend.TTYTest do
     test "ASCII fallback maps box corners to +" do
       output =
         capture_io(fn ->
-          {:ok, state} = TTY.init(
-            line_mode: :full_redraw,
-            size: {24, 80},
-            capabilities: %{unicode: false}
-          )
+          {:ok, state} =
+            TTY.init(
+              line_mode: :full_redraw,
+              size: {24, 80},
+              capabilities: %{unicode: false}
+            )
 
           # Unicode corners should be mapped to +
           cells = [
@@ -4215,6 +4285,7 @@ defmodule TermUI.Backend.TTYTest do
             {{2, 1}, {@unicode_chars.bl, :default, :default, []}},
             {{2, 2}, {@unicode_chars.br, :default, :default, []}}
           ]
+
           {:ok, _state} = TTY.draw_cells(state, cells)
         end)
 
@@ -4233,17 +4304,19 @@ defmodule TermUI.Backend.TTYTest do
     test "ASCII fallback maps horizontal line to - and vertical to |" do
       output =
         capture_io(fn ->
-          {:ok, state} = TTY.init(
-            line_mode: :full_redraw,
-            size: {24, 80},
-            capabilities: %{unicode: false}
-          )
+          {:ok, state} =
+            TTY.init(
+              line_mode: :full_redraw,
+              size: {24, 80},
+              capabilities: %{unicode: false}
+            )
 
           cells = [
             {{1, 1}, {@unicode_chars.h_line, :default, :default, []}},
             {{1, 2}, {@unicode_chars.h_line, :default, :default, []}},
             {{2, 1}, {@unicode_chars.v_line, :default, :default, []}}
           ]
+
           {:ok, _state} = TTY.draw_cells(state, cells)
         end)
 
@@ -4259,11 +4332,12 @@ defmodule TermUI.Backend.TTYTest do
     test "ASCII fallback maps T-junctions and cross to +" do
       output =
         capture_io(fn ->
-          {:ok, state} = TTY.init(
-            line_mode: :full_redraw,
-            size: {24, 80},
-            capabilities: %{unicode: false}
-          )
+          {:ok, state} =
+            TTY.init(
+              line_mode: :full_redraw,
+              size: {24, 80},
+              capabilities: %{unicode: false}
+            )
 
           cells = [
             {{1, 1}, {@unicode_chars.t_up, :default, :default, []}},
@@ -4272,6 +4346,7 @@ defmodule TermUI.Backend.TTYTest do
             {{1, 4}, {@unicode_chars.t_right, :default, :default, []}},
             {{1, 5}, {@unicode_chars.cross, :default, :default, []}}
           ]
+
           {:ok, _state} = TTY.draw_cells(state, cells)
         end)
 
@@ -4290,16 +4365,18 @@ defmodule TermUI.Backend.TTYTest do
     test "ASCII fallback maps progress bar characters" do
       output =
         capture_io(fn ->
-          {:ok, state} = TTY.init(
-            line_mode: :full_redraw,
-            size: {24, 80},
-            capabilities: %{unicode: false}
-          )
+          {:ok, state} =
+            TTY.init(
+              line_mode: :full_redraw,
+              size: {24, 80},
+              capabilities: %{unicode: false}
+            )
 
           cells = [
             {{1, 1}, {@unicode_chars.bar_full, :default, :default, []}},
             {{1, 2}, {@unicode_chars.bar_empty, :default, :default, []}}
           ]
+
           {:ok, _state} = TTY.draw_cells(state, cells)
         end)
 
@@ -4315,11 +4392,12 @@ defmodule TermUI.Backend.TTYTest do
     test "ASCII fallback maps check marks and arrows" do
       output =
         capture_io(fn ->
-          {:ok, state} = TTY.init(
-            line_mode: :full_redraw,
-            size: {24, 80},
-            capabilities: %{unicode: false}
-          )
+          {:ok, state} =
+            TTY.init(
+              line_mode: :full_redraw,
+              size: {24, 80},
+              capabilities: %{unicode: false}
+            )
 
           cells = [
             {{1, 1}, {@unicode_chars.check, :default, :default, []}},
@@ -4329,6 +4407,7 @@ defmodule TermUI.Backend.TTYTest do
             {{1, 5}, {@unicode_chars.arrow_left, :default, :default, []}},
             {{1, 6}, {@unicode_chars.arrow_right, :default, :default, []}}
           ]
+
           {:ok, _state} = TTY.draw_cells(state, cells)
         end)
 
@@ -4357,11 +4436,12 @@ defmodule TermUI.Backend.TTYTest do
       for unicode_mode <- [true, false] do
         output =
           capture_io(fn ->
-            {:ok, state} = TTY.init(
-              line_mode: :full_redraw,
-              size: {24, 80},
-              capabilities: %{unicode: unicode_mode}
-            )
+            {:ok, state} =
+              TTY.init(
+                line_mode: :full_redraw,
+                size: {24, 80},
+                capabilities: %{unicode: unicode_mode}
+              )
 
             cells = [
               {{1, 1}, {"H", :default, :default, []}},
@@ -4370,6 +4450,7 @@ defmodule TermUI.Backend.TTYTest do
               {{1, 4}, {"l", :default, :default, []}},
               {{1, 5}, {"o", :default, :default, []}}
             ]
+
             {:ok, _state} = TTY.draw_cells(state, cells)
           end)
 
@@ -4383,11 +4464,12 @@ defmodule TermUI.Backend.TTYTest do
     test "Unicode text passes through unchanged in unicode mode" do
       output =
         capture_io(fn ->
-          {:ok, state} = TTY.init(
-            line_mode: :full_redraw,
-            size: {24, 80},
-            capabilities: %{unicode: true}
-          )
+          {:ok, state} =
+            TTY.init(
+              line_mode: :full_redraw,
+              size: {24, 80},
+              capabilities: %{unicode: true}
+            )
 
           # Unicode text that is NOT box-drawing (should pass through)
           cells = [
@@ -4395,6 +4477,7 @@ defmodule TermUI.Backend.TTYTest do
             {{1, 2}, {"本", :default, :default, []}},
             {{1, 3}, {"語", :default, :default, []}}
           ]
+
           {:ok, _state} = TTY.draw_cells(state, cells)
         end)
 
@@ -4406,11 +4489,12 @@ defmodule TermUI.Backend.TTYTest do
     test "non-box-drawing Unicode passes through unchanged in ascii mode" do
       output =
         capture_io(fn ->
-          {:ok, state} = TTY.init(
-            line_mode: :full_redraw,
-            size: {24, 80},
-            capabilities: %{unicode: false}
-          )
+          {:ok, state} =
+            TTY.init(
+              line_mode: :full_redraw,
+              size: {24, 80},
+              capabilities: %{unicode: false}
+            )
 
           # Unicode text that is NOT in our box-drawing map should pass through
           # (the terminal may or may not display it, but we don't modify it)
@@ -4418,6 +4502,7 @@ defmodule TermUI.Backend.TTYTest do
             {{1, 1}, {"日", :default, :default, []}},
             {{1, 2}, {"本", :default, :default, []}}
           ]
+
           {:ok, _state} = TTY.draw_cells(state, cells)
         end)
 
@@ -4430,11 +4515,12 @@ defmodule TermUI.Backend.TTYTest do
     test "mixed content: text with box-drawing on same row in unicode mode" do
       output =
         capture_io(fn ->
-          {:ok, state} = TTY.init(
-            line_mode: :full_redraw,
-            size: {24, 80},
-            capabilities: %{unicode: true}
-          )
+          {:ok, state} =
+            TTY.init(
+              line_mode: :full_redraw,
+              size: {24, 80},
+              capabilities: %{unicode: true}
+            )
 
           # Mixed: box corner, text, box corner
           cells = [
@@ -4445,6 +4531,7 @@ defmodule TermUI.Backend.TTYTest do
             {{1, 5}, {"t", :default, :default, []}},
             {{1, 6}, {@unicode_chars.tr, :default, :default, []}}
           ]
+
           {:ok, _state} = TTY.draw_cells(state, cells)
         end)
 
@@ -4457,11 +4544,12 @@ defmodule TermUI.Backend.TTYTest do
     test "mixed content: text with box-drawing on same row in ascii mode" do
       output =
         capture_io(fn ->
-          {:ok, state} = TTY.init(
-            line_mode: :full_redraw,
-            size: {24, 80},
-            capabilities: %{unicode: false}
-          )
+          {:ok, state} =
+            TTY.init(
+              line_mode: :full_redraw,
+              size: {24, 80},
+              capabilities: %{unicode: false}
+            )
 
           # Mixed: box corner, text, box corner (should map corners to +)
           cells = [
@@ -4472,6 +4560,7 @@ defmodule TermUI.Backend.TTYTest do
             {{1, 5}, {"t", :default, :default, []}},
             {{1, 6}, {@unicode_chars.tr, :default, :default, []}}
           ]
+
           {:ok, _state} = TTY.draw_cells(state, cells)
         end)
 
