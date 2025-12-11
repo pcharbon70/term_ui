@@ -142,7 +142,15 @@ defmodule TermUI.ThemeTest do
       theme = %Theme{
         name: :invalid,
         colors: %{background: :black},
-        semantic: %{success: :green, warning: :yellow, error: :red, info: :cyan, muted: :white},
+        semantic: %{
+          success: :green,
+          warning: :yellow,
+          error: :red,
+          info: :cyan,
+          muted: :white,
+          help: :white,
+          placeholder: :white
+        },
         components: %{}
       }
 

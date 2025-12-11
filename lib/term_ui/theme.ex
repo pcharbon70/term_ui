@@ -63,7 +63,9 @@ defmodule TermUI.Theme do
           warning: color(),
           error: color(),
           info: color(),
-          muted: color()
+          muted: color(),
+          help: color(),
+          placeholder: color()
         }
 
   @type component_styles :: %{
@@ -102,7 +104,9 @@ defmodule TermUI.Theme do
         warning: :yellow,
         error: :red,
         info: :cyan,
-        muted: :bright_black
+        muted: :bright_black,
+        help: :white,
+        placeholder: :bright_black
       },
       components: %{
         button: %{
@@ -124,6 +128,22 @@ defmodule TermUI.Theme do
           normal: Style.new() |> Style.fg(:bright_black),
           focused: Style.new() |> Style.fg(:blue),
           accent: Style.new() |> Style.fg(:magenta)
+        },
+        item: %{
+          normal: Style.new() |> Style.fg(:white),
+          selected: Style.new() |> Style.fg(:black) |> Style.bg(:cyan),
+          focused: Style.new() |> Style.fg(:white) |> Style.bg(:blue)
+        },
+        divider: %{
+          normal: Style.new() |> Style.fg(:white),
+          focused: Style.new() |> Style.fg(:cyan) |> Style.bold()
+        },
+        status: %{
+          running: Style.new() |> Style.fg(:green),
+          warning: Style.new() |> Style.fg(:yellow),
+          error: Style.new() |> Style.fg(:red),
+          terminated: Style.new() |> Style.fg(:red),
+          unknown: Style.new() |> Style.fg(:white)
         }
       }
     }
@@ -144,7 +164,9 @@ defmodule TermUI.Theme do
         warning: :yellow,
         error: :red,
         info: :blue,
-        muted: :bright_black
+        muted: :bright_black,
+        help: :black,
+        placeholder: :bright_black
       },
       components: %{
         button: %{
@@ -166,6 +188,22 @@ defmodule TermUI.Theme do
           normal: Style.new() |> Style.fg(:bright_black),
           focused: Style.new() |> Style.fg(:blue),
           accent: Style.new() |> Style.fg(:magenta)
+        },
+        item: %{
+          normal: Style.new() |> Style.fg(:black),
+          selected: Style.new() |> Style.fg(:black) |> Style.bg(:cyan),
+          focused: Style.new() |> Style.fg(:white) |> Style.bg(:blue)
+        },
+        divider: %{
+          normal: Style.new() |> Style.fg(:black),
+          focused: Style.new() |> Style.fg(:cyan) |> Style.bold()
+        },
+        status: %{
+          running: Style.new() |> Style.fg(:green),
+          warning: Style.new() |> Style.fg(:yellow),
+          error: Style.new() |> Style.fg(:red),
+          terminated: Style.new() |> Style.fg(:red),
+          unknown: Style.new() |> Style.fg(:black)
         }
       }
     }
@@ -186,7 +224,9 @@ defmodule TermUI.Theme do
         warning: :bright_yellow,
         error: :bright_red,
         info: :bright_cyan,
-        muted: :white
+        muted: :white,
+        help: :bright_white,
+        placeholder: :white
       },
       components: %{
         button: %{
@@ -220,6 +260,22 @@ defmodule TermUI.Theme do
           normal: Style.new() |> Style.fg(:white),
           focused: Style.new() |> Style.fg(:bright_cyan) |> Style.bold(),
           accent: Style.new() |> Style.fg(:bright_magenta)
+        },
+        item: %{
+          normal: Style.new() |> Style.fg(:bright_white),
+          selected: Style.new() |> Style.fg(:black) |> Style.bg(:bright_cyan) |> Style.bold(),
+          focused: Style.new() |> Style.fg(:black) |> Style.bg(:bright_yellow) |> Style.bold()
+        },
+        divider: %{
+          normal: Style.new() |> Style.fg(:white),
+          focused: Style.new() |> Style.fg(:bright_cyan) |> Style.bold()
+        },
+        status: %{
+          running: Style.new() |> Style.fg(:bright_green) |> Style.bold(),
+          warning: Style.new() |> Style.fg(:bright_yellow) |> Style.bold(),
+          error: Style.new() |> Style.fg(:bright_red) |> Style.bold(),
+          terminated: Style.new() |> Style.fg(:bright_red) |> Style.bold(),
+          unknown: Style.new() |> Style.fg(:bright_white)
         }
       }
     }
@@ -455,7 +511,7 @@ defmodule TermUI.Theme do
       end
 
     # Check required semantic fields
-    required_semantic = [:success, :warning, :error, :info, :muted]
+    required_semantic = [:success, :warning, :error, :info, :muted, :help, :placeholder]
 
     missing_semantic =
       Enum.filter(required_semantic, fn key ->
