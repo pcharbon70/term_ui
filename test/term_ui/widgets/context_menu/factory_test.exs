@@ -1,6 +1,8 @@
 defmodule TermUI.Widgets.ContextMenu.FactoryTest do
   use ExUnit.Case, async: true
 
+  import TermUI.Test.ContextMenuHelpers
+
   alias TermUI.Widgets.ContextMenu
   alias TermUI.Widgets.ContextMenu.Factory
   alias TermUI.Widgets.ContextMenu.Inline
@@ -8,22 +10,26 @@ defmodule TermUI.Widgets.ContextMenu.FactoryTest do
 
   # Test helpers
 
-  defp test_items do
-    [
-      ContextMenu.action(:copy, "Copy"),
-      ContextMenu.action(:paste, "Paste"),
-      ContextMenu.action(:delete, "Delete")
-    ]
+  # Restores an environment variable to its original value (or deletes if it was nil)
+  defp restore_env(key, original_value) do
+    if original_value do
+      System.put_env(key, original_value)
+    else
+      System.delete_env(key)
+    end
   end
 
+  # Executes a test function with mouse support enabled or disabled
   defp with_mouse_support(enabled, fun) do
     # Clear cache and set up test capabilities
     Capabilities.clear_cache()
 
-    # Store original env
-    original_term = System.get_env("TERM")
-    original_colorterm = System.get_env("COLORTERM")
-    original_term_program = System.get_env("TERM_PROGRAM")
+    # Store original environment
+    original_env = %{
+      "TERM" => System.get_env("TERM"),
+      "COLORTERM" => System.get_env("COLORTERM"),
+      "TERM_PROGRAM" => System.get_env("TERM_PROGRAM")
+    }
 
     try do
       if enabled do
@@ -43,17 +49,8 @@ defmodule TermUI.Widgets.ContextMenu.FactoryTest do
 
       fun.()
     after
-      # Restore original env
-      if original_term, do: System.put_env("TERM", original_term), else: System.delete_env("TERM")
-
-      if original_colorterm,
-        do: System.put_env("COLORTERM", original_colorterm),
-        else: System.delete_env("COLORTERM")
-
-      if original_term_program,
-        do: System.put_env("TERM_PROGRAM", original_term_program),
-        else: System.delete_env("TERM_PROGRAM")
-
+      # Restore original environment
+      Enum.each(original_env, fn {key, value} -> restore_env(key, value) end)
       Capabilities.clear_cache()
     end
   end
@@ -80,7 +77,7 @@ defmodule TermUI.Widgets.ContextMenu.FactoryTest do
     test "creates Inline menu" do
       {:ok, {module, props}} =
         Factory.create(
-          items: test_items(),
+          items: simple_items(),
           mode: :inline
         )
 
@@ -91,7 +88,7 @@ defmodule TermUI.Widgets.ContextMenu.FactoryTest do
     test "creates Inline menu even with position provided" do
       {:ok, {module, _props}} =
         Factory.create(
-          items: test_items(),
+          items: simple_items(),
           mode: :inline,
           position: {10, 5}
         )
@@ -102,7 +99,7 @@ defmodule TermUI.Widgets.ContextMenu.FactoryTest do
     test "passes orientation option to Inline" do
       {:ok, {module, props}} =
         Factory.create(
-          items: test_items(),
+          items: simple_items(),
           mode: :inline,
           orientation: :vertical
         )
@@ -116,7 +113,7 @@ defmodule TermUI.Widgets.ContextMenu.FactoryTest do
     test "creates ContextMenu with position" do
       {:ok, {module, props}} =
         Factory.create(
-          items: test_items(),
+          items: simple_items(),
           mode: :positioned,
           position: {10, 5}
         )
@@ -128,7 +125,7 @@ defmodule TermUI.Widgets.ContextMenu.FactoryTest do
     test "returns error when position not provided" do
       assert {:error, :missing_position} =
                Factory.create(
-                 items: test_items(),
+                 items: simple_items(),
                  mode: :positioned
                )
     end
@@ -142,7 +139,7 @@ defmodule TermUI.Widgets.ContextMenu.FactoryTest do
     test "uses positioned mode when position provided" do
       {:ok, {module, props}} =
         Factory.create(
-          items: test_items(),
+          items: simple_items(),
           position: {10, 5}
         )
 
@@ -154,7 +151,7 @@ defmodule TermUI.Widgets.ContextMenu.FactoryTest do
       with_mouse_support(false, fn ->
         {:ok, {module, _props}} =
           Factory.create(
-            items: test_items()
+            items: simple_items()
           )
 
         assert module == Inline
@@ -165,7 +162,7 @@ defmodule TermUI.Widgets.ContextMenu.FactoryTest do
       with_mouse_support(true, fn ->
         assert {:error, :position_required} =
                  Factory.create(
-                   items: test_items()
+                   items: simple_items()
                  )
       end)
     end
@@ -181,7 +178,7 @@ defmodule TermUI.Widgets.ContextMenu.FactoryTest do
 
       {:ok, {_module, props}} =
         Factory.create(
-          items: test_items(),
+          items: simple_items(),
           position: {10, 5},
           on_select: on_select
         )
@@ -194,7 +191,7 @@ defmodule TermUI.Widgets.ContextMenu.FactoryTest do
 
       {:ok, {_module, props}} =
         Factory.create(
-          items: test_items(),
+          items: simple_items(),
           mode: :inline,
           on_select: on_select
         )
@@ -207,7 +204,7 @@ defmodule TermUI.Widgets.ContextMenu.FactoryTest do
 
       {:ok, {_module, props}} =
         Factory.create(
-          items: test_items(),
+          items: simple_items(),
           mode: :inline,
           on_close: on_close
         )
@@ -224,7 +221,7 @@ defmodule TermUI.Widgets.ContextMenu.FactoryTest do
     test "passes styles to positioned menu" do
       {:ok, {_module, props}} =
         Factory.create(
-          items: test_items(),
+          items: simple_items(),
           position: {10, 5},
           item_style: :normal,
           selected_style: :selected,
@@ -239,7 +236,7 @@ defmodule TermUI.Widgets.ContextMenu.FactoryTest do
     test "passes styles to inline menu" do
       {:ok, {_module, props}} =
         Factory.create(
-          items: test_items(),
+          items: simple_items(),
           mode: :inline,
           item_style: :normal,
           selected_style: :selected,
@@ -262,7 +259,7 @@ defmodule TermUI.Widgets.ContextMenu.FactoryTest do
     test "returns result on success" do
       {module, props} =
         Factory.create!(
-          items: test_items(),
+          items: simple_items(),
           mode: :inline
         )
 
@@ -279,7 +276,7 @@ defmodule TermUI.Widgets.ContextMenu.FactoryTest do
     test "raises on missing position for positioned mode" do
       assert_raise ArgumentError, ~r/requires :position/, fn ->
         Factory.create!(
-          items: test_items(),
+          items: simple_items(),
           mode: :positioned
         )
       end
@@ -288,7 +285,7 @@ defmodule TermUI.Widgets.ContextMenu.FactoryTest do
     test "raises when mouse supported but no position" do
       with_mouse_support(true, fn ->
         assert_raise ArgumentError, ~r/position/, fn ->
-          Factory.create!(items: test_items())
+          Factory.create!(items: simple_items())
         end
       end)
     end
@@ -320,7 +317,7 @@ defmodule TermUI.Widgets.ContextMenu.FactoryTest do
     test "created positioned menu can be initialized" do
       {:ok, {module, props}} =
         Factory.create(
-          items: test_items(),
+          items: simple_items(),
           position: {10, 5}
         )
 
@@ -332,7 +329,7 @@ defmodule TermUI.Widgets.ContextMenu.FactoryTest do
     test "created inline menu can be initialized" do
       {:ok, {module, props}} =
         Factory.create(
-          items: test_items(),
+          items: simple_items(),
           mode: :inline
         )
 

@@ -1,29 +1,10 @@
 defmodule TermUI.Widgets.ContextMenu.BehaviorTest do
   use ExUnit.Case, async: true
 
+  import TermUI.Test.ContextMenuHelpers
+
   alias TermUI.Widgets.ContextMenu
   alias TermUI.Widgets.ContextMenu.Behavior
-
-  # ----------------------------------------------------------------------------
-  # Test Helpers
-  # ----------------------------------------------------------------------------
-
-  defp test_items do
-    [
-      ContextMenu.action(:copy, "Copy"),
-      ContextMenu.separator(),
-      ContextMenu.action(:paste, "Paste", disabled: true),
-      ContextMenu.action(:delete, "Delete")
-    ]
-  end
-
-  defp simple_items do
-    [
-      ContextMenu.action(:copy, "Copy"),
-      ContextMenu.action(:paste, "Paste"),
-      ContextMenu.action(:delete, "Delete")
-    ]
-  end
 
   # ----------------------------------------------------------------------------
   # selectable?/1 Tests
@@ -57,7 +38,7 @@ defmodule TermUI.Widgets.ContextMenu.BehaviorTest do
 
   describe "find_first_selectable/1" do
     test "finds first selectable item in mixed list" do
-      items = test_items()
+      items = mixed_items()
       assert Behavior.find_first_selectable(items) == :copy
     end
 

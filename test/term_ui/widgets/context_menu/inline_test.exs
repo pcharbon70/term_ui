@@ -1,16 +1,14 @@
 defmodule TermUI.Widgets.ContextMenu.InlineTest do
   use ExUnit.Case, async: true
 
+  import TermUI.Test.ContextMenuHelpers
+
   alias TermUI.Widgets.ContextMenu
   alias TermUI.Widgets.ContextMenu.Inline
   alias TermUI.Event
   alias TermUI.Renderer.Style
 
   # Test helpers
-
-  defp test_area(width, height) do
-    %{x: 0, y: 0, width: width, height: height}
-  end
 
   defp create_test_props(opts \\ []) do
     items = Keyword.get(opts, :items, [

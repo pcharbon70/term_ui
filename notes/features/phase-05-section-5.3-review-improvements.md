@@ -35,8 +35,8 @@ The improvements are organized into three priority levels based on impact and ef
 - [x] Task 6: Simplify find_number_for_item/2 (~15m) - **COMPLETE**
 
 ### Priority 3 (Low Impact)
-- [ ] Task 7: Extract test helpers (~30m)
-- [ ] Task 8: Improve test environment restoration (~15m)
+- [x] Task 7: Extract test helpers (~30m) - **COMPLETE**
+- [x] Task 8: Improve test environment restoration (~15m) - **COMPLETE**
 - [x] Task 9: Document callback error behavior (~15m) - **COMPLETE**
 
 ---
