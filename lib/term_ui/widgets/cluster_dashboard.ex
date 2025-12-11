@@ -41,6 +41,7 @@ defmodule TermUI.Widgets.ClusterDashboard do
   use TermUI.StatefulComponent
 
   alias TermUI.Event
+  alias TermUI.Theme
 
   @type view_mode :: :nodes | :globals | :pg_groups | :events
   @type node_status :: :connected | :disconnected | :local
@@ -629,7 +630,13 @@ defmodule TermUI.Widgets.ClusterDashboard do
 
   defp render_alert(state) do
     if state.partition_alert do
-      [text(state.partition_alert, Style.new(bg: :red, fg: :white, attrs: [:bold]))]
+      alert_style =
+        Style.new()
+        |> Style.bg(Theme.get_semantic(:error))
+        |> Style.fg(Theme.get_color(:background))
+        |> Style.bold()
+
+      [text(state.partition_alert, alert_style)]
     else
       []
     end
@@ -652,7 +659,8 @@ defmodule TermUI.Widgets.ClusterDashboard do
     header_text =
       "Cluster: #{local}#{dist_status} | Connected: #{connected_count} | View: #{mode_label}"
 
-    text(header_text, Style.new(fg: :cyan, attrs: [:bold]))
+    header_style = Style.new() |> Style.fg(Theme.get_semantic(:info)) |> Style.bold()
+    text(header_text, header_style)
   end
 
   defp render_content(state) do
@@ -724,13 +732,13 @@ defmodule TermUI.Widgets.ClusterDashboard do
     style =
       cond do
         is_selected ->
-          Style.new(bg: :blue, fg: :white)
+          Theme.get_component_style(:item, :selected)
 
         node_info.status == :local ->
-          Style.new(fg: :green)
+          Style.new() |> Style.fg(Theme.get_semantic(:success))
 
         node_info.status == :disconnected ->
-          Style.new(fg: :red)
+          Style.new() |> Style.fg(Theme.get_semantic(:error))
 
         true ->
           nil
@@ -748,7 +756,8 @@ defmodule TermUI.Widgets.ClusterDashboard do
     header = text(header_line, Style.new(attrs: [:bold, :underline]))
 
     if Enum.empty?(state.global_names) do
-      [header, text("  (no global names registered)", Style.new(fg: :yellow))]
+      empty_style = Style.new() |> Style.fg(Theme.get_semantic(:muted))
+      [header, text("  (no global names registered)", empty_style)]
     else
       visible =
         state.global_names
@@ -768,7 +777,7 @@ defmodule TermUI.Widgets.ClusterDashboard do
 
           line = name_str <> node_str <> pid_str
 
-          style = if is_selected, do: Style.new(bg: :blue, fg: :white), else: nil
+          style = if is_selected, do: Theme.get_component_style(:item, :selected), else: nil
           text(line, style)
         end)
 
@@ -785,7 +794,8 @@ defmodule TermUI.Widgets.ClusterDashboard do
     header = text(header_line, Style.new(attrs: [:bold, :underline]))
 
     if Enum.empty?(state.pg_groups) do
-      [header, text("  (no :pg groups - is :pg started?)", Style.new(fg: :yellow))]
+      empty_style = Style.new() |> Style.fg(Theme.get_semantic(:muted))
+      [header, text("  (no :pg groups - is :pg started?)", empty_style)]
     else
       visible =
         state.pg_groups
@@ -806,7 +816,7 @@ defmodule TermUI.Widgets.ClusterDashboard do
 
           line = group_str <> count_str <> nodes_str
 
-          style = if is_selected, do: Style.new(bg: :blue, fg: :white), else: nil
+          style = if is_selected, do: Theme.get_component_style(:item, :selected), else: nil
           text(line, style)
         end)
 
@@ -823,7 +833,8 @@ defmodule TermUI.Widgets.ClusterDashboard do
     header = text(header_line, Style.new(attrs: [:bold, :underline]))
 
     if Enum.empty?(state.events) do
-      [header, text("  (no events yet)", Style.new(fg: :yellow))]
+      empty_style = Style.new() |> Style.fg(Theme.get_semantic(:muted))
+      [header, text("  (no events yet)", empty_style)]
     else
       visible =
         state.events
@@ -852,9 +863,9 @@ defmodule TermUI.Widgets.ClusterDashboard do
 
           style =
             cond do
-              is_selected -> Style.new(bg: :blue, fg: :white)
-              event.event == :nodedown -> Style.new(fg: :red)
-              event.event == :nodeup -> Style.new(fg: :green)
+              is_selected -> Theme.get_component_style(:item, :selected)
+              event.event == :nodedown -> Style.new() |> Style.fg(Theme.get_semantic(:error))
+              event.event == :nodeup -> Style.new() |> Style.fg(Theme.get_semantic(:success))
               true -> nil
             end
 
@@ -866,7 +877,8 @@ defmodule TermUI.Widgets.ClusterDashboard do
   end
 
   defp render_details(state) do
-    border = text(String.duplicate("-", 60), Style.new(fg: :blue))
+    border_style = Style.new() |> Style.fg(Theme.get_color(:primary))
+    border = text(String.duplicate("-", 60), border_style)
 
     case state.view_mode do
       :nodes -> render_node_details(state, border)
@@ -903,9 +915,11 @@ defmodule TermUI.Widgets.ClusterDashboard do
         border
       ]
     else
+      empty_style = Style.new() |> Style.fg(Theme.get_semantic(:muted))
+
       [
         border,
-        text("No details available", Style.new(fg: :yellow)),
+        text("No details available", empty_style),
         text("", nil),
         text("", nil),
         text("", nil),
@@ -980,9 +994,11 @@ defmodule TermUI.Widgets.ClusterDashboard do
   end
 
   defp render_empty_details(border) do
+    empty_style = Style.new() |> Style.fg(Theme.get_semantic(:muted))
+
     [
       border,
-      text("No item selected", Style.new(fg: :yellow)),
+      text("No item selected", empty_style),
       text("", nil),
       text("", nil),
       text("", nil),
@@ -997,7 +1013,8 @@ defmodule TermUI.Widgets.ClusterDashboard do
     help_text =
       "[↑↓] Select [Enter] Details [n] Nodes [g] Globals [p] PG [e] Events [r] Refresh"
 
-    [text(help_text, Style.new(fg: :white, attrs: [:dim]))]
+    help_style = Style.new() |> Style.fg(Theme.get_semantic(:help)) |> Style.dim()
+    [text(help_text, help_style)]
   end
 
   # ----------------------------------------------------------------------------

@@ -2,7 +2,14 @@ defmodule TermUI.Widgets.ClusterDashboardTest do
   use ExUnit.Case, async: true
 
   alias TermUI.Event
+  alias TermUI.Theme
   alias TermUI.Widgets.ClusterDashboard
+
+  setup do
+    # Start Theme server for color support
+    {:ok, _theme_pid} = Theme.start_link(theme: :dark)
+    :ok
+  end
 
   describe "new/1" do
     test "creates props with defaults" do
