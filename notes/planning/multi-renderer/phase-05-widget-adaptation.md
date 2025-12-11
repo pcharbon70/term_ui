@@ -213,24 +213,24 @@ Identify all widgets that specify colors.
 
 ### 5.4.2 Implement Theme-Based Colors
 
-- [ ] **Task 5.4.2 Complete**
+- [x] **Task 5.4.2 Complete**
 
 Ensure colors come from theme system.
 
-- [ ] 5.4.2.1 Verify all widgets use `Theme.color/1` or similar
-- [ ] 5.4.2.2 Ensure themes define semantic color names
-- [ ] 5.4.2.3 Theme system handles degradation via backend capabilities
+- [x] 5.4.2.1 Verify all widgets use `Theme.color/1` or similar
+- [x] 5.4.2.2 Ensure themes define semantic color names
+- [x] 5.4.2.3 Theme system handles degradation via backend capabilities
 
 ### 5.4.3 Add Monochrome Fallbacks
 
-- [ ] **Task 5.4.3 Complete**
+- [x] **Task 5.4.3 Complete**
 
 Ensure widgets remain usable in monochrome mode.
 
-- [ ] 5.4.3.1 Selected items use reverse video in mono mode
-- [ ] 5.4.3.2 Focused items use bold in mono mode
-- [ ] 5.4.3.3 Error states use underline in mono mode
-- [ ] 5.4.3.4 Charts use character differentiation (*, +, o, x)
+- [x] 5.4.3.1 Selected items use reverse video in mono mode
+- [x] 5.4.3.2 Focused items use bold in mono mode
+- [x] 5.4.3.3 Error states use underline in mono mode
+- [x] 5.4.3.4 Charts use character differentiation (*, +, o, x)
 
 ### Unit Tests - Section 5.4
 
