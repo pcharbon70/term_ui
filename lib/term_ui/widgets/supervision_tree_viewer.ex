@@ -40,6 +40,7 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
   use TermUI.StatefulComponent
 
   alias TermUI.Event
+  alias TermUI.Theme
 
   @type node_type :: :supervisor | :worker
   @type node_status :: :running | :restarting | :terminated | :undefined
@@ -73,11 +74,11 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
     undefined: "?"
   }
 
-  @status_colors %{
-    running: :green,
-    restarting: :yellow,
-    terminated: :red,
-    undefined: :white
+  @status_text %{
+    running: "[R]",
+    restarting: "[Y]",
+    terminated: "[T]",
+    undefined: "[U]"
   }
 
   @type_icons %{
@@ -828,6 +829,22 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
   # Helpers
   # ----------------------------------------------------------------------------
 
+  defp status_style(status) do
+    case status do
+      :running -> Theme.get_component_style(:status, :running)
+      :restarting -> Theme.get_component_style(:status, :warning)
+      :terminated -> Theme.get_component_style(:status, :error)
+      :undefined -> Theme.get_component_style(:status, :unknown)
+      _ -> Theme.get_component_style(:status, :unknown)
+    end
+  end
+
+  defp status_indicator(status) do
+    icon = Map.get(@status_icons, status, "?")
+    text = Map.get(@status_text, status, "[?]")
+    "#{icon} #{text}"
+  end
+
   defp maybe_call_on_select(state) do
     if state.on_select do
       case get_selected(state) do
@@ -882,9 +899,10 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
 
     count = length(state.flattened)
 
+    style = Style.new() |> Style.fg(Theme.get_semantic(:info)) |> Style.bold()
     text(
       "Supervision Tree: #{root_name} | Nodes: #{count}",
-      Style.new(fg: :cyan, attrs: [:bold])
+      style
     )
   end
 
@@ -911,7 +929,8 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
       |> Enum.with_index(scroll_offset)
 
     if Enum.empty?(visible_nodes) do
-      text("  No processes found", Style.new(fg: :white, attrs: [:dim]))
+      style = Style.new() |> Style.fg(Theme.get_semantic(:muted)) |> Style.dim()
+      text("  No processes found", style)
     else
       lines =
         Enum.map(visible_nodes, fn {node, idx} ->
@@ -938,9 +957,8 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
           "  "
       end
 
-    # Status icon with color
-    status_icon = Map.get(@status_icons, node.status, "?")
-    status_color = Map.get(@status_colors, node.status, :white)
+    # Status indicator with icon and text
+    status_ind = status_indicator(node.status)
 
     # Type icon
     type_icon = Map.get(@type_icons, node.type, " ")
@@ -966,24 +984,27 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
 
     content = "#{indent}#{expand_indicator}#{type_icon} #{name}#{strategy_str}#{memory_str}"
 
-    # For now, render as simple text with status indicator prefix
-    full_content = "#{status_icon} #{content}"
+    # Render with status indicator prefix and appropriate style
+    full_content = "#{status_ind} #{content}"
 
     if selected do
-      text(full_content, Style.new(bg: :blue, fg: :white))
+      # Use theme selection style
+      text(full_content, Theme.get_component_style(:item, :selected))
     else
-      # Use the status color for the whole line
-      text(full_content, Style.new(fg: status_color))
+      # Use theme status style
+      text(full_content, status_style(node.status))
     end
   end
 
   defp render_filter_line(state) do
     cond do
       state.filter_input != nil ->
-        text("Filter: #{state.filter_input}_", Style.new(fg: :yellow))
+        style = Style.new() |> Style.fg(Theme.get_semantic(:warning))
+        text("Filter: #{state.filter_input}_", style)
 
       state.filter != nil ->
-        text("Filter: #{state.filter} (Esc to clear)", Style.new(fg: :yellow, attrs: [:dim]))
+        style = Style.new() |> Style.fg(Theme.get_semantic(:warning)) |> Style.dim()
+        text("Filter: #{state.filter} (Esc to clear)", style)
 
       true ->
         nil
@@ -997,15 +1018,16 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
           nil
 
         node ->
+          info_style = Style.new() |> Style.fg(Theme.get_semantic(:info))
           lines = [
-            text("─── Process Info ───", Style.new(fg: :cyan)),
+            text("─── Process Info ───", info_style),
             text("  ID: #{inspect(node.id)}", nil),
             text("  PID: #{inspect(node.pid)}", nil),
             text("  Name: #{inspect(node.name)}", nil),
             text("  Type: #{node.type}", nil),
             text(
               "  Status: #{node.status}",
-              Style.new(fg: Map.get(@status_colors, node.status, :white))
+              status_style(node.status)
             )
           ]
 
@@ -1046,19 +1068,22 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
       :restart ->
         node = get_selected(state)
         name = if node, do: node_display_name(node), else: "?"
-        text("Restart #{name}? [y/n]", Style.new(fg: :yellow, attrs: [:bold]))
+        style = Style.new() |> Style.fg(Theme.get_semantic(:warning)) |> Style.bold()
+        text("Restart #{name}? [y/n]", style)
 
       :terminate ->
         node = get_selected(state)
         name = if node, do: node_display_name(node), else: "?"
-        text("Terminate #{name}? [y/n]", Style.new(fg: :red, attrs: [:bold]))
+        style = Style.new() |> Style.fg(Theme.get_semantic(:error)) |> Style.bold()
+        text("Terminate #{name}? [y/n]", style)
     end
   end
 
   defp render_footer(_state) do
+    style = Style.new() |> Style.fg(Theme.get_semantic(:help)) |> Style.dim()
     text(
       "[↑↓] Navigate [←→] Expand/Collapse [i] Info [r] Restart [k] Kill [R] Refresh [/] Filter",
-      Style.new(fg: :white, attrs: [:dim])
+      style
     )
   end
 

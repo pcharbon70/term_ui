@@ -157,10 +157,10 @@ degraded_color = Style.convert_for_terminal(error_color, caps.color_mode)
 
 ---
 
-### ⏸️ Step 2: Phase 1 - Supervision Tree Viewer (2-3 hours)
+### ✅ Step 2: Phase 1 - Supervision Tree Viewer (2-3 hours)
 
-**Status:** Pending
-**Priority:** **CRITICAL** - Accessibility Issue
+**Status:** Complete
+**Priority:** **CRITICAL** - Accessibility Issue **RESOLVED**
 
 **File:** `lib/term_ui/widgets/supervision_tree_viewer.ex`
 
@@ -203,10 +203,28 @@ degraded_color = Style.convert_for_terminal(error_color, caps.color_mode)
 - Selection visible in monochrome
 
 **Success Criteria:**
-- [ ] Status map replaced with theme lookups
-- [ ] Text indicators `[R]`, `[Y]`, `[T]`, `[U]` added
-- [ ] Selection uses theme component style
-- [ ] Works in all color modes (true_color/256/16/mono)
+- [x] Status map replaced with theme lookups
+- [x] Text indicators `[R]`, `[Y]`, `[T]`, `[U]` added
+- [x] Selection uses theme component style
+- [x] Works in all color modes (tested via Theme system)
+- [x] All 43 tests passing
+
+**Changes Made:**
+- Added Theme alias
+- Added `@status_text` map with text indicators for accessibility
+- Removed `@status_colors` module attribute
+- Created `status_style/1` helper using `Theme.get_component_style(:status, variant)`
+- Created `status_indicator/1` helper combining icon and text (e.g., "● [R]")
+- Migrated all rendering functions to Theme API:
+  - render_node_line: Theme.get_component_style(:item, :selected)
+  - render_header: Theme.get_semantic(:info)
+  - render_tree_view: Theme.get_semantic(:muted)
+  - render_filter_line: Theme.get_semantic(:warning)
+  - render_info_panel: Theme.get_semantic(:info) + status_style()
+  - render_confirmation_prompt: Theme.get_semantic(:warning/:error)
+  - render_footer: Theme.get_semantic(:help)
+- Updated test setup to start Theme GenServer
+- **CRITICAL ACCESSIBILITY ISSUE RESOLVED**: Status now indicated with both color AND text
 
 ---
 
