@@ -43,6 +43,8 @@ defmodule TermUI.Widgets.ProcessMonitor do
   use TermUI.StatefulComponent
 
   alias TermUI.Event
+  alias TermUI.Renderer.Style
+  alias TermUI.Theme
 
   @type sort_field :: :pid | :name | :reductions | :memory | :queue | :status
   @type sort_direction :: :asc | :desc
@@ -716,7 +718,8 @@ defmodule TermUI.Widgets.ProcessMonitor do
 
     header_text = "Processes: #{length(state.processes)} | Sort: #{sort_label}#{filter_label}"
 
-    text(header_text, Style.new(fg: :cyan, attrs: [:bold]))
+    header_style = Style.new() |> Style.fg(Theme.get_semantic(:info)) |> Style.bold()
+    text(header_text, header_style)
   end
 
   defp render_process_list(state) do
@@ -769,36 +772,36 @@ defmodule TermUI.Widgets.ProcessMonitor do
   defp render_process_row(process, idx, state, {pid_w, name_w, red_w, mem_w, queue_w, status_w}) do
     is_selected = idx == state.selected_idx
 
-    # Format fields
+    # Format fields with threshold indicators for accessibility
     pid_str = String.pad_trailing(inspect(process.pid), pid_w)
     name_str = String.pad_trailing(truncate(process_name(process), name_w - 1), name_w)
     red_str = String.pad_leading(format_number(process.reductions), red_w)
-    mem_str = String.pad_leading(format_bytes(process.memory), mem_w)
-    queue_str = String.pad_leading(Integer.to_string(process.message_queue_len), queue_w)
+    mem_str = String.pad_leading(format_memory_with_indicator(process.memory, state.thresholds), mem_w)
+    queue_str = String.pad_leading(format_queue_with_indicator(process.message_queue_len, state.thresholds), queue_w)
     status_str = String.pad_trailing("  #{process.status}", status_w)
 
     line = pid_str <> name_str <> red_str <> mem_str <> queue_str <> status_str
 
-    # Determine style
+    # Determine style with Theme API
     style =
       cond do
         is_selected ->
-          Style.new(bg: :blue, fg: :white)
+          Theme.get_component_style(:item, :selected)
 
         process.message_queue_len >= state.thresholds.queue_critical ->
-          Style.new(fg: :red, attrs: [:bold])
+          Style.new() |> Style.fg(Theme.get_semantic(:error)) |> Style.bold()
 
         process.message_queue_len >= state.thresholds.queue_warning ->
-          Style.new(fg: :yellow)
+          Style.new() |> Style.fg(Theme.get_semantic(:warning))
 
         process.memory >= state.thresholds.memory_critical ->
-          Style.new(fg: :red, attrs: [:bold])
+          Style.new() |> Style.fg(Theme.get_semantic(:error)) |> Style.bold()
 
         process.memory >= state.thresholds.memory_warning ->
-          Style.new(fg: :yellow)
+          Style.new() |> Style.fg(Theme.get_semantic(:warning))
 
         process.status == :suspended ->
-          Style.new(fg: :magenta)
+          Style.new() |> Style.fg(Theme.get_color(:accent))
 
         true ->
           nil
@@ -817,12 +820,13 @@ defmodule TermUI.Widgets.ProcessMonitor do
         :trace -> render_trace_details(process)
       end
     else
-      [text("No process selected", Style.new(fg: :yellow))]
+      empty_style = Style.new() |> Style.fg(Theme.get_semantic(:muted))
+      [text("No process selected", empty_style)]
     end
   end
 
   defp render_info_details(process, _state) do
-    border = text(String.duplicate("-", 60), Style.new(fg: :blue))
+    border = text(String.duplicate("-", 60), Style.new() |> Style.fg(Theme.get_color(:primary)))
 
     lines = [
       border,
@@ -842,7 +846,7 @@ defmodule TermUI.Widgets.ProcessMonitor do
   end
 
   defp render_links_details(process) do
-    border = text(String.duplicate("-", 60), Style.new(fg: :blue))
+    border = text(String.duplicate("-", 60), Style.new() |> Style.fg(Theme.get_color(:primary)))
 
     links_text =
       if length(process.links) > 0 do
@@ -884,7 +888,7 @@ defmodule TermUI.Widgets.ProcessMonitor do
   end
 
   defp render_trace_details(process) do
-    border = text(String.duplicate("-", 60), Style.new(fg: :blue))
+    border = text(String.duplicate("-", 60), Style.new() |> Style.fg(Theme.get_color(:primary)))
 
     trace = get_stack_trace(process.pid)
 
@@ -898,7 +902,8 @@ defmodule TermUI.Widgets.ProcessMonitor do
           text("  #{m}.#{f}/#{a} (#{file}:#{line})", nil)
         end)
       else
-        [text("  (no stack trace available)", Style.new(fg: :yellow))]
+        empty_style = Style.new() |> Style.fg(Theme.get_semantic(:muted))
+        [text("  (no stack trace available)", empty_style)]
       end
 
     [border, text("Stack Trace:", Style.new(attrs: [:bold]))] ++ trace_lines ++ [border]
@@ -907,7 +912,8 @@ defmodule TermUI.Widgets.ProcessMonitor do
   defp render_footer(state) do
     input_line =
       if state.filter_input != nil do
-        [text("Filter: #{state.filter_input}_", Style.new(fg: :yellow))]
+        filter_style = Style.new() |> Style.fg(Theme.get_semantic(:warning))
+        [text("Filter: #{state.filter_input}_", filter_style)]
       else
         []
       end
@@ -915,7 +921,8 @@ defmodule TermUI.Widgets.ProcessMonitor do
     help_text =
       "[↑↓] Select [Enter] Details [s/S] Sort [/] Filter [k] Kill [p] Pause [l] Links [t] Trace [r] Refresh"
 
-    input_line ++ [text(help_text, Style.new(fg: :white, attrs: [:dim]))]
+    help_style = Style.new() |> Style.fg(Theme.get_semantic(:help)) |> Style.dim()
+    input_line ++ [text(help_text, help_style)]
   end
 
   defp render_confirmation(state) do
@@ -930,11 +937,13 @@ defmodule TermUI.Widgets.ProcessMonitor do
         end
 
       if process do
+        confirm_style = Style.new() |> Style.fg(Theme.get_semantic(:error)) |> Style.bold()
+
         [
           text("", nil),
           text(
             "#{action_text} #{inspect(process.pid)} (#{process_name(process)})? [y/n]",
-            Style.new(fg: :red, attrs: [:bold])
+            confirm_style
           )
         ]
       else
@@ -987,4 +996,25 @@ defmodule TermUI.Widgets.ProcessMonitor do
 
   defp format_mfa(nil), do: "-"
   defp format_mfa({m, f, a}), do: "#{inspect(m)}.#{f}/#{a}"
+
+  # Threshold indicator helpers for accessibility
+  defp format_queue_with_indicator(queue_len, thresholds) do
+    base = Integer.to_string(queue_len)
+
+    cond do
+      queue_len >= thresholds.queue_critical -> "#{base}[H]"
+      queue_len >= thresholds.queue_warning -> "#{base}[M]"
+      true -> base
+    end
+  end
+
+  defp format_memory_with_indicator(memory, thresholds) do
+    base = format_bytes(memory)
+
+    cond do
+      memory >= thresholds.memory_critical -> "#{base}[H]"
+      memory >= thresholds.memory_warning -> "#{base}[M]"
+      true -> base
+    end
+  end
 end

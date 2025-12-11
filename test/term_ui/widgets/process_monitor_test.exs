@@ -2,9 +2,20 @@ defmodule TermUI.Widgets.ProcessMonitorTest do
   use ExUnit.Case, async: true
 
   alias TermUI.Event
+  alias TermUI.Theme
   alias TermUI.Widgets.ProcessMonitor
 
   @area %{x: 0, y: 0, width: 100, height: 30}
+
+  setup do
+    # Start Theme server for color support (ignore if already started)
+    case Theme.start_link(theme: :dark) do
+      {:ok, _pid} -> :ok
+      {:error, {:already_started, _pid}} -> :ok
+    end
+
+    :ok
+  end
 
   describe "new/1" do
     test "creates props with defaults" do

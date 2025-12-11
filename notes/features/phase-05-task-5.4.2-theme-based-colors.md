@@ -324,34 +324,36 @@ degraded_color = Style.convert_for_terminal(error_color, caps.color_mode)
 
 ---
 
-### ⏸️ Step 5: Phase 1 - Process Monitor (1-2 hours)
+### ✅ Step 5: Phase 1 - Process Monitor (1-2 hours)
 
-**Status:** Pending
+**Status:** Complete
 
 **File:** `lib/term_ui/widgets/process_monitor.ex`
 
-**Current Color Usage:**
-- High memory/queue: `:red` with bold
-- Moderate levels: `:yellow`
-- Headers: `:cyan` with bold
-- Selection: `:blue` bg + `:white` fg
-
-**Migration Steps:**
-
-1. **Migrate threshold colors**
-   - High/critical: `Theme.get_semantic(:error)` + bold
-   - Medium/warning: `Theme.get_semantic(:warning)`
-
-2. **Add text threshold indicators**
-   - Format: `"Queue: 1000 [HIGH]"` or `"Memory: 50MB [MED]"`
-
-3. **Migrate selection, headers**
-   - Use theme component styles
+**Changes Made:**
+- Added Theme and Style aliases
+- Created threshold indicator helpers:
+  - `format_queue_with_indicator/2` - Adds `[H]` for critical, `[M]` for warning
+  - `format_memory_with_indicator/2` - Adds `[H]` for critical, `[M]` for warning
+- Migrated all 15 hardcoded color usages to Theme API:
+  - Header → Theme.get_semantic(:info) with bold
+  - Selection → Theme.get_component_style(:item, :selected)
+  - Queue/memory critical → Theme.get_semantic(:error) with bold
+  - Queue/memory warning → Theme.get_semantic(:warning)
+  - Suspended status → Theme.get_color(:accent)
+  - Empty state messages (2 locations) → Theme.get_semantic(:muted)
+  - Borders (3 locations) → Theme.get_color(:primary)
+  - Filter input → Theme.get_semantic(:warning)
+  - Help footer → Theme.get_semantic(:help) with dim
+  - Confirmation prompt → Theme.get_semantic(:error) with bold
+- Updated test setup to handle Theme GenServer (already started check)
+- Threshold indicators provide accessibility for colorblind users
 
 **Success Criteria:**
-- [ ] Threshold colors use theme semantics
-- [ ] Text indicators added: `[HIGH]`, `[MED]`
-- [ ] Works in all color modes
+- [x] Threshold colors use theme semantics
+- [x] Text indicators added: `[H]` (high/critical), `[M]` (medium/warning)
+- [x] Works in all color modes (tested via Theme system)
+- [x] All 44 tests passing
 
 ---
 
