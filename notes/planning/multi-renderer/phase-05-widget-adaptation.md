@@ -251,13 +251,14 @@ Ensure all widgets that use box-drawing or special characters query the characte
 
 ### 5.5.1 Audit Widget Character Usage
 
-- [ ] **Task 5.5.1 Complete**
+- [x] **Task 5.5.1 Complete**
 
 Identify all widgets using special characters.
 
-- [ ] 5.5.1.1 List widgets using box-drawing characters
-- [ ] 5.5.1.2 List widgets using arrows or symbols
-- [ ] 5.5.1.3 List widgets using progress/gauge characters
+- [x] 5.5.1.1 List widgets using box-drawing characters (11 widgets identified)
+- [x] 5.5.1.2 List widgets using arrows or symbols (11 + 4 widgets identified)
+- [x] 5.5.1.3 List widgets using Braille patterns (2 widgets identified)
+- [x] 5.5.1.4 Document current fallback behavior (zero widgets use CharacterSet)
 
 ### 5.5.2 Use CharacterSet Module
 
