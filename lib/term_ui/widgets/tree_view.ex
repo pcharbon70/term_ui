@@ -47,6 +47,8 @@ defmodule TermUI.Widgets.TreeView do
   use TermUI.StatefulComponent
 
   alias TermUI.Event
+  alias TermUI.Renderer.Style
+  alias TermUI.Theme
 
   @type node_id :: term()
 
@@ -722,19 +724,24 @@ defmodule TermUI.Widgets.TreeView do
     # Apply styling
     cond do
       node.disabled ->
-        styled(text(line), Style.new(fg: :bright_black))
+        styled(text(line), Style.new() |> Style.fg(Theme.get_semantic(:muted)))
 
       is_cursor && is_match ->
-        styled(text(line), Style.new(fg: :black, bg: :yellow))
+        cursor_match_style =
+          Style.new()
+          |> Style.fg(Theme.get_color(:background))
+          |> Style.bg(Theme.get_semantic(:warning))
+
+        styled(text(line), cursor_match_style)
 
       is_cursor ->
-        styled(text(line), Style.new(attrs: [:reverse]))
+        styled(text(line), Theme.get_component_style(:item, :focused))
 
       is_match ->
-        styled(text(line), Style.new(fg: :yellow))
+        styled(text(line), Style.new() |> Style.fg(Theme.get_semantic(:warning)))
 
       is_selected ->
-        styled(text(line), Style.new(fg: :cyan))
+        styled(text(line), Style.new() |> Style.fg(Theme.get_color(:primary)))
 
       true ->
         text(line)
@@ -746,7 +753,8 @@ defmodule TermUI.Widgets.TreeView do
     match_count = MapSet.size(state.filter_matches)
     count_text = if match_count > 0, do: " (#{match_count} matches)", else: " (no matches)"
 
-    styled(text(filter_text <> count_text), Style.new(fg: :yellow, attrs: [:bold]))
+    filter_style = Style.new() |> Style.fg(Theme.get_semantic(:warning)) |> Style.bold()
+    styled(text(filter_text <> count_text), filter_style)
   end
 
   # ----------------------------------------------------------------------------

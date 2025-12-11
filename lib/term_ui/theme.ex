@@ -46,7 +46,7 @@ defmodule TermUI.Theme do
 
   use GenServer
 
-  alias TermUI.Style
+  alias TermUI.Renderer.Style
 
   @type color :: Style.color()
 

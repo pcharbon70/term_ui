@@ -41,6 +41,8 @@ defmodule TermUI.Widgets.TextInput do
   use TermUI.StatefulComponent
 
   alias TermUI.Event
+  alias TermUI.Renderer.Style
+  alias TermUI.Theme
 
   @default_width 40
   @default_max_visible_lines 5
@@ -616,7 +618,7 @@ defmodule TermUI.Widgets.TextInput do
     # Determine style
     base_style =
       if state.focused do
-        state.focused_style || Style.new(fg: :white)
+        state.focused_style || Style.new() |> Style.fg(Theme.get_color(:foreground))
       else
         state.style
       end

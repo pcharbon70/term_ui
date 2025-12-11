@@ -35,6 +35,8 @@ defmodule TermUI.Widgets.CommandPalette do
   use TermUI.StatefulComponent
 
   alias TermUI.Event
+  alias TermUI.Renderer.Style
+  alias TermUI.Theme
 
   @doc """
   Creates new CommandPalette widget props.
@@ -181,7 +183,7 @@ defmodule TermUI.Widgets.CommandPalette do
           padded_label = String.pad_trailing(cmd.label, min_width)
 
           if is_selected do
-            text("  " <> padded_label, Style.new(fg: :black, bg: :cyan))
+            text("  " <> padded_label, Theme.get_component_style(:item, :selected))
           else
             text("  " <> padded_label, nil)
           end

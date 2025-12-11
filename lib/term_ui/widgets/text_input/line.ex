@@ -102,6 +102,7 @@ defmodule TermUI.Widgets.TextInput.Line do
 
   import TermUI.Component.RenderNode
   alias TermUI.Renderer.Style
+  alias TermUI.Theme
 
   @typedoc """
   TextInput.Line state structure.
@@ -605,7 +606,7 @@ defmodule TermUI.Widgets.TextInput.Line do
 
   # Renders the error message
   defp render_error(error) do
-    error_style = Style.new(fg: :red)
+    error_style = Style.new() |> Style.fg(Theme.get_semantic(:error))
     text(error, error_style)
   end
 end
