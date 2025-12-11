@@ -262,13 +262,13 @@ Identify all widgets using special characters.
 
 ### 5.5.2 Use CharacterSet Module
 
-- [ ] **Task 5.5.2 Complete**
+- [ ] **Task 5.5.2 Complete** (In Progress - Dialog widget complete, 20 widgets remaining)
 
 Ensure widgets use CharacterSet for special characters.
 
-- [ ] 5.5.2.1 Replace hardcoded box chars with `CharacterSet.get(:tl)` etc.
-- [ ] 5.5.2.2 Replace hardcoded arrows with `CharacterSet.get(:arrow_right)` etc.
-- [ ] 5.5.2.3 Replace hardcoded progress chars with `CharacterSet.get(:bar_full)` etc.
+- [x] 5.5.2.1 Replace hardcoded box chars with `CharacterSet` (Dialog complete, reference pattern established)
+- [ ] 5.5.2.2 Replace hardcoded arrows with `CharacterSet` (20 widgets remaining)
+- [ ] 5.5.2.3 Replace hardcoded progress chars with `CharacterSet` (6 visualization widgets remaining)
 
 ### 5.5.3 Verify ASCII Fallbacks
 
