@@ -44,6 +44,7 @@ defmodule TermUI.Widgets.LogViewer do
   use TermUI.StatefulComponent
 
   alias TermUI.Event
+  alias TermUI.Theme
 
   @type log_level ::
           :debug | :info | :notice | :warning | :error | :critical | :alert | :emergency
@@ -70,17 +71,6 @@ defmodule TermUI.Widgets.LogViewer do
           current_match: non_neg_integer(),
           highlight: boolean()
         }
-
-  @level_colors %{
-    debug: :cyan,
-    info: :green,
-    notice: :blue,
-    warning: :yellow,
-    error: :red,
-    critical: :magenta,
-    alert: :red,
-    emergency: :red
-  }
 
   @level_patterns [
     {:emergency, ~r/\b(EMERGENCY|EMERG)\b/i},
@@ -894,7 +884,7 @@ defmodule TermUI.Widgets.LogViewer do
     parts =
       if state.show_line_numbers do
         num_str = String.pad_leading("#{actual_idx + 1}", 5)
-        num_style = Style.new(fg: :white, attrs: [:dim])
+        num_style = Style.new() |> Style.fg(Theme.get_semantic(:muted)) |> Style.dim()
         parts ++ [text(num_str <> " ", num_style)]
       else
         parts
@@ -903,7 +893,8 @@ defmodule TermUI.Widgets.LogViewer do
     # Bookmark indicator
     parts =
       if is_bookmarked do
-        parts ++ [text("*", Style.new(fg: :yellow))]
+        bookmark_style = Style.new() |> Style.fg(Theme.get_semantic(:warning))
+        parts ++ [text("*", bookmark_style)]
       else
         parts ++ [text(" ", nil)]
       end
@@ -912,8 +903,7 @@ defmodule TermUI.Widgets.LogViewer do
     parts =
       if state.show_levels && line.level do
         level_str = String.pad_trailing(level_abbrev(line.level), 5)
-        level_color = Map.get(@level_colors, line.level, :white)
-        level_style = Style.new(fg: level_color)
+        level_style = Style.new() |> Style.fg(level_color(line.level))
         parts ++ [text(level_str <> " ", level_style)]
       else
         parts
@@ -925,6 +915,20 @@ defmodule TermUI.Widgets.LogViewer do
     parts = parts ++ [text(message, message_style)]
 
     stack(:horizontal, parts)
+  end
+
+  defp level_color(level) do
+    case level do
+      :debug -> Theme.get_semantic(:info)
+      :info -> Theme.get_semantic(:success)
+      :notice -> Theme.get_color(:primary)
+      :warning -> Theme.get_semantic(:warning)
+      :error -> Theme.get_semantic(:error)
+      :critical -> Theme.get_color(:accent)
+      :alert -> Theme.get_semantic(:error)
+      :emergency -> Theme.get_semantic(:error)
+      _ -> Theme.get_color(:foreground)
+    end
   end
 
   defp level_abbrev(:debug), do: "DEBUG"
@@ -954,23 +958,23 @@ defmodule TermUI.Widgets.LogViewer do
   defp get_message_style(state, line, is_cursor, is_selected, is_search_match) do
     base_color =
       if state.highlight_levels && line.level do
-        Map.get(@level_colors, line.level, :white)
+        level_color(line.level)
       else
-        :white
+        Theme.get_color(:foreground)
       end
 
     cond do
       is_cursor ->
-        Style.new(fg: :black, bg: base_color, attrs: [:bold])
+        Theme.get_component_style(:item, :focused)
 
       is_selected ->
-        Style.new(fg: :black, bg: :blue)
+        Theme.get_component_style(:item, :selected)
 
       is_search_match ->
-        Style.new(fg: base_color, bg: :yellow)
+        Style.new() |> Style.fg(base_color) |> Style.bg(Theme.get_semantic(:warning))
 
       true ->
-        Style.new(fg: base_color)
+        Style.new() |> Style.fg(base_color)
     end
   end
 
@@ -1030,16 +1034,19 @@ defmodule TermUI.Widgets.LogViewer do
       end
 
     status = Enum.join(parts, "")
-    text(status, Style.new(fg: :cyan, attrs: [:dim]))
+    status_style = Style.new() |> Style.fg(Theme.get_semantic(:info)) |> Style.dim()
+    text(status, status_style)
   end
 
   defp render_input_bar(state) do
     cond do
       state.search_input != nil ->
-        [text("Search: " <> state.search_input <> "_", Style.new(fg: :yellow))]
+        search_style = Style.new() |> Style.fg(Theme.get_semantic(:warning))
+        [text("Search: " <> state.search_input <> "_", search_style)]
 
       state.filter_input != nil ->
-        [text("Filter: " <> state.filter_input <> "_", Style.new(fg: :green))]
+        filter_style = Style.new() |> Style.fg(Theme.get_semantic(:success))
+        [text("Filter: " <> state.filter_input <> "_", filter_style)]
 
       true ->
         []

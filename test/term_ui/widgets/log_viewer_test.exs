@@ -2,7 +2,14 @@ defmodule TermUI.Widgets.LogViewerTest do
   use ExUnit.Case, async: true
 
   alias TermUI.Event
+  alias TermUI.Theme
   alias TermUI.Widgets.LogViewer
+
+  setup do
+    # Start Theme server for color support
+    {:ok, _theme_pid} = Theme.start_link(theme: :dark)
+    :ok
+  end
 
   # Helper to create test area
   defp test_area(width, height) do

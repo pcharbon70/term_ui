@@ -228,9 +228,9 @@ degraded_color = Style.convert_for_terminal(error_color, caps.color_mode)
 
 ---
 
-### ⏸️ Step 3: Phase 1 - Log Viewer (1 hour)
+### ✅ Step 3: Phase 1 - Log Viewer (1 hour)
 
-**Status:** Pending
+**Status:** Complete
 
 **File:** `lib/term_ui/widgets/log_viewer.ex`
 
@@ -264,10 +264,33 @@ degraded_color = Style.convert_for_terminal(error_color, caps.color_mode)
 4. **Note:** Already has level text (e.g., "ERROR", "WARNING") - excellent for accessibility
 
 **Success Criteria:**
-- [ ] Level color map replaced with theme lookups
-- [ ] Already accessible (level text always present)
-- [ ] Selection/mode colors from theme
-- [ ] Works in all color modes
+- [x] Level color map replaced with theme lookups
+- [x] Already accessible (level text always present)
+- [x] Selection/mode colors from theme
+- [x] Works in all color modes
+- [x] All 66 tests passing
+
+**Changes Made:**
+- Added Theme alias
+- Removed `@level_colors` module attribute
+- Created `level_color/1` helper using Theme API:
+  - debug → Theme.get_semantic(:info)
+  - info → Theme.get_semantic(:success)
+  - warning → Theme.get_semantic(:warning)
+  - error/alert/emergency → Theme.get_semantic(:error)
+  - notice → Theme.get_color(:primary)
+  - critical → Theme.get_color(:accent)
+- Migrated all rendering functions to Theme API:
+  - Line numbers: Theme.get_semantic(:muted)
+  - Bookmark marker: Theme.get_semantic(:warning)
+  - Level indicator: level_color(level)
+  - Selection: Theme.get_component_style(:item, :selected)
+  - Cursor: Theme.get_component_style(:item, :focused)
+  - Search match: Theme.get_semantic(:warning) bg
+  - Status bar: Theme.get_semantic(:info)
+  - Search input: Theme.get_semantic(:warning)
+  - Filter input: Theme.get_semantic(:success)
+- Updated test setup to start Theme GenServer
 
 ---
 
