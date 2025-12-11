@@ -51,6 +51,7 @@ defmodule TermUI.Widgets.SplitPane do
   use TermUI.StatefulComponent
 
   alias TermUI.Event
+  alias TermUI.Theme
 
   @type orientation :: :horizontal | :vertical
 
@@ -73,8 +74,6 @@ defmodule TermUI.Widgets.SplitPane do
           computed_size: non_neg_integer()
         }
 
-  @default_divider_style Style.new(fg: :white)
-  @focused_divider_style Style.new(fg: :cyan, attrs: [:bold])
   @resize_step 1
   @large_resize_step 5
 
@@ -151,8 +150,8 @@ defmodule TermUI.Widgets.SplitPane do
       orientation: Keyword.get(opts, :orientation, :horizontal),
       panes: Keyword.fetch!(opts, :panes),
       divider_size: Keyword.get(opts, :divider_size, 1),
-      divider_style: Keyword.get(opts, :divider_style, @default_divider_style),
-      focused_divider_style: Keyword.get(opts, :focused_divider_style, @focused_divider_style),
+      divider_style: Keyword.get(opts, :divider_style),
+      focused_divider_style: Keyword.get(opts, :focused_divider_style),
       resizable: Keyword.get(opts, :resizable, true),
       on_resize: Keyword.get(opts, :on_resize),
       on_collapse: Keyword.get(opts, :on_collapse),
@@ -194,12 +193,18 @@ defmodule TermUI.Widgets.SplitPane do
         Map.merge(pane_spec, %{computed_size: 0})
       end)
 
+    # Set theme-based default styles if not provided
+    divider_style = props.divider_style || Theme.get_component_style(:divider, :normal)
+
+    focused_divider_style =
+      props.focused_divider_style || Theme.get_component_style(:divider, :focused)
+
     state = %{
       orientation: props.orientation,
       panes: panes,
       divider_size: props.divider_size,
-      divider_style: props.divider_style,
-      focused_divider_style: props.focused_divider_style,
+      divider_style: divider_style,
+      focused_divider_style: focused_divider_style,
       resizable: props.resizable,
       focused_divider: nil,
       dragging: false,

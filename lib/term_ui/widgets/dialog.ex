@@ -38,6 +38,7 @@ defmodule TermUI.Widgets.Dialog do
 
   alias TermUI.Event
   alias TermUI.Renderer.Style
+  alias TermUI.Theme
 
   @doc """
   Creates new Dialog widget props.
@@ -172,7 +173,7 @@ defmodule TermUI.Widgets.Dialog do
       # Provide dimensions and background for opaque fill
       width: dialog_width,
       height: dialog_height,
-      bg: Style.new(bg: :black)
+      bg: Style.new() |> Style.bg(Theme.get_color(:background))
     }
   end
 

@@ -40,6 +40,8 @@ defmodule TermUI.Widgets.FormBuilder do
   use TermUI.StatefulComponent
 
   alias TermUI.Event
+  alias TermUI.Renderer.Style
+  alias TermUI.Theme
   alias TermUI.Widgets.WidgetHelpers, as: Helpers
 
   @type field_type :: :text | :password | :checkbox | :radio | :select | :multi_select
@@ -610,10 +612,12 @@ defmodule TermUI.Widgets.FormBuilder do
 
     # Add error messages
     if errors != [] do
+      error_style = Style.new() |> Style.fg(Theme.get_semantic(:error))
+
       error_rows =
         Enum.map(errors, fn err ->
           padding = String.duplicate(" ", label_width + 5)
-          styled(text("#{padding}! #{err}"), Style.new(fg: :red))
+          styled(text("#{padding}! #{err}"), error_style)
         end)
 
       [row | error_rows]
