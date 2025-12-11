@@ -26,6 +26,8 @@ defmodule TermUI.Widgets.Gauge do
   """
 
   import TermUI.Component.RenderNode
+  alias TermUI.Renderer.Style
+  alias TermUI.Theme
   alias TermUI.Widgets.VisualizationHelper, as: VizHelper
 
   @bar_char "█"
@@ -278,13 +280,17 @@ defmodule TermUI.Widgets.Gauge do
   @doc """
   Creates a gauge with traffic light colors (green/yellow/red).
 
+  Uses theme-based semantic colors for visual feedback:
+  - Green zone (0-warning): success
+  - Yellow zone (warning-danger): warning
+  - Red zone (danger+): error
+
   ## Options
 
   - `:value` - Current value (required)
   - `:warning` - Yellow zone threshold (default: 60)
   - `:danger` - Red zone threshold (default: 80)
-
-  Note: You need to provide actual Style structs for the zones to be visible.
+  - `:zones` - Override with custom zones
   """
   @spec traffic_light(keyword()) :: TermUI.Component.RenderNode.t()
   def traffic_light(opts) do
@@ -292,16 +298,14 @@ defmodule TermUI.Widgets.Gauge do
     warning = Keyword.get(opts, :warning, 60)
     danger = Keyword.get(opts, :danger, 80)
 
-    # Create zones - users should provide actual Style structs
-    # These nil values mean no styling will be applied by default
-    zones = [
-      # green zone (default)
-      {0, nil},
-      # yellow zone
-      {warning, nil},
-      # red zone
-      {danger, nil}
+    # Create theme-based default zones
+    default_zones = [
+      {0, Style.new() |> Style.fg(Theme.get_semantic(:success))},
+      {warning, Style.new() |> Style.fg(Theme.get_semantic(:warning))},
+      {danger, Style.new() |> Style.fg(Theme.get_semantic(:error))}
     ]
+
+    zones = Keyword.get(opts, :zones, default_zones)
 
     opts = opts |> Keyword.put(:value, value) |> Keyword.merge(zones: zones)
     render(opts)

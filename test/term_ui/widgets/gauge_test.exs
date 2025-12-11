@@ -1,7 +1,18 @@
 defmodule TermUI.Widgets.GaugeTest do
   use ExUnit.Case, async: true
 
+  alias TermUI.Theme
   alias TermUI.Widgets.Gauge
+
+  setup do
+    # Start Theme server for color support (ignore if already started)
+    case Theme.start_link(theme: :dark) do
+      {:ok, _pid} -> :ok
+      {:error, {:already_started, _pid}} -> :ok
+    end
+
+    :ok
+  end
 
   describe "render/1 bar style" do
     test "renders bar gauge" do
