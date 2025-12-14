@@ -40,6 +40,7 @@ defmodule TermUI.Widgets.TextInput do
 
   use TermUI.StatefulComponent
 
+  alias TermUI.CharacterSet
   alias TermUI.Event
   alias TermUI.Renderer.Style
   alias TermUI.Theme
@@ -602,6 +603,9 @@ defmodule TermUI.Widgets.TextInput do
   end
 
   defp render_content(state) do
+    # Get character set for scroll indicators
+    chars = CharacterSet.current_charset()
+
     # Determine visible lines
     total_lines = line_count(state)
     visible_count = min(total_lines, state.max_visible_lines)
@@ -633,7 +637,7 @@ defmodule TermUI.Widgets.TextInput do
       end)
 
     # Add scroll indicators if needed
-    scroll_indicator = render_scroll_indicator(state, total_lines, visible_count)
+    scroll_indicator = render_scroll_indicator(state, total_lines, visible_count, chars)
 
     content =
       if scroll_indicator do
@@ -688,16 +692,16 @@ defmodule TermUI.Widgets.TextInput do
     ])
   end
 
-  defp render_scroll_indicator(state, total_lines, visible_count) do
+  defp render_scroll_indicator(state, total_lines, visible_count, chars) do
     if total_lines > visible_count do
       can_scroll_up = state.scroll_offset > 0
       can_scroll_down = state.scroll_offset + visible_count < total_lines
 
       indicator =
         cond do
-          can_scroll_up and can_scroll_down -> "↕"
-          can_scroll_up -> "↑"
-          can_scroll_down -> "↓"
+          can_scroll_up and can_scroll_down -> "#{chars.arrow_up}#{chars.arrow_down}"
+          can_scroll_up -> chars.arrow_up
+          can_scroll_down -> chars.arrow_down
           true -> nil
         end
 

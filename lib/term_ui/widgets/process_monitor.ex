@@ -42,6 +42,7 @@ defmodule TermUI.Widgets.ProcessMonitor do
 
   use TermUI.StatefulComponent
 
+  alias TermUI.CharacterSet
   alias TermUI.Event
   alias TermUI.Renderer.Style
   alias TermUI.Theme
@@ -683,6 +684,9 @@ defmodule TermUI.Widgets.ProcessMonitor do
 
   @impl true
   def render(state, area) do
+    # Get character set for arrows and indicators
+    chars = CharacterSet.current_charset()
+
     # Update viewport dimensions
     detail_height = if state.show_details, do: 8, else: 0
 
@@ -694,10 +698,10 @@ defmodule TermUI.Widgets.ProcessMonitor do
     }
 
     # Build render tree
-    header = render_header(state)
+    header = render_header(state, chars)
     process_list = render_process_list(state)
     details = if state.show_details, do: render_details(state), else: []
-    footer = render_footer(state)
+    footer = render_footer(state, chars)
     confirmation = render_confirmation(state)
 
     content = [header] ++ process_list ++ details ++ footer ++ confirmation
@@ -705,8 +709,8 @@ defmodule TermUI.Widgets.ProcessMonitor do
     stack(:vertical, content)
   end
 
-  defp render_header(state) do
-    sort_indicator = if state.sort_direction == :asc, do: "▲", else: "▼"
+  defp render_header(state, chars) do
+    sort_indicator = if state.sort_direction == :asc, do: chars.arrow_up, else: chars.arrow_down
     sort_label = "#{state.sort_field}#{sort_indicator}"
 
     filter_label =
@@ -909,7 +913,7 @@ defmodule TermUI.Widgets.ProcessMonitor do
     [border, text("Stack Trace:", Style.new(attrs: [:bold]))] ++ trace_lines ++ [border]
   end
 
-  defp render_footer(state) do
+  defp render_footer(state, chars) do
     input_line =
       if state.filter_input != nil do
         filter_style = Style.new() |> Style.fg(Theme.get_semantic(:warning))
@@ -919,7 +923,7 @@ defmodule TermUI.Widgets.ProcessMonitor do
       end
 
     help_text =
-      "[↑↓] Select [Enter] Details [s/S] Sort [/] Filter [k] Kill [p] Pause [l] Links [t] Trace [r] Refresh"
+      "[#{chars.arrow_up}#{chars.arrow_down}] Select [Enter] Details [s/S] Sort [/] Filter [k] Kill [p] Pause [l] Links [t] Trace [r] Refresh"
 
     help_style = Style.new() |> Style.fg(Theme.get_semantic(:help)) |> Style.dim()
     input_line ++ [text(help_text, help_style)]

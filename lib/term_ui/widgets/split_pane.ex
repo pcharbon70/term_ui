@@ -50,6 +50,7 @@ defmodule TermUI.Widgets.SplitPane do
 
   use TermUI.StatefulComponent
 
+  alias TermUI.CharacterSet
   alias TermUI.Event
   alias TermUI.Theme
 
@@ -76,12 +77,6 @@ defmodule TermUI.Widgets.SplitPane do
 
   @resize_step 1
   @large_resize_step 5
-
-  # Divider characters
-  @vertical_divider "│"
-  @vertical_divider_focused "┃"
-  @horizontal_divider "─"
-  @horizontal_divider_focused "━"
 
   # ----------------------------------------------------------------------------
   # Pane Constructors
@@ -636,9 +631,11 @@ defmodule TermUI.Widgets.SplitPane do
   defp wrap_content(content), do: [content]
 
   defp render_vertical_divider(state, divider_idx, height) do
+    chars = CharacterSet.current_charset()
     is_focused = state.focused_divider == divider_idx
     style = if is_focused, do: state.focused_divider_style, else: state.divider_style
-    char = if is_focused, do: @vertical_divider_focused, else: @vertical_divider
+    # Use v_line for both focused and unfocused; style provides visual distinction
+    char = chars.v_line
 
     lines =
       for _ <- 1..height do
@@ -649,9 +646,11 @@ defmodule TermUI.Widgets.SplitPane do
   end
 
   defp render_horizontal_divider(state, divider_idx, width) do
+    chars = CharacterSet.current_charset()
     is_focused = state.focused_divider == divider_idx
     style = if is_focused, do: state.focused_divider_style, else: state.divider_style
-    char = if is_focused, do: @horizontal_divider_focused, else: @horizontal_divider
+    # Use h_line for both focused and unfocused; style provides visual distinction
+    char = chars.h_line
 
     text(String.duplicate(char, width), style)
   end
