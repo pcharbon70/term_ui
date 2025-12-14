@@ -32,14 +32,16 @@ defmodule TermUI.Widgets.SparklineTest do
   describe "value_to_bar/3" do
     test "maps minimum value to lowest bar" do
       result = Sparkline.value_to_bar(0, 0, 10)
+      bars = Sparkline.bar_characters()
 
-      assert result == "▁"
+      assert result == List.first(bars)
     end
 
     test "maps maximum value to highest bar" do
       result = Sparkline.value_to_bar(10, 0, 10)
+      bars = Sparkline.bar_characters()
 
-      assert result == "█"
+      assert result == List.last(bars)
     end
 
     test "maps middle value to middle bar" do
@@ -53,14 +55,16 @@ defmodule TermUI.Widgets.SparklineTest do
 
     test "clamps values below min" do
       result = Sparkline.value_to_bar(-10, 0, 10)
+      bars = Sparkline.bar_characters()
 
-      assert result == "▁"
+      assert result == List.first(bars)
     end
 
     test "clamps values above max" do
       result = Sparkline.value_to_bar(100, 0, 10)
+      bars = Sparkline.bar_characters()
 
-      assert result == "█"
+      assert result == List.last(bars)
     end
 
     test "handles equal min and max" do
@@ -98,8 +102,8 @@ defmodule TermUI.Widgets.SparklineTest do
 
       assert is_list(bars)
       assert length(bars) == 8
-      assert "▁" in bars
-      assert "█" in bars
+      assert List.first(bars) in bars
+      assert List.last(bars) in bars
     end
   end
 

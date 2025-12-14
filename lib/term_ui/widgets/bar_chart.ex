@@ -32,10 +32,9 @@ defmodule TermUI.Widgets.BarChart do
   """
 
   import TermUI.Component.RenderNode
+  alias TermUI.CharacterSet
   alias TermUI.Widgets.VisualizationHelper, as: VizHelper
 
-  @bar_char "█"
-  @empty_char " "
   @max_label_length 50
 
   @doc """
@@ -67,7 +66,11 @@ defmodule TermUI.Widgets.BarChart do
         height = opts |> Keyword.get(:height, 10) |> VizHelper.clamp_height()
         show_values = Keyword.get(opts, :show_values, true)
         show_labels = Keyword.get(opts, :show_labels, true)
-        bar_char = Keyword.get(opts, :bar_char, @bar_char)
+
+        # Get character set for bar character
+        chars = CharacterSet.current_charset()
+        bar_char = Keyword.get(opts, :bar_char, chars.bar_full)
+
         colors = Keyword.get(opts, :colors, [])
         style = Keyword.get(opts, :style)
 
@@ -98,6 +101,10 @@ defmodule TermUI.Widgets.BarChart do
   end
 
   defp render_horizontal(data, width, show_values, show_labels, bar_char, colors, style) do
+    # Get character set for empty character
+    chars = CharacterSet.current_charset()
+    empty_char = chars.bar_empty
+
     values = Enum.map(data, & &1.value)
     max_value = Enum.max(values, fn -> 0 end)
 
@@ -133,7 +140,7 @@ defmodule TermUI.Widgets.BarChart do
         bar_length = min(bar_length, bar_width)
 
         bar = VizHelper.safe_duplicate(bar_char, bar_length)
-        empty_part = VizHelper.safe_duplicate(@empty_char, bar_width - bar_length)
+        empty_part = VizHelper.safe_duplicate(empty_char, bar_width - bar_length)
 
         # Value
         value_str =
@@ -156,6 +163,10 @@ defmodule TermUI.Widgets.BarChart do
   end
 
   defp render_vertical(data, _width, height, show_values, show_labels, bar_char, colors, style) do
+    # Get character set for empty character
+    chars = CharacterSet.current_charset()
+    empty_char = chars.bar_empty
+
     values = Enum.map(data, & &1.value)
     max_value = Enum.max(values, fn -> 0 end)
 
@@ -173,7 +184,7 @@ defmodule TermUI.Widgets.BarChart do
           |> Enum.with_index()
           |> Enum.map(fn {_item, index} ->
             bar_height = Enum.at(bar_heights, index)
-            build_bar_char(row, bar_height, index, bar_char, colors)
+            build_bar_char(row, bar_height, index, bar_char, empty_char, colors)
           end)
 
         # Join chars with spacing
@@ -212,13 +223,13 @@ defmodule TermUI.Widgets.BarChart do
     VizHelper.maybe_style(result, style)
   end
 
-  defp build_bar_char(row, bar_height, index, bar_char, colors) when row < bar_height do
+  defp build_bar_char(row, bar_height, index, bar_char, _empty_char, colors) when row < bar_height do
     color = VizHelper.cycle_color(colors, index)
     {bar_char, color}
   end
 
-  defp build_bar_char(_row, _bar_height, _index, _bar_char, _colors) do
-    {@empty_char, nil}
+  defp build_bar_char(_row, _bar_height, _index, _bar_char, empty_char, _colors) do
+    {empty_char, nil}
   end
 
   defp style_bar_char({char, color}) do
@@ -243,8 +254,11 @@ defmodule TermUI.Widgets.BarChart do
     value = Keyword.get(opts, :value, 0)
     max = Keyword.get(opts, :max, 100)
     width = opts |> Keyword.get(:width, 20) |> VizHelper.clamp_width()
-    bar_char = Keyword.get(opts, :bar_char, @bar_char)
-    empty_char = Keyword.get(opts, :empty_char, "░")
+
+    # Get character set for bar characters
+    chars = CharacterSet.current_charset()
+    bar_char = Keyword.get(opts, :bar_char, chars.bar_full)
+    empty_char = Keyword.get(opts, :empty_char, chars.bar_empty)
 
     case {VizHelper.validate_number(value), VizHelper.validate_number(max)} do
       {:ok, :ok} ->

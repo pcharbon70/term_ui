@@ -26,12 +26,10 @@ defmodule TermUI.Widgets.Gauge do
   """
 
   import TermUI.Component.RenderNode
+  alias TermUI.CharacterSet
   alias TermUI.Renderer.Style
   alias TermUI.Theme
   alias TermUI.Widgets.VisualizationHelper, as: VizHelper
-
-  @bar_char "█"
-  @empty_char "░"
 
   @doc """
   Renders a gauge.
@@ -73,8 +71,11 @@ defmodule TermUI.Widgets.Gauge do
     show_range = Keyword.get(opts, :show_range, true)
     zones = Keyword.get(opts, :zones, [])
     label = Keyword.get(opts, :label)
-    bar_char = Keyword.get(opts, :bar_char, @bar_char)
-    empty_char = Keyword.get(opts, :empty_char, @empty_char)
+
+    # Get character set for bar characters
+    chars = CharacterSet.current_charset()
+    bar_char = Keyword.get(opts, :bar_char, chars.bar_full)
+    empty_char = Keyword.get(opts, :empty_char, chars.bar_empty)
 
     case gauge_type do
       :bar ->
