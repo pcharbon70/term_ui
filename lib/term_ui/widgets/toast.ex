@@ -30,6 +30,7 @@ defmodule TermUI.Widgets.Toast do
 
   use TermUI.StatefulComponent
 
+  alias TermUI.CharacterSet
   alias TermUI.Event
 
   @type_icons %{
@@ -148,6 +149,8 @@ defmodule TermUI.Widgets.Toast do
   end
 
   defp render_toast(state) do
+    # Get character set for box drawing
+    chars = CharacterSet.current_charset()
     width = state.width
 
     # Icon + message
@@ -167,9 +170,9 @@ defmodule TermUI.Widgets.Toast do
     padded = String.pad_trailing(content_text, inner_width)
 
     # Build toast box
-    top_border = text("┌" <> String.duplicate("─", width - 2) <> "┐")
-    content_line = text("│ " <> padded <> " │")
-    bottom_border = text("└" <> String.duplicate("─", width - 2) <> "┘")
+    top_border = text(chars.tl <> String.duplicate(chars.h_line, width - 2) <> chars.tr)
+    content_line = text(chars.v_line <> " " <> padded <> " " <> chars.v_line)
+    bottom_border = text(chars.bl <> String.duplicate(chars.h_line, width - 2) <> chars.br)
 
     content = stack(:vertical, [top_border, content_line, bottom_border])
 

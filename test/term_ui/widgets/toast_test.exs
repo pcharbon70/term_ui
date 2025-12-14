@@ -286,7 +286,7 @@ defmodule TermUI.Widgets.ToastTest do
       assert result.type == :empty
     end
 
-    test "render returns stack for multiple toasts" do
+    test "render returns list of overlays for multiple toasts" do
       manager = ToastManager.new()
       manager = ToastManager.add_toast(manager, "Message 1")
       manager = ToastManager.add_toast(manager, "Message 2")
@@ -294,8 +294,10 @@ defmodule TermUI.Widgets.ToastTest do
 
       result = ToastManager.render(manager, area)
 
-      assert result.type == :stack
-      assert length(result.children) == 2
+      # Returns a list of overlays, not a stack node
+      assert is_list(result)
+      assert length(result) == 2
+      assert Enum.all?(result, fn overlay -> overlay.type == :overlay end)
     end
   end
 end
