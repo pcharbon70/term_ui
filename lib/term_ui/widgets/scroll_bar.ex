@@ -33,6 +33,7 @@ defmodule TermUI.Widgets.ScrollBar do
 
   use TermUI.StatefulComponent
 
+  alias TermUI.CharacterSet
   alias TermUI.Event
 
   @doc """
@@ -52,6 +53,9 @@ defmodule TermUI.Widgets.ScrollBar do
   """
   @spec new(keyword()) :: map()
   def new(opts) do
+    # Get character set for scroll bar characters
+    chars = CharacterSet.current_charset()
+
     %{
       orientation: Keyword.get(opts, :orientation, :vertical),
       total: Keyword.get(opts, :total, 100),
@@ -59,8 +63,8 @@ defmodule TermUI.Widgets.ScrollBar do
       position: Keyword.get(opts, :position, 0),
       length: Keyword.get(opts, :length, 20),
       on_scroll: Keyword.get(opts, :on_scroll),
-      track_char: Keyword.get(opts, :track_char, "░"),
-      thumb_char: Keyword.get(opts, :thumb_char, "█"),
+      track_char: Keyword.get(opts, :track_char, chars.bar_empty),
+      thumb_char: Keyword.get(opts, :thumb_char, chars.bar_full),
       min_thumb_size: Keyword.get(opts, :min_thumb_size, 1)
     }
   end

@@ -54,6 +54,7 @@ defmodule TermUI.Widgets.ContextMenu do
 
   use TermUI.StatefulComponent
 
+  alias TermUI.CharacterSet
   alias TermUI.Event
   alias TermUI.Widgets.ContextMenu.Behavior
 
@@ -207,12 +208,14 @@ defmodule TermUI.Widgets.ContextMenu do
   @impl true
   def render(state, _area) do
     if state.visible do
+      # Get character set for menu separators
+      chars = CharacterSet.current_charset()
       {pos_x, pos_y} = state.position
       width = calculate_width(state.items)
 
       rows =
         Enum.map(state.items, fn item ->
-          render_item(state, item, width)
+          render_item(state, item, width, chars)
         end)
 
       content = stack(:vertical, rows)
@@ -250,10 +253,10 @@ defmodule TermUI.Widgets.ContextMenu do
     |> Enum.max(fn -> 10 end)
   end
 
-  defp render_item(state, item, width) do
+  defp render_item(state, item, width, chars) do
     case item.type do
       :separator ->
-        text(String.duplicate("─", width))
+        text(String.duplicate(chars.h_line, width))
 
       _ ->
         render_action_item(state, item, width)
