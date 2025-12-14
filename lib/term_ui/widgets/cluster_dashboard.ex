@@ -40,6 +40,7 @@ defmodule TermUI.Widgets.ClusterDashboard do
 
   use TermUI.StatefulComponent
 
+  alias TermUI.CharacterSet
   alias TermUI.Event
   alias TermUI.Theme
 
@@ -607,6 +608,9 @@ defmodule TermUI.Widgets.ClusterDashboard do
 
   @impl true
   def render(state, area) do
+    # Get character set for help text arrows
+    chars = CharacterSet.current_charset()
+
     # Update viewport dimensions
     detail_height = if state.show_details, do: 8, else: 0
 
@@ -621,7 +625,7 @@ defmodule TermUI.Widgets.ClusterDashboard do
     header = render_header(state)
     content = render_content(state)
     details = if state.show_details, do: render_details(state), else: []
-    footer = render_footer(state)
+    footer = render_footer(state, chars)
 
     all = alert ++ [header] ++ content ++ details ++ footer
 
@@ -1009,9 +1013,9 @@ defmodule TermUI.Widgets.ClusterDashboard do
     ]
   end
 
-  defp render_footer(_state) do
+  defp render_footer(_state, chars) do
     help_text =
-      "[↑↓] Select [Enter] Details [n] Nodes [g] Globals [p] PG [e] Events [r] Refresh"
+      "[#{chars.arrow_up}#{chars.arrow_down}] Select [Enter] Details [n] Nodes [g] Globals [p] PG [e] Events [r] Refresh"
 
     help_style = Style.new() |> Style.fg(Theme.get_semantic(:help)) |> Style.dim()
     [text(help_text, help_style)]
