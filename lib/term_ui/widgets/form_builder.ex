@@ -39,6 +39,7 @@ defmodule TermUI.Widgets.FormBuilder do
 
   use TermUI.StatefulComponent
 
+  alias TermUI.CharacterSet
   alias TermUI.Event
   alias TermUI.Renderer.Style
   alias TermUI.Theme
@@ -301,13 +302,16 @@ defmodule TermUI.Widgets.FormBuilder do
 
   @impl true
   def render(state, area) do
+    # Get character set for group indicators
+    chars = CharacterSet.current_charset()
+
     # Group fields by their group
     grouped_fields = group_fields(state)
 
     # Render each group
     rendered_groups =
       Enum.flat_map(grouped_fields, fn {group_id, fields} ->
-        render_group(state, group_id, fields, area)
+        render_group(state, group_id, fields, area, chars)
       end)
 
     # Add submit button if enabled
@@ -562,15 +566,15 @@ defmodule TermUI.Widgets.FormBuilder do
 
   # Rendering
 
-  defp render_group(state, nil, fields, _area) do
+  defp render_group(state, nil, fields, _area, _chars) do
     # Ungrouped fields - just render them
     Enum.flat_map(fields, &render_field(state, &1))
   end
 
-  defp render_group(state, group, fields, _area) when is_map(group) do
+  defp render_group(state, group, fields, _area, chars) when is_map(group) do
     collapsed = MapSet.member?(state.collapsed_groups, group.id)
 
-    header = render_group_header(group, collapsed)
+    header = render_group_header(group, collapsed, chars)
 
     if collapsed do
       [header]
@@ -580,8 +584,8 @@ defmodule TermUI.Widgets.FormBuilder do
     end
   end
 
-  defp render_group_header(group, collapsed) do
-    indicator = if collapsed, do: "▶", else: "▼"
+  defp render_group_header(group, collapsed, chars) do
+    indicator = if collapsed, do: chars.arrow_right, else: chars.arrow_down
     text("#{indicator} #{group.label}")
   end
 

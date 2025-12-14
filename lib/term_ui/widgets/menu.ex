@@ -41,6 +41,7 @@ defmodule TermUI.Widgets.Menu do
 
   use TermUI.StatefulComponent
 
+  alias TermUI.CharacterSet
   alias TermUI.Event
 
   @type item_type :: :action | :submenu | :separator | :checkbox
@@ -195,12 +196,15 @@ defmodule TermUI.Widgets.Menu do
 
   @impl true
   def render(state, _area) do
+    # Get character set for menu indicators
+    chars = CharacterSet.current_charset()
+
     visible = get_visible_items(state)
     width = state.width || calculate_width(visible)
 
     rows =
       Enum.map(visible, fn {item, depth} ->
-        render_item(state, item, depth, width)
+        render_item(state, item, depth, width, chars)
       end)
 
     stack(:vertical, rows)
@@ -367,19 +371,19 @@ defmodule TermUI.Widgets.Menu do
     |> Enum.max(fn -> 10 end)
   end
 
-  defp render_item(state, item, depth, width) do
+  defp render_item(state, item, depth, width, chars) do
     case item.type do
       :separator ->
-        text(String.duplicate("─", width))
+        text(String.duplicate(chars.h_line, width))
 
       _ ->
-        render_selectable_item(state, item, depth, width)
+        render_selectable_item(state, item, depth, width, chars)
     end
   end
 
-  defp render_selectable_item(state, item, depth, width) do
+  defp render_selectable_item(state, item, depth, width, chars) do
     indent = String.duplicate("  ", depth)
-    prefix = get_item_prefix(item, state)
+    prefix = get_item_prefix(item, state, chars)
 
     # Main label
     label = indent <> prefix <> item.label
@@ -401,14 +405,18 @@ defmodule TermUI.Widgets.Menu do
     end
   end
 
-  defp get_item_prefix(%{type: :checkbox, checked: true}, _state), do: "[×] "
-  defp get_item_prefix(%{type: :checkbox}, _state), do: "[ ] "
+  defp get_item_prefix(%{type: :checkbox, checked: true}, _state, _chars), do: "[x] "
+  defp get_item_prefix(%{type: :checkbox}, _state, _chars), do: "[ ] "
 
-  defp get_item_prefix(%{type: :submenu, id: id}, state) do
-    if MapSet.member?(state.expanded, id), do: "▼ ", else: "▶ "
+  defp get_item_prefix(%{type: :submenu, id: id}, state, chars) do
+    if MapSet.member?(state.expanded, id) do
+      "#{chars.arrow_down} "
+    else
+      "#{chars.arrow_right} "
+    end
   end
 
-  defp get_item_prefix(_item, _state), do: "  "
+  defp get_item_prefix(_item, _state, _chars), do: "  "
 
   defp get_item_style(item, state) do
     cond do

@@ -266,3 +266,18 @@ end
   - Updated expand/collapse arrows
 - ✅ All P0 widgets complete: 153 total tests passing
 - ✅ Updated planning document with completion status
+
+### 2025-12-11 - Session 3
+- ✅ Implemented Menu widget (31 tests passing)
+  - Updated expand/collapse arrows for submenus
+  - Updated separator lines to use CharacterSet
+  - Checkbox markers remain ASCII
+- ✅ Implemented FormBuilder widget (50 tests passing)
+  - Updated group expand/collapse arrows
+- ✅ Implemented SupervisionTreeViewer widget (43 tests passing)
+  - Converted @status_icons, @type_icons, @strategy_display to functions
+  - Updated all icons to ASCII-friendly: o, ~, x for status
+  - Updated expand/collapse arrows
+  - Updated help text arrows
+- ✅ All P1 widgets complete: 124 total tests passing
+- ✅ Total P0+P1: 277 tests passing (7 of 21 widgets, 33% complete)

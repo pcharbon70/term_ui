@@ -54,6 +54,7 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
 
   use TermUI.StatefulComponent
 
+  alias TermUI.CharacterSet
   alias TermUI.Event
   alias TermUI.Theme
 
@@ -82,12 +83,15 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
   @default_interval 2000
   @page_size 15
 
-  @status_icons %{
-    running: "●",
-    restarting: "◐",
-    terminated: "○",
-    undefined: "?"
-  }
+  # ASCII-friendly icons for universal compatibility
+  defp get_status_icons do
+    %{
+      running: "o",
+      restarting: "~",
+      terminated: "x",
+      undefined: "?"
+    }
+  end
 
   @status_text %{
     running: "[R]",
@@ -96,17 +100,22 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
     undefined: "[U]"
   }
 
-  @type_icons %{
-    supervisor: "□",
-    worker: "◇"
-  }
+  defp get_type_icons do
+    %{
+      supervisor: "S",
+      worker: "W"
+    }
+  end
 
-  @strategy_display %{
-    one_for_one: "1:1",
-    one_for_all: "1:*",
-    rest_for_one: "1:→",
-    simple_one_for_one: "1:1+"
-  }
+  defp get_strategy_display do
+    chars = CharacterSet.current_charset()
+    %{
+      one_for_one: "1:1",
+      one_for_all: "1:*",
+      rest_for_one: "1:#{chars.arrow_right}",
+      simple_one_for_one: "1:1+"
+    }
+  end
 
   # ----------------------------------------------------------------------------
   # Props
@@ -854,8 +863,8 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
     end
   end
 
-  defp status_indicator(status) do
-    icon = Map.get(@status_icons, status, "?")
+  defp status_indicator(status, status_icons) do
+    icon = Map.get(status_icons, status, "?")
     text = Map.get(@status_text, status, "[?]")
     "#{icon} #{text}"
   end
@@ -890,12 +899,18 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
 
   @impl true
   def render(state, area) do
+    # Get character set for indicators
+    chars = CharacterSet.current_charset()
+    status_icons = get_status_icons()
+    type_icons = get_type_icons()
+    strategy_display = get_strategy_display()
+
     header = render_header(state)
-    tree_view = render_tree_view(state, area)
+    tree_view = render_tree_view(state, area, chars, status_icons, type_icons, strategy_display)
     filter_line = render_filter_line(state)
-    info_panel = render_info_panel(state)
+    info_panel = render_info_panel(state, chars)
     confirmation = render_confirmation(state)
-    footer = render_footer(state)
+    footer = render_footer(state, chars)
 
     children =
       [header, tree_view, filter_line, info_panel, confirmation, footer]
@@ -921,7 +936,7 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
     )
   end
 
-  defp render_tree_view(state, area) do
+  defp render_tree_view(state, area, chars, status_icons, type_icons, strategy_display) do
     visible_height = min(area.height - 4, length(state.flattened))
 
     # Calculate scroll offset to keep selected in view
@@ -949,34 +964,34 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
     else
       lines =
         Enum.map(visible_nodes, fn {node, idx} ->
-          render_node_line(node, idx == state.selected_idx, state.expanded)
+          render_node_line(node, idx == state.selected_idx, state.expanded, chars, status_icons, type_icons, strategy_display)
         end)
 
       stack(:vertical, lines)
     end
   end
 
-  defp render_node_line(node, selected, expanded) do
+  defp render_node_line(node, selected, expanded, chars, status_icons, type_icons, strategy_display) do
     indent = String.duplicate("  ", node.depth)
 
     # Expand/collapse indicator
     expand_indicator =
       case {node.type, node.children} do
         {:supervisor, children} when is_list(children) and length(children) > 0 ->
-          if MapSet.member?(expanded, node.id), do: "▼ ", else: "▶ "
+          if MapSet.member?(expanded, node.id), do: "#{chars.arrow_down} ", else: "#{chars.arrow_right} "
 
         {:supervisor, _} ->
-          "▶ "
+          "#{chars.arrow_right} "
 
         _ ->
           "  "
       end
 
     # Status indicator with icon and text
-    status_ind = status_indicator(node.status)
+    status_ind = status_indicator(node.status, status_icons)
 
     # Type icon
-    type_icon = Map.get(@type_icons, node.type, " ")
+    type_icon = Map.get(type_icons, node.type, " ")
 
     # Name
     name = node_display_name(node)
@@ -984,7 +999,7 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
     # Strategy for supervisors
     strategy_str =
       if node.type == :supervisor and node.strategy do
-        " [#{Map.get(@strategy_display, node.strategy, "?")}]"
+        " [#{Map.get(strategy_display, node.strategy, "?")}]"
       else
         ""
       end
@@ -1026,7 +1041,7 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
     end
   end
 
-  defp render_info_panel(state) do
+  defp render_info_panel(state, chars) do
     if state.show_info do
       case get_selected(state) do
         nil ->
@@ -1035,7 +1050,7 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
         node ->
           info_style = Style.new() |> Style.fg(Theme.get_semantic(:info))
           lines = [
-            text("─── Process Info ───", info_style),
+            text("#{String.duplicate(chars.h_line, 3)} Process Info #{String.duplicate(chars.h_line, 3)}", info_style),
             text("  ID: #{inspect(node.id)}", nil),
             text("  PID: #{inspect(node.pid)}", nil),
             text("  Name: #{inspect(node.name)}", nil),
@@ -1094,10 +1109,10 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
     end
   end
 
-  defp render_footer(_state) do
+  defp render_footer(_state, chars) do
     style = Style.new() |> Style.fg(Theme.get_semantic(:help)) |> Style.dim()
     text(
-      "[↑↓] Navigate [←→] Expand/Collapse [i] Info [r] Restart [k] Kill [R] Refresh [/] Filter",
+      "[#{chars.arrow_up}#{chars.arrow_down}] Navigate [#{chars.arrow_left}#{chars.arrow_right}] Expand/Collapse [i] Info [r] Restart [k] Kill [R] Refresh [/] Filter",
       style
     )
   end
