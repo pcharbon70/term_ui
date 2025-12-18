@@ -329,51 +329,51 @@ Document best practices for widget development.
 
 ## 5.7 Integration Tests
 
-- [ ] **Section 5.7 Complete**
+- [x] **Section 5.7 Complete**
 
 Integration tests verify widgets work correctly across both backends.
 
 ### 5.7.1 TextInput.Line Integration
 
-- [ ] **Task 5.7.1 Complete**
+- [x] **Task 5.7.1 Complete**
 
 Test TextInput.Line works correctly.
 
-- [ ] 5.7.1.1 Test line input with shell editing
-- [ ] 5.7.1.2 Test validation feedback
-- [ ] 5.7.1.3 Test focus flow
+- [x] 5.7.1.1 Test line input with shell editing
+- [x] 5.7.1.2 Test validation feedback
+- [x] 5.7.1.3 Test focus flow
 
 ### 5.7.2 Keyboard Navigation Tests
 
-- [ ] **Task 5.7.2 Complete**
+- [x] **Task 5.7.2 Complete**
 
 Test keyboard navigation works identically in both modes.
 
-- [ ] 5.7.2.1 Test List arrow navigation in raw mode
-- [ ] 5.7.2.2 Test List arrow navigation in TTY mode
-- [ ] 5.7.2.3 Test Menu navigation in both modes
-- [ ] 5.7.2.4 Test Tabs navigation in both modes
-- [ ] 5.7.2.5 Verify identical behavior between modes
+- [x] 5.7.2.1 Test List arrow navigation in raw mode
+- [x] 5.7.2.2 Test List arrow navigation in TTY mode
+- [x] 5.7.2.3 Test Menu navigation in both modes
+- [x] 5.7.2.4 Test Tabs navigation in both modes
+- [x] 5.7.2.5 Verify identical behavior between modes
 
 ### 5.7.3 Mouse Fallback Tests
 
-- [ ] **Task 5.7.3 Complete**
+- [x] **Task 5.7.3 Complete**
 
 Test mouse feature fallbacks work correctly.
 
-- [ ] 5.7.3.1 Test SplitPane keyboard resize
-- [ ] 5.7.3.2 Test ContextMenu.Inline number selection
-- [ ] 5.7.3.3 Test scrollbar keyboard alternatives
+- [x] 5.7.3.1 Test SplitPane keyboard resize
+- [x] 5.7.3.2 Test ContextMenu.Inline number selection
+- [x] 5.7.3.3 Test scrollbar keyboard alternatives (covered by keyboard navigation tests)
 
 ### 5.7.4 Visual Degradation Tests
 
-- [ ] **Task 5.7.4 Complete**
+- [x] **Task 5.7.4 Complete**
 
 Test visual degradation across capability levels.
 
-- [ ] 5.7.4.1 Test rendering in each color mode
-- [ ] 5.7.4.2 Test rendering with Unicode vs ASCII
-- [ ] 5.7.4.3 Test combined degradation (monochrome + ASCII)
+- [x] 5.7.4.1 Test rendering in each color mode
+- [x] 5.7.4.2 Test rendering with Unicode vs ASCII
+- [x] 5.7.4.3 Test combined degradation (monochrome + ASCII)
 
 ---
 
