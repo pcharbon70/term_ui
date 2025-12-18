@@ -29,6 +29,7 @@ defmodule TermUI.Widgets.LineChart do
   """
 
   import TermUI.Component.RenderNode
+  alias TermUI.CharacterSet
   alias TermUI.Widgets.VisualizationHelper, as: VizHelper
 
   # Braille base character
@@ -151,7 +152,8 @@ defmodule TermUI.Widgets.LineChart do
       result =
         if show_axis do
           # Add axis
-          axis_row = text("└" <> VizHelper.safe_duplicate("─", width - 1))
+          chars = CharacterSet.current_charset()
+          axis_row = text(chars.bl <> VizHelper.safe_duplicate(chars.h_line, width - 1))
           stack(:vertical, row_nodes ++ [axis_row])
         else
           stack(:vertical, row_nodes)

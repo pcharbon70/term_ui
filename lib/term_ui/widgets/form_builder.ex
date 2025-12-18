@@ -39,6 +39,7 @@ defmodule TermUI.Widgets.FormBuilder do
 
   use TermUI.StatefulComponent
 
+  alias TermUI.CharacterSet
   alias TermUI.Event
   alias TermUI.Renderer.Style
   alias TermUI.Theme
@@ -581,7 +582,8 @@ defmodule TermUI.Widgets.FormBuilder do
   end
 
   defp render_group_header(group, collapsed) do
-    indicator = if collapsed, do: "▶", else: "▼"
+    chars = CharacterSet.current_charset()
+    indicator = if collapsed, do: chars.triangle_right, else: chars.triangle_down
     text("#{indicator} #{group.label}")
   end
 

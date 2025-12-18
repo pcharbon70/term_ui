@@ -36,6 +36,7 @@ defmodule TermUI.Widgets.Dialog do
 
   use TermUI.StatefulComponent
 
+  alias TermUI.CharacterSet
   alias TermUI.Event
   alias TermUI.Renderer.Style
   alias TermUI.Theme
@@ -239,31 +240,33 @@ defmodule TermUI.Widgets.Dialog do
   end
 
   defp render_dialog(state, width) do
+    chars = CharacterSet.current_charset()
+
     # Title bar
-    title = render_title(state, width)
+    title = render_title(state, width, chars)
 
     # Content area
-    content = render_content(state, width)
+    content = render_content(state, width, chars)
 
     # Button bar
-    buttons = render_buttons(state)
+    buttons = render_buttons(state, chars)
 
     # Border
-    top_border = text("┌" <> String.duplicate("─", width - 2) <> "┐")
-    bottom_border = text("└" <> String.duplicate("─", width - 2) <> "┘")
+    top_border = text(chars.tl <> String.duplicate(chars.h_line, width - 2) <> chars.tr)
+    bottom_border = text(chars.bl <> String.duplicate(chars.h_line, width - 2) <> chars.br)
 
     stack(:vertical, [
       top_border,
       title,
-      render_separator(width),
+      render_separator(width, chars),
       content,
-      render_separator(width),
+      render_separator(width, chars),
       buttons,
       bottom_border
     ])
   end
 
-  defp render_title(state, width) do
+  defp render_title(state, width, chars) do
     # Center title in available space
     title_text = state.title
     padding = width - String.length(title_text) - 4
@@ -271,10 +274,12 @@ defmodule TermUI.Widgets.Dialog do
     right_pad = padding - left_pad
 
     line =
-      "│ " <>
+      chars.v_line <>
+        " " <>
         String.duplicate(" ", left_pad) <>
         title_text <>
-        String.duplicate(" ", right_pad) <> " │"
+        String.duplicate(" ", right_pad) <>
+        " " <> chars.v_line
 
     if state.title_style do
       styled(text(line), state.title_style)
@@ -283,11 +288,11 @@ defmodule TermUI.Widgets.Dialog do
     end
   end
 
-  defp render_separator(width) do
-    text("├" <> String.duplicate("─", width - 2) <> "┤")
+  defp render_separator(width, chars) do
+    text(chars.t_right <> String.duplicate(chars.h_line, width - 2) <> chars.t_left)
   end
 
-  defp render_content(state, width) do
+  defp render_content(state, width, chars) do
     # Extract text from content node
     content_text =
       case state.content do
@@ -304,7 +309,7 @@ defmodule TermUI.Widgets.Dialog do
       Enum.map(lines, fn line_text ->
         padded = String.pad_trailing(line_text, inner_width)
         padded = String.slice(padded, 0, inner_width)
-        line = "│ " <> padded <> " │"
+        line = chars.v_line <> " " <> padded <> " " <> chars.v_line
 
         if state.content_style do
           styled(text(line), state.content_style)
@@ -316,7 +321,7 @@ defmodule TermUI.Widgets.Dialog do
     stack(:vertical, content_lines)
   end
 
-  defp render_buttons(state) do
+  defp render_buttons(state, chars) do
     button_texts =
       Enum.map(state.buttons, fn button ->
         label = button.label
@@ -336,10 +341,12 @@ defmodule TermUI.Widgets.Dialog do
     left_pad = div(padding, 2)
 
     line =
-      "│ " <>
+      chars.v_line <>
+        " " <>
         String.duplicate(" ", left_pad) <>
         buttons_line <>
-        String.duplicate(" ", inner_width - left_pad - String.length(buttons_line)) <> " │"
+        String.duplicate(" ", inner_width - left_pad - String.length(buttons_line)) <>
+        " " <> chars.v_line
 
     if state.focused_button_style do
       styled(text(line), state.focused_button_style)

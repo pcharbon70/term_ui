@@ -54,6 +54,7 @@ defmodule TermUI.Widgets.ContextMenu do
 
   use TermUI.StatefulComponent
 
+  alias TermUI.CharacterSet
   alias TermUI.Event
   alias TermUI.Widgets.ContextMenu.Behavior
 
@@ -253,7 +254,8 @@ defmodule TermUI.Widgets.ContextMenu do
   defp render_item(state, item, width) do
     case item.type do
       :separator ->
-        text(String.duplicate("─", width))
+        chars = CharacterSet.current_charset()
+        text(String.duplicate(chars.h_line, width))
 
       _ ->
         render_action_item(state, item, width)

@@ -54,6 +54,7 @@ defmodule TermUI.Widgets.ContextMenu.Inline do
 
   use TermUI.StatefulComponent
 
+  alias TermUI.CharacterSet
   alias TermUI.Event
   alias TermUI.Widgets.ContextMenu.Behavior
 
@@ -294,9 +295,11 @@ defmodule TermUI.Widgets.ContextMenu.Inline do
   end
 
   defp render_separator(state) do
+    chars = CharacterSet.current_charset()
+
     case state.orientation do
-      :horizontal -> text("|")
-      :vertical -> text("───")
+      :horizontal -> text(chars.v_line)
+      :vertical -> text(String.duplicate(chars.h_line, 3))
     end
   end
 

@@ -40,17 +40,17 @@ defmodule TermUI.Widgets.ToastTest do
       assert props.position == :top_center
     end
 
-    test "uses correct icons for each type" do
-      types_and_icons = [
-        {:info, "ℹ"},
-        {:success, "✓"},
-        {:warning, "⚠"},
-        {:error, "✗"}
+    test "uses correct icon_keys for each type" do
+      types_and_icon_keys = [
+        {:info, :info},
+        {:success, :check},
+        {:warning, :warning},
+        {:error, :cross_mark}
       ]
 
-      for {type, expected_icon} <- types_and_icons do
+      for {type, expected_icon_key} <- types_and_icon_keys do
         props = Toast.new(message: "Test", type: type)
-        assert props.icon == expected_icon
+        assert props.icon_key == expected_icon_key
       end
     end
   end

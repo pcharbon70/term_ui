@@ -28,7 +28,9 @@ defmodule TermUI.CharacterSet do
 
   ### Box Drawing
   - `tl`, `tr`, `bl`, `br` - Corners (top-left, top-right, bottom-left, bottom-right)
-  - `h_line`, `v_line` - Horizontal and vertical lines
+  - `tl_round`, `tr_round`, `bl_round`, `br_round` - Rounded corners
+  - `h_line`, `v_line` - Horizontal and vertical lines (light)
+  - `h_line_heavy`, `v_line_heavy` - Heavy horizontal and vertical lines
   - `t_up`, `t_down`, `t_left`, `t_right` - T-junctions
   - `cross` - Cross junction (four-way)
 
@@ -36,13 +38,27 @@ defmodule TermUI.CharacterSet do
   - `bar_full` - Full block for filled progress
   - `bar_empty` - Empty/light block for unfilled progress
   - `bar_levels` - List of characters for fractional progress (8 levels Unicode, 5 ASCII)
+  - `sparkline_levels` - List of vertical bar characters for sparklines
 
   ### Indicators
   - `check` - Check mark for success/selected
   - `cross_mark` - X mark for failure/deselected
+  - `bullet`, `bullet_empty` - Filled and empty circle bullets
+  - `pointer` - Pointer/cursor indicator
 
-  ### Arrows
+  ### Arrows and Triangles
   - `arrow_up`, `arrow_down`, `arrow_left`, `arrow_right` - Directional arrows
+  - `arrow_up_down` - Bidirectional vertical arrow
+  - `triangle_up`, `triangle_down`, `triangle_left`, `triangle_right` - Solid triangles
+
+  ### Special Icons
+  - `info` - Information icon
+  - `warning` - Warning icon
+  - `loading` - Loading/spinner icon
+
+  ### Misc
+  - `ellipsis` - Ellipsis character
+  - `dot` - Bullet dot/point
 
   ## Configuration
 
@@ -67,14 +83,22 @@ defmodule TermUI.CharacterSet do
   Character set map containing all box-drawing and special characters.
   """
   @type t :: %{
-          # Box corners
+          # Box corners (light)
           tl: String.t(),
           tr: String.t(),
           bl: String.t(),
           br: String.t(),
-          # Lines
+          # Rounded box corners
+          tl_round: String.t(),
+          tr_round: String.t(),
+          bl_round: String.t(),
+          br_round: String.t(),
+          # Lines (light)
           h_line: String.t(),
           v_line: String.t(),
+          # Lines (heavy)
+          h_line_heavy: String.t(),
+          v_line_heavy: String.t(),
           # T-junctions
           t_up: String.t(),
           t_down: String.t(),
@@ -86,6 +110,8 @@ defmodule TermUI.CharacterSet do
           bar_full: String.t(),
           bar_empty: String.t(),
           bar_levels: [String.t()],
+          # Sparkline levels (vertical bars)
+          sparkline_levels: [String.t()],
           # Check marks
           check: String.t(),
           cross_mark: String.t(),
@@ -93,7 +119,24 @@ defmodule TermUI.CharacterSet do
           arrow_up: String.t(),
           arrow_down: String.t(),
           arrow_left: String.t(),
-          arrow_right: String.t()
+          arrow_right: String.t(),
+          arrow_up_down: String.t(),
+          # Triangle indicators
+          triangle_up: String.t(),
+          triangle_down: String.t(),
+          triangle_left: String.t(),
+          triangle_right: String.t(),
+          # Selection indicators
+          bullet: String.t(),
+          bullet_empty: String.t(),
+          pointer: String.t(),
+          # Special icons
+          info: String.t(),
+          warning: String.t(),
+          loading: String.t(),
+          # Misc
+          ellipsis: String.t(),
+          dot: String.t()
         }
 
   # Define charsets as module attributes for compile-time access
@@ -103,9 +146,17 @@ defmodule TermUI.CharacterSet do
     tr: "┐",
     bl: "└",
     br: "┘",
+    # Rounded box corners
+    tl_round: "╭",
+    tr_round: "╮",
+    bl_round: "╰",
+    br_round: "╯",
     # Lines (light)
     h_line: "─",
     v_line: "│",
+    # Lines (heavy)
+    h_line_heavy: "━",
+    v_line_heavy: "┃",
     # T-junctions (light)
     t_up: "┴",
     t_down: "┬",
@@ -118,6 +169,8 @@ defmodule TermUI.CharacterSet do
     bar_empty: "░",
     # 8 levels of progress (1/8 to 8/8)
     bar_levels: ["▏", "▎", "▍", "▌", "▋", "▊", "▉", "█"],
+    # 8 sparkline levels (vertical bars)
+    sparkline_levels: ["▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"],
     # Check marks
     check: "✓",
     cross_mark: "✗",
@@ -125,7 +178,24 @@ defmodule TermUI.CharacterSet do
     arrow_up: "↑",
     arrow_down: "↓",
     arrow_left: "←",
-    arrow_right: "→"
+    arrow_right: "→",
+    arrow_up_down: "↕",
+    # Triangle indicators (for expand/collapse, sort, etc.)
+    triangle_up: "▲",
+    triangle_down: "▼",
+    triangle_left: "◀",
+    triangle_right: "▶",
+    # Selection indicators
+    bullet: "●",
+    bullet_empty: "○",
+    pointer: "►",
+    # Special icons
+    info: "ℹ",
+    warning: "⚠",
+    loading: "⟳",
+    # Misc
+    ellipsis: "…",
+    dot: "•"
   }
 
   @ascii_charset %{
@@ -134,9 +204,17 @@ defmodule TermUI.CharacterSet do
     tr: "+",
     bl: "+",
     br: "+",
+    # Rounded box corners (same as regular in ASCII)
+    tl_round: "+",
+    tr_round: "+",
+    bl_round: "+",
+    br_round: "+",
     # Lines (ASCII)
     h_line: "-",
     v_line: "|",
+    # Lines (heavy - same as regular in ASCII)
+    h_line_heavy: "=",
+    v_line_heavy: "|",
     # T-junctions (ASCII)
     t_up: "+",
     t_down: "+",
@@ -149,6 +227,8 @@ defmodule TermUI.CharacterSet do
     bar_empty: ".",
     # 5 levels of progress for ASCII
     bar_levels: [" ", ".", ":", "=", "#"],
+    # 5 sparkline levels for ASCII
+    sparkline_levels: ["_", ".", ":", "=", "#"],
     # Check marks (ASCII)
     check: "x",
     cross_mark: "X",
@@ -156,7 +236,24 @@ defmodule TermUI.CharacterSet do
     arrow_up: "^",
     arrow_down: "v",
     arrow_left: "<",
-    arrow_right: ">"
+    arrow_right: ">",
+    arrow_up_down: "|",
+    # Triangle indicators (ASCII approximations)
+    triangle_up: "^",
+    triangle_down: "v",
+    triangle_left: "<",
+    triangle_right: ">",
+    # Selection indicators (ASCII)
+    bullet: "*",
+    bullet_empty: "o",
+    pointer: ">",
+    # Special icons (ASCII)
+    info: "i",
+    warning: "!",
+    loading: "*",
+    # Misc (ASCII)
+    ellipsis: "...",
+    dot: "*"
   }
 
   # Derive keys from the actual charset map at compile time

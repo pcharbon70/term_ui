@@ -41,6 +41,7 @@ defmodule TermUI.Widgets.Menu do
 
   use TermUI.StatefulComponent
 
+  alias TermUI.CharacterSet
   alias TermUI.Event
 
   @type item_type :: :action | :submenu | :separator | :checkbox
@@ -370,7 +371,8 @@ defmodule TermUI.Widgets.Menu do
   defp render_item(state, item, depth, width) do
     case item.type do
       :separator ->
-        text(String.duplicate("─", width))
+        chars = CharacterSet.current_charset()
+        text(String.duplicate(chars.h_line, width))
 
       _ ->
         render_selectable_item(state, item, depth, width)
@@ -401,11 +403,21 @@ defmodule TermUI.Widgets.Menu do
     end
   end
 
-  defp get_item_prefix(%{type: :checkbox, checked: true}, _state), do: "[×] "
+  defp get_item_prefix(%{type: :checkbox, checked: true}, _state) do
+    chars = CharacterSet.current_charset()
+    "[#{chars.check}] "
+  end
+
   defp get_item_prefix(%{type: :checkbox}, _state), do: "[ ] "
 
   defp get_item_prefix(%{type: :submenu, id: id}, state) do
-    if MapSet.member?(state.expanded, id), do: "▼ ", else: "▶ "
+    chars = CharacterSet.current_charset()
+
+    if MapSet.member?(state.expanded, id) do
+      "#{chars.triangle_down} "
+    else
+      "#{chars.triangle_right} "
+    end
   end
 
   defp get_item_prefix(_item, _state), do: "  "

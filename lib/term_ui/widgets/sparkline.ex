@@ -27,11 +27,8 @@ defmodule TermUI.Widgets.Sparkline do
   """
 
   import TermUI.Component.RenderNode
+  alias TermUI.CharacterSet
   alias TermUI.Widgets.VisualizationHelper, as: VizHelper
-
-  # Unicode block elements for sparkline (bottom to top)
-  @bars ["▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"]
-  @bar_count length(@bars)
 
   @doc """
   Renders a sparkline from values.
@@ -119,30 +116,35 @@ defmodule TermUI.Widgets.Sparkline do
   """
   @spec value_to_bar(number(), number(), number()) :: String.t()
   def value_to_bar(value, min, max) when is_number(value) and is_number(min) and is_number(max) do
+    bars = bar_characters()
+    bar_count = length(bars)
+
     if max > min do
       # Normalize value to 0-1 range
       normalized = VizHelper.normalize(value, min, max)
 
-      # Map to bar index (0 to @bar_count - 1)
-      index = round(normalized * (@bar_count - 1))
-      Enum.at(@bars, index)
+      # Map to bar index (0 to bar_count - 1)
+      index = round(normalized * (bar_count - 1))
+      Enum.at(bars, index)
     else
       # When min == max, return middle bar
-      Enum.at(@bars, div(@bar_count, 2))
+      Enum.at(bars, div(bar_count, 2))
     end
   end
 
   def value_to_bar(_value, _min, _max) do
     # Invalid input, return middle bar
-    Enum.at(@bars, div(@bar_count, 2))
+    bars = bar_characters()
+    Enum.at(bars, div(length(bars), 2))
   end
 
   @doc """
   Returns the list of bar characters used by sparklines.
+  Uses CharacterSet for proper ASCII/Unicode degradation.
   """
   @spec bar_characters() :: [String.t()]
   def bar_characters do
-    @bars
+    CharacterSet.current_charset().sparkline_levels
   end
 
   @doc """
