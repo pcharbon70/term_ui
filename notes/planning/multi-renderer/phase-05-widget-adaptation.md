@@ -293,37 +293,37 @@ Verify ASCII fallbacks render correctly.
 
 ## 5.6 Document Widget Compatibility
 
-- [ ] **Section 5.6 Complete**
+- [x] **Section 5.6 Complete**
 
 Create documentation explaining widget behavior across backends.
 
 ### 5.6.1 Create Compatibility Matrix
 
-- [ ] **Task 5.6.1 Complete**
+- [x] **Task 5.6.1 Complete**
 
 Document widget compatibility.
 
-- [ ] 5.6.1.1 Create table: Widget | Raw Mode | TTY Mode | Notes
-- [ ] 5.6.1.2 List fully compatible widgets (majority)
-- [ ] 5.6.1.3 List widgets with variants (TextInput → TextInput.Line)
-- [ ] 5.6.1.4 List features requiring keyboard alternatives (SplitPane drag, ContextMenu position)
+- [x] 5.6.1.1 Create table: Widget | Raw Mode | TTY Mode | Notes
+- [x] 5.6.1.2 List fully compatible widgets (majority)
+- [x] 5.6.1.3 List widgets with variants (TextInput → TextInput.Line)
+- [x] 5.6.1.4 List features requiring keyboard alternatives (SplitPane drag, ContextMenu position)
 
 ### 5.6.2 Document Best Practices
 
-- [ ] **Task 5.6.2 Complete**
+- [x] **Task 5.6.2 Complete**
 
 Document best practices for widget development.
 
-- [ ] 5.6.2.1 Always use Theme for colors
-- [ ] 5.6.2.2 Always use CharacterSet for special characters
-- [ ] 5.6.2.3 Provide keyboard alternatives for mouse features
-- [ ] 5.6.2.4 Test with both backends during development
+- [x] 5.6.2.1 Always use Theme for colors
+- [x] 5.6.2.2 Always use CharacterSet for special characters
+- [x] 5.6.2.3 Provide keyboard alternatives for mouse features
+- [x] 5.6.2.4 Test with both backends during development
 
 ### Unit Tests - Section 5.6
 
-- [ ] **Unit Tests 5.6 Complete**
-- [ ] Test documentation compiles without errors
-- [ ] Test code examples in documentation work
+- [x] **Unit Tests 5.6 Complete**
+- [x] Test documentation compiles without errors
+- [x] Test code examples in documentation work
 
 ---
 
