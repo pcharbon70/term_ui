@@ -78,6 +78,7 @@ defmodule TermUI.MixProject do
         README.md
         LICENSE
         CHANGELOG.md
+        usage-rules.md
       )
     ]
   end
