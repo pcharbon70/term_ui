@@ -67,7 +67,7 @@ defmodule TermUI.Widgets.ContextMenu.Factory do
           | {:position, {non_neg_integer(), non_neg_integer()}}
           | {:mode, mode()}
           | {:on_select, (term() -> any())}
-          | {:on_close, (() -> any())}
+          | {:on_close, (-> any())}
           | {:orientation, :horizontal | :vertical}
           | {:item_style, term()}
           | {:selected_style, term()}

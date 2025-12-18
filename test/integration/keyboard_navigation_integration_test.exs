@@ -128,7 +128,8 @@ defmodule TermUI.Integration.KeyboardNavigationIntegrationTest do
 
     test "end jumps to last item", %{state: state} do
       {:ok, state} = TreeView.handle_event(%Event.Key{key: :end}, state)
-      assert state.cursor == 3  # Index of last item
+      # Index of last item
+      assert state.cursor == 3
     end
   end
 
@@ -359,7 +360,8 @@ defmodule TermUI.Integration.KeyboardNavigationIntegrationTest do
       # Navigate right to tab2
       {:ok, state} = Tabs.handle_event(%Event.Key{key: :right}, state)
       assert state.focused == :tab2
-      assert state.selected == :tab1  # Not selected yet
+      # Not selected yet
+      assert state.selected == :tab1
 
       # Select tab2
       {:ok, state} = Tabs.handle_event(%Event.Key{key: :enter}, state)
@@ -451,16 +453,20 @@ defmodule TermUI.Integration.KeyboardNavigationIntegrationTest do
       # TreeView uses integer indices for cursor
       for _iteration <- 1..2 do
         {:ok, state} = TreeView.init(props)
-        assert state.cursor == 0  # First item
+        # First item
+        assert state.cursor == 0
 
         {:ok, state} = TreeView.handle_event(%Event.Key{key: :down}, state)
-        assert state.cursor == 1  # Second item
+        # Second item
+        assert state.cursor == 1
 
         {:ok, state} = TreeView.handle_event(%Event.Key{key: :down}, state)
-        assert state.cursor == 2  # Third item
+        # Third item
+        assert state.cursor == 2
 
         {:ok, state} = TreeView.handle_event(%Event.Key{key: :up}, state)
-        assert state.cursor == 1  # Back to second
+        # Back to second
+        assert state.cursor == 1
       end
     end
 
@@ -477,7 +483,8 @@ defmodule TermUI.Integration.KeyboardNavigationIntegrationTest do
       tree_nodes = [TreeView.node(:a, "A"), TreeView.node(:b, "B")]
       {:ok, tree_state} = TreeView.init(TreeView.new(nodes: tree_nodes))
       {:ok, tree_state} = TreeView.handle_event(%Event.Key{key: :down}, tree_state)
-      assert tree_state.cursor == 1  # Index 1 = second item
+      # Index 1 = second item
+      assert tree_state.cursor == 1
 
       # Both widgets moved from first to second item with same event
       # (Menu uses IDs, TreeView uses indices, but same semantic movement)
@@ -531,7 +538,8 @@ defmodule TermUI.Integration.KeyboardNavigationIntegrationTest do
 
     test "right arrow expands node with children", %{state: state} do
       # TreeView uses integer indices for cursor
-      assert state.cursor == 0  # First item (parent)
+      # First item (parent)
+      assert state.cursor == 0
       refute MapSet.member?(state.expanded, :parent)
 
       {:ok, state} = TreeView.handle_event(%Event.Key{key: :right}, state)
@@ -563,13 +571,16 @@ defmodule TermUI.Integration.KeyboardNavigationIntegrationTest do
       # Navigate down into children
       # After expansion, flat_nodes = [parent, child1, child2, sibling]
       {:ok, state} = TreeView.handle_event(%Event.Key{key: :down}, state)
-      assert state.cursor == 1  # Index 1 = child1
+      # Index 1 = child1
+      assert state.cursor == 1
 
       {:ok, state} = TreeView.handle_event(%Event.Key{key: :down}, state)
-      assert state.cursor == 2  # Index 2 = child2
+      # Index 2 = child2
+      assert state.cursor == 2
 
       {:ok, state} = TreeView.handle_event(%Event.Key{key: :down}, state)
-      assert state.cursor == 3  # Index 3 = sibling
+      # Index 3 = sibling
+      assert state.cursor == 3
     end
 
     test "complete treeview workflow: expand, navigate, collapse", %{state: state} do
@@ -600,7 +611,8 @@ defmodule TermUI.Integration.KeyboardNavigationIntegrationTest do
       # After collapse, flat_nodes = [parent, sibling]
       # Navigate down - should go to sibling (now index 1)
       {:ok, state} = TreeView.handle_event(%Event.Key{key: :down}, state)
-      assert state.cursor == 1  # Now sibling is at index 1
+      # Now sibling is at index 1
+      assert state.cursor == 1
     end
   end
 end

@@ -776,8 +776,16 @@ defmodule TermUI.Widgets.ProcessMonitor do
     pid_str = String.pad_trailing(inspect(process.pid), pid_w)
     name_str = String.pad_trailing(truncate(process_name(process), name_w - 1), name_w)
     red_str = String.pad_leading(format_number(process.reductions), red_w)
-    mem_str = String.pad_leading(format_memory_with_indicator(process.memory, state.thresholds), mem_w)
-    queue_str = String.pad_leading(format_queue_with_indicator(process.message_queue_len, state.thresholds), queue_w)
+
+    mem_str =
+      String.pad_leading(format_memory_with_indicator(process.memory, state.thresholds), mem_w)
+
+    queue_str =
+      String.pad_leading(
+        format_queue_with_indicator(process.message_queue_len, state.thresholds),
+        queue_w
+      )
+
     status_str = String.pad_trailing("  #{process.status}", status_w)
 
     line = pid_str <> name_str <> red_str <> mem_str <> queue_str <> status_str

@@ -167,11 +167,15 @@ defmodule TermUI.Widgets.SplitPane do
   @spec validate_resize_config(term(), term(), term()) :: {float(), float(), float()}
   defp validate_resize_config(step, min_r, max_r) do
     # Ensure step is in valid range (0.001 to 1.0)
-    step = if is_number(step) and step > 0 and step <= 1.0, do: step, else: @default_ctrl_resize_step
+    step =
+      if is_number(step) and step > 0 and step <= 1.0, do: step, else: @default_ctrl_resize_step
 
     # Ensure ratios are in valid range (0.0 to 1.0)
-    min_r = if is_number(min_r) and min_r >= 0.0 and min_r < 1.0, do: min_r, else: @default_min_ratio
-    max_r = if is_number(max_r) and max_r > 0.0 and max_r <= 1.0, do: max_r, else: @default_max_ratio
+    min_r =
+      if is_number(min_r) and min_r >= 0.0 and min_r < 1.0, do: min_r, else: @default_min_ratio
+
+    max_r =
+      if is_number(max_r) and max_r > 0.0 and max_r <= 1.0, do: max_r, else: @default_max_ratio
 
     # Ensure min < max, otherwise reset to defaults
     if min_r >= max_r do

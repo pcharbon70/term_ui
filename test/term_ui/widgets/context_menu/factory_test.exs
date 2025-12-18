@@ -150,9 +150,7 @@ defmodule TermUI.Widgets.ContextMenu.FactoryTest do
     test "uses inline mode when no position and mouse not supported" do
       with_mouse_support(false, fn ->
         {:ok, {module, _props}} =
-          Factory.create(
-            items: simple_items()
-          )
+          Factory.create(items: simple_items())
 
         assert module == Inline
       end)
@@ -161,9 +159,7 @@ defmodule TermUI.Widgets.ContextMenu.FactoryTest do
     test "returns error when no position but mouse is supported" do
       with_mouse_support(true, fn ->
         assert {:error, :position_required} =
-                 Factory.create(
-                   items: simple_items()
-                 )
+                 Factory.create(items: simple_items())
       end)
     end
   end

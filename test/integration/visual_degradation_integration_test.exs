@@ -483,7 +483,9 @@ defmodule TermUI.Integration.VisualDegradationIntegrationTest do
       for {key, value} <- ascii_chars, key != :bar_levels do
         # Each character should be printable ASCII
         assert is_binary(value), "#{key} should be a string"
-        assert byte_size(value) == String.length(value), "#{key} should be ASCII: #{inspect(value)}"
+
+        assert byte_size(value) == String.length(value),
+               "#{key} should be ASCII: #{inspect(value)}"
       end
     end
   end
