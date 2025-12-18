@@ -245,7 +245,7 @@ Ensure widgets remain usable in monochrome mode.
 
 ## 5.5 Ensure Character Set Handling in Widgets
 
-- [ ] **Section 5.5 Complete**
+- [x] **Section 5.5 Complete**
 
 Ensure all widgets that use box-drawing or special characters query the character set and use appropriate fallbacks.
 
@@ -272,22 +272,22 @@ Ensure widgets use CharacterSet for special characters.
 
 ### 5.5.3 Verify ASCII Fallbacks
 
-- [ ] **Task 5.5.3 Complete**
+- [x] **Task 5.5.3 Complete**
 
 Verify ASCII fallbacks render correctly.
 
-- [ ] 5.5.3.1 Test box borders render with +, -, | in ASCII mode
-- [ ] 5.5.3.2 Test arrows render with <, >, ^, v in ASCII mode
-- [ ] 5.5.3.3 Test progress bars render with #, - in ASCII mode
+- [x] 5.5.3.1 Test box borders render with +, -, | in ASCII mode
+- [x] 5.5.3.2 Test arrows render with <, >, ^, v in ASCII mode
+- [x] 5.5.3.3 Test progress bars render with #, . in ASCII mode
 
 ### Unit Tests - Section 5.5
 
-- [ ] **Unit Tests 5.5 Complete**
-- [ ] Test widgets render correctly with Unicode character set
-- [ ] Test widgets render correctly with ASCII character set
-- [ ] Test box-drawing degrades to ASCII correctly
-- [ ] Test arrows degrade to ASCII correctly
-- [ ] Test gauges/progress degrade to ASCII correctly
+- [x] **Unit Tests 5.5 Complete**
+- [x] Test widgets render correctly with Unicode character set (existing tests)
+- [x] Test widgets render correctly with ASCII character set
+- [x] Test box-drawing degrades to ASCII correctly
+- [x] Test arrows degrade to ASCII correctly
+- [x] Test gauges/progress degrade to ASCII correctly
 
 ---
 
