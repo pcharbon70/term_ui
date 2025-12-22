@@ -480,7 +480,10 @@ defmodule TermUI.Integration.VisualDegradationIntegrationTest do
     test "ASCII characters are all single-byte printable" do
       ascii_chars = CharacterSet.get(:ascii)
 
-      for {key, value} <- ascii_chars, key != :bar_levels do
+      # bar_levels and sparkline_levels are lists, not single characters
+      list_keys = [:bar_levels, :sparkline_levels]
+
+      for {key, value} <- ascii_chars, key not in list_keys do
         # Each character should be printable ASCII
         assert is_binary(value), "#{key} should be a string"
 

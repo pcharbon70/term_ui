@@ -3,6 +3,7 @@ defmodule TermUI.Widgets.ContextMenu.InlineTest do
 
   import TermUI.Test.ContextMenuHelpers
 
+  alias TermUI.CharacterSet
   alias TermUI.Widgets.ContextMenu
   alias TermUI.Widgets.ContextMenu.Inline
   alias TermUI.Event
@@ -297,8 +298,9 @@ defmodule TermUI.Widgets.ContextMenu.InlineTest do
       # Separator should be between items
       [_item1, _space1, separator, _space2, _item2] = render.children
 
+      chars = CharacterSet.current_charset()
       assert separator.type == :text
-      assert separator.content == "|"
+      assert separator.content == chars.v_line
     end
 
     test "renders separators as horizontal lines in vertical mode" do
@@ -352,8 +354,9 @@ defmodule TermUI.Widgets.ContextMenu.InlineTest do
       # Separator has no number
       [_item1, _space, separator] = render.children
 
+      chars = CharacterSet.current_charset()
       assert separator.type == :text
-      assert separator.content == "|"
+      assert separator.content == chars.v_line
     end
 
     test "limits numbers to 1-9" do

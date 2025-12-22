@@ -926,7 +926,14 @@ defmodule TermUI.Widgets.SplitPane do
   defp maybe_call_resize_callback(state) do
     if state.on_resize do
       sizes = Enum.map(state.panes, fn p -> {p.id, p.size} end)
-      state.on_resize.(sizes)
+
+      try do
+        state.on_resize.(sizes)
+      rescue
+        e ->
+          require Logger
+          Logger.error("SplitPane on_resize callback error: #{inspect(e)}")
+      end
     end
 
     {:ok, state}

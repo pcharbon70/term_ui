@@ -66,7 +66,12 @@ Some widgets have variants optimized for different backends:
 | Shell Editing | No | Yes (history, readline) |
 | Real-time Validation | Yes | On submit only |
 | Cursor Control | Full | Shell-controlled |
+| Blocking | No (event-driven) | Yes (blocks during read) |
 | Best For | Real-time input, search | Free-form text entry |
+
+> **Note:** `TextInput.Line` uses blocking I/O. When `read/1` is called, the
+> process blocks until the user presses Enter. This is intentional to enable
+> shell line editing features. For non-blocking input, use `TextInput`.
 
 **Usage:**
 ```elixir

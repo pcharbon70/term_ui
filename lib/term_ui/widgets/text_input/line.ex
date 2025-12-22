@@ -96,6 +96,29 @@ defmodule TermUI.Widgets.TextInput.Line do
   | Multi-line | No | Yes (optional) |
   | Custom key bindings | No | Yes |
   | Blocking | Yes (blocks during read) | No (event-driven) |
+
+  ## Blocking I/O Behavior (Architectural Note)
+
+  Unlike other TermUI widgets which are event-driven, `TextInput.Line` uses
+  **blocking I/O** when reading input. This is an intentional design choice:
+
+  1. **Why blocking?** Shell line editing requires the terminal to be in line
+     mode, where the shell buffers input until Enter is pressed. This is
+     fundamentally different from raw mode's character-by-character input.
+
+  2. **Process implications:** When `read/1` or `handle_focus/1` is called,
+     the calling process blocks until input is complete. This means:
+     - The widget cannot respond to other events during input
+     - UI updates (like animations) will pause
+     - Other processes are unaffected
+
+  3. **Best practices:**
+     - Use `TextInput.Line` for simple, sequential input flows
+     - For concurrent input handling, spawn a separate process for input
+     - For real-time UI during input, use the standard `TextInput` widget
+
+  This behavior is intentional and will not change. The blocking nature enables
+  shell line editing features that are not possible with event-driven input.
   """
 
   alias TermUI.Input.LineReader
@@ -476,11 +499,26 @@ defmodule TermUI.Widgets.TextInput.Line do
   defp unfocus_result({:error, reason, state}), do: {:error, reason, %{state | focused: false}}
   defp unfocus_result({:cancelled, state}), do: {:cancelled, %{state | focused: false}}
 
-  # Call on_blur callback if configured
-  defp call_on_blur({_, _, state}) when is_function(state.on_blur, 1), do: state.on_blur.(state)
+  # Call on_blur callback if configured (with error protection)
+  defp call_on_blur({_, _, state}) when is_function(state.on_blur, 1) do
+    try do
+      state.on_blur.(state)
+    rescue
+      e ->
+        require Logger
+        Logger.error("TextInput.Line on_blur callback error: #{inspect(e)}")
+    end
+  end
 
-  defp call_on_blur({:cancelled, state}) when is_function(state.on_blur, 1),
-    do: state.on_blur.(state)
+  defp call_on_blur({:cancelled, state}) when is_function(state.on_blur, 1) do
+    try do
+      state.on_blur.(state)
+    rescue
+      e ->
+        require Logger
+        Logger.error("TextInput.Line on_blur callback error: #{inspect(e)}")
+    end
+  end
 
   defp call_on_blur(_), do: :ok
 
@@ -519,7 +557,17 @@ defmodule TermUI.Widgets.TextInput.Line do
   @spec blur(t()) :: t()
   def blur(%__MODULE__{} = state) do
     new_state = %{state | focused: false}
-    if is_function(state.on_blur, 1), do: state.on_blur.(new_state)
+
+    if is_function(state.on_blur, 1) do
+      try do
+        state.on_blur.(new_state)
+      rescue
+        e ->
+          require Logger
+          Logger.error("TextInput.Line on_blur callback error: #{inspect(e)}")
+      end
+    end
+
     new_state
   end
 
