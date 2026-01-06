@@ -309,6 +309,14 @@ defmodule TermUI.Renderer.Style do
     a.fg == b.fg and a.bg == b.bg and MapSet.equal?(a.attrs, b.attrs)
   end
 
+  @doc """
+  Checks if style has an attribute.
+  """
+  @spec has_attr?(t(), attribute()) :: boolean()
+  def has_attr?(%__MODULE__{} = style, attr) do
+    MapSet.member?(style.attrs, attr)
+  end
+
   # Private validation helpers
 
   defp validate_color!(nil), do: nil
