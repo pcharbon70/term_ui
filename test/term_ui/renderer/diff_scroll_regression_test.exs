@@ -24,8 +24,9 @@ defmodule TermUI.Renderer.DiffScrollRegressionTest do
   - **"bug reproduction" tests**: Simulate the actual desync scenario where
     terminal state differs from previous_buffer.
 
-  - **"fix: dirty regions" tests**: Test the dirty region mechanism. These
-    FAIL until the fix is implemented, then should PASS.
+  - **"fix: dirty regions" tests**: Verify the dirty region mechanism works.
+    Callers can pass `dirty_regions: [{start_row, end_row}]` to `Diff.diff/3`
+    to force full row redraws, fixing the desync issue.
 
   See: MISSION.md, DEBUG_ESCAPE_CAPTURE.md
   """
@@ -305,16 +306,13 @@ defmodule TermUI.Renderer.DiffScrollRegressionTest do
   # =============================================================================
   # FIX VERIFICATION: DIRTY REGIONS
   #
-  # These tests verify the dirty region fix mechanism. They currently FAIL
-  # because the feature doesn't exist yet. After implementation, they should
-  # PASS.
+  # These tests verify the dirty region fix mechanism.
   #
   # The fix: Diff.diff/3 accepts an optional dirty_regions parameter. Rows in
   # dirty regions are always fully redrawn, skipping cell-by-cell comparison.
   # =============================================================================
 
   describe "fix: dirty regions force full redraw" do
-    @tag :skip
     test "dirty rows are fully redrawn regardless of content matches" do
       {:ok, previous} = Buffer.new(3, 30)
       {:ok, current} = Buffer.new(3, 30)
@@ -324,26 +322,23 @@ defmodule TermUI.Renderer.DiffScrollRegressionTest do
       Buffer.write_string(current, 1, 1, "XXX MATCHING CONTENT YYY")
 
       # Mark row 1 as dirty - should force full redraw
-      _dirty_regions = [{1, 1}]
+      dirty_regions = [{1, 1}]
 
-      # TODO: Implement Diff.diff/3 with dirty_regions parameter
-      # operations = Diff.diff(current, previous, dirty_regions: dirty_regions)
-      operations = Diff.diff(current, previous)
+      operations = Diff.diff(current, previous, dirty_regions: dirty_regions)
 
       text_ops = Enum.filter(operations, fn {:text, _} -> true; _ -> false end)
       chars_updated = text_ops |> Enum.map(fn {:text, t} -> String.length(t) end) |> Enum.sum()
 
-      # With dirty region: entire row should be updated (24 chars)
+      # With dirty region: entire row should be updated (30 cols = full row width)
       # Without: only "AAA" and "BBB" → "XXX" and "YYY" (6 chars)
-      assert chars_updated == 24,
+      assert chars_updated == 30,
              "Dirty row should be fully redrawn. " <>
-               "Expected 24 chars, got #{chars_updated}."
+               "Expected 30 chars (full row), got #{chars_updated}."
 
       Buffer.destroy(previous)
       Buffer.destroy(current)
     end
 
-    @tag :skip
     test "non-dirty rows still use optimized diff" do
       {:ok, previous} = Buffer.new(3, 30)
       {:ok, current} = Buffer.new(3, 30)
@@ -356,12 +351,10 @@ defmodule TermUI.Renderer.DiffScrollRegressionTest do
       Buffer.write_string(previous, 2, 1, "Old text")
       Buffer.write_string(current, 2, 1, "New text")
 
-      # Only row 2 dirty
-      _dirty_regions = [{2, 2}]
+      # Only row 2 dirty - but row 1 is identical so should have no ops regardless
+      dirty_regions = [{2, 2}]
 
-      # TODO: Implement Diff.diff/3 with dirty_regions parameter
-      # operations = Diff.diff(current, previous, dirty_regions: dirty_regions)
-      operations = Diff.diff(current, previous)
+      operations = Diff.diff(current, previous, dirty_regions: dirty_regions)
 
       # Row 1 should have no moves (identical, not dirty)
       row1_ops = Enum.filter(operations, fn {:move, 1, _} -> true; _ -> false end)
@@ -374,7 +367,6 @@ defmodule TermUI.Renderer.DiffScrollRegressionTest do
       Buffer.destroy(current)
     end
 
-    @tag :skip
     test "viewport scroll marks entire viewport dirty" do
       # When a viewport scrolls, all rows in the viewport should be marked dirty
       {:ok, previous} = Buffer.new(5, 30)
@@ -390,11 +382,9 @@ defmodule TermUI.Renderer.DiffScrollRegressionTest do
       Buffer.write_string(current, 3, 1, "Line 4: Some content here  ")
 
       # Viewport occupies rows 1-3, all should be dirty
-      _dirty_regions = [{1, 3}]
+      dirty_regions = [{1, 3}]
 
-      # TODO: Implement Diff.diff/3 with dirty_regions parameter
-      # operations = Diff.diff(current, previous, dirty_regions: dirty_regions)
-      operations = Diff.diff(current, previous)
+      operations = Diff.diff(current, previous, dirty_regions: dirty_regions)
 
       text_ops = Enum.filter(operations, fn {:text, _} -> true; _ -> false end)
       total_text = text_ops |> Enum.map(fn {:text, t} -> t end) |> Enum.join()

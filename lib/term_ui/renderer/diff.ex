@@ -55,6 +55,14 @@ defmodule TermUI.Renderer.Diff do
   The current buffer contains the new frame to render, and the previous
   buffer contains the last rendered frame. Only differences are output.
 
+  ## Options
+
+    * `:dirty_regions` - List of row ranges to force full redraw. Each element
+      can be a single row number or a `{start_row, end_row}` tuple. Rows in
+      dirty regions bypass cell-by-cell comparison and output the entire row.
+      This is useful when `previous_buffer` may not match actual terminal state
+      (e.g., after viewport scrolls).
+
   ## Examples
 
       {:ok, current} = Buffer.new(24, 80)
@@ -63,23 +71,58 @@ defmodule TermUI.Renderer.Diff do
 
       operations = Diff.diff(current, previous)
       # => [{:move, 1, 1}, {:style, %Style{}}, {:text, "Hello"}]
+
+      # Force rows 1-5 to fully redraw (useful after scroll):
+      operations = Diff.diff(current, previous, dirty_regions: [{1, 5}])
   """
-  @spec diff(Buffer.t(), Buffer.t()) :: [operation()]
-  def diff(current, previous) do
+  @spec diff(Buffer.t(), Buffer.t(), keyword()) :: [operation()]
+  def diff(current, previous, opts \\ []) do
+    dirty_regions = Keyword.get(opts, :dirty_regions, [])
     {rows, cols} = Buffer.dimensions(current)
 
     1..rows
     |> Enum.flat_map(fn row ->
-      diff_row(current, previous, row, cols)
+      force_redraw = row_in_dirty_region?(row, dirty_regions)
+      diff_row(current, previous, row, cols, force_redraw)
     end)
     |> optimize_operations()
   end
 
+  # Check if a row falls within any dirty region
+  defp row_in_dirty_region?(_row, []), do: false
+
+  defp row_in_dirty_region?(row, dirty_regions) do
+    Enum.any?(dirty_regions, fn
+      {start_row, end_row} -> row >= start_row and row <= end_row
+      single_row when is_integer(single_row) -> row == single_row
+    end)
+  end
+
   @doc """
   Compares a single row and returns render operations for changed spans.
+
+  When `force_redraw` is true, outputs the entire row as a single span,
+  bypassing cell-by-cell comparison. This is used for dirty regions where
+  the previous buffer may not accurately reflect terminal state.
   """
-  @spec diff_row(Buffer.t(), Buffer.t(), pos_integer(), pos_integer()) :: [operation()]
-  def diff_row(current, previous, row, _cols) do
+  @spec diff_row(Buffer.t(), Buffer.t(), pos_integer(), pos_integer(), boolean()) :: [operation()]
+  def diff_row(current, previous, row, cols, force_redraw \\ false)
+
+  # Force full row redraw - output entire row as single span
+  def diff_row(current, _previous, row, cols, true = _force_redraw) do
+    current_row = Buffer.get_row(current, row)
+
+    # Skip entirely empty rows (all spaces with default style)
+    if row_is_empty?(current_row) do
+      []
+    else
+      span = %{row: row, start_col: 1, end_col: cols, cells: current_row}
+      span_to_operations(span)
+    end
+  end
+
+  # Normal diff - compare cells and output only changes
+  def diff_row(current, previous, row, _cols, false = _force_redraw) do
     # Get all cells for the row using optimized batch lookup
     current_row = Buffer.get_row(current, row)
     previous_row = Buffer.get_row(previous, row)
@@ -102,6 +145,12 @@ defmodule TermUI.Renderer.Diff do
 
     # Generate operations for each span
     Enum.flat_map(merged_spans, &span_to_operations/1)
+  end
+
+  # Check if a row contains only empty cells (spaces with default style)
+  defp row_is_empty?(cells) do
+    default_style = Style.new()
+    Enum.all?(cells, fn cell -> cell.char == " " and Style.equal?(cell_to_style(cell), default_style) end)
   end
 
   @doc """
