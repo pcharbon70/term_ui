@@ -411,7 +411,6 @@ defmodule TermUI.Renderer.DiffScrollRegressionTest do
   # =============================================================================
 
   describe "fix: scroll operations synchronize previous_buffer" do
-    @tag :skip
     test "scroll-up shifts previous_buffer content" do
       # When viewport scrolls up by 1 line:
       # 1. Emit terminal scroll command
@@ -424,8 +423,8 @@ defmodule TermUI.Renderer.DiffScrollRegressionTest do
       Buffer.write_string(buffer, 2, 1, "Line 2")
       Buffer.write_string(buffer, 3, 1, "Line 3")
 
-      # TODO: Implement Buffer.scroll_region/4 or BufferManager scroll support
-      # Buffer.scroll_region(buffer, 1, 3, -1)  # scroll up by 1
+      # Scroll up by 1 line
+      Buffer.scroll_region(buffer, 1, 3, -1)
 
       # After scroll: row 1 = old row 2, row 2 = old row 3, row 3 = cleared
       row1 = Buffer.get_row(buffer, 1) |> Enum.map(& &1.char) |> Enum.join()
@@ -440,7 +439,6 @@ defmodule TermUI.Renderer.DiffScrollRegressionTest do
       Buffer.destroy(buffer)
     end
 
-    @tag :skip
     test "scroll detection via row hashing" do
       # Detect scroll by comparing row hashes between frames
       # If hash_current[r] == hash_previous[r - k], content scrolled by k
@@ -461,10 +459,8 @@ defmodule TermUI.Renderer.DiffScrollRegressionTest do
       Buffer.write_string(current, 4, 1, "Zeta content")
       Buffer.write_string(current, 5, 1, "Eta content")
 
-      # TODO: Implement Diff.detect_scroll/2
-      # {scroll_amount, confidence} = Diff.detect_scroll(current, previous)
-      scroll_amount = 0
-      confidence = 0.0
+      # Detect scroll using row hashing
+      {scroll_amount, confidence} = Diff.detect_scroll(current, previous)
 
       assert scroll_amount == -2,
              "Should detect scroll up by 2 lines. Got: #{scroll_amount}"

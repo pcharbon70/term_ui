@@ -349,6 +349,113 @@ defmodule TermUI.Renderer.Buffer do
   end
 
   @doc """
+  Scrolls content within a region by shifting rows.
+
+  This function shifts rows within the specified region to keep `previous_buffer`
+  synchronized with terminal state after scroll operations.
+
+  ## Parameters
+
+    * `buffer` - The buffer to modify
+    * `top_row` - First row of the scroll region (1-indexed)
+    * `bottom_row` - Last row of the scroll region (1-indexed)
+    * `delta` - Number of rows to scroll (negative = up, positive = down)
+
+  ## Behavior
+
+    * `delta < 0`: Scroll up - content moves toward row 1, empty rows appear at bottom
+    * `delta > 0`: Scroll down - content moves toward end, empty rows appear at top
+    * `delta == 0`: No change
+
+  ## Examples
+
+      # Scroll up by 1 line within rows 1-5
+      Buffer.scroll_region(buffer, 1, 5, -1)
+      # Row 2 becomes row 1, row 3 becomes row 2, etc.
+      # Row 5 is cleared
+
+      # Scroll down by 2 lines within rows 1-5
+      Buffer.scroll_region(buffer, 1, 5, 2)
+      # Row 1 becomes row 3, row 2 becomes row 4, etc.
+      # Rows 1-2 are cleared
+  """
+  @spec scroll_region(t(), pos_integer(), pos_integer(), integer()) :: :ok
+  def scroll_region(%__MODULE__{} = buffer, top_row, bottom_row, delta)
+      when is_integer(delta) do
+    # Validate bounds
+    top_row = max(1, top_row)
+    bottom_row = min(buffer.rows, bottom_row)
+
+    # No-op if invalid region or no scroll
+    if top_row > bottom_row or delta == 0 do
+      :ok
+    else
+      region_height = bottom_row - top_row + 1
+      # Clamp delta to region height
+      clamped_delta = max(-region_height, min(region_height, delta))
+
+      do_scroll_region(buffer, top_row, bottom_row, clamped_delta)
+    end
+  end
+
+  defp do_scroll_region(buffer, top_row, bottom_row, delta) when delta < 0 do
+    # Scroll up: content moves up, empty rows at bottom
+    # Copy rows from (top_row - delta) to bottom_row → (top_row) to (bottom_row + delta)
+    abs_delta = abs(delta)
+
+    # First, collect all rows we need to shift
+    rows_to_copy =
+      for src_row <- (top_row + abs_delta)..bottom_row do
+        {src_row - abs_delta, get_row(buffer, src_row)}
+      end
+
+    # Write shifted rows
+    Enum.each(rows_to_copy, fn {dest_row, cells} ->
+      cells_with_coords =
+        cells
+        |> Enum.with_index(1)
+        |> Enum.map(fn {cell, col} -> {dest_row, col, cell} end)
+
+      set_cells(buffer, cells_with_coords)
+    end)
+
+    # Clear the newly exposed rows at the bottom
+    for row <- (bottom_row - abs_delta + 1)..bottom_row do
+      clear_row(buffer, row)
+    end
+
+    :ok
+  end
+
+  defp do_scroll_region(buffer, top_row, bottom_row, delta) when delta > 0 do
+    # Scroll down: content moves down, empty rows at top
+    # Copy rows from top_row to (bottom_row - delta) → (top_row + delta) to bottom_row
+
+    # Collect rows in reverse order to avoid overwriting before copying
+    rows_to_copy =
+      for src_row <- (bottom_row - delta)..top_row//-1 do
+        {src_row + delta, get_row(buffer, src_row)}
+      end
+
+    # Write shifted rows
+    Enum.each(rows_to_copy, fn {dest_row, cells} ->
+      cells_with_coords =
+        cells
+        |> Enum.with_index(1)
+        |> Enum.map(fn {cell, col} -> {dest_row, col, cell} end)
+
+      set_cells(buffer, cells_with_coords)
+    end)
+
+    # Clear the newly exposed rows at the top
+    for row <- top_row..(top_row + delta - 1) do
+      clear_row(buffer, row)
+    end
+
+    :ok
+  end
+
+  @doc """
   Gets a row as a list of cells.
 
   Uses a single ETS match operation for efficiency instead of
