@@ -2,7 +2,7 @@ defmodule TermUI.Renderer.DiffScrollRegressionTest do
   @moduledoc """
   Regression tests for the wide-terminal scroll corruption bug (GitHub issue #12).
 
-  ## Root Cause (Revised Understanding)
+  ## Root Cause
 
   **The diff algorithm is correct. The bug is: `previous_buffer ≠ what's actually on screen`.**
 
@@ -10,21 +10,22 @@ defmodule TermUI.Renderer.DiffScrollRegressionTest do
   - Newlines at bottom cause implicit terminal scroll
   - Autowrap at last column triggers scroll/wrap
   - Terminal resize invalidates screen contents
+  - Viewport widgets scroll content without terminal awareness
 
   When this happens, `previous_buffer` becomes a "lie" about what's on the terminal.
   The diff correctly skips cells that match between buffers, but since the terminal
   has different content, those "skipped" cells show stale/wrong content → corruption.
 
-  ## What These Tests Demonstrate
+  ## Test Structure
 
-  These tests simulate scenarios where `previous_buffer` and `current_buffer` have
-  matching cells that the diff skips. In the real bug, these matches occur because:
-  1. Terminal scrolled (changing what's on screen)
-  2. `previous_buffer` wasn't updated to match
-  3. `current_buffer` has new content that coincidentally matches old `previous_buffer` cells
+  - **"mechanism" tests**: Document HOW buffer desync causes visible corruption.
+    These test correct diff behavior - the diff SHOULD skip matching cells.
 
-  The fix should ensure `previous_buffer` always matches actual terminal state, OR
-  detect desync and force full redraw.
+  - **"bug reproduction" tests**: Simulate the actual desync scenario where
+    terminal state differs from previous_buffer.
+
+  - **"fix: dirty regions" tests**: Test the dirty region mechanism. These
+    FAIL until the fix is implemented, then should PASS.
 
   See: MISSION.md, DEBUG_ESCAPE_CAPTURE.md
   """
@@ -34,49 +35,53 @@ defmodule TermUI.Renderer.DiffScrollRegressionTest do
   alias TermUI.Renderer.Buffer
   alias TermUI.Renderer.Diff
 
-  describe "regression: scroll corruption bug (GitHub issue #12)" do
-    test "cells with coincidentally matching characters after scroll are not updated" do
-      {:ok, previous} = Buffer.new(3, 20)
-      {:ok, current} = Buffer.new(3, 20)
+  # =============================================================================
+  # MECHANISM TESTS
+  #
+  # These tests document WHY buffer desync causes visible corruption. They test
+  # CORRECT diff behavior - the diff is supposed to skip matching cells. These
+  # tests will continue to pass after the fix because the fix won't change the
+  # diff algorithm itself.
+  # =============================================================================
 
-      # Simulate BEFORE scroll - row 1 has "Any member unable..."
-      Buffer.write_string(previous, 1, 1, "Any member unable...")
+  describe "mechanism: positional diff skips matching cells (correct behavior)" do
+    test "diff skips cells that match between buffers" do
+      # This is CORRECT behavior. The diff algorithm optimizes by only updating
+      # cells that differ. When previous_buffer accurately reflects terminal
+      # state, this optimization is perfect.
+      #
+      # The bug occurs when previous_buffer is WRONG about terminal state.
+      {:ok, previous} = Buffer.new(1, 20)
+      {:ok, current} = Buffer.new(1, 20)
 
-      # Simulate AFTER scroll - row 1 now has DIFFERENT logical content
-      # but some characters happen to match at same positions
-      # (e.g., spaces, common letters)
-      Buffer.write_string(current, 1, 1, "  - member of Ereal")
-      #                                    ^^ spaces and "member" match positions
+      # Both buffers have "MATCH" in the same position
+      Buffer.write_string(previous, 1, 1, "AAA MATCH BBB")
+      Buffer.write_string(current, 1, 1, "XXX MATCH YYY")
 
       operations = Diff.diff(current, previous)
 
-      # Extract what gets updated on row 1
+      # Extract text operations
       text_ops = Enum.filter(operations, fn {:text, _} -> true; _ -> false end)
       chars_updated = text_ops |> Enum.map(fn {:text, t} -> String.length(t) end) |> Enum.sum()
 
-      # BUG: Only some chars updated (the ones that differ character-by-character)
-      # EXPECTED: All 19 chars should be updated (it's a different logical line)
-      #
-      # This test PASSES with buggy code (documenting current behavior)
-      # After fix, change to: assert chars_updated == 19
-      assert chars_updated < 19,
-             "If this fails, the scroll corruption bug may be fixed! " <>
-               "Update this test to verify correct behavior."
+      # Diff correctly skips " MATCH " (7 chars) - this is EXPECTED
+      # 13 total chars - 7 matching = 6 updated
+      assert chars_updated < 13,
+             "Diff should skip matching cells. Got #{chars_updated} updated, expected < 13."
 
       Buffer.destroy(previous)
       Buffer.destroy(current)
     end
 
-    test "wide terminal increases probability of accidental matches" do
-      # Wide terminals (200+ cols) have more cells = more chance of matches
+    test "wide terminals increase probability of coincidental matches" do
+      # On wide terminals (200+ columns), there are more cells, so the
+      # probability of coincidental character matches increases. This makes
+      # buffer desync MORE visible, not because the diff is wrong, but because
+      # more cells get incorrectly skipped when previous_buffer is stale.
       {:ok, previous} = Buffer.new(1, 200)
       {:ok, current} = Buffer.new(1, 200)
 
-      # Design strings that INTENTIONALLY share characters at same positions
-      # This simulates what happens when content scrolls - different logical
-      # lines that happen to have same chars at same columns
-      #
-      # Pattern: "Item X: description here..." where X changes but surrounding matches
+      # Patterns with common substrings (spaces, "Item", ":", etc.)
       line_a =
         "Item 1: The first item in list  |Item 2: The second item here |Item 3: The third item here  |Item 4: The fourth item here|"
         |> String.pad_trailing(200)
@@ -85,7 +90,6 @@ defmodule TermUI.Renderer.DiffScrollRegressionTest do
         "Item 2: The second item here |Item 3: The third item here  |Item 4: The fourth item here|Item 5: The fifth item here |"
         |> String.pad_trailing(200)
 
-      # Many characters match: "Item ", ": The ", "item ", "here", "|", spaces
       Buffer.write_string(previous, 1, 1, line_a)
       Buffer.write_string(current, 1, 1, line_b)
 
@@ -93,138 +97,95 @@ defmodule TermUI.Renderer.DiffScrollRegressionTest do
       text_ops = Enum.filter(operations, fn {:text, _} -> true; _ -> false end)
       chars_updated = text_ops |> Enum.map(fn {:text, t} -> String.length(t) end) |> Enum.sum()
 
-      # Count how many chars are skipped (accidental matches)
       chars_skipped = 200 - chars_updated
 
-      # On wide terminals with similar content patterns, we expect accidental matches
-      # These skipped chars = visual corruption (old content remains visible)
-      #
-      # After fix, change to: assert chars_skipped == 0
+      # Many chars skipped due to coincidental matches - this is CORRECT diff behavior
       assert chars_skipped > 0,
-             "If this fails, the wide terminal corruption bug may be fixed! " <>
-               "Expected some accidental matches, got #{chars_skipped} skipped chars. " <>
-               "Update this test to verify correct behavior."
+             "Wide terminals with similar patterns should have coincidental matches. " <>
+               "Got #{chars_skipped} skipped chars."
 
       Buffer.destroy(previous)
       Buffer.destroy(current)
     end
 
-    test "scrolling content by one line causes partial updates" do
-      # Simulates the exact scenario from DEBUG_ESCAPE_CAPTURE.md
+    test "scrolled content produces fragmented diff output" do
+      # When content scrolls by one line, the diff sees different content at
+      # each row position but with matching substrings. This causes fragmented
+      # updates - multiple small spans instead of full row rewrites.
       {:ok, previous} = Buffer.new(3, 30)
       {:ok, current} = Buffer.new(3, 30)
 
-      # Design content where scrolling causes character matches at same positions
-      # Use identical prefixes that will match after scroll
-      #
-      # Before scroll:
-      # Row 1: "AA: Hello world message AA"
-      # Row 2: "BB: Hello world message BB"
-      # Row 3: "CC: Hello world message CC"
+      # Before scroll: rows have "AA:", "BB:", "CC:" prefixes
       Buffer.write_string(previous, 1, 1, "AA: Hello world message AA")
       Buffer.write_string(previous, 2, 1, "BB: Hello world message BB")
       Buffer.write_string(previous, 3, 1, "CC: Hello world message CC")
 
-      # After scroll (content moved up by 1):
-      # Row 1: "BB: Hello world message BB" (was row 2)
-      # Row 2: "CC: Hello world message CC" (was row 3)
-      # Row 3: "DD: Hello world message DD" (new)
-      #
-      # Positions 4-25 (": Hello world message ") are IDENTICAL
-      # Only positions 1-2 and 26-27 differ
+      # After scroll: content moved up, new line at bottom
+      # ": Hello world message " matches at same positions
       Buffer.write_string(current, 1, 1, "BB: Hello world message BB")
       Buffer.write_string(current, 2, 1, "CC: Hello world message CC")
       Buffer.write_string(current, 3, 1, "DD: Hello world message DD")
 
       operations = Diff.diff(current, previous)
 
-      # Count move operations (each move = start of a new span to update)
+      # Count move operations (each move = start of new span)
       move_ops = Enum.filter(operations, fn {:move, _, _} -> true; _ -> false end)
-
-      # With the bug: Multiple small spans per row (gaps where chars matched)
-      # Each row should have 2 moves: one for "XX" prefix, one for "XX" suffix
-      # So 3 rows * 2 spans = 6 moves minimum
-      #
-      # Expected after fix: One span per row (full row updates) = 3 moves
       num_moves = length(move_ops)
 
-      # BUG: More moves than rows indicates fragmented updates
-      # After fix, change to: assert num_moves == 3
+      # Fragmented output: multiple moves per row due to gaps at matching sections
+      # If we had 3 rows with no matches, we'd have exactly 3 moves
       assert num_moves > 3,
-             "If this fails with num_moves <= 3, the bug may be fixed! " <>
-               "Got #{num_moves} move operations for 3 rows. " <>
-               "Update this test to verify correct behavior."
+             "Scrolled content should produce fragmented diff (>3 moves for 3 rows). " <>
+               "Got #{num_moves} moves."
 
       Buffer.destroy(previous)
       Buffer.destroy(current)
     end
 
-    test "escape sequence gap pattern from DEBUG_ESCAPE_CAPTURE.md" do
-      # Reproduces the exact pattern: [61;6Hny[0m[61;15H unable to attend
-      # This showed "ny" at col 6, then jump to col 15 for " unable to attend"
-      # Columns 8-14 were SKIPPED (showed old content)
-
+    test "gap pattern matches DEBUG_ESCAPE_CAPTURE.md evidence" do
+      # This recreates the escape sequence pattern from the bug report:
+      # [61;6Hny[0m[61;15H unable to attend
+      # Shows cursor jumping over "matching" cells (cols 8-14)
       {:ok, previous} = Buffer.new(1, 30)
       {:ok, current} = Buffer.new(1, 30)
 
-      # Design strings where middle section matches exactly
-      # Previous: "XXX MATCH SECTION YYY"
-      # Current:  "AAA MATCH SECTION BBB"
-      # The " MATCH SECTION " part is identical, causing a gap
-
       Buffer.write_string(previous, 1, 1, "XXX MATCH SECTION HERE YYY")
       Buffer.write_string(current, 1, 1, "AAA MATCH SECTION HERE BBB")
-      #                                   123456789012345678901234567
-      #                                      ^                   ^
-      #                                   Positions 4-22 match exactly
 
       operations = Diff.diff(current, previous)
 
-      # Find all move operations for row 1
       row1_moves =
         operations
-        |> Enum.filter(fn
-          {:move, 1, _col} -> true
-          _ -> false
-        end)
+        |> Enum.filter(fn {:move, 1, _col} -> true; _ -> false end)
         |> Enum.map(fn {:move, 1, col} -> col end)
         |> Enum.sort()
 
-      # BUG: Multiple moves indicate gaps (cursor jumping over "matching" cells)
-      # Expected: Move to col 1 for "AAA", then jump to col 24 for "BBB"
-      # After fix: Should be single move to col 1 (full line update)
+      # Multiple moves = gaps in output (cursor jumps over "matching" cells)
       has_gaps = length(row1_moves) > 1
 
       assert has_gaps,
-             "If this fails, the gap pattern bug may be fixed! " <>
-               "Move positions: #{inspect(row1_moves)}. " <>
-               "Expected multiple moves (gaps), got single continuous update."
+             "Should have multiple moves (gaps) due to matching middle section. " <>
+               "Move positions: #{inspect(row1_moves)}"
 
       Buffer.destroy(previous)
       Buffer.destroy(current)
     end
   end
 
-  describe "viewport scroll scenario" do
-    test "simulates viewport content shift causing fragmented diff" do
-      # This test simulates what happens in a real Viewport widget:
-      # - Frame N: Viewport shows lines 1-5 of content
-      # - Frame N+1: User scrolls, viewport shows lines 2-6
-      # - Content at each row position is different, but characters may match
-
+  describe "mechanism: real-world patterns that expose the bug" do
+    test "chat/viewport content shift" do
+      # Simulates a chat viewport scrolling down by one message
       {:ok, previous} = Buffer.new(5, 30)
       {:ok, current} = Buffer.new(5, 30)
 
-      # Frame N: Viewport shows messages 1-5
-      # Each message has format "User X: message text here"
+      # Frame N: messages 1-5
       Buffer.write_string(previous, 1, 1, "User A: Hello everyone!      ")
       Buffer.write_string(previous, 2, 1, "User B: How are you today?   ")
       Buffer.write_string(previous, 3, 1, "User A: I'm doing great!     ")
       Buffer.write_string(previous, 4, 1, "User C: Anyone up for games? ")
       Buffer.write_string(previous, 5, 1, "User B: Sure, count me in!   ")
 
-      # Frame N+1: User scrolled down by 1, now showing messages 2-6
-      # Row 1 now has what was row 2, etc.
+      # Frame N+1: scrolled down, now messages 2-6
       Buffer.write_string(current, 1, 1, "User B: How are you today?   ")
       Buffer.write_string(current, 2, 1, "User A: I'm doing great!     ")
       Buffer.write_string(current, 3, 1, "User C: Anyone up for games? ")
@@ -232,93 +193,80 @@ defmodule TermUI.Renderer.DiffScrollRegressionTest do
       Buffer.write_string(current, 5, 1, "User D: What game shall we?  ")
 
       operations = Diff.diff(current, previous)
-
-      # Count how many cells are updated
       text_ops = Enum.filter(operations, fn {:text, _} -> true; _ -> false end)
       chars_updated = text_ops |> Enum.map(fn {:text, t} -> String.length(t) end) |> Enum.sum()
 
-      # Total cells in buffer: 5 rows * 30 cols = 150
-      # If every cell is updated, chars_updated = 150
-      # With the bug, common substrings like "User ", ": ", spaces won't be updated
-
-      # BUG: Only ~some chars updated due to matching patterns
-      # After fix with dirty regions: All 150 chars should be updated
+      # Common patterns like "User ", ": ", spaces cause matches
+      # Total: 5 * 30 = 150 chars, but many will be skipped
       assert chars_updated < 150,
-             "If this fails, viewport scroll handling may be fixed! " <>
-               "Expected fewer than 150 chars due to matches, got #{chars_updated}."
+             "Chat content should have coincidental matches. " <>
+               "Updated #{chars_updated}/150 chars."
 
       Buffer.destroy(previous)
       Buffer.destroy(current)
     end
 
-    test "log-like content with matching prefixes shows fragmented updates" do
-      # Real-world scenario: Log entries with similar prefixes
-      # Common patterns like "INFO ", "2024-", spaces create matches
-
+    test "log entries with common prefixes" do
+      # Log entries have highly repetitive prefixes: timestamp, level, module
       {:ok, previous} = Buffer.new(3, 50)
       {:ok, current} = Buffer.new(3, 50)
 
-      # Frame N: Log entries with common prefix pattern
-      # "INFO  | 2024-01-0X | Module | Message"
       Buffer.write_string(previous, 1, 1, "INFO  | 2024-01-05 | Auth   | User logged in   ")
       Buffer.write_string(previous, 2, 1, "INFO  | 2024-01-05 | Auth   | Session created  ")
       Buffer.write_string(previous, 3, 1, "INFO  | 2024-01-05 | DB     | Query executed   ")
 
-      # Frame N+1: Scrolled down
-      # Positions 1-6 ("INFO  "), 8-17 ("2024-01-05"), 19 ("|"), 28 ("|") all match!
+      # Scrolled: "INFO  | 2024-01-05 | " matches at positions 1-21
       Buffer.write_string(current, 1, 1, "INFO  | 2024-01-05 | Auth   | Session created  ")
       Buffer.write_string(current, 2, 1, "INFO  | 2024-01-05 | DB     | Query executed   ")
       Buffer.write_string(current, 3, 1, "INFO  | 2024-01-05 | Cache  | Entry invalidated")
 
       operations = Diff.diff(current, previous)
-
-      # Count text operations to see how fragmented the updates are
       text_ops = Enum.filter(operations, fn {:text, _} -> true; _ -> false end)
 
-      # With bug: Many small text operations due to matching prefixes
-      # After fix: Should be 3 text operations (one per row, full content)
+      # Many small text ops due to matching prefixes causing fragmentation
       assert length(text_ops) > 3,
-             "If this fails with #{length(text_ops)} text ops, log prefix matching may be handled! " <>
-               "Expected fragmented updates (>3 text ops) due to matching INFO/date prefixes."
+             "Log entries should produce fragmented updates. " <>
+               "Got #{length(text_ops)} text ops for 3 rows."
 
       Buffer.destroy(previous)
       Buffer.destroy(current)
     end
   end
 
-  describe "documentation: why the bug matters" do
-    test "demonstrates buffer desync causing visual corruption" do
-      # REVISED: The diff is CORRECT. The bug is previous_buffer != terminal screen.
-      #
-      # This test simulates the REAL bug scenario:
-      # 1. Terminal has scrolled (content shifted up)
-      # 2. previous_buffer still has OLD positions
-      # 3. current_buffer has NEW content at NEW positions
-      # 4. Diff skips cells that "match" between buffers
-      # 5. But terminal screen doesn't match previous_buffer → corruption
+  # =============================================================================
+  # BUG REPRODUCTION
+  #
+  # This test simulates the ACTUAL bug scenario: terminal state differs from
+  # previous_buffer. The diff operates on incorrect assumptions, producing
+  # partial updates that corrupt the display.
+  # =============================================================================
 
+  describe "bug reproduction: buffer desync causes visual corruption" do
+    test "diff produces corrupt output when previous_buffer doesn't match terminal" do
+      # This is the REAL bug scenario:
+      # 1. previous_buffer says terminal has "AAA the application menu BBB"
+      # 2. We want to render "XXX the application menu YYY"
+      # 3. BUT: Terminal actually has "CCC different line entirely DDD"
+      #    (e.g., because it scrolled without our knowledge)
+      # 4. Diff skips " the application menu " (matches between buffers)
+      # 5. Result: "XXX different line YYY" - corruption!
       {:ok, previous_buffer} = Buffer.new(1, 40)
       {:ok, current_buffer} = Buffer.new(1, 40)
 
-      # What previous_buffer THINKS is on screen (from last render)
+      # What previous_buffer THINKS is on screen
       Buffer.write_string(previous_buffer, 1, 1, "AAA the application menu BBB")
 
-      # What we want to render now
+      # What we want to render
       Buffer.write_string(current_buffer, 1, 1, "XXX the application menu YYY")
 
-      # BUT: The terminal has SCROLLED since last render!
-      # The ACTUAL terminal screen has DIFFERENT content than previous_buffer
-      # Simulating: terminal scrolled, so row 1 now shows what was row 2
-      actual_terminal_screen = "CCC different line entirely DDD" |> String.pad_trailing(40)
+      # What's ACTUALLY on the terminal (unknown to us)
+      actual_terminal = "CCC different line entirely DDD" |> String.pad_trailing(40)
 
       operations = Diff.diff(current_buffer, previous_buffer)
 
-      # Apply diff operations to the ACTUAL terminal screen
-      # (This is what really happens - we write to the real terminal)
-      result = String.to_charlist(actual_terminal_screen)
-
+      # Apply diff ops to actual terminal (simulating real render)
       {final_result, _col} =
-        Enum.reduce(operations, {result, 0}, fn op, {res, col} ->
+        Enum.reduce(operations, {String.to_charlist(actual_terminal), 0}, fn op, {res, col} ->
           case op do
             {:move, _row, new_col} ->
               {res, new_col - 1}
@@ -342,18 +290,200 @@ defmodule TermUI.Renderer.DiffScrollRegressionTest do
       displayed = List.to_string(final_result)
       expected = "XXX the application menu YYY" |> String.pad_trailing(40)
 
-      # BUG: The diff only updated positions where previous_buffer != current_buffer
-      # But previous_buffer was a LIE about what's on the terminal
-      # So the middle section wasn't updated (diff thought it "matched")
-      # Result: We see a mix of actual_terminal_screen + partial updates
-      #
-      # After fix, the renderer should detect the desync and force full redraw
+      # The diff correctly updated "XXX" and "YYY" but skipped the middle
+      # because it matched between current and previous buffers.
+      # But the middle of actual_terminal was DIFFERENT, so we get corruption.
       refute displayed == expected,
-             "If this fails, the buffer desync bug may be fixed! " <>
-               "Displayed: #{inspect(displayed)}, Expected: #{inspect(expected)}"
+             "Buffer desync should cause corruption. " <>
+               "Got: #{inspect(displayed)}, Expected: #{inspect(expected)}"
 
       Buffer.destroy(previous_buffer)
       Buffer.destroy(current_buffer)
+    end
+  end
+
+  # =============================================================================
+  # FIX VERIFICATION: DIRTY REGIONS
+  #
+  # These tests verify the dirty region fix mechanism. They currently FAIL
+  # because the feature doesn't exist yet. After implementation, they should
+  # PASS.
+  #
+  # The fix: Diff.diff/3 accepts an optional dirty_regions parameter. Rows in
+  # dirty regions are always fully redrawn, skipping cell-by-cell comparison.
+  # =============================================================================
+
+  describe "fix: dirty regions force full redraw" do
+    @tag :skip
+    test "dirty rows are fully redrawn regardless of content matches" do
+      {:ok, previous} = Buffer.new(3, 30)
+      {:ok, current} = Buffer.new(3, 30)
+
+      # Content with matching middle section
+      Buffer.write_string(previous, 1, 1, "AAA MATCHING CONTENT BBB")
+      Buffer.write_string(current, 1, 1, "XXX MATCHING CONTENT YYY")
+
+      # Mark row 1 as dirty - should force full redraw
+      _dirty_regions = [{1, 1}]
+
+      # TODO: Implement Diff.diff/3 with dirty_regions parameter
+      # operations = Diff.diff(current, previous, dirty_regions: dirty_regions)
+      operations = Diff.diff(current, previous)
+
+      text_ops = Enum.filter(operations, fn {:text, _} -> true; _ -> false end)
+      chars_updated = text_ops |> Enum.map(fn {:text, t} -> String.length(t) end) |> Enum.sum()
+
+      # With dirty region: entire row should be updated (24 chars)
+      # Without: only "AAA" and "BBB" → "XXX" and "YYY" (6 chars)
+      assert chars_updated == 24,
+             "Dirty row should be fully redrawn. " <>
+               "Expected 24 chars, got #{chars_updated}."
+
+      Buffer.destroy(previous)
+      Buffer.destroy(current)
+    end
+
+    @tag :skip
+    test "non-dirty rows still use optimized diff" do
+      {:ok, previous} = Buffer.new(3, 30)
+      {:ok, current} = Buffer.new(3, 30)
+
+      # Row 1: identical - should produce no ops
+      Buffer.write_string(previous, 1, 1, "Unchanged content here")
+      Buffer.write_string(current, 1, 1, "Unchanged content here")
+
+      # Row 2: different - should produce ops
+      Buffer.write_string(previous, 2, 1, "Old text")
+      Buffer.write_string(current, 2, 1, "New text")
+
+      # Only row 2 dirty
+      _dirty_regions = [{2, 2}]
+
+      # TODO: Implement Diff.diff/3 with dirty_regions parameter
+      # operations = Diff.diff(current, previous, dirty_regions: dirty_regions)
+      operations = Diff.diff(current, previous)
+
+      # Row 1 should have no moves (identical, not dirty)
+      row1_ops = Enum.filter(operations, fn {:move, 1, _} -> true; _ -> false end)
+
+      assert row1_ops == [],
+             "Identical non-dirty row should have no operations. " <>
+               "Got: #{inspect(row1_ops)}"
+
+      Buffer.destroy(previous)
+      Buffer.destroy(current)
+    end
+
+    @tag :skip
+    test "viewport scroll marks entire viewport dirty" do
+      # When a viewport scrolls, all rows in the viewport should be marked dirty
+      {:ok, previous} = Buffer.new(5, 30)
+      {:ok, current} = Buffer.new(5, 30)
+
+      # Simulate viewport scroll - content shifts but has matching patterns
+      Buffer.write_string(previous, 1, 1, "Line 1: Some content here  ")
+      Buffer.write_string(previous, 2, 1, "Line 2: Some content here  ")
+      Buffer.write_string(previous, 3, 1, "Line 3: Some content here  ")
+
+      Buffer.write_string(current, 1, 1, "Line 2: Some content here  ")
+      Buffer.write_string(current, 2, 1, "Line 3: Some content here  ")
+      Buffer.write_string(current, 3, 1, "Line 4: Some content here  ")
+
+      # Viewport occupies rows 1-3, all should be dirty
+      _dirty_regions = [{1, 3}]
+
+      # TODO: Implement Diff.diff/3 with dirty_regions parameter
+      # operations = Diff.diff(current, previous, dirty_regions: dirty_regions)
+      operations = Diff.diff(current, previous)
+
+      text_ops = Enum.filter(operations, fn {:text, _} -> true; _ -> false end)
+      total_text = text_ops |> Enum.map(fn {:text, t} -> t end) |> Enum.join()
+
+      # All 3 rows * ~27 chars should be output
+      # " content here  " (15 chars) matches in each row, but dirty forces full redraw
+      assert String.length(total_text) >= 75,
+             "All dirty viewport rows should be fully redrawn. " <>
+               "Expected >= 75 chars, got #{String.length(total_text)}."
+
+      Buffer.destroy(previous)
+      Buffer.destroy(current)
+    end
+  end
+
+  # =============================================================================
+  # FIX VERIFICATION: SCROLL OPERATIONS
+  #
+  # These tests verify scroll-aware buffer updates. When content scrolls, the
+  # renderer should shift previous_buffer to match, keeping it synchronized
+  # with terminal state.
+  #
+  # Note: This is a higher-level fix at BufferManager/Runtime, not Diff.
+  # =============================================================================
+
+  describe "fix: scroll operations synchronize previous_buffer" do
+    @tag :skip
+    test "scroll-up shifts previous_buffer content" do
+      # When viewport scrolls up by 1 line:
+      # 1. Emit terminal scroll command
+      # 2. Shift previous_buffer rows up by 1
+      # 3. Clear newly exposed bottom row
+      # 4. Diff will now see correct previous state
+      {:ok, buffer} = Buffer.new(3, 20)
+
+      Buffer.write_string(buffer, 1, 1, "Line 1")
+      Buffer.write_string(buffer, 2, 1, "Line 2")
+      Buffer.write_string(buffer, 3, 1, "Line 3")
+
+      # TODO: Implement Buffer.scroll_region/4 or BufferManager scroll support
+      # Buffer.scroll_region(buffer, 1, 3, -1)  # scroll up by 1
+
+      # After scroll: row 1 = old row 2, row 2 = old row 3, row 3 = cleared
+      row1 = Buffer.get_row(buffer, 1) |> Enum.map(& &1.char) |> Enum.join()
+      row3 = Buffer.get_row(buffer, 3) |> Enum.map(& &1.char) |> Enum.join()
+
+      assert String.starts_with?(row1, "Line 2"),
+             "After scroll up, row 1 should contain old row 2 content"
+
+      assert String.trim(row3) == "",
+             "After scroll up, row 3 should be cleared"
+
+      Buffer.destroy(buffer)
+    end
+
+    @tag :skip
+    test "scroll detection via row hashing" do
+      # Detect scroll by comparing row hashes between frames
+      # If hash_current[r] == hash_previous[r - k], content scrolled by k
+      {:ok, previous} = Buffer.new(5, 20)
+      {:ok, current} = Buffer.new(5, 20)
+
+      # Previous frame
+      Buffer.write_string(previous, 1, 1, "Alpha content")
+      Buffer.write_string(previous, 2, 1, "Beta content")
+      Buffer.write_string(previous, 3, 1, "Gamma content")
+      Buffer.write_string(previous, 4, 1, "Delta content")
+      Buffer.write_string(previous, 5, 1, "Epsilon content")
+
+      # Current frame: scrolled up by 2
+      Buffer.write_string(current, 1, 1, "Gamma content")
+      Buffer.write_string(current, 2, 1, "Delta content")
+      Buffer.write_string(current, 3, 1, "Epsilon content")
+      Buffer.write_string(current, 4, 1, "Zeta content")
+      Buffer.write_string(current, 5, 1, "Eta content")
+
+      # TODO: Implement Diff.detect_scroll/2
+      # {scroll_amount, confidence} = Diff.detect_scroll(current, previous)
+      scroll_amount = 0
+      confidence = 0.0
+
+      assert scroll_amount == -2,
+             "Should detect scroll up by 2 lines. Got: #{scroll_amount}"
+
+      assert confidence > 0.5,
+             "Scroll detection confidence should be > 50%. Got: #{confidence}"
+
+      Buffer.destroy(previous)
+      Buffer.destroy(current)
     end
   end
 end
