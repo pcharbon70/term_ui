@@ -80,11 +80,6 @@ defmodule TermUI.Renderer.Diff do
     dirty_regions = Keyword.get(opts, :dirty_regions, [])
     {rows, cols} = Buffer.dimensions(current)
 
-    # DEBUG: Log when dirty_regions is used
-    if dirty_regions != [] do
-      IO.puts(:stderr, "[DIFF DEBUG] diff called with dirty_regions=#{inspect(dirty_regions)} buffer_dims=#{rows}x#{cols}")
-    end
-
     1..rows
     |> Enum.flat_map(fn row ->
       force_redraw = row_in_dirty_region?(row, dirty_regions)
@@ -215,15 +210,6 @@ defmodule TermUI.Renderer.Diff do
   def diff_row(current, _previous, row, cols, true = _force_redraw) do
     current_row = Buffer.get_row(current, row)
 
-    # DEBUG: Log what we're seeing in the buffer for first 10 rows
-    if row <= 10 do
-      chars = current_row |> Enum.map(& &1.char) |> Enum.join() |> String.trim_trailing()
-      is_empty = row_is_empty?(current_row)
-      cell_count = length(current_row)
-
-      IO.puts(:stderr, "[DIFF DEBUG] row=#{row} cells=#{cell_count} empty?=#{is_empty} content=#{inspect(String.slice(chars, 0, 60))}")
-    end
-
     # Skip entirely empty rows (all spaces with default style)
     if row_is_empty?(current_row) do
       []
@@ -261,7 +247,9 @@ defmodule TermUI.Renderer.Diff do
 
   # Check if a row contains only empty cells (spaces with default style)
   defp row_is_empty?(cells) do
-    default_style = Style.new()
+    # Note: Cell.empty() uses fg: :default, bg: :default, NOT nil
+    # Style.new() returns nil for colors, so we must match what cells actually have
+    default_style = %Style{fg: :default, bg: :default, attrs: MapSet.new()}
     Enum.all?(cells, fn cell -> cell.char == " " and Style.equal?(cell_to_style(cell), default_style) end)
   end
 

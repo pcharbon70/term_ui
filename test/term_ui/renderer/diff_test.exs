@@ -553,4 +553,61 @@ defmodule TermUI.Renderer.DiffTest do
       Buffer.destroy(previous)
     end
   end
+
+  # =============================================================================
+  # BUG FIX TESTS: row_is_empty? style mismatch
+  #
+  # Bug: row_is_empty? used Style.new() which returns fg: nil, bg: nil
+  # But Cell.empty() creates cells with fg: :default, bg: :default
+  # Style.equal? saw :default != nil → all rows treated as non-empty
+  # =============================================================================
+
+  describe "row_is_empty? style detection (bug fix)" do
+    test "dirty region skips truly empty rows (Cell.empty cells)" do
+      # Create two identical empty buffers
+      {:ok, current} = Buffer.new(3, 10)
+      {:ok, previous} = Buffer.new(3, 10)
+
+      # Both buffers contain only Cell.empty() cells (space, fg: :default, bg: :default)
+      # With dirty_regions, empty rows should produce NO operations
+
+      operations = Diff.diff(current, previous, dirty_regions: [{1, 3}])
+
+      # Bug behavior: row_is_empty? returns false for Cell.empty() rows
+      # because Style.new() returns nil but cells have :default
+      # This causes ALL rows to produce operations (non-empty)
+
+      # Fixed behavior: empty rows should be skipped, producing no operations
+      assert operations == [],
+             "Empty rows in dirty region should produce no operations. " <>
+               "Got #{length(operations)} operations: #{inspect(Enum.take(operations, 5))}"
+
+      Buffer.destroy(current)
+      Buffer.destroy(previous)
+    end
+
+    test "dirty region outputs rows with actual content" do
+      {:ok, current} = Buffer.new(3, 10)
+      {:ok, previous} = Buffer.new(3, 10)
+
+      # Row 1: has content
+      Buffer.write_string(current, 1, 1, "Hello")
+      # Row 2: empty (default cells)
+      # Row 3: has content
+      Buffer.write_string(current, 3, 1, "World")
+
+      operations = Diff.diff(current, previous, dirty_regions: [{1, 3}])
+
+      # Should have operations for rows 1 and 3, but NOT row 2
+      move_ops = Enum.filter(operations, fn {:move, _, _} -> true; _ -> false end)
+      rows_with_ops = move_ops |> Enum.map(fn {:move, row, _} -> row end) |> Enum.uniq()
+
+      assert 1 in rows_with_ops, "Row 1 (with content) should have operations"
+      assert 3 in rows_with_ops, "Row 3 (with content) should have operations"
+      refute 2 in rows_with_ops, "Row 2 (empty) should NOT have operations"
+
+      Buffer.destroy(current)
+      Buffer.destroy(previous)
+    end
+  end
 end
