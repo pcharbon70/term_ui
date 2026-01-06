@@ -55,6 +55,14 @@ defmodule TermUI.Renderer.Diff do
   The current buffer contains the new frame to render, and the previous
   buffer contains the last rendered frame. Only differences are output.
 
+  ## Options
+
+    * `:dirty_regions` - List of row ranges to force full redraw. Each element
+      can be a single row number or a `{start_row, end_row}` tuple. Rows in
+      dirty regions bypass cell-by-cell comparison and output the entire row.
+      This is useful when `previous_buffer` may not match actual terminal state
+      (e.g., after viewport scrolls).
+
   ## Examples
 
       {:ok, current} = Buffer.new(24, 80)
@@ -63,23 +71,156 @@ defmodule TermUI.Renderer.Diff do
 
       operations = Diff.diff(current, previous)
       # => [{:move, 1, 1}, {:style, %Style{}}, {:text, "Hello"}]
+
+      # Force rows 1-5 to fully redraw (useful after scroll):
+      operations = Diff.diff(current, previous, dirty_regions: [{1, 5}])
   """
-  @spec diff(Buffer.t(), Buffer.t()) :: [operation()]
-  def diff(current, previous) do
+  @spec diff(Buffer.t(), Buffer.t(), keyword()) :: [operation()]
+  def diff(current, previous, opts \\ []) do
+    dirty_regions = Keyword.get(opts, :dirty_regions, [])
     {rows, cols} = Buffer.dimensions(current)
 
     1..rows
     |> Enum.flat_map(fn row ->
-      diff_row(current, previous, row, cols)
+      force_redraw = row_in_dirty_region?(row, dirty_regions)
+      diff_row(current, previous, row, cols, force_redraw)
     end)
     |> optimize_operations()
   end
 
+  # Check if a row falls within any dirty region
+  defp row_in_dirty_region?(_row, []), do: false
+
+  defp row_in_dirty_region?(row, dirty_regions) do
+    Enum.any?(dirty_regions, fn
+      {start_row, end_row} -> row >= start_row and row <= end_row
+      single_row when is_integer(single_row) -> row == single_row
+    end)
+  end
+
+  @doc """
+  Detects if content scrolled between two buffer frames using row hashing.
+
+  Compares row hashes between buffers to find the scroll offset with the best
+  match ratio. This enables scroll-aware buffer synchronization without
+  requiring widget cooperation.
+
+  ## Returns
+
+  A tuple `{scroll_amount, confidence}` where:
+    * `scroll_amount` - Negative = scrolled up, positive = scrolled down, 0 = no scroll
+    * `confidence` - Float 0.0-1.0 based on row match ratio
+
+  ## Algorithm
+
+  1. Compute a hash for each row in both buffers
+  2. For each possible scroll offset k in range [-rows, +rows]:
+     - Count how many rows match: `hash_current[r] == hash_previous[r - k]`
+  3. Find the offset with the most matches
+  4. Return `{best_offset, matches / total_rows}`
+
+  ## Examples
+
+      # Detect a 2-line scroll up
+      {scroll_amount, confidence} = Diff.detect_scroll(current, previous)
+      # => {-2, 0.6}  (60% of rows matched with offset -2)
+  """
+  @spec detect_scroll(Buffer.t(), Buffer.t()) :: {integer(), float()}
+  def detect_scroll(current, previous) do
+    {rows, _cols} = Buffer.dimensions(current)
+
+    # Compute row hashes for both buffers
+    current_hashes = compute_row_hashes(current, rows)
+    previous_hashes = compute_row_hashes(previous, rows)
+
+    # Test all possible scroll offsets and find the best match
+    # Offset range: -rows to +rows (content could have shifted entirely)
+    best_result =
+      -rows..rows
+      |> Enum.map(fn offset ->
+        matches = count_matching_rows(current_hashes, previous_hashes, offset, rows)
+        {offset, matches}
+      end)
+      |> Enum.max_by(fn {_offset, matches} -> matches end)
+
+    {best_offset, best_matches} = best_result
+    confidence = if rows > 0, do: best_matches / rows, else: 0.0
+
+    # Only report scroll if there's meaningful confidence and offset != 0
+    # Offset 0 means "no scroll detected" - if that's the best match, report it
+    if best_offset == 0 do
+      {0, confidence}
+    else
+      {best_offset, confidence}
+    end
+  end
+
+  @doc """
+  Computes a hash for a buffer row based on cell content and styles.
+
+  Uses `:erlang.phash2/1` for fast, deterministic hashing.
+  """
+  @spec row_hash(Buffer.t(), pos_integer()) :: non_neg_integer()
+  def row_hash(buffer, row) do
+    cells = Buffer.get_row(buffer, row)
+
+    # Hash the content that matters: char, fg, bg, attrs
+    hash_data =
+      Enum.map(cells, fn cell ->
+        {cell.char, cell.fg, cell.bg, cell.attrs}
+      end)
+
+    :erlang.phash2(hash_data)
+  end
+
+  # Compute hashes for all rows, returning a map of row => hash
+  defp compute_row_hashes(buffer, rows) do
+    for row <- 1..rows, into: %{} do
+      {row, row_hash(buffer, row)}
+    end
+  end
+
+  # Count how many rows match between current and previous with given offset
+  # offset < 0: content scrolled up (current row r matches previous row r - offset)
+  # offset > 0: content scrolled down (current row r matches previous row r - offset)
+  defp count_matching_rows(current_hashes, previous_hashes, offset, rows) do
+    1..rows
+    |> Enum.count(fn row ->
+      prev_row = row - offset
+
+      if prev_row >= 1 and prev_row <= rows do
+        Map.get(current_hashes, row) == Map.get(previous_hashes, prev_row)
+      else
+        false
+      end
+    end)
+  end
+
   @doc """
   Compares a single row and returns render operations for changed spans.
+
+  When `force_redraw` is true, outputs the entire row as a single span,
+  bypassing cell-by-cell comparison. This is used for dirty regions where
+  the previous buffer may not accurately reflect terminal state.
   """
-  @spec diff_row(Buffer.t(), Buffer.t(), pos_integer(), pos_integer()) :: [operation()]
-  def diff_row(current, previous, row, _cols) do
+  @spec diff_row(Buffer.t(), Buffer.t(), pos_integer(), pos_integer(), boolean()) :: [operation()]
+  def diff_row(current, previous, row, cols, force_redraw \\ false)
+
+  # Force full row redraw - output entire row as single span
+  def diff_row(current, _previous, row, cols, true = _force_redraw) do
+    current_row = Buffer.get_row(current, row)
+
+    # Skip entirely empty rows (all spaces with default style)
+    if row_is_empty?(current_row) do
+      []
+    else
+      span = %{row: row, start_col: 1, end_col: cols, cells: current_row}
+      span_to_operations(span)
+    end
+  end
+
+  # Normal diff - compare cells and output only changes
+  def diff_row(current, previous, row, _cols, false = _force_redraw) do
     # Get all cells for the row using optimized batch lookup
     current_row = Buffer.get_row(current, row)
     previous_row = Buffer.get_row(previous, row)
@@ -102,6 +243,14 @@ defmodule TermUI.Renderer.Diff do
 
     # Generate operations for each span
     Enum.flat_map(merged_spans, &span_to_operations/1)
+  end
+
+  # Check if a row contains only empty cells (spaces with default style)
+  defp row_is_empty?(cells) do
+    # Note: Cell.empty() uses fg: :default, bg: :default, NOT nil
+    # Style.new() returns nil for colors, so we must match what cells actually have
+    default_style = %Style{fg: :default, bg: :default, attrs: MapSet.new()}
+    Enum.all?(cells, fn cell -> cell.char == " " and Style.equal?(cell_to_style(cell), default_style) end)
   end
 
   @doc """
