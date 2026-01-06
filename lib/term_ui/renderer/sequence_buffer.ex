@@ -96,15 +96,22 @@ defmodule TermUI.Renderer.SequenceBuffer do
   end
 
   @doc """
-  Appends data to the buffer, ignoring auto-flush result.
+  Appends data to the buffer, automatically writing flushed data to IO.
 
-  Simpler API when you don't need to handle auto-flush immediately.
+  When the buffer threshold is exceeded, the accumulated data is written
+  to IO immediately and the buffer is reset. This ensures no data is lost
+  during large render operations.
   """
   @spec append!(t(), iodata()) :: t()
   def append!(%__MODULE__{} = buffer, data) do
     case append(buffer, data) do
-      {:ok, new_buffer} -> new_buffer
-      {:flush, _data, new_buffer} -> new_buffer
+      {:ok, new_buffer} ->
+        new_buffer
+
+      {:flush, flushed_data, new_buffer} ->
+        # Write the flushed data immediately instead of discarding it
+        IO.write(flushed_data)
+        new_buffer
     end
   end
 
