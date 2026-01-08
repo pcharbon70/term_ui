@@ -323,6 +323,73 @@ Canvas.render(canvas_state, %{width: 60, height: 20})
 
 ## Layout Widgets
 
+### Markdown Viewer
+
+> **Example:** See [`examples/markdown_viewer/`](../../examples/markdown_viewer/) for a complete demonstration.
+
+Scrollable markdown viewer with syntax highlighting for code blocks.
+
+```elixir
+alias TermUI.Widgets.MarkdownViewer
+
+# Create props
+props = MarkdownViewer.new(
+  content: "# Hello World\n\nThis is **bold** and `code`.\n\n```elixir\ndef hello do\n  :world\nend\n```",
+  width: 80,
+  height: 24,
+  on_copy: fn code -> IO.puts("Copied: #{code}") end
+)
+
+# Initialize
+{:ok, viewer_state} = MarkdownViewer.init(props)
+
+# Handle events and render
+{:ok, viewer_state} = MarkdownViewer.handle_event(event, viewer_state)
+MarkdownViewer.render(viewer_state, %{width: 80, height: 24})
+
+# Update content dynamically
+MarkdownViewer.set_content(viewer_pid, "# New content")
+```
+
+**Features:**
+- CommonMark compliant markdown rendering via mdex
+- Syntax highlighting for code blocks (Elixir, Erlang, and many more)
+- Scrollable viewport with keyboard navigation
+- Focusable code blocks with copy functionality
+
+**Keyboard Controls:**
+- `↑/↓` - Scroll by line
+- `Page Up/Page Down` - Scroll by page
+- `Home/End` - Jump to top/bottom
+- `Tab` - Cycle focus through code blocks
+- `Shift+Tab` - Reverse cycle through code blocks
+- `Enter` / `c` - Copy focused code block
+- Mouse wheel - Scroll
+
+**Supported Markdown:**
+- Headings (`#`, `##`, etc.)
+- Bold (`**text**`), italic (`*text*`)
+- Code (`` `inline` ``) and code blocks (fenced with ` ``` `)
+- Lists (ordered and unordered)
+- Blockquotes (`>`)
+- Links and images
+
+**Options:**
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `content` | string | required | Markdown content to display |
+| `width` | integer | 80 | Display width |
+| `height` | integer | 24 | Display height |
+| `on_copy` | function | `nil` | Callback when code block copied |
+
+**Helper Functions:**
+
+```elixir
+# Update content dynamically (from another process)
+MarkdownViewer.set_content(viewer_pid, "# Updated content")
+```
+
 ### Viewport
 
 > **Example:** See [`examples/viewport/`](../../examples/viewport/) for a complete demonstration.
