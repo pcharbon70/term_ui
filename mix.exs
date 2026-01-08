@@ -60,6 +60,13 @@ defmodule TermUI.MixProject do
       # Streaming
       {:gen_stage, "~> 1.2"},
 
+      # Markdown processing
+      {:mdex, "~> 0.10"},
+
+      # Syntax highlighting for code blocks
+      {:makeup, "~> 1.1"},
+      {:makeup_elixir, "~> 1.0"},
+
       # LLM usage rules
       {:usage_rules, "~> 0.1", only: :dev, runtime: false}
     ]
