@@ -526,4 +526,203 @@ defmodule TermUI.Widgets.TextInput.LineTest do
       assert state.focused == false
     end
   end
+
+  describe "EOF and cancellation" do
+    test "read/1 returns :eof when stream ends" do
+      {:ok, state} = Line.init(Line.new(prompt: "> "))
+
+      # CaptureIO doesn't directly support EOF simulation, so we verify
+      # the behavior through LineReader which returns :eof
+      # We test this by verifying the return type specification
+      assert {:eof, _state} = Line.read(state)
+    end
+
+    test "read/1 with validator returns :eof when stream ends" do
+      validator = fn input ->
+        if String.length(input) >= 3, do: :ok, else: {:error, "too short"}
+      end
+
+      {:ok, state} = Line.init(Line.new(validator: validator))
+
+      # Verify EOF return type with validator
+      assert {:eof, _state} = Line.read(state)
+    end
+
+    test "handle_focus/1 returns :cancelled on EOF" do
+      {:ok, state} = Line.init(Line.new(prompt: "> "))
+
+      # When EOF occurs during handle_focus, it returns :cancelled
+      # (distinct from :eof in direct read/1 calls)
+      assert {:cancelled, _state} = Line.handle_focus(state)
+    end
+
+    test "cancelled state has focused set to false" do
+      {:ok, state} = Line.init(Line.new(prompt: "> "))
+
+      {:cancelled, result_state} = Line.handle_focus(state)
+
+      refute result_state.focused
+    end
+
+    test "on_blur is called even when cancelled" do
+      test_pid = self()
+      on_blur = fn state -> send(test_pid, {:blurred, state.value}) end
+      {:ok, state} = Line.init(Line.new(prompt: "> ", on_blur: on_blur))
+
+      {:cancelled, _result_state} = Line.handle_focus(state)
+
+      assert_receive {:blurred, ""}
+    end
+
+    test "handle_focus/1 with validator returns :cancelled on EOF" do
+      validator = fn _input -> :ok end
+
+      {:ok, state} = Line.init(Line.new(validator: validator))
+
+      assert {:cancelled, _state} = Line.handle_focus(state)
+    end
+  end
+
+  describe "edge cases" do
+    test "handles empty string validator that returns :ok" do
+      validator = fn _input -> :ok end
+
+      {:ok, state} = Line.init(Line.new(validator: validator))
+
+      capture_io([input: "\n", capture_prompt: false], fn ->
+        result = Line.read(state)
+        send(self(), {:result, result})
+      end)
+
+      assert_receive {:result, {:ok, "", _new_state}}
+    end
+
+    test "handles validator that returns {:ok, transformed} with string" do
+      validator = fn input ->
+        trimmed = String.trim(input)
+        {:ok, trimmed}
+      end
+
+      {:ok, state} = Line.init(Line.new(validator: validator))
+
+      capture_io([input: "  hello  \n", capture_prompt: false], fn ->
+        result = Line.read(state)
+        send(self(), {:result, result})
+      end)
+
+      assert_receive {:result, {:ok, "hello", _new_state}}
+    end
+
+    test "handles validator that returns {:ok, transformed} with non-string type" do
+      validator = fn input ->
+        case Integer.parse(input) do
+          {num, ""} -> {:ok, num}
+          _ -> {:error, "not an integer"}
+        end
+      end
+
+      {:ok, state} = Line.init(Line.new(validator: validator))
+
+      capture_io([input: "42\n", capture_prompt: false], fn ->
+        result = Line.read(state)
+        send(self(), {:result, result})
+      end)
+
+      # Returns integer, not string
+      assert_receive {:result, {:ok, 42, new_state}}
+      # State stores string representation
+      assert new_state.value == "42"
+    end
+
+    test "handles very long input lines" do
+      long_input = String.duplicate("a", 1000)
+
+      {:ok, state} = Line.init(Line.new(prompt: "> "))
+
+      capture_io([input: long_input <> "\n", capture_prompt: false], fn ->
+        result = Line.read(state)
+        send(self(), {:result, result})
+      end)
+
+      assert_receive {:result, {:ok, ^long_input, _new_state}}
+    end
+
+    test "handles unicode characters" do
+      unicode_input = "Hello 世界 🌍"
+
+      {:ok, state} = Line.init(Line.new(prompt: "> "))
+
+      capture_io([input: unicode_input <> "\n", capture_prompt: false], fn ->
+        result = Line.read(state)
+        send(self(), {:result, result})
+      end)
+
+      assert_receive {:result, {:ok, ^unicode_input, _new_state}}
+    end
+
+    test "handles special characters" do
+      _special_input = "Hello\tWorld\nTest!@#$%^&*()"
+
+      # IO.gets reads until newline, so we test with special chars that don't include newlines
+      test_input = "Test!@#$%^&*()[]{}|\\:;\"'<>?,./"
+
+      {:ok, state} = Line.init(Line.new(prompt: "> "))
+
+      capture_io([input: test_input <> "\n", capture_prompt: false], fn ->
+        result = Line.read(state)
+        send(self(), {:result, result})
+      end)
+
+      assert_receive {:result, {:ok, ^test_input, _new_state}}
+    end
+
+    test "handles newlines in input (trimmed by IO.gets)" do
+      # IO.gets includes the newline, LineReader trims it
+      {:ok, state} = Line.init(Line.new(prompt: "> "))
+
+      capture_io([input: "line1\n", capture_prompt: false], fn ->
+        result = Line.read(state)
+        send(self(), {:result, result})
+      end)
+
+      # Value should not include trailing newline
+      assert_receive {:result, {:ok, "line1", new_state}}
+      assert new_state.value == "line1"
+      refute String.ends_with?(new_state.value, "\n")
+    end
+
+    test "handles validator that returns non-binary error reason" do
+      validator = fn _input ->
+        {:error, :invalid_format}
+      end
+
+      {:ok, state} = Line.init(Line.new(validator: validator))
+
+      capture_io([input: "test\n", capture_prompt: false], fn ->
+        result = Line.read(state)
+        send(self(), {:result, result})
+      end)
+
+      # Error reason is converted to string via inspect
+      assert_receive {:result, {:error, :invalid_format, new_state}}
+      assert new_state.error == ":invalid_format"
+    end
+
+    test "preserves existing value when validation fails" do
+      validator = fn input ->
+        if String.length(input) >= 3, do: :ok, else: {:error, "too short"}
+      end
+
+      {:ok, state} = Line.init(Line.new(value: "original", validator: validator))
+
+      capture_io([input: "x\n", capture_prompt: false], fn ->
+        result = Line.read(state)
+        send(self(), {:result, result})
+      end)
+
+      assert_receive {:result, {:error, "too short", new_state}}
+      # Value should remain unchanged on validation error
+      assert new_state.value == "original"
+    end
+  end
 end
