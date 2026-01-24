@@ -356,8 +356,32 @@ defmodule TermUI.Runtime do
         {:ok, backend_state} = backend.init(capabilities: capabilities)
         {:tty, backend, backend_state, capabilities, false, nil, nil}
 
+      {:explicit, :raw, _opts} ->
+        # Explicit raw backend selection - atom form
+        case setup_terminal_and_buffers() do
+          {true, buffer_manager, dimensions} ->
+            backend = TermUI.Backend.Raw
+            {:ok, backend_state} = backend.init(
+              alternate_screen: true,
+              hide_cursor: true,
+              mouse_tracking: :all,
+              size: dimensions
+            )
+            {:raw, backend, backend_state, nil, true, buffer_manager, dimensions}
+
+          {false, nil, nil} ->
+            raise "Raw backend requested but unavailable"
+        end
+
+      {:explicit, :tty, _opts} ->
+        # Explicit TTY backend selection - atom form
+        capabilities = Selector.detect_capabilities()
+        backend = TermUI.Backend.TTY
+        {:ok, backend_state} = backend.init(capabilities: capabilities)
+        {:tty, backend, backend_state, capabilities, false, nil, nil}
+
       {:explicit, module, _opts} ->
-        # Explicit backend selection
+        # Explicit backend selection - module form (TermUI.Backend.Raw or TermUI.Backend.TTY)
         case module do
           TermUI.Backend.Raw ->
             case setup_terminal_and_buffers() do
