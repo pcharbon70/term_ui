@@ -162,60 +162,60 @@ Ensure character set is available during rendering.
 
 ## 6.4 Create Application API
 
-- [ ] **Section 6.4 Complete**
+- [x] **Section 6.4 Complete**
 
 Create a clean API for applications to start and run with the multi-renderer system.
 
 ### 6.4.1 Create TermUI.App Module
 
-- [ ] **Task 6.4.1 Complete**
+- [x] **Task 6.4.1 Complete**
 
 Create the application entry point module.
 
-- [ ] 6.4.1.1 Create `lib/term_ui/app.ex` with `@moduledoc`
-- [ ] 6.4.1.2 Document application lifecycle
-- [ ] 6.4.1.3 Document configuration options
+- [x] 6.4.1.1 Create `lib/term_ui/app.ex` with `@moduledoc`
+- [x] 6.4.1.2 Document application lifecycle
+- [x] 6.4.1.3 Document configuration options
 
 ### 6.4.2 Implement start/2
 
-- [ ] **Task 6.4.2 Complete**
+- [x] **Task 6.4.2 Complete**
 
 Implement application start function.
 
-- [ ] 6.4.2.1 Implement `start/2` accepting model module and options
-- [ ] 6.4.2.2 Initialize backend via selector
-- [ ] 6.4.2.3 Start runtime with selected backend
-- [ ] 6.4.2.4 Return `{:ok, pid}` or `{:error, reason}`
+- [x] 6.4.2.1 Implement `start/2` accepting model module and options
+- [x] 6.4.2.2 Initialize backend via selector
+- [x] 6.4.2.3 Start runtime with selected backend
+- [x] 6.4.2.4 Return `{:ok, pid}` or `{:error, reason}`
 
 ### 6.4.3 Implement run/2
 
-- [ ] **Task 6.4.3 Complete**
+- [x] **Task 6.4.3 Complete**
 
 Implement blocking run function.
 
-- [ ] 6.4.3.1 Implement `run/2` that starts and waits for completion
-- [ ] 6.4.3.2 Block until application exits
-- [ ] 6.4.3.3 Clean up terminal state on exit
-- [ ] 6.4.3.4 Return final model state
+- [x] 6.4.3.1 Implement `run/2` that starts and waits for completion
+- [x] 6.4.3.2 Block until application exits
+- [x] 6.4.3.3 Clean up terminal state on exit
+- [x] 6.4.3.4 Return final model state
 
 ### 6.4.4 Implement Convenience Functions
 
-- [ ] **Task 6.4.4 Complete**
+- [x] **Task 6.4.4 Complete**
 
 Add convenience functions for common operations.
 
-- [ ] 6.4.4.1 Implement `backend_mode/0` returning current mode
-- [ ] 6.4.4.2 Implement `supports?/1` for capability queries
-- [ ] 6.4.4.3 Implement `shutdown/0` for clean shutdown
+- [x] 6.4.4.1 Implement `backend_mode/0` returning current mode
+- [x] 6.4.4.2 Implement `supports?/1` for capability queries
+- [x] 6.4.4.3 Implement `shutdown/0` for clean shutdown
 
 ### Unit Tests - Section 6.4
 
-- [ ] **Unit Tests 6.4 Complete**
-- [ ] Test `start/2` returns `{:ok, pid}`
-- [ ] Test `run/2` blocks until completion
-- [ ] Test `backend_mode/0` returns correct mode
-- [ ] Test `supports?/1` queries capabilities
-- [ ] Test cleanup happens on exit
+- [x] **Unit Tests 6.4 Complete**
+- [x] Test `start/2` returns `{:ok, pid}`
+- [x] Test `run/2` blocks until completion
+- [x] Test `backend_mode/0` returns correct mode
+- [x] Test `supports?/1` queries capabilities
+- [x] Test cleanup happens on exit
 
 ---
 
