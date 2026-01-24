@@ -291,8 +291,8 @@ defmodule TermUI.CharacterSet do
   @doc """
   Returns the currently configured character set type.
 
-  Reads from application config `:term_ui, :character_set`.
-  Defaults to `:unicode` if not configured.
+  Reads from persistent_term (set by Runtime), falling back to application config.
+  Defaults to `:unicode` if neither is configured.
 
   ## Returns
 
@@ -303,13 +303,22 @@ defmodule TermUI.CharacterSet do
       iex> TermUI.CharacterSet.current()
       :unicode
 
-      iex> Application.put_env(:term_ui, :character_set, :ascii)
+      # After Runtime sets it based on capabilities
+      iex> :persistent_term.put(:term_ui_character_set, :ascii)
       iex> TermUI.CharacterSet.current()
       :ascii
   """
   @spec current() :: charset()
   def current do
-    Application.get_env(:term_ui, :character_set, :unicode)
+    # First check persistent_term (set by Runtime based on detected capabilities)
+    case :persistent_term.get(:term_ui_character_set, :fallback) do
+      :fallback ->
+        # Fall back to application config
+        Application.get_env(:term_ui, :character_set, :unicode)
+
+      charset ->
+        charset
+    end
   end
 
   @doc """
