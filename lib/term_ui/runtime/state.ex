@@ -9,9 +9,20 @@ defmodule TermUI.Runtime.State do
   - Render configuration
   - Focus tracking
   - Shutdown status
+  - Backend selection and capabilities
   """
 
   alias TermUI.MessageQueue
+
+  @type backend_mode :: :raw | :tty | nil
+
+  @type capabilities :: %{
+          optional(:colors) => :true_color | :color_256 | :color_16 | :monochrome,
+          optional(:unicode) => boolean(),
+          optional(:dimensions) => {pos_integer(), pos_integer()} | nil,
+          optional(:terminal) => boolean(),
+          optional(:raw_mode_error) => term()
+        }
 
   @type t :: %__MODULE__{
           root_module: module(),
@@ -26,7 +37,10 @@ defmodule TermUI.Runtime.State do
           terminal_started: boolean(),
           buffer_manager: pid() | nil,
           dimensions: {pos_integer(), pos_integer()} | nil,
-          input_reader: pid() | nil
+          input_reader: pid() | nil,
+          backend_mode: backend_mode(),
+          backend: module() | nil,
+          capabilities: capabilities() | nil
         }
 
   @type component_entry :: %{
@@ -52,6 +66,9 @@ defmodule TermUI.Runtime.State do
     :terminal_started,
     :buffer_manager,
     :dimensions,
-    :input_reader
+    :input_reader,
+    backend_mode: nil,
+    backend: nil,
+    capabilities: nil
   ]
 end
