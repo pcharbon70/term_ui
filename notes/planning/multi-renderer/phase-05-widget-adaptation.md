@@ -24,7 +24,7 @@ The main work in this phase is:
 
 ## 5.1 Create TextInput.Line Widget
 
-- [ ] **Section 5.1 Complete**
+- [x] **Section 5.1 Complete**
 
 Create a TTY-friendly variant of TextInput that uses `IO.gets/1` for line-based input. This widget is useful when shell line editing (backspace, history, cursor movement) is desirable.
 
@@ -86,12 +86,14 @@ Implement focus handling for the widget.
 
 ### Unit Tests - Section 5.1
 
-- [ ] **Unit Tests 5.1 Complete**
-- [ ] Test TextInput.Line initializes with default state
-- [ ] Test rendering includes label and prompt
-- [ ] Test `read/1` returns entered value (mock LineReader)
-- [ ] Test validator is applied to input
-- [ ] Test invalid input returns error with message
+- [x] **Unit Tests 5.1 Complete**
+- [x] Test TextInput.Line initializes with default state
+- [x] Test rendering includes label and prompt
+- [x] Test `read/1` returns entered value (mock LineReader)
+- [x] Test validator is applied to input
+- [x] Test invalid input returns error with message
+- [x] Test EOF/cancellation behavior (`:eof` and `:cancelled` return values)
+- [x] Test edge cases (unicode, long input, special characters)
 
 ---
 
