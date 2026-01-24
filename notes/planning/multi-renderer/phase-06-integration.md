@@ -69,47 +69,47 @@ Make backend information available to components.
 
 ## 6.2 Update Event Loop
 
-- [ ] **Section 6.2 Complete**
+- [x] **Section 6.2 Complete**
 
 Update the runtime event loop to use the selected input handler.
 
 ### 6.2.1 Integrate Input Handler
 
-- [ ] **Task 6.2.1 Complete**
+- [x] **Task 6.2.1 Complete**
 
 Use the appropriate input handler based on backend mode.
 
-- [ ] 6.2.1.1 Modify event loop to call `Input.Selector.select/0`
-- [ ] 6.2.1.2 Use selected handler's `poll/2` for input reading
-- [ ] 6.2.1.3 Handle input results consistently from both handlers
+- [x] 6.2.1.1 Modify event loop to call `Input.Selector.select/0`
+- [x] 6.2.1.2 Use selected handler's `poll/2` for input reading
+- [x] 6.2.1.3 Handle input results consistently from both handlers
 
 ### 6.2.2 Unify Event Handling
 
-- [ ] **Task 6.2.2 Complete**
+- [x] **Task 6.2.2 Complete**
 
 Ensure events from both backends are handled identically.
 
-- [ ] 6.2.2.1 Both backends produce `TermUI.Event.Key` structs
-- [ ] 6.2.2.2 Arrow keys, Tab, Enter work identically
-- [ ] 6.2.2.3 Escape sequences parsed by both handlers
+- [x] 6.2.2.1 Both backends produce `TermUI.Event.Key` structs
+- [x] 6.2.2.2 Arrow keys, Tab, Enter work identically
+- [x] 6.2.2.3 Escape sequences parsed by both handlers
 
 ### 6.2.3 Handle Backend-Specific Events
 
-- [ ] **Task 6.2.3 Complete**
+- [x] **Task 6.2.3 Complete**
 
 Handle events that only exist in one mode.
 
-- [ ] 6.2.3.1 Mouse events only from raw backend (when enabled)
-- [ ] 6.2.3.2 Resize events from both backends (different detection)
-- [ ] 6.2.3.3 Focus events only from raw backend (when supported)
+- [x] 6.2.3.1 Mouse events only from raw backend (when enabled)
+- [x] 6.2.3.2 Resize events from both backends (different detection)
+- [x] 6.2.3.3 Focus events only from raw backend (when supported)
 
 ### Unit Tests - Section 6.2
 
-- [ ] **Unit Tests 6.2 Complete**
-- [ ] Test event loop reads from correct input handler
-- [ ] Test key events are identical format from both backends
-- [ ] Test mouse events only appear in raw mode
-- [ ] Test resize events work in both modes
+- [x] **Unit Tests 6.2 Complete**
+- [x] Test event loop reads from correct input handler
+- [x] Test key events are identical format from both backends
+- [x] Test mouse events only appear in raw mode
+- [x] Test resize events work in both modes
 
 ---
 
