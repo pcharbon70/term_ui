@@ -199,7 +199,7 @@ Note: Completed as part of Task 5.3.1 (ContextMenu.Inline implementation)
 
 ## 5.4 Ensure Color Degradation in Widgets
 
-- [ ] **Section 5.4 Complete**
+- [x] **Section 5.4 Complete**
 
 Ensure all widgets that use colors query backend capabilities and degrade gracefully.
 
@@ -236,12 +236,12 @@ Ensure widgets remain usable in monochrome mode.
 
 ### Unit Tests - Section 5.4
 
-- [ ] **Unit Tests 5.4 Complete**
-- [ ] Test widgets render correctly in true_color mode
-- [ ] Test widgets render correctly in color_256 mode
-- [ ] Test widgets render correctly in color_16 mode
-- [ ] Test widgets render correctly in monochrome mode
-- [ ] Test selection is visible in all color modes
+- [x] **Unit Tests 5.4 Complete**
+- [x] Test widgets render correctly in true_color mode (integration tests)
+- [x] Test widgets render correctly in color_256 mode (integration tests)
+- [x] Test widgets render correctly in color_16 mode (integration tests)
+- [x] Test widgets render correctly in monochrome mode (integration tests)
+- [x] Test selection is visible in all color modes (theme tests: monochrome compatibility)
 
 ---
 
