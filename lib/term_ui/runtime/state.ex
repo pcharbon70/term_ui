@@ -41,6 +41,7 @@ defmodule TermUI.Runtime.State do
           input_reader: pid() | nil,
           backend_mode: backend_mode(),
           backend: module() | nil,
+          backend_state: term() | nil,
           capabilities: capabilities() | nil,
           input_handler: module() | nil,
           input_state: term() | nil
@@ -72,6 +73,7 @@ defmodule TermUI.Runtime.State do
     :input_reader,
     backend_mode: nil,
     backend: nil,
+    backend_state: nil,
     capabilities: nil,
     input_handler: nil,
     input_state: nil
