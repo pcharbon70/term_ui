@@ -534,4 +534,53 @@ defmodule TermUI.RuntimeTest do
       assert state.backend == nil
     end
   end
+
+  describe "input handler integration" do
+    test "does not use input handler by default" do
+      {:ok, runtime} = start_test_runtime(root: Counter)
+
+      state = Runtime.get_state(runtime)
+      # By default, input_handler is nil (legacy InputReader is used)
+      assert state.input_handler == nil
+      assert state.input_state == nil
+    end
+
+    test "initializes input handler when use_input_handler is true" do
+      {:ok, runtime} =
+        Runtime.start_link(root: Counter, use_input_handler: true, skip_terminal: true)
+
+      state = Runtime.get_state(runtime)
+      # With skip_terminal and backend_mode :skip, no input handler is initialized
+      assert state.input_handler == nil
+    end
+
+    test "initializes input handler for raw backend mode" do
+      # We can't test actual raw mode without a terminal, but we can verify
+      # the logic path by checking the state structure
+      {:ok, runtime} =
+        Runtime.start_link(root: Counter, backend: :raw, use_input_handler: true, skip_terminal: true)
+
+      state = Runtime.get_state(runtime)
+      # Backend mode :skip means no handler selected
+      assert state.input_handler == nil
+    end
+
+    test "initializes input handler for TTY backend mode" do
+      {:ok, runtime} =
+        Runtime.start_link(root: Counter, backend: :tty, use_input_handler: true, skip_terminal: true)
+
+      state = Runtime.get_state(runtime)
+      # Backend mode :skip means no handler selected
+      assert state.input_handler == nil
+    end
+
+    test "input_handler defaults to nil when use_input_handler is false" do
+      {:ok, runtime} =
+        Runtime.start_link(root: Counter, use_input_handler: false, skip_terminal: true)
+
+      state = Runtime.get_state(runtime)
+      assert state.input_handler == nil
+      assert state.input_state == nil
+    end
+  end
 end

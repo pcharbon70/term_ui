@@ -28,6 +28,7 @@ defmodule TermUI.Runtime do
   alias TermUI.Backend.Selector
   alias TermUI.Elm
   alias TermUI.Event
+  alias TermUI.Input.Selector, as: InputSelector
   alias TermUI.MessageQueue
   alias TermUI.Renderer.BufferManager
   alias TermUI.Renderer.Diff
@@ -43,9 +44,13 @@ defmodule TermUI.Runtime do
           | {:render_interval, pos_integer()}
           | {:backend, :auto | :raw | :tty}
           | {:skip_terminal, boolean()}
+          | {:use_input_handler, boolean()}
 
   # Default render interval in milliseconds (~60 FPS)
   @default_render_interval 16
+
+  # Input polling interval (same as render interval)
+  @input_poll_interval 16
 
   # --- Public API ---
 
@@ -241,6 +246,7 @@ defmodule TermUI.Runtime do
     render_interval = Keyword.get(opts, :render_interval, @default_render_interval)
     skip_terminal = Keyword.get(opts, :skip_terminal, false)
     backend_opt = Keyword.get(opts, :backend, :auto)
+    use_input_handler = Keyword.get(opts, :use_input_handler, false)
 
     # Select backend using Backend.Selector
     {backend_mode, backend, capabilities, terminal_started, buffer_manager, dimensions} =
@@ -256,15 +262,29 @@ defmodule TermUI.Runtime do
     # Initialize root component state
     root_state = root_module.init(opts)
 
-    # Start input reader and register for resize callbacks if in raw mode
+    # Select and initialize input handler (if enabled)
+    {input_handler, input_state} =
+      if use_input_handler and backend_mode in [:raw, :tty] do
+        handler = InputSelector.select(backend_mode)
+        {handler, handler.new()}
+      else
+        {nil, nil}
+      end
+
+    # Start input reader and register for resize callbacks if using legacy InputReader
     input_reader =
-      if terminal_started do
+      if not use_input_handler and terminal_started do
         {:ok, reader_pid} = InputReader.start_link(target: self())
         Terminal.register_resize_callback(self())
         reader_pid
       else
         nil
       end
+
+    # Register for resize callbacks if using new input handler
+    if use_input_handler and terminal_started do
+      Terminal.register_resize_callback(self())
+    end
 
     state = %State{
       root_module: root_module,
@@ -283,7 +303,9 @@ defmodule TermUI.Runtime do
       input_reader: input_reader,
       backend_mode: backend_mode,
       backend: backend,
-      capabilities: capabilities
+      capabilities: capabilities,
+      input_handler: input_handler,
+      input_state: input_state
     }
 
     # Log backend selection
@@ -294,6 +316,11 @@ defmodule TermUI.Runtime do
 
     # Schedule first render
     schedule_render(render_interval)
+
+    # Schedule first input poll (if using new input handler)
+    if input_handler do
+      schedule_input_poll()
+    end
 
     {:ok, state}
   end
@@ -425,6 +452,33 @@ defmodule TermUI.Runtime do
   def handle_info(:render, state) do
     state = process_render_tick(state)
     {:noreply, state}
+  end
+
+  @impl true
+  def handle_info(:input_poll, state) do
+    # Poll input handler for new events
+    if state.shutting_down or state.input_handler == nil do
+      {:noreply, state}
+    else
+      case state.input_handler.poll(state.input_state, @input_poll_interval) do
+        {{:ok, event}, new_input_state} ->
+          # Dispatch the event and continue polling
+          state = %{state | input_state: new_input_state}
+          state = dispatch_event(event, state)
+          schedule_input_poll()
+          {:noreply, state}
+
+        {:timeout, new_input_state} ->
+          # No input, but continue polling
+          schedule_input_poll()
+          {:noreply, %{state | input_state: new_input_state}}
+
+        {:eof, _new_input_state} ->
+          # EOF - initiate shutdown
+          state = initiate_shutdown(%{state | input_state: nil})
+          {:noreply, state}
+      end
+    end
   end
 
   @impl true
@@ -743,6 +797,10 @@ defmodule TermUI.Runtime do
 
   defp schedule_render(interval) do
     Process.send_after(self(), :render, interval)
+  end
+
+  defp schedule_input_poll do
+    Process.send_after(self(), :input_poll, @input_poll_interval)
   end
 
   defp process_render_tick(state) do
