@@ -25,6 +25,7 @@ defmodule TermUI.Runtime do
 
   use GenServer
 
+  alias TermUI.Backend.Selector
   alias TermUI.Elm
   alias TermUI.Event
   alias TermUI.MessageQueue
@@ -40,6 +41,8 @@ defmodule TermUI.Runtime do
           {:root, module()}
           | {:name, GenServer.name()}
           | {:render_interval, pos_integer()}
+          | {:backend, :auto | :raw | :tty}
+          | {:skip_terminal, boolean()}
 
   # Default render interval in milliseconds (~60 FPS)
   @default_render_interval 16
@@ -54,6 +57,30 @@ defmodule TermUI.Runtime do
   - `:root` - The root component module (required)
   - `:name` - GenServer name (optional)
   - `:render_interval` - Milliseconds between renders (default: 16)
+  - `:backend` - Backend selection: `:auto` (default), `:raw`, `:tty`
+  - `:skip_terminal` - Skip terminal initialization (default: false, for testing)
+
+  ## Backend Selection
+
+  The `:backend` option controls which terminal backend is used:
+
+  - `:auto` (default) - Attempts raw mode first, falls back to TTY if unavailable
+  - `:raw` - Forces raw mode (requires OTP 28+, errors if unavailable)
+  - `:tty` - Forces TTY mode (line-based input, no raw mode attempt)
+
+  ## Examples
+
+      # Auto-detect backend (default behavior)
+      {:ok, runtime} = Runtime.start_link(root: MyApp.Root)
+
+      # Force TTY mode
+      {:ok, runtime} = Runtime.start_link(root: MyApp.Root, backend: :tty)
+
+      # Query backend mode at runtime
+      :raw = Runtime.backend_mode()
+
+      # Query capabilities (useful for TTY mode)
+      %{colors: :true_color, unicode: true} = Runtime.capabilities()
   """
   @spec start_link([option()]) :: GenServer.on_start()
   def start_link(opts) do
@@ -126,6 +153,42 @@ defmodule TermUI.Runtime do
   end
 
   @doc """
+  Gets the current backend mode.
+
+  Returns `:raw` if raw mode is active, `:tty` if TTY mode is active,
+  or `nil` if no runtime has been started.
+
+  ## Examples
+
+      :raw = Runtime.backend_mode()
+      :tty = Runtime.backend_mode()
+  """
+  @spec backend_mode() :: State.backend_mode()
+  def backend_mode do
+    :persistent_term.get(:term_ui_backend_mode, nil)
+  end
+
+  @doc """
+  Gets the detected terminal capabilities.
+
+  Returns a map with keys:
+  - `:colors` - Color depth (`:true_color`, `:color_256`, `:color_16`, `:monochrome`)
+  - `:unicode` - Boolean indicating Unicode support
+  - `:dimensions` - `{rows, cols}` tuple or `nil`
+  - `:terminal` - Boolean indicating terminal presence
+
+  Returns `nil` if no runtime has been started.
+
+  ## Examples
+
+      %{colors: :true_color, unicode: true} = Runtime.capabilities()
+  """
+  @spec capabilities() :: State.capabilities() | nil
+  def capabilities do
+    :persistent_term.get(:term_ui_capabilities, nil)
+  end
+
+  @doc """
   Forces an immediate render (bypassing framerate limiter).
   """
   @spec force_render(GenServer.server()) :: :ok
@@ -177,19 +240,23 @@ defmodule TermUI.Runtime do
     root_module = Keyword.fetch!(opts, :root)
     render_interval = Keyword.get(opts, :render_interval, @default_render_interval)
     skip_terminal = Keyword.get(opts, :skip_terminal, false)
+    backend_opt = Keyword.get(opts, :backend, :auto)
 
-    # Initialize terminal and buffer manager (unless skipped for tests)
-    {terminal_started, buffer_manager, dimensions} =
+    # Select backend using Backend.Selector
+    {backend_mode, backend, capabilities, terminal_started, buffer_manager, dimensions} =
       if skip_terminal do
-        {false, nil, nil}
+        {:skip, nil, nil, false, nil, nil}
       else
-        initialize_terminal()
+        select_backend(backend_opt)
       end
+
+    # Store backend info in persistent_term for global access
+    store_backend_context(backend_mode, capabilities)
 
     # Initialize root component state
     root_state = root_module.init(opts)
 
-    # Start input reader and register for resize callbacks if terminal is available
+    # Start input reader and register for resize callbacks if in raw mode
     input_reader =
       if terminal_started do
         {:ok, reader_pid} = InputReader.start_link(target: self())
@@ -213,8 +280,17 @@ defmodule TermUI.Runtime do
       terminal_started: terminal_started,
       buffer_manager: buffer_manager,
       dimensions: dimensions,
-      input_reader: input_reader
+      input_reader: input_reader,
+      backend_mode: backend_mode,
+      backend: backend,
+      capabilities: capabilities
     }
+
+    # Log backend selection
+    if backend_mode && backend_mode != :skip do
+      require Logger
+      Logger.info("TermUI.Runtime started with #{backend_mode} backend")
+    end
 
     # Schedule first render
     schedule_render(render_interval)
@@ -222,43 +298,89 @@ defmodule TermUI.Runtime do
     {:ok, state}
   end
 
-  defp initialize_terminal do
-    # Start Terminal GenServer
-    case Terminal.start_link() do
-      {:ok, _pid} ->
-        setup_terminal_and_buffers()
+  defp select_backend(backend_opt) do
+    case Selector.select(backend_opt) do
+      {:raw, _raw_state} ->
+        # Raw mode succeeded - set up terminal and buffers
+        case setup_terminal_and_buffers() do
+          {true, buffer_manager, dimensions} ->
+            {:raw, TermUI.Backend.Raw, nil, true, buffer_manager, dimensions}
 
-      {:error, {:already_started, _pid}} ->
-        setup_terminal_and_buffers()
+          {false, nil, nil} ->
+            # Terminal setup failed, fall back to TTY
+            capabilities = Selector.detect_capabilities()
+            {:tty, TermUI.Backend.TTY, capabilities, false, nil, nil}
+        end
 
-      {:error, _reason} ->
-        # Terminal not available (e.g., not a TTY)
-        {false, nil, nil}
+      {:tty, capabilities} ->
+        # TTY mode - no terminal setup, no buffer manager
+        {:tty, TermUI.Backend.TTY, capabilities, false, nil, nil}
+
+      {:explicit, module, _opts} ->
+        # Explicit backend selection
+        case module do
+          TermUI.Backend.Raw ->
+            case setup_terminal_and_buffers() do
+              {true, buffer_manager, dimensions} ->
+                {:raw, TermUI.Backend.Raw, nil, true, buffer_manager, dimensions}
+
+              {false, nil, nil} ->
+                raise "Raw backend requested but unavailable"
+            end
+
+          TermUI.Backend.TTY ->
+            capabilities = Selector.detect_capabilities()
+            {:tty, TermUI.Backend.TTY, capabilities, false, nil, nil}
+        end
     end
   end
 
   defp setup_terminal_and_buffers do
-    # Enable raw mode and alternate screen
-    Terminal.enable_raw_mode()
-    Terminal.enter_alternate_screen()
-    Terminal.hide_cursor()
-    Terminal.enable_mouse_tracking(:all)
+    # Enable raw mode first
+    with {:ok, _} <- Terminal.enable_raw_mode(),
+         :ok <- Terminal.enter_alternate_screen(),
+         :ok <- Terminal.hide_cursor(),
+         :ok <- Terminal.enable_mouse_tracking(:all),
+         {rows, cols} <- get_terminal_dimensions_safe(),
+         {:ok, buffer_pid} <- BufferManager.start_link(rows: rows, cols: cols) do
+      {true, buffer_pid, {cols, rows}}
+    else
+      {:error, {:already_started, buffer_pid}} ->
+        # BufferManager already started, use it
+        {rows, cols} = get_terminal_dimensions_safe()
+        {true, buffer_pid, {cols, rows}}
 
-    # Get terminal dimensions
-    {rows, cols} =
-      case Terminal.get_terminal_size() do
-        {:ok, {rows, cols}} -> {rows, cols}
-        {:error, _reason} -> {24, 80}
+      {:error, _reason} ->
+        {false, nil, nil}
+
+      _ ->
+        {false, nil, nil}
+    end
+  rescue
+    _ -> {false, nil, nil}
+  end
+
+  defp get_terminal_dimensions_safe do
+    case Terminal.get_terminal_size() do
+      {:ok, {rows, cols}} -> {rows, cols}
+      {:error, _reason} -> {24, 80}
+    end
+  end
+
+  defp store_backend_context(backend_mode, capabilities) do
+    # Store in persistent_term for global access
+    :persistent_term.put(:term_ui_backend_mode, backend_mode)
+
+    # Store capabilities (use empty map for raw mode)
+    caps_to_store =
+      if backend_mode == :raw do
+        # Detect capabilities even in raw mode for consistency
+        Selector.detect_capabilities()
+      else
+        capabilities
       end
 
-    # Start BufferManager with terminal dimensions
-    buffer_pid =
-      case BufferManager.start_link(rows: rows, cols: cols) do
-        {:ok, pid} -> pid
-        {:error, {:already_started, pid}} -> pid
-      end
-
-    {true, buffer_pid, {cols, rows}}
+    :persistent_term.put(:term_ui_capabilities, caps_to_store)
   end
 
   @impl true

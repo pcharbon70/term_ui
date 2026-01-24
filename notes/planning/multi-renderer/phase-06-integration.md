@@ -17,53 +17,53 @@ After this phase, applications written for TermUI will automatically work in bot
 
 ## 6.1 Update Runtime Initialization
 
-- [ ] **Section 6.1 Complete**
+- [x] **Section 6.1 Complete**
 
 Update `TermUI.Runtime` to use the backend selector for initialization.
 
 ### 6.1.1 Integrate Backend Selector
 
-- [ ] **Task 6.1.1 Complete**
+- [x] **Task 6.1.1 Complete**
 
 Modify runtime startup to use the backend selector.
 
-- [ ] 6.1.1.1 Modify `lib/term_ui/runtime.ex` init sequence
-- [ ] 6.1.1.2 Call `Backend.Selector.select/1` with configuration options
-- [ ] 6.1.1.3 Store selected backend module in runtime state
-- [ ] 6.1.1.4 Store backend state in runtime state
-- [ ] 6.1.1.5 Log which backend was selected
+- [x] 6.1.1.1 Modify `lib/term_ui/runtime.ex` init sequence
+- [x] 6.1.1.2 Call `Backend.Selector.select/1` with configuration options
+- [x] 6.1.1.3 Store selected backend module in runtime state
+- [x] 6.1.1.4 Store backend state in runtime state
+- [x] 6.1.1.5 Log which backend was selected
 
 ### 6.1.2 Handle Backend Selection Options
 
-- [ ] **Task 6.1.2 Complete**
+- [x] **Task 6.1.2 Complete**
 
 Support configuration options for backend selection.
 
-- [ ] 6.1.2.1 Accept `:backend` option: `:auto` (default), `:raw`, `:tty`
-- [ ] 6.1.2.2 `:auto` uses selector's try-raw-first strategy
-- [ ] 6.1.2.3 `:raw` forces raw backend (error if unavailable)
-- [ ] 6.1.2.4 `:tty` forces TTY backend (skips raw mode attempt)
-- [ ] 6.1.2.5 Document options in runtime moduledoc
+- [x] 6.1.2.1 Accept `:backend` option: `:auto` (default), `:raw`, `:tty`
+- [x] 6.1.2.2 `:auto` uses selector's try-raw-first strategy
+- [x] 6.1.2.3 `:raw` forces raw backend (error if unavailable)
+- [x] 6.1.2.4 `:tty` forces TTY backend (skips raw mode attempt)
+- [x] 6.1.2.5 Document options in runtime moduledoc
 
 ### 6.1.3 Store Backend Context
 
-- [ ] **Task 6.1.3 Complete**
+- [x] **Task 6.1.3 Complete**
 
 Make backend information available to components.
 
-- [ ] 6.1.3.1 Store backend mode (`:raw` or `:tty`) in persistent_term
-- [ ] 6.1.3.2 Store capabilities map in persistent_term
-- [ ] 6.1.3.3 Implement `TermUI.Runtime.backend_mode/0` query function
-- [ ] 6.1.3.4 Implement `TermUI.Runtime.capabilities/0` query function
+- [x] 6.1.3.1 Store backend mode (`:raw` or `:tty`) in persistent_term
+- [x] 6.1.3.2 Store capabilities map in persistent_term
+- [x] 6.1.3.3 Implement `TermUI.Runtime.backend_mode/0` query function
+- [x] 6.1.3.4 Implement `TermUI.Runtime.capabilities/0` query function
 
 ### Unit Tests - Section 6.1
 
-- [ ] **Unit Tests 6.1 Complete**
-- [ ] Test runtime initializes with auto backend selection
-- [ ] Test runtime respects `:backend` option
-- [ ] Test `backend_mode/0` returns correct mode
-- [ ] Test `capabilities/0` returns capabilities map
-- [ ] Test forced `:raw` fails gracefully when unavailable
+- [x] **Unit Tests 6.1 Complete**
+- [x] Test runtime initializes with auto backend selection
+- [x] Test runtime respects `:backend` option
+- [x] Test `backend_mode/0` returns correct mode
+- [x] Test `capabilities/0` returns capabilities map
+- [x] Test forced `:raw` fails gracefully when unavailable
 
 ---
 
