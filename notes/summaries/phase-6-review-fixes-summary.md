@@ -7,7 +7,7 @@
 
 ## Overview
 
-Implemented critical security and OTP fixes from the Phase 6 multi-renderer integration code review. All 12 blockers from the security, OTP, and consistency categories have been addressed.
+Implemented critical security, OTP, and consistency fixes from the Phase 6 multi-renderer integration code review. All 12 blockers from the security, OTP, and consistency categories have been addressed.
 
 ## Completed Work
 
@@ -51,6 +51,21 @@ Implemented critical security and OTP fixes from the Phase 6 multi-renderer inte
 - Ensures supervisor-safe crash recovery
 - Files modified: `lib/term_ui/renderer/framerate_limiter.ex`
 
+### Phase 3: Consistency Blockers (2/2) ✅
+
+**3.1 Standardize Error Handling**
+- Created `TermUI.Error` with 15 standardized error types
+- Functions: `format/1`, `error/2`, `is_error_reason/1`, `error_type/1`
+- 20 tests added
+- Files: `lib/term_ui/error.ex`, `test/term_ui/error_test.exs`
+
+**3.2 Naming Conventions**
+- Renamed `Backend.State.mode` to `Backend.State.backend_mode`
+- Updated type definition and all constructor functions
+- Added naming convention documentation
+- 71 tests updated
+- Files modified: `lib/term_ui/backend/state.ex`, `lib/term_ui/input/selector.ex`
+
 ### Phase 5: Planning Document ✅
 
 **Section 6.3 Update**
@@ -60,27 +75,31 @@ Implemented critical security and OTP fixes from the Phase 6 multi-renderer inte
 ## Test Results
 
 ```
-117 tests, 0 failures
+137 tests, 0 failures
 - TermUtils: 15 tests
 - EventQueue: 18 tests
 - Sanitize: 45 tests
 - PersistentTerms: 17 tests
-- FramerateLimiter: 22 tests
+- Error: 20 tests
+- Backend.State: 71 tests (updated for backend_mode rename)
+- FramerateLimiter: 22 tests (from Phase 2.3)
 ```
 
 ## Files Changed
 
-### New Files (8)
+### New Files (11)
 - `lib/term_ui/term_utils.ex`
 - `lib/term_ui/event_queue.ex`
 - `lib/term_ui/sanitize.ex`
 - `lib/term_ui/persistent_terms.ex`
+- `lib/term_ui/error.ex`
 - `test/term_ui/term_utils_test.exs`
 - `test/term_ui/event_queue_test.exs`
 - `test/term_ui/sanitize_test.exs`
 - `test/term_ui/persistent_terms_test.exs`
+- `test/term_ui/error_test.exs`
 
-### Modified Files (10)
+### Modified Files (11)
 - `lib/term_ui/runtime.ex` - child_spec, persistent_term cleanup, event queue
 - `lib/term_ui/runtime/state.ex` - event_queue field
 - `lib/term_ui/terminal.ex` - child_spec, TermUtils integration
@@ -90,17 +109,25 @@ Implemented critical security and OTP fixes from the Phase 6 multi-renderer inte
 - `lib/term_ui/renderer/framerate_limiter.ex` - removed process dict
 - `lib/term_ui/app.ex` - PersistentTerms integration
 - `lib/term_ui/character_set.ex` - PersistentTerms integration
+- `lib/term_ui/backend/state.ex` - renamed mode to backend_mode
+- `lib/term_ui/input/selector.ex` - updated documentation
 - `notes/planning/multi-renderer/phase-06-integration.md` - Section 6.3 checkboxes
+
+## Breaking Changes
+
+**Internal API Change**: `Backend.State` struct field renamed from `:mode` to `:backend_mode`
+- This is an internal struct used by backend selection
+- External-facing APIs (Runtime, App) remain unchanged
+- Migration guide: Update any direct struct creation to use `backend_mode:` keyword
 
 ## Remaining Work (Optional)
 
 The following phases are marked as lower priority and can be addressed in future PRs:
 
-- **Phase 3**: Consistency Blockers - Error handling standardization
 - **Phase 4**: Redundancy Blockers - ANSI parser/emitter extraction
 - **Phase 6**: Address Concerns - 33 items from code review
 - **Phase 7**: Implement Suggestions - 40 improvement suggestions
 
 ## Merge Recommendation
 
-This branch is ready to merge into `multi-renderer`. It addresses all critical security vulnerabilities and OTP blockers identified in the Phase 6 review, with comprehensive test coverage and no breaking changes to public APIs.
+This branch is ready to merge into `multi-renderer`. It addresses all critical security vulnerabilities, OTP blockers, and consistency issues identified in the Phase 6 review, with comprehensive test coverage and minimal breaking changes (one internal struct field rename).
