@@ -907,7 +907,7 @@ defmodule TermUI.Backend.RawTest do
 
     test "rejects terminal size exceeding maximum bounds" do
       # Test with size exceeding @max_terminal_dimension (9999)
-      with_terminal_env(10000, 10000, fn ->
+      with_terminal_env(10_000, 10_000, fn ->
         {:ok, state} = Raw.init(size: {24, 80})
         result = Raw.refresh_size(state)
 
