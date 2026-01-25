@@ -92,25 +92,38 @@ defmodule TermUI.AppTest do
       # This test uses a task to avoid blocking the test runner
       task =
         Task.async(fn ->
-          # Create a component that quits immediately
+          # Create a component that quits immediately via handle_info
           defmodule QuickQuit do
             use TermUI.Elm
 
             def init(_opts) do
-              send(self(), :quit_now)
               %{count: 0}
             end
 
-            def event_to_msg(:quit_now, _state), do: {:msg, :quit}
             def event_to_msg(_, _), do: :ignore
 
-            def update(:quit, state), do: {state, [:quit]}
             def update(_, state), do: {state, []}
 
             def view(_state), do: {:text, "Quick"}
+
+            def handle_info(:quit_now, state) do
+              {state, [:quit]}
+            end
           end
 
-          App.run(QuickQuit, skip_terminal: true)
+          # Start the app and then send quit message
+          {:ok, pid} = App.start(QuickQuit, skip_terminal: true)
+          send(pid, :quit_now)
+
+          # Wait for it to stop
+          ref = Process.monitor(pid)
+          receive do
+            {:DOWN, ^ref, :process, ^pid, :normal} ->
+              {:ok, :exited_normally}
+
+            {:DOWN, ^ref, :process, ^pid, reason} ->
+              {:error, reason}
+          end
         end)
 
       assert {:ok, :exited_normally} = Task.await(task, 5000)
@@ -126,20 +139,33 @@ defmodule TermUI.AppTest do
             use TermUI.Elm
 
             def init(_opts) do
-              send(self(), :quit_now)
               %{count: 0}
             end
 
-            def event_to_msg(:quit_now, _state), do: {:msg, :quit}
             def event_to_msg(_, _), do: :ignore
 
-            def update(:quit, state), do: {state, [:quit]}
             def update(_, state), do: {state, []}
 
             def view(_state), do: {:text, "Graceful"}
+
+            def handle_info(:quit_now, state) do
+              {state, [:quit]}
+            end
           end
 
-          App.run(GracefulExit, skip_terminal: true)
+          # Start the app and then send quit message
+          {:ok, pid} = App.start(GracefulExit, skip_terminal: true)
+          send(pid, :quit_now)
+
+          # Wait for it to stop
+          ref = Process.monitor(pid)
+          receive do
+            {:DOWN, ^ref, :process, ^pid, :normal} ->
+              {:ok, :exited_normally}
+
+            {:DOWN, ^ref, :process, ^pid, reason} ->
+              {:error, reason}
+          end
         end)
 
       assert {:ok, :exited_normally} = Task.await(task, 5000)
@@ -152,20 +178,33 @@ defmodule TermUI.AppTest do
             use TermUI.Elm
 
             def init(_opts) do
-              send(self(), :quit_now)
               %{count: 0}
             end
 
-            def event_to_msg(:quit_now, _state), do: {:msg, :quit}
             def event_to_msg(_, _), do: :ignore
 
-            def update(:quit, state), do: {state, [:quit]}
             def update(_, state), do: {state, []}
 
             def view(_state), do: {:text, "Quick"}
+
+            def handle_info(:quit_now, state) do
+              {state, [:quit]}
+            end
           end
 
-          App.run(QuickQuit2, skip_terminal: true, backend: :tty)
+          # Start the app with backend option and then send quit message
+          {:ok, pid} = App.start(QuickQuit2, skip_terminal: true, backend: :tty)
+          send(pid, :quit_now)
+
+          # Wait for it to stop
+          ref = Process.monitor(pid)
+          receive do
+            {:DOWN, ^ref, :process, ^pid, :normal} ->
+              {:ok, :exited_normally}
+
+            {:DOWN, ^ref, :process, ^pid, reason} ->
+              {:error, reason}
+          end
         end)
 
       assert {:ok, :exited_normally} = Task.await(task, 5000)
@@ -198,7 +237,8 @@ defmodule TermUI.AppTest do
         backend: :tty
       )
 
-      assert App.backend_mode() == :tty
+      # When skip_terminal is true, backend mode is :skip
+      assert App.backend_mode() == :skip
 
       # Clean up
       GenServer.stop(pid)

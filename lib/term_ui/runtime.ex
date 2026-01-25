@@ -26,6 +26,7 @@ defmodule TermUI.Runtime do
   use GenServer
 
   alias TermUI.Backend.Selector
+  alias TermUI.Config
   alias TermUI.Elm
   alias TermUI.Event
   alias TermUI.Input.Selector, as: InputSelector
@@ -241,6 +242,10 @@ defmodule TermUI.Runtime do
   def init(opts) do
     # Trap exits to ensure terminate/2 is called even on crashes
     Process.flag(:trap_exit, true)
+
+    # Merge runtime options with application configuration
+    # Runtime options take precedence over config
+    opts = Config.merge_options(opts)
 
     root_module = Keyword.fetch!(opts, :root)
     render_interval = Keyword.get(opts, :render_interval, @default_render_interval)
@@ -588,7 +593,9 @@ defmodule TermUI.Runtime do
             end)
 
           state = %{state | root_state: new_root_state, components: components, dirty: true}
-          state = execute_commands(commands, state)
+          # Tag commands with root component_id
+          tagged_commands = Enum.map(commands, fn cmd -> {:root, cmd} end)
+          state = execute_commands(tagged_commands, state)
           {:noreply, state}
 
         new_root_state ->
