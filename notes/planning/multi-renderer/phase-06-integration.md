@@ -594,39 +594,40 @@ Evaluated separate process approach but implemented simpler direct approach for 
 
 ## 7.3 Integrate with Runtime
 
-- [ ] **Section 7.3 Complete**
+- [x] **Section 7.3 Complete**
 
-Update the Runtime to use the new TTY input process architecture.
+Update the Runtime to properly integrate with the IEx-compatible TTY input handler.
 
-### 7.3.1 Update Event Loop
+**Note**: The original Phase 7.3 plan assumed a separate-process input architecture (TTY.Server), but Phase 7.2 implemented a simpler direct approach using `:io.get_chars/2`. This phase updates the integration to match the actual implementation.
 
-- [ ] **Task 7.3.1 Complete**
+### 7.3.1 Add stop/1 to Input Behaviour
 
-Modify the runtime event loop to receive messages from input process instead of polling directly.
+- [x] **Task 7.3.1 Complete**
 
-- [ ] 7.3.1.1 Start TTY input process in runtime initialization
-- [ ] 7.3.1.2 Update event loop to receive key messages instead of polling
-- [ ] 7.3.1.3 Handle input process crashes and restarts
-- [ ] 7.3.1.4 Ensure input process is terminated on runtime shutdown
+Add cleanup callback to the Input behaviour and implement in handlers.
 
-### 7.3.2 Preserve Raw Backend Behavior
+- [x] 7.3.1.1 Add `stop/1` callback to `TermUI.Input` behaviour
+- [x] 7.3.1.2 Update behaviour documentation
+- [x] 7.3.1.3 Implement `stop/1` in `TermUI.Input.Raw`
+- [x] 7.3.1.4 Add `@impl true` to `TermUI.Input.TTY.stop/1`
 
-- [ ] **Task 7.3.2 Complete**
+### 7.3.2 Update Runtime Cleanup
 
-Ensure Raw backend continues to work correctly.
+- [x] **Task 7.3.2 Complete**
 
-- [ ] 7.3.2.1 Verify Raw backend input is unchanged
-- [ ] 7.3.2.2 Test that Raw backend still works outside IEx
-- [ ] 7.3.2.3 Test that Raw backend still works inside IEx (if applicable)
+Ensure Runtime calls input handler cleanup during shutdown.
+
+- [x] 7.3.2.1 Add input handler cleanup to `Runtime.terminate/2`
+- [x] 7.3.2.2 Handle nil input_handler gracefully
+- [x] 7.3.2.3 Verify cleanup happens in correct order
 
 ### Unit Tests - Section 7.3
 
-- [ ] **Unit Tests 7.3 Complete**
-- [ ] Test runtime starts TTY input process when TTY backend selected
-- [ ] Test runtime receives key messages from input process
-- [ ] Test runtime handles input process crashes
-- [ ] Test runtime cleanup terminates input process
-- [ ] Test Raw backend behavior is unchanged
+- [x] **Unit Tests 7.3 Complete**
+- [x] Test Input.stop/1 callback is defined
+- [x] Test Raw.stop/1 returns :ok
+- [x] Test TTY.stop/1 returns :ok
+- [x] Test Runtime calls stop on input handler during shutdown
 
 ---
 
