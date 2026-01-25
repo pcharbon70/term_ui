@@ -35,6 +35,20 @@ defmodule TermUI.Terminal do
   end
 
   @doc """
+  Returns a child specification for starting the terminal in a supervisor.
+  """
+  @spec child_spec(keyword()) :: Supervisor.child_spec()
+  def child_spec(opts \\ []) do
+    %{
+      id: __MODULE__,
+      start: {__MODULE__, :start_link, [opts]},
+      restart: :permanent,
+      shutdown: 5000,
+      type: :worker
+    }
+  end
+
+  @doc """
   Enables raw mode on the terminal.
 
   Calls OTP 28's `shell.start_interactive({:noshell, :raw})` and configures

@@ -102,6 +102,37 @@ defmodule TermUI.Runtime do
   end
 
   @doc """
+  Returns a child specification for starting the runtime in a supervisor.
+
+  ## Options
+
+  Same as `start_link/1`:
+  - `:root` - The root component module (required)
+  - `:name` - GenServer name (optional)
+  - `:render_interval` - Milliseconds between renders (default: 16)
+  - `:backend` - Backend selection: `:auto`, `:raw`, `:tty`
+  - `:skip_terminal` - Skip terminal initialization (default: false)
+
+  ## Examples
+
+      children = [
+        {TermUI.Runtime, root: MyApp.Root, name: :my_runtime}
+      ]
+
+      Supervisor.start_link(children, strategy: :one_for_one)
+  """
+  @spec child_spec([option()]) :: Supervisor.child_spec()
+  def child_spec(opts) do
+    %{
+      id: __MODULE__,
+      start: {__MODULE__, :start_link, [opts]},
+      restart: :permanent,
+      shutdown: 5000,
+      type: :worker
+    }
+  end
+
+  @doc """
   Sends an event to the runtime for processing.
   """
   @spec send_event(GenServer.server(), Event.t()) :: :ok
