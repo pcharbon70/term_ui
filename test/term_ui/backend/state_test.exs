@@ -16,20 +16,20 @@ defmodule TermUI.Backend.StateTest do
 
   describe "struct creation with required fields" do
     test "creates struct with backend_module and mode" do
-      state = %State{backend_module: SomeBackend, mode: :raw}
+      state = %State{backend_module: SomeBackend, backend_mode: :raw}
 
       assert state.backend_module == SomeBackend
-      assert state.mode == :raw
+      assert state.backend_mode == :raw
     end
 
     test "raises when backend_module is missing" do
       assert_raise ArgumentError, ~r/:backend_module/, fn ->
-        struct!(State, mode: :raw)
+        struct!(State, backend_mode: :raw)
       end
     end
 
-    test "raises when mode is missing" do
-      assert_raise ArgumentError, ~r/:mode/, fn ->
+    test "raises when backend_mode is missing" do
+      assert_raise ArgumentError, ~r/:backend_mode/, fn ->
         struct!(State, backend_module: SomeBackend)
       end
     end
@@ -43,22 +43,22 @@ defmodule TermUI.Backend.StateTest do
 
   describe "default values" do
     test "backend_state defaults to nil" do
-      state = %State{backend_module: SomeBackend, mode: :raw}
+      state = %State{backend_module: SomeBackend, backend_mode: :raw}
       assert state.backend_state == nil
     end
 
     test "capabilities defaults to empty map" do
-      state = %State{backend_module: SomeBackend, mode: :raw}
+      state = %State{backend_module: SomeBackend, backend_mode: :raw}
       assert state.capabilities == %{}
     end
 
     test "size defaults to nil" do
-      state = %State{backend_module: SomeBackend, mode: :raw}
+      state = %State{backend_module: SomeBackend, backend_mode: :raw}
       assert state.size == nil
     end
 
     test "initialized defaults to false" do
-      state = %State{backend_module: SomeBackend, mode: :raw}
+      state = %State{backend_module: SomeBackend, backend_mode: :raw}
       assert state.initialized == false
     end
   end
@@ -70,7 +70,7 @@ defmodule TermUI.Backend.StateTest do
       state = %State{
         backend_module: TermUI.Backend.TTY,
         backend_state: %{some: :state},
-        mode: :tty,
+        backend_mode: :tty,
         capabilities: capabilities,
         size: {24, 80},
         initialized: true
@@ -78,45 +78,45 @@ defmodule TermUI.Backend.StateTest do
 
       assert state.backend_module == TermUI.Backend.TTY
       assert state.backend_state == %{some: :state}
-      assert state.mode == :tty
+      assert state.backend_mode == :tty
       assert state.capabilities == capabilities
       assert state.size == {24, 80}
       assert state.initialized == true
     end
   end
 
-  describe "mode field" do
+  describe "backend_mode field" do
     test "accepts :raw mode" do
-      state = %State{backend_module: SomeBackend, mode: :raw}
-      assert state.mode == :raw
+      state = %State{backend_module: SomeBackend, backend_mode: :raw}
+      assert state.backend_mode == :raw
     end
 
     test "accepts :tty mode" do
-      state = %State{backend_module: SomeBackend, mode: :tty}
-      assert state.mode == :tty
+      state = %State{backend_module: SomeBackend, backend_mode: :tty}
+      assert state.backend_mode == :tty
     end
   end
 
   describe "size field" do
     test "accepts nil" do
-      state = %State{backend_module: SomeBackend, mode: :raw, size: nil}
+      state = %State{backend_module: SomeBackend, backend_mode: :raw, size: nil}
       assert state.size == nil
     end
 
     test "accepts {rows, cols} tuple" do
-      state = %State{backend_module: SomeBackend, mode: :raw, size: {24, 80}}
+      state = %State{backend_module: SomeBackend, backend_mode: :raw, size: {24, 80}}
       assert state.size == {24, 80}
     end
 
     test "accepts different dimension values" do
-      state = %State{backend_module: SomeBackend, mode: :raw, size: {50, 120}}
+      state = %State{backend_module: SomeBackend, backend_mode: :raw, size: {50, 120}}
       assert state.size == {50, 120}
     end
   end
 
   describe "capabilities field" do
     test "accepts empty map" do
-      state = %State{backend_module: SomeBackend, mode: :raw, capabilities: %{}}
+      state = %State{backend_module: SomeBackend, backend_mode: :raw, capabilities: %{}}
       assert state.capabilities == %{}
     end
 
@@ -128,7 +128,7 @@ defmodule TermUI.Backend.StateTest do
         terminal: true
       }
 
-      state = %State{backend_module: SomeBackend, mode: :tty, capabilities: caps}
+      state = %State{backend_module: SomeBackend, backend_mode: :tty, capabilities: caps}
       assert state.capabilities == caps
       assert state.capabilities.colors == :color_256
       assert state.capabilities.unicode == true
@@ -137,7 +137,7 @@ defmodule TermUI.Backend.StateTest do
 
   describe "struct updates" do
     test "can update backend_state" do
-      state = %State{backend_module: SomeBackend, mode: :raw}
+      state = %State{backend_module: SomeBackend, backend_mode: :raw}
       updated = %{state | backend_state: %{cursor: {1, 1}}}
 
       assert updated.backend_state == %{cursor: {1, 1}}
@@ -145,14 +145,14 @@ defmodule TermUI.Backend.StateTest do
     end
 
     test "can update size" do
-      state = %State{backend_module: SomeBackend, mode: :raw}
+      state = %State{backend_module: SomeBackend, backend_mode: :raw}
       updated = %{state | size: {30, 100}}
 
       assert updated.size == {30, 100}
     end
 
     test "can update initialized flag" do
-      state = %State{backend_module: SomeBackend, mode: :raw}
+      state = %State{backend_module: SomeBackend, backend_mode: :raw}
       assert state.initialized == false
 
       updated = %{state | initialized: true}
@@ -160,7 +160,7 @@ defmodule TermUI.Backend.StateTest do
     end
 
     test "can update multiple fields at once" do
-      state = %State{backend_module: SomeBackend, mode: :raw}
+      state = %State{backend_module: SomeBackend, backend_mode: :raw}
 
       updated = %{state | size: {24, 80}, initialized: true, backend_state: :ready}
 
@@ -170,7 +170,7 @@ defmodule TermUI.Backend.StateTest do
     end
 
     test "updates are immutable" do
-      original = %State{backend_module: SomeBackend, mode: :raw}
+      original = %State{backend_module: SomeBackend, backend_mode: :raw}
       _updated = %{original | initialized: true}
 
       # Original is unchanged
@@ -198,17 +198,17 @@ defmodule TermUI.Backend.StateTest do
       assert length(type_docs) == 1, "type t should be defined"
     end
 
-    test "type mode is defined" do
+    test "type backend_mode is defined" do
       {:docs_v1, _, :elixir, _, _, _, docs} = Code.fetch_docs(State)
 
       type_docs =
         docs
         |> Enum.filter(fn
-          {{:type, :mode, _}, _, _, _, _} -> true
+          {{:type, :backend_mode, _}, _, _, _, _} -> true
           _ -> false
         end)
 
-      assert length(type_docs) == 1, "type mode should be defined"
+      assert length(type_docs) == 1, "type backend_mode should be defined"
     end
 
     test "type dimensions is defined" do
@@ -227,20 +227,20 @@ defmodule TermUI.Backend.StateTest do
 
   describe "new/2 constructor" do
     test "creates state with backend_module and mode" do
-      state = State.new(SomeBackend, mode: :tty)
+      state = State.new(SomeBackend, backend_mode: :tty)
 
       assert state.backend_module == SomeBackend
-      assert state.mode == :tty
+      assert state.backend_mode == :tty
     end
 
-    test "raises when mode is missing" do
-      assert_raise ArgumentError, "the :mode option is required", fn ->
+    test "raises when backend_mode is missing" do
+      assert_raise ArgumentError, "the :backend_mode option is required", fn ->
         State.new(SomeBackend)
       end
     end
 
-    test "raises when mode is missing from options" do
-      assert_raise ArgumentError, "the :mode option is required", fn ->
+    test "raises when backend_mode is missing from options" do
+      assert_raise ArgumentError, "the :backend_mode option is required", fn ->
         State.new(SomeBackend, capabilities: %{})
       end
     end
@@ -250,7 +250,7 @@ defmodule TermUI.Backend.StateTest do
 
       state =
         State.new(SomeBackend,
-          mode: :tty,
+          backend_mode: :tty,
           backend_state: %{some: :state},
           capabilities: caps,
           size: {24, 80},
@@ -258,7 +258,7 @@ defmodule TermUI.Backend.StateTest do
         )
 
       assert state.backend_module == SomeBackend
-      assert state.mode == :tty
+      assert state.backend_mode == :tty
       assert state.backend_state == %{some: :state}
       assert state.capabilities == caps
       assert state.size == {24, 80}
@@ -266,7 +266,7 @@ defmodule TermUI.Backend.StateTest do
     end
 
     test "applies defaults for omitted optional fields" do
-      state = State.new(SomeBackend, mode: :raw)
+      state = State.new(SomeBackend, backend_mode: :raw)
 
       assert state.backend_state == nil
       assert state.capabilities == %{}
@@ -275,13 +275,13 @@ defmodule TermUI.Backend.StateTest do
     end
 
     test "accepts :raw mode" do
-      state = State.new(SomeBackend, mode: :raw)
-      assert state.mode == :raw
+      state = State.new(SomeBackend, backend_mode: :raw)
+      assert state.backend_mode == :raw
     end
 
     test "accepts :tty mode" do
-      state = State.new(SomeBackend, mode: :tty)
-      assert state.mode == :tty
+      state = State.new(SomeBackend, backend_mode: :tty)
+      assert state.backend_mode == :tty
     end
   end
 
@@ -290,7 +290,7 @@ defmodule TermUI.Backend.StateTest do
       state = State.new_raw()
 
       assert state.backend_module == TermUI.Backend.Raw
-      assert state.mode == :raw
+      assert state.backend_mode == :raw
       assert state.backend_state == nil
       assert state.capabilities == %{}
       assert state.size == nil
@@ -302,7 +302,7 @@ defmodule TermUI.Backend.StateTest do
       state = State.new_raw(backend_state)
 
       assert state.backend_module == TermUI.Backend.Raw
-      assert state.mode == :raw
+      assert state.backend_mode == :raw
       assert state.backend_state == backend_state
     end
 
@@ -324,7 +324,7 @@ defmodule TermUI.Backend.StateTest do
       state = State.new_tty(caps)
 
       assert state.backend_module == TermUI.Backend.TTY
-      assert state.mode == :tty
+      assert state.backend_mode == :tty
       assert state.capabilities == caps
       assert state.backend_state == nil
       assert state.size == nil
@@ -337,7 +337,7 @@ defmodule TermUI.Backend.StateTest do
       state = State.new_tty(caps, backend_state)
 
       assert state.backend_module == TermUI.Backend.TTY
-      assert state.mode == :tty
+      assert state.backend_mode == :tty
       assert state.capabilities == caps
       assert state.backend_state == backend_state
     end
@@ -436,7 +436,7 @@ defmodule TermUI.Backend.StateTest do
 
       assert updated.backend_state == %{some: :state}
       assert updated.backend_module == TermUI.Backend.TTY
-      assert updated.mode == :tty
+      assert updated.backend_mode == :tty
       assert updated.capabilities == %{colors: :true_color}
       assert updated.size == {24, 80}
       assert updated.initialized == true
@@ -494,7 +494,7 @@ defmodule TermUI.Backend.StateTest do
 
       assert updated.size == {30, 100}
       assert updated.backend_module == TermUI.Backend.TTY
-      assert updated.mode == :tty
+      assert updated.backend_mode == :tty
       assert updated.capabilities == %{colors: :true_color}
       assert updated.backend_state == %{some: :state}
       assert updated.initialized == true
@@ -556,7 +556,7 @@ defmodule TermUI.Backend.StateTest do
 
       assert updated.capabilities == %{colors: :true_color}
       assert updated.backend_module == TermUI.Backend.TTY
-      assert updated.mode == :tty
+      assert updated.backend_mode == :tty
       assert updated.size == {24, 80}
       assert updated.backend_state == %{some: :state}
       assert updated.initialized == true
@@ -599,7 +599,7 @@ defmodule TermUI.Backend.StateTest do
 
       assert updated.initialized == true
       assert updated.backend_module == TermUI.Backend.TTY
-      assert updated.mode == :tty
+      assert updated.backend_mode == :tty
       assert updated.capabilities == %{colors: :true_color}
       assert updated.size == {24, 80}
       assert updated.backend_state == %{some: :state}
@@ -677,12 +677,12 @@ defmodule TermUI.Backend.StateTest do
       state = %State{
         backend_module: TermUI.Backend.Raw,
         backend_state: raw_state,
-        mode: :raw,
+        backend_mode: :raw,
         capabilities: %{},
         initialized: false
       }
 
-      assert state.mode == :raw
+      assert state.backend_mode == :raw
       assert state.backend_state.raw_mode_started == true
     end
 
@@ -698,12 +698,12 @@ defmodule TermUI.Backend.StateTest do
       state = %State{
         backend_module: TermUI.Backend.TTY,
         backend_state: nil,
-        mode: :tty,
+        backend_mode: :tty,
         capabilities: capabilities,
         initialized: false
       }
 
-      assert state.mode == :tty
+      assert state.backend_mode == :tty
       assert state.capabilities.colors == :color_256
       assert state.size == nil
     end
@@ -712,7 +712,7 @@ defmodule TermUI.Backend.StateTest do
       # Create initial state
       state = %State{
         backend_module: TermUI.Backend.TTY,
-        mode: :tty,
+        backend_mode: :tty,
         capabilities: %{colors: :true_color}
       }
 

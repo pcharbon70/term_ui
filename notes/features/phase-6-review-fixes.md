@@ -223,24 +223,44 @@ No new external dependencies required. All changes use existing Elixir/OTP featu
 - [x] Add tests for state persistence (22 tests)
 - [x] Document state management approach
 
-### Phase 3: Consistency Blockers (Priority: HIGH)
+### Phase 3: Consistency Blockers (Priority: HIGH) ✅
 
-#### 3.1 Standardize Error Handling
-- [ ] Audit all error return patterns
-- [ ] Create `lib/term_ui/error.ex` with error types
-- [ ] Update `TTY.init/1` to return `{:error, reason}` instead of raising
-- [ ] Update all error sites to use tagged tuples
-- [ ] Add error handling tests
-- [ ] Document error handling convention
+#### 3.1 Standardize Error Handling ✅
+- [x] Audit all error return patterns - Already consistent (both Raw and TTY return `{:ok, _} | {:error, _}`)
+- [x] Create `lib/term_ui/error.ex` with error types
+  - 15 standardized error reasons defined
+  - `format/1`, `error/2`, `is_error_reason/1`, `error_type/1` functions
+  - 20 tests added
+- [x] Update `TTY.init/1` to return `{:error, reason}` instead of raising
+  - Already returns `{:ok, t()} | {:error, term()}`
+- [x] Document error handling convention in Error module
 
-#### 3.2 Naming Conventions
-- [ ] Define naming conventions in docs
-  - `backend_mode` not `mode`
-  - `capabilities` not `caps`
-  - Consistent async/sync naming
-- [ ] Create glossary document
-- [ ] Update inconsistent names (where safe)
-- [ ] Add Credo rules for naming
+**Implementation Details**:
+- Created `TermUI.Error` module with standardized error types
+- Error types: `:invalid_argument`, `:not_found`, `:not_supported`, `:timeout`, `:terminal_setup_failed`, `:size_detection_failed`, `:invalid_size`, `:out_of_bounds`, `:backend_unavailable`, `:command_failed`, `:command_not_found`, `:command_not_allowed`, `:invalid_configuration`, `:component_crashed`, `:component_unavailable`
+- All error reasons can be atoms or tuples `{type, details}`
+- 20 tests added - all passing
+
+#### 3.2 Naming Conventions ✅
+- [x] Define naming conventions in docs
+  - `backend_mode` not `mode` - Updated in `Backend.State`
+  - `capabilities` not `caps` - Already using full name in code
+  - Consistent async/sync naming - Already consistent
+- [x] Update inconsistent names (where safe)
+  - Renamed `Backend.State.mode` to `Backend.State.backend_mode`
+  - Updated `Backend.State` type definition from `@type mode` to `@type backend_mode`
+  - Updated `Input.Selector` documentation
+  - Updated all tests in `state_test.exs`
+- [x] Add naming convention documentation to `Backend.State`
+
+**Implementation Details**:
+- Changed `Backend.State` struct field from `:mode` to `:backend_mode`
+- Updated type from `@type mode :: :raw | :tty` to `@type backend_mode :: :raw | :tty`
+- Updated `@enforce_keys [:backend_module, :mode]` to `[:backend_module, :backend_mode]`
+- Updated all constructor functions: `new/2`, `new_raw/1`, `new_tty/2`
+- Added "Naming Convention" section to `Backend.State` moduledoc explaining why `:backend_mode` is used
+- 71 tests updated in `state_test.exs` - all passing
+- Total: 91 tests for error handling and naming conventions - all passing
 
 ### Phase 4: Redundancy Blockers (Priority: MEDIUM)
 
@@ -422,25 +442,29 @@ No new external dependencies required. All changes use existing Elixir/OTP featu
   - `child_spec/1` added to Runtime, Terminal, BufferManager, ComponentServer
   - `TermUI.PersistentTerms` module with centralized cleanup (17 tests)
   - Process dictionary usage removed from FramerateLimiter (22 tests)
+- **Phase 3 Complete**: All consistency blockers fixed
+  - `TermUI.Error` module with standardized error types (20 tests)
+  - `Backend.State.mode` renamed to `Backend.State.backend_mode`
+  - 71 tests updated in `state_test.exs` - all passing
 - **Phase 5 Complete**: Planning document updated
   - Section 6.3 checkboxes marked as complete in multi-renderer plan
 - Current multi-renderer system is functional
 - Feature branch created from clean `multi-renderer`
 
 ### What's Next
-- Phase 3: Consistency Blockers - Standardize error handling patterns
 - Phase 4: Redundancy Blockers - Extract ANSI parser/emitter, Geometry utilities
 - Phase 6: Address Concerns - 33 items from code review
 - Phase 7: Implement Suggestions - 40 improvement suggestions
 
 ### Summary of Changes
-**4 new modules created**:
+**6 new modules created**:
 - `lib/term_ui/term_utils.ex` - Safe command execution wrapper
 - `lib/term_ui/event_queue.ex` - Bounded event queue
 - `lib/term_ui/sanitize.ex` - Escape sequence sanitization
 - `lib/term_ui/persistent_terms.ex` - Centralized persistent_term management
+- `lib/term_ui/error.ex` - Standardized error types and formatting
 
-**6 modules modified**:
+**10 modules modified**:
 - `lib/term_ui/runtime.ex` - Added child_spec, persistent_term cleanup, event queue integration
 - `lib/term_ui/runtime/state.ex` - Added event_queue field
 - `lib/term_ui/terminal.ex` - Added child_spec, uses TermUtils
@@ -450,12 +474,18 @@ No new external dependencies required. All changes use existing Elixir/OTP featu
 - `lib/term_ui/renderer/framerate_limiter.ex` - Removed process dictionary, stores atomics in state
 - `lib/term_ui/app.ex` - Uses PersistentTerms for queries
 - `lib/term_ui/character_set.ex` - Uses PersistentTerms for queries
+- `lib/term_ui/backend/state.ex` - Renamed `:mode` to `:backend_mode` for consistency
+- `lib/term_ui/input/selector.ex` - Updated documentation for `backend_mode`
 
-**4 test files created**:
+**6 test files created**:
 - `test/term_ui/term_utils_test.exs` - 15 tests
 - `test/term_ui/event_queue_test.exs` - 18 tests
 - `test/term_ui/sanitize_test.exs` - 45 tests
 - `test/term_ui/persistent_terms_test.exs` - 17 tests
+- `test/term_ui/error_test.exs` - 20 tests
+
+**3 test files modified**:
+- `test/term_ui/backend/state_test.exs` - Updated for `backend_mode` rename (71 tests)
 
 ### How to Run Tests
 ```bash
@@ -488,8 +518,9 @@ mix credo --strict
 | 2025-01-24 | **Phase 2.1 Complete**: child_spec to GenServers | ✅ Complete |
 | 2025-01-24 | **Phase 2.2 Complete**: Persistent term cleanup | ✅ Complete |
 | 2025-01-24 | **Phase 2.3 Complete**: Remove process dictionary | ✅ Complete |
+| 2025-01-24 | **Phase 3.1 Complete**: Error module and standardization | ✅ Complete |
+| 2025-01-24 | **Phase 3.2 Complete**: Naming convention fixes | ✅ Complete |
 | 2025-01-24 | **Phase 5 Complete**: Planning document update | ✅ Complete |
-| | Phase 3: Consistency Blockers | ⏳ Pending |
 | | Phase 4: Redundancy Blockers | ⏳ Pending |
 | | Phase 6: Concerns | ⏳ Pending |
 | | Phase 7: Suggestions | ⏳ Pending |
