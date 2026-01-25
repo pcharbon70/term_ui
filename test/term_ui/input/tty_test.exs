@@ -48,6 +48,19 @@ defmodule TermUI.Input.TTYTest do
     end
   end
 
+  describe "stop/1" do
+    test "returns :ok" do
+      state = TTY.new()
+      assert TTY.stop(state) == :ok
+    end
+
+    test "is idempotent - can be called multiple times" do
+      state = TTY.new()
+      assert TTY.stop(state) == :ok
+      assert TTY.stop(state) == :ok
+    end
+  end
+
   describe "poll/2 with pre-buffered input" do
     test "returns event from buffer with simple character" do
       # Pre-populate buffer with a simple character

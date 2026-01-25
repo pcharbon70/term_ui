@@ -14,10 +14,11 @@ defmodule TermUI.InputTest do
     test "behaviour_info returns expected callbacks" do
       callbacks = Input.behaviour_info(:callbacks)
 
-      # Should define poll/2 and mode/1 callbacks
+      # Should define poll/2, mode/1, and stop/1 callbacks
       assert {:poll, 2} in callbacks
       assert {:mode, 1} in callbacks
-      assert length(callbacks) == 2
+      assert {:stop, 1} in callbacks
+      assert length(callbacks) == 3
     end
 
     test "behaviour_info returns optional callbacks (empty)" do
@@ -84,6 +85,9 @@ defmodule TermUI.InputTest do
 
       @impl true
       def mode(%__MODULE__{mode: mode}), do: mode
+
+      @impl true
+      def stop(_state), do: :ok
     end
 
     test "mock module compiles and implements behaviour" do
@@ -131,6 +135,9 @@ defmodule TermUI.InputTest do
 
     @impl true
     def mode(_state), do: :raw
+
+    @impl true
+    def stop(_state), do: :ok
   end
 
   describe "stateful mock" do
@@ -192,6 +199,20 @@ defmodule TermUI.InputTest do
       {{:callback, :mode, 1}, _, _, %{"en" => doc}, _} = mode_doc
       assert String.contains?(doc, ":raw")
       assert String.contains?(doc, ":tty")
+    end
+
+    test "stop/1 callback has documentation" do
+      {:docs_v1, _, :elixir, _, _, _, docs} = Code.fetch_docs(Input)
+
+      stop_doc =
+        Enum.find(docs, fn
+          {{:callback, :stop, 1}, _, _, _, _} -> true
+          _ -> false
+        end)
+
+      assert stop_doc != nil
+      {{:callback, :stop, 1}, _, _, %{"en" => doc}, _} = stop_doc
+      assert String.contains?(doc, "cleanup")
     end
   end
 end
