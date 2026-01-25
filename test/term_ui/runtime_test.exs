@@ -1,5 +1,6 @@
 defmodule TermUI.RuntimeTest do
   use ExUnit.Case, async: false
+  import ExUnit.CaptureLog
 
   alias TermUI.Event
   alias TermUI.Runtime
@@ -581,6 +582,18 @@ defmodule TermUI.RuntimeTest do
       state = Runtime.get_state(runtime)
       assert state.input_handler == nil
       assert state.input_state == nil
+    end
+  end
+
+  describe "logging" do
+    test "logs capabilities at debug level when backend is selected" do
+      log =
+        capture_log([level: :debug], fn ->
+          {:ok, _runtime} = Runtime.start_link(root: Counter, skip_terminal: true, backend: :tty)
+        end)
+
+      # With skip_terminal: true, capabilities should still be logged
+      assert log =~ "TermUI: Capabilities detected" or log =~ "TermUI: Character set"
     end
   end
 end

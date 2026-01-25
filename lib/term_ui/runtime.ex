@@ -24,6 +24,7 @@ defmodule TermUI.Runtime do
   """
 
   use GenServer
+  require Logger
 
   alias TermUI.Backend.Selector
   alias TermUI.Config
@@ -462,6 +463,9 @@ defmodule TermUI.Runtime do
     # Default to :unicode if not specified
     charset = determine_character_set(caps_to_store)
     :persistent_term.put(:term_ui_character_set, charset)
+
+    # Log capabilities at debug level
+    log_capabilities(caps_to_store, charset)
   end
 
   # Determines character set from capabilities map
@@ -474,6 +478,27 @@ defmodule TermUI.Runtime do
   end
 
   defp determine_character_set(_capabilities), do: :unicode
+
+  # Logs detected capabilities at debug level
+  defp log_capabilities(capabilities, charset) when is_map(capabilities) do
+    color_mode = Map.get(capabilities, :colors, :unknown)
+    unicode = Map.get(capabilities, :unicode, :unknown)
+    dimensions = Map.get(capabilities, :dimensions, :unknown)
+    terminal = Map.get(capabilities, :terminal, :unknown)
+
+    Logger.debug("""
+    TermUI: Capabilities detected:\
+    \n  Color mode: #{inspect(color_mode)}\
+    \n  Character set: #{inspect(charset)}\
+    \n  Unicode: #{inspect(unicode)}\
+    \n  Terminal size: #{inspect(dimensions)}\
+    \n  Terminal: #{inspect(terminal)}\
+    """)
+  end
+
+  defp log_capabilities(_capabilities, charset) do
+    Logger.debug("TermUI: Character set: #{inspect(charset)}")
+  end
 
   @impl true
   def handle_cast({:event, event}, state) do

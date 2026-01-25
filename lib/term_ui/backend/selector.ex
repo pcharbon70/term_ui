@@ -89,6 +89,8 @@ defmodule TermUI.Backend.Selector do
   - **OTP 27 and earlier**: Automatic fallback to TTY mode
   """
 
+  require Logger
+
   @typedoc """
   Result of backend selection.
 
@@ -170,10 +172,12 @@ defmodule TermUI.Backend.Selector do
   def select(:auto), do: select()
 
   def select({module, opts}) when is_atom(module) and is_list(opts) do
+    Logger.info("TermUI: Using forced backend: #{inspect(module)}")
     {:explicit, module, opts}
   end
 
   def select(module) when is_atom(module) do
+    Logger.info("TermUI: Using forced backend: #{inspect(module)}")
     {:explicit, module, []}
   end
 
@@ -187,6 +191,7 @@ defmodule TermUI.Backend.Selector do
     rescue
       # Handle pre-OTP 28 systems where :shell.start_interactive/1 doesn't exist
       UndefinedFunctionError ->
+        Logger.info("TermUI: Backend selected: :tty (OTP < 28, raw mode unavailable)")
         {:tty, detect_capabilities()}
     end
   end
@@ -199,10 +204,12 @@ defmodule TermUI.Backend.Selector do
     case :shell.start_interactive({:noshell, :raw}) do
       :ok ->
         # Raw mode successfully activated
+        Logger.info("TermUI: Backend selected: :raw (full terminal control)")
         {:raw, %{raw_mode_started: true}}
 
       {:error, :already_started} ->
         # A shell is already running, fall back to TTY mode
+        Logger.info("TermUI: Backend selected: :tty (shell already running)")
         {:tty, detect_capabilities()}
 
       {:error, reason} ->
@@ -210,6 +217,7 @@ defmodule TermUI.Backend.Selector do
         # While OTP 28 documentation only specifies :ok and {:error, :already_started},
         # we gracefully handle other error conditions for forward compatibility and
         # robustness. The error reason is preserved in the capabilities map for debugging.
+        Logger.info("TermUI: Backend selected: :tty (raw mode failed: #{inspect(reason)})")
         {:tty, Map.put(detect_capabilities(), :raw_mode_error, reason)}
     end
   end
