@@ -16,7 +16,7 @@ defmodule TermUI.CharacterSet do
       chars = TermUI.CharacterSet.get(:unicode)
       top_border = chars.tl <> String.duplicate(chars.h_line, width - 2) <> chars.tr
 
-  For runtime queries, use `current/0` which reads from application config:
+  For runtime queries, use `current/0` which reads from persistent_term:
 
       chars = TermUI.CharacterSet.get(TermUI.CharacterSet.current())
 
@@ -291,8 +291,8 @@ defmodule TermUI.CharacterSet do
   @doc """
   Returns the currently configured character set type.
 
-  Reads from persistent_term (set by Runtime), falling back to application config.
-  Defaults to `:unicode` if neither is configured.
+  Reads from persistent_term via PersistentTerms (set by Runtime),
+  falling back to application config. Defaults to `:unicode` if neither is configured.
 
   ## Returns
 
@@ -309,17 +309,7 @@ defmodule TermUI.CharacterSet do
       :ascii
   """
   @spec current() :: charset()
-  def current do
-    # First check persistent_term (set by Runtime based on detected capabilities)
-    case :persistent_term.get(:term_ui_character_set, :fallback) do
-      :fallback ->
-        # Fall back to application config
-        Application.get_env(:term_ui, :character_set, :unicode)
-
-      charset ->
-        charset
-    end
-  end
+  def current, do: TermUI.PersistentTerms.character_set()
 
   @doc """
   Returns the current character set as a map.

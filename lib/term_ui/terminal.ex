@@ -13,6 +13,7 @@ defmodule TermUI.Terminal do
   alias TermUI.Terminal.State
   alias TermUI.Terminal.SizeDetector
   alias TermUI.ANSI
+  alias TermUI.TermUtils
 
   @ets_table :term_ui_terminal_state
 
@@ -31,6 +32,20 @@ defmodule TermUI.Terminal do
   @spec start_link(keyword()) :: GenServer.on_start()
   def start_link(opts \\ []) do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
+  end
+
+  @doc """
+  Returns a child specification for starting the terminal in a supervisor.
+  """
+  @spec child_spec(keyword()) :: Supervisor.child_spec()
+  def child_spec(opts \\ []) do
+    %{
+      id: __MODULE__,
+      start: {__MODULE__, :start_link, [opts]},
+      restart: :permanent,
+      shutdown: 5000,
+      type: :worker
+    }
   end
 
   @doc """
@@ -426,9 +441,13 @@ defmodule TermUI.Terminal do
   end
 
   defp save_terminal_settings do
-    case System.cmd("stty", ["-g"], stderr_to_stdout: true) do
-      {output, 0} ->
-        String.trim(output)
+    case TermUtils.safe_stty(["-g"]) do
+      {:ok, output} ->
+        # Validate output format before storing
+        case TermUtils.validate_stty_settings(output) do
+          :ok -> output
+          {:error, _} -> nil
+        end
 
       _ ->
         nil
@@ -445,18 +464,13 @@ defmodule TermUI.Terminal do
     # time 0: timeout in tenths of a second (0 = no timeout)
     # -isig: disable signal generation (Ctrl+C etc handled by app)
     # -ixon: disable XON/XOFF flow control
-    case System.cmd("stty", ["raw", "-echo", "-isig", "-ixon", "min", "1", "time", "0"],
-           stderr_to_stdout: true
-         ) do
-      {_output, 0} ->
+    case TermUtils.safe_stty(["raw", "-echo", "-isig", "-ixon", "1", "0"]) do
+      {:ok, _output} ->
         :ok
 
-      {error, _code} ->
-        {:error, {:stty_failed, error}}
+      {:error, reason} ->
+        {:error, {:stty_failed, reason}}
     end
-  rescue
-    e ->
-      {:error, {:stty_exception, Exception.message(e)}}
   end
 
   defp do_disable_raw_mode(original_settings) do
@@ -478,18 +492,20 @@ defmodule TermUI.Terminal do
   end
 
   defp restore_terminal_settings(settings) do
-    System.cmd("stty", [settings], stderr_to_stdout: true)
-    :ok
-  rescue
-    _ -> :ok
+    # Restore original settings - settings was validated when captured
+    # We pass it as a single argument which stty accepts for restoration
+    case TermUtils.safe_stty([settings]) do
+      {:ok, _} -> :ok
+      {:error, _} -> :ok
+    end
   end
 
   defp restore_stty_sane do
     # Restore terminal to reasonable defaults
-    System.cmd("stty", ["sane"], stderr_to_stdout: true)
-    :ok
-  rescue
-    _ -> :ok
+    case TermUtils.safe_stty(["sane"]) do
+      {:ok, _} -> :ok
+      {:error, _} -> :ok
+    end
   end
 
   # Delegates to SizeDetector for consistent size detection across modules.
@@ -568,12 +584,10 @@ defmodule TermUI.Terminal do
   end
 
   defp check_tty do
-    case System.cmd("test", ["-t", "0"], stderr_to_stdout: true) do
-      {_, 0} -> true
+    case TermUtils.safe_test(["-t", "0"]) do
+      {:ok, _} -> true
       _ -> false
     end
-  rescue
-    _ -> false
   end
 
   defp create_ets_table do

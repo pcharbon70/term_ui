@@ -29,9 +29,11 @@ defmodule TermUI.Runtime do
   alias TermUI.Backend.Selector
   alias TermUI.Config
   alias TermUI.Elm
+  alias TermUI.EventQueue
   alias TermUI.Event
   alias TermUI.Input.Selector, as: InputSelector
   alias TermUI.MessageQueue
+  alias TermUI.PersistentTerms
   alias TermUI.Renderer.Buffer
   alias TermUI.Renderer.BufferManager
   alias TermUI.Renderer.Cell
@@ -98,6 +100,37 @@ defmodule TermUI.Runtime do
     else
       GenServer.start_link(__MODULE__, opts)
     end
+  end
+
+  @doc """
+  Returns a child specification for starting the runtime in a supervisor.
+
+  ## Options
+
+  Same as `start_link/1`:
+  - `:root` - The root component module (required)
+  - `:name` - GenServer name (optional)
+  - `:render_interval` - Milliseconds between renders (default: 16)
+  - `:backend` - Backend selection: `:auto`, `:raw`, `:tty`
+  - `:skip_terminal` - Skip terminal initialization (default: false)
+
+  ## Examples
+
+      children = [
+        {TermUI.Runtime, root: MyApp.Root, name: :my_runtime}
+      ]
+
+      Supervisor.start_link(children, strategy: :one_for_one)
+  """
+  @spec child_spec([option()]) :: Supervisor.child_spec()
+  def child_spec(opts) do
+    %{
+      id: __MODULE__,
+      start: {__MODULE__, :start_link, [opts]},
+      restart: :permanent,
+      shutdown: 5000,
+      type: :worker
+    }
   end
 
   @doc """
@@ -171,9 +204,7 @@ defmodule TermUI.Runtime do
       :tty = Runtime.backend_mode()
   """
   @spec backend_mode() :: State.backend_mode()
-  def backend_mode do
-    :persistent_term.get(:term_ui_backend_mode, nil)
-  end
+  def backend_mode, do: PersistentTerms.backend_mode()
 
   @doc """
   Gets the detected terminal capabilities.
@@ -191,9 +222,7 @@ defmodule TermUI.Runtime do
       %{colors: :true_color, unicode: true} = Runtime.capabilities()
   """
   @spec capabilities() :: State.capabilities() | nil
-  def capabilities do
-    :persistent_term.get(:term_ui_capabilities, nil)
-  end
+  def capabilities, do: PersistentTerms.capabilities()
 
   @doc """
   Forces an immediate render (bypassing framerate limiter).
@@ -263,7 +292,7 @@ defmodule TermUI.Runtime do
       end
 
     # Store backend info in persistent_term for global access
-    store_backend_context(backend_mode, capabilities)
+    PersistentTerms.store_backend_context(backend_mode, capabilities)
 
     # Initialize root component state
     root_state = root_module.init(opts)
@@ -296,6 +325,7 @@ defmodule TermUI.Runtime do
       root_module: root_module,
       root_state: root_state,
       message_queue: MessageQueue.new(),
+      event_queue: EventQueue.new(),
       render_interval: render_interval,
       # Initial render needed
       dirty: true,
@@ -444,68 +474,21 @@ defmodule TermUI.Runtime do
     end
   end
 
-  defp store_backend_context(backend_mode, capabilities) do
-    # Store in persistent_term for global access
-    :persistent_term.put(:term_ui_backend_mode, backend_mode)
-
-    # Store capabilities (use empty map for raw mode)
-    caps_to_store =
-      if backend_mode == :raw do
-        # Detect capabilities even in raw mode for consistency
-        Selector.detect_capabilities()
-      else
-        capabilities
-      end
-
-    :persistent_term.put(:term_ui_capabilities, caps_to_store)
-
-    # Determine and store character set (:unicode or :ascii)
-    # Default to :unicode if not specified
-    charset = determine_character_set(caps_to_store)
-    :persistent_term.put(:term_ui_character_set, charset)
-
-    # Log capabilities at debug level
-    log_capabilities(caps_to_store, charset)
-  end
-
-  # Determines character set from capabilities map
-  defp determine_character_set(capabilities) when is_map(capabilities) do
-    case Map.get(capabilities, :unicode, true) do
-      true -> :unicode
-      false -> :ascii
-      _ -> :unicode
-    end
-  end
-
-  defp determine_character_set(_capabilities), do: :unicode
-
-  # Logs detected capabilities at debug level
-  defp log_capabilities(capabilities, charset) when is_map(capabilities) do
-    color_mode = Map.get(capabilities, :colors, :unknown)
-    unicode = Map.get(capabilities, :unicode, :unknown)
-    dimensions = Map.get(capabilities, :dimensions, :unknown)
-    terminal = Map.get(capabilities, :terminal, :unknown)
-
-    Logger.debug("""
-    TermUI: Capabilities detected:\
-    \n  Color mode: #{inspect(color_mode)}\
-    \n  Character set: #{inspect(charset)}\
-    \n  Unicode: #{inspect(unicode)}\
-    \n  Terminal size: #{inspect(dimensions)}\
-    \n  Terminal: #{inspect(terminal)}\
-    """)
-  end
-
-  defp log_capabilities(_capabilities, charset) do
-    Logger.debug("TermUI: Character set: #{inspect(charset)}")
-  end
-
   @impl true
   def handle_cast({:event, event}, state) do
     if state.shutting_down do
       {:noreply, state}
     else
-      state = dispatch_event(event, state)
+      # Add to bounded event queue (may drop oldest if full)
+      {result, new_queue} = EventQueue.push(state.event_queue, event)
+      state = %{state | event_queue: new_queue}
+      # Log if event was dropped
+      case result do
+        {:dropped, _} -> :ok  # EventQueue already logged
+        :ok -> :ok
+      end
+      # Process queued events
+      state = process_event_queue(state)
       {:noreply, state}
     end
   end
@@ -577,7 +560,16 @@ defmodule TermUI.Runtime do
     if state.shutting_down do
       {:noreply, state}
     else
-      state = dispatch_event(event, state)
+      # Add to bounded event queue (may drop oldest if full)
+      {result, new_queue} = EventQueue.push(state.event_queue, event)
+      state = %{state | event_queue: new_queue}
+      # Process queued events
+      state = process_event_queue(state)
+      # Log if event was dropped (EventQueue handles rate limiting)
+      case result do
+        {:dropped, _} -> :ok
+        :ok -> :ok
+      end
       {:noreply, state}
     end
   end
@@ -714,10 +706,32 @@ defmodule TermUI.Runtime do
       _ -> :ok
     end
 
+    # Clean up persistent_term storage to prevent memory leaks
+    try do
+      PersistentTerms.cleanup()
+    rescue
+      _ -> :ok
+    end
+
     :ok
   end
 
   # --- Event Dispatch ---
+
+  # Processes events from the bounded event queue.
+  #
+  # Processes one event per call to prevent event loop starvation.
+  # Multiple events will be processed across multiple GenServer handle_info/call cycles.
+  defp process_event_queue(state) do
+    case EventQueue.pop(state.event_queue) do
+      {{:value, event}, new_queue} ->
+        state = %{state | event_queue: new_queue}
+        dispatch_event(event, state)
+
+      {:empty, _} ->
+        state
+    end
+  end
 
   defp dispatch_event(%Event.Key{} = event, state) do
     # Keyboard events go to focused component

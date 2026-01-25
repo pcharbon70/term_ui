@@ -46,8 +46,8 @@ defmodule TermUI.Input.Selector do
   For runtime code that already has a `Backend.State` struct, you can
   extract the mode and pass it directly:
 
-      backend_state = %TermUI.Backend.State{mode: :tty, ...}
-      handler = TermUI.Input.Selector.select(backend_state.mode)
+      backend_state = %TermUI.Backend.State{backend_mode: :tty, ...}
+      handler = TermUI.Input.Selector.select(backend_state.backend_mode)
 
   ## Input Handler Contract
 
@@ -157,8 +157,8 @@ defmodule TermUI.Input.Selector do
       # => TermUI.Input.TTY
 
       # Using with Backend.State
-      backend_state = %TermUI.Backend.State{mode: :tty, ...}
-      handler = TermUI.Input.Selector.select(backend_state.mode)
+      backend_state = %TermUI.Backend.State{backend_mode: :tty, ...}
+      handler = TermUI.Input.Selector.select(backend_state.backend_mode)
 
       # Invalid mode raises
       TermUI.Input.Selector.select(:invalid)

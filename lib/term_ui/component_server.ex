@@ -66,6 +66,20 @@ defmodule TermUI.ComponentServer do
   end
 
   @doc """
+  Returns a child specification for starting a component in a supervisor.
+  """
+  @spec child_spec(module(), map(), keyword()) :: Supervisor.child_spec()
+  def child_spec(module, props, opts \\ []) do
+    %{
+      id: opts[:id] || module,
+      start: {__MODULE__, :start_link, [module, props, opts]},
+      restart: :permanent,
+      shutdown: 5000,
+      type: :worker
+    }
+  end
+
+  @doc """
   Triggers the mount lifecycle stage.
 
   Called when the component is added to the active component tree.

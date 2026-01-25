@@ -6,6 +6,7 @@ defmodule TermUI.Runtime.State do
   - Root component module and state
   - Component registry
   - Message queue
+  - Event queue (bounded, prevents DoS)
   - Render configuration
   - Focus tracking
   - Shutdown status
@@ -13,6 +14,7 @@ defmodule TermUI.Runtime.State do
   - Input handler (Raw or TTY mode)
   """
 
+  alias TermUI.EventQueue
   alias TermUI.MessageQueue
 
   @type backend_mode :: :raw | :tty | nil
@@ -29,6 +31,7 @@ defmodule TermUI.Runtime.State do
           root_module: module(),
           root_state: term(),
           message_queue: MessageQueue.t(),
+          event_queue: EventQueue.t(),
           render_interval: pos_integer(),
           dirty: boolean(),
           focused_component: atom(),
@@ -61,6 +64,7 @@ defmodule TermUI.Runtime.State do
     :root_module,
     :root_state,
     :message_queue,
+    :event_queue,
     :render_interval,
     :dirty,
     :focused_component,
