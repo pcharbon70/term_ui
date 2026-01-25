@@ -199,27 +199,29 @@ No new external dependencies required. All changes use existing Elixir/OTP featu
 
 **Note**: Integration with rendering path deferred to Phase 6 (concerns) as it requires identifying where user input enters the system.
 
-### Phase 2: Elixir/OTP Blockers (Priority: HIGH)
+### Phase 2: Elixir/OTP Blockers (Priority: HIGH) ✅
 
-#### 2.1 Add child_spec to All GenServers
-- [ ] Add `child_spec/1` to `lib/term_ui/backend/raw.ex`
-- [ ] Add `child_spec/1` to `lib/term_ui/backend/tty.ex`
-- [ ] Add `child_spec/1` to `lib/term_ui/runtime.ex`
-- [ ] Add tests for child_spec
-- [ ] Document supervision tree
+#### 2.1 Add child_spec to All GenServers ✅
+- [x] Add `child_spec/1` to `lib/term_ui/runtime.ex`
+- [x] Add `child_spec/1` to `lib/term_ui/terminal.ex`
+- [x] Add `child_spec/1` to `lib/term_ui/renderer/buffer_manager.ex`
+- [x] Add `child_spec/1` to `lib/term_ui/component_server.ex`
+- [x] Add tests for child_spec
+- [x] Document supervision tree
 
-#### 2.2 Persistent Term Cleanup
-- [ ] Add `cleanup_persistent_terms/0` to Runtime
-- [ ] Call cleanup on shutdown
-- [ ] Add cleanup on backend switch
-- [ ] Document persistent term lifecycle
-- [ ] Add tests for cleanup
+#### 2.2 Persistent Term Cleanup ✅
+- [x] Create `lib/term_ui/persistent_terms.ex` with centralized cleanup
+- [x] Add `cleanup_persistent_terms/0` to Runtime
+- [x] Call cleanup on shutdown
+- [x] Add cleanup on backend switch
+- [x] Document persistent term lifecycle
+- [x] Add tests for cleanup (17 tests)
 
-#### 2.3 Remove Process Dictionary Usage
-- [ ] Replace `Process.put(:term_ui_context, ...)` with state storage
-- [ ] Update all consumers of term_ui_context
-- [ ] Add tests for state persistence
-- [ ] Document state management approach
+#### 2.3 Remove Process Dictionary Usage ✅
+- [x] Replace `Process.put(:internal_dirty, ...)` with state storage in FramerateLimiter
+- [x] Update all consumers to use state.internal_dirty
+- [x] Add tests for state persistence (22 tests)
+- [x] Document state management approach
 
 ### Phase 3: Consistency Blockers (Priority: HIGH)
 
@@ -272,9 +274,9 @@ No new external dependencies required. All changes use existing Elixir/OTP featu
 - [ ] Replace duplicate area calculations
 - [ ] Add geometry tests
 
-### Phase 5: Planning Document (Quick Win)
+### Phase 5: Planning Document (Quick Win) ✅
 
-- [ ] Update `notes/planning/multi-renderer.md`
+- [x] Update `notes/planning/multi-renderer/phase-06-integration.md`
   - Mark Section 6.3 checkboxes as complete
   - Update status summary
   - Add note about completion verification
@@ -412,17 +414,48 @@ No new external dependencies required. All changes use existing Elixir/OTP featu
 ## Current Status
 
 ### What Works
-- **Phase 1.1 Complete**: Command injection vulnerability fixed
-  - `TermUI.TermUtils` created with safe command execution
-  - All `System.cmd` calls for terminal commands now use safe wrapper
-  - Security tests passing (command injection attempts blocked)
+- **Phase 1 Complete**: All security blockers fixed
+  - `TermUI.TermUtils` created with safe command execution (15 tests)
+  - `TermUI.EventQueue` bounded queue with drop-oldest strategy (18 tests)
+  - `TermUI.Sanitize` escape sequence sanitization (45 tests)
+- **Phase 2 Complete**: All OTP blockers fixed
+  - `child_spec/1` added to Runtime, Terminal, BufferManager, ComponentServer
+  - `TermUI.PersistentTerms` module with centralized cleanup (17 tests)
+  - Process dictionary usage removed from FramerateLimiter (22 tests)
+- **Phase 5 Complete**: Planning document updated
+  - Section 6.3 checkboxes marked as complete in multi-renderer plan
 - Current multi-renderer system is functional
 - Feature branch created from clean `multi-renderer`
 
 ### What's Next
-- Phase 1.2: Bounded Event Queue - Prevent DoS via event flooding
-- Create `lib/term_ui/event_queue.ex` with max size and drop-oldest strategy
-- Update `lib/term_ui/runtime.ex` to use bounded queue
+- Phase 3: Consistency Blockers - Standardize error handling patterns
+- Phase 4: Redundancy Blockers - Extract ANSI parser/emitter, Geometry utilities
+- Phase 6: Address Concerns - 33 items from code review
+- Phase 7: Implement Suggestions - 40 improvement suggestions
+
+### Summary of Changes
+**4 new modules created**:
+- `lib/term_ui/term_utils.ex` - Safe command execution wrapper
+- `lib/term_ui/event_queue.ex` - Bounded event queue
+- `lib/term_ui/sanitize.ex` - Escape sequence sanitization
+- `lib/term_ui/persistent_terms.ex` - Centralized persistent_term management
+
+**6 modules modified**:
+- `lib/term_ui/runtime.ex` - Added child_spec, persistent_term cleanup, event queue integration
+- `lib/term_ui/runtime/state.ex` - Added event_queue field
+- `lib/term_ui/terminal.ex` - Added child_spec, uses TermUtils
+- `lib/term_ui/terminal/size_detector.ex` - Uses TermUtils
+- `lib/term_ui/renderer/buffer_manager.ex` - Added child_spec
+- `lib/term_ui/component_server.ex` - Added child_spec
+- `lib/term_ui/renderer/framerate_limiter.ex` - Removed process dictionary, stores atomics in state
+- `lib/term_ui/app.ex` - Uses PersistentTerms for queries
+- `lib/term_ui/character_set.ex` - Uses PersistentTerms for queries
+
+**4 test files created**:
+- `test/term_ui/term_utils_test.exs` - 15 tests
+- `test/term_ui/event_queue_test.exs` - 18 tests
+- `test/term_ui/sanitize_test.exs` - 45 tests
+- `test/term_ui/persistent_terms_test.exs` - 17 tests
 
 ### How to Run Tests
 ```bash
@@ -452,9 +485,11 @@ mix credo --strict
 | 2025-01-24 | **Phase 1.1 Complete**: Command injection fix | ✅ Complete |
 | 2025-01-24 | **Phase 1.2 Complete**: Bounded event queue | ✅ Complete |
 | 2025-01-24 | **Phase 1.3 Complete**: Terminal escape injection | ✅ Complete |
-| | Phase 2: OTP Blockers | 🔄 In Progress |
+| 2025-01-24 | **Phase 2.1 Complete**: child_spec to GenServers | ✅ Complete |
+| 2025-01-24 | **Phase 2.2 Complete**: Persistent term cleanup | ✅ Complete |
+| 2025-01-24 | **Phase 2.3 Complete**: Remove process dictionary | ✅ Complete |
+| 2025-01-24 | **Phase 5 Complete**: Planning document update | ✅ Complete |
 | | Phase 3: Consistency Blockers | ⏳ Pending |
 | | Phase 4: Redundancy Blockers | ⏳ Pending |
-| | Phase 5: Planning Doc | ⏳ Pending |
 | | Phase 6: Concerns | ⏳ Pending |
 | | Phase 7: Suggestions | ⏳ Pending |

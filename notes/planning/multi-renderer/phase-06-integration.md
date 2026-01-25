@@ -115,48 +115,48 @@ Handle events that only exist in one mode.
 
 ## 6.3 Update Rendering Pipeline
 
-- [ ] **Section 6.3 Complete**
+- [x] **Section 6.3 Complete**
 
 Connect the rendering pipeline to the selected backend.
 
 ### 6.3.1 Delegate Rendering to Backend
 
-- [ ] **Task 6.3.1 Complete**
+- [x] **Task 6.3.1 Complete**
 
 Route render calls through the backend.
 
-- [ ] 6.3.1.1 Modify renderer to use `state.backend` module
-- [ ] 6.3.1.2 Call `backend.draw_cells/2` for frame rendering
-- [ ] 6.3.1.3 Call `backend.flush/1` after drawing
-- [ ] 6.3.1.4 Pass backend state through render cycle
+- [x] 6.3.1.1 Modify renderer to use `state.backend` module
+- [x] 6.3.1.2 Call `backend.draw_cells/2` for frame rendering
+- [x] 6.3.1.3 Call `backend.flush/1` after drawing
+- [x] 6.3.1.4 Pass backend state through render cycle
 
 ### 6.3.2 Handle Render Mode Differences
 
-- [ ] **Task 6.3.2 Complete**
+- [x] **Task 6.3.2 Complete**
 
 Handle differences between raw and TTY rendering.
 
-- [ ] 6.3.2.1 Raw backend uses differential rendering
-- [ ] 6.3.2.2 TTY backend uses full_redraw by default
-- [ ] 6.3.2.3 Both support same cell format
-- [ ] 6.3.2.4 Color degradation handled by backend
+- [x] 6.3.2.1 Raw backend uses differential rendering
+- [x] 6.3.2.2 TTY backend uses full_redraw by default
+- [x] 6.3.2.3 Both support same cell format
+- [x] 6.3.2.4 Color degradation handled by backend
 
 ### 6.3.3 Integrate CharacterSet
 
-- [ ] **Task 6.3.3 Complete**
+- [x] **Task 6.3.3 Complete**
 
 Ensure character set is available during rendering.
 
-- [ ] 6.3.3.1 Set `CharacterSet.current/0` based on capabilities
-- [ ] 6.3.3.2 Widgets use `CharacterSet.current/0` for box drawing
-- [ ] 6.3.3.3 Backend applies character mapping if needed
+- [x] 6.3.3.1 Set `CharacterSet.current/0` based on capabilities
+- [x] 6.3.3.2 Widgets use `CharacterSet.current/0` for box drawing
+- [x] 6.3.3.3 Backend applies character mapping if needed
 
 ### Unit Tests - Section 6.3
 
-- [ ] **Unit Tests 6.3 Complete**
-- [ ] Test render pipeline uses correct backend
-- [ ] Test cells are rendered correctly in both modes
-- [ ] Test character set is applied during rendering
+- [x] **Unit Tests 6.3 Complete**
+- [x] Test render pipeline uses correct backend
+- [x] Test cells are rendered correctly in both modes
+- [x] Test character set is applied during rendering
 
 ---
 
