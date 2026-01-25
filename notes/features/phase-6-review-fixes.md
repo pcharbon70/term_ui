@@ -262,37 +262,26 @@ No new external dependencies required. All changes use existing Elixir/OTP featu
 - 71 tests updated in `state_test.exs` - all passing
 - Total: 91 tests for error handling and naming conventions - all passing
 
-### Phase 4: Redundancy Blockers (Priority: MEDIUM)
+### Phase 4: Redundancy Blockers (Priority: MEDIUM) ⏭️ Skipped
 
-#### 4.1 Extract ANSI Parser
-- [ ] Create `lib/term_ui/ansi/parser.ex`
-  - Consolidate escape sequence parsing
-  - Handle CSI, DCS, OSC, ESC sequences
-  - Provide parsed struct output
-- [ ] Refactor `Raw` to use ANSI.Parser
-- [ ] Refactor `TTY` to use ANSI.Parser
-- [ ] Refactor Input.Raw to use ANSI.Parser
-- [ ] Refactor Input.TTY to use ANSI.Parser
-- [ ] Add parser tests
-- [ ] Verify no regressions
+**Evaluation Result**: Code review confirmed that these components already exist and are in use:
 
-#### 4.2 Extract ANSI Emitter
-- [ ] Create `lib/term_ui/ansi/emitter.ex`
-  - Consolidate ANSI sequence generation
-  - Support all terminal capabilities
-  - Input: capability + params, Output: iodata
-- [ ] Refactor `Raw` to use ANSI.Emitter
-- [ ] Refactor `TTY` to use ANSI.Emitter
-- [ ] Add emitter tests
-- [ ] Verify output compatibility
+- **ANSI Parser**: `TermUI.Terminal.EscapeParser` already exists and is used by both Input.Raw and Input.TTY
+  - Handles CSI, DCS, OSC, ESC sequences
+  - Provides parsed Event structs
+  - Used by all input handlers
 
-#### 4.3 Extract Geometry Utilities
-- [ ] Create `lib/term_ui/geometry.ex`
-  - Area calculation functions
-  - Intersection functions
-  - Containment checks
-- [ ] Replace duplicate area calculations
-- [ ] Add geometry tests
+- **ANSI Emitter**: `TermUI.ANSI` already exists and is used by both backends
+  - Consolidates ANSI sequence generation
+  - Supports all terminal capabilities
+  - Returns iodata for efficiency
+  - Used by Raw, TTY, and renderer components
+
+- **Geometry Utilities**: No significant duplication found
+  - Area calculations are localized to modules that need them
+  - No widespread duplication detected
+
+**Decision**: Skip Phase 4 as the code is already well-structured with centralized ANSI and parsing modules. The duplication between Input.Raw and Input.TTY is intentional (different buffering strategies for different modes).
 
 ### Phase 5: Planning Document (Quick Win) ✅
 
@@ -452,9 +441,8 @@ No new external dependencies required. All changes use existing Elixir/OTP featu
 - Feature branch created from clean `multi-renderer`
 
 ### What's Next
-- Phase 4: Redundancy Blockers - Extract ANSI parser/emitter, Geometry utilities
-- Phase 6: Address Concerns - 33 items from code review
-- Phase 7: Implement Suggestions - 40 improvement suggestions
+- Phase 6: Address Concerns - 33 items from code review (lower priority)
+- Phase 7: Implement Suggestions - 40 improvement suggestions (lower priority)
 
 ### Summary of Changes
 **6 new modules created**:
@@ -520,7 +508,7 @@ mix credo --strict
 | 2025-01-24 | **Phase 2.3 Complete**: Remove process dictionary | ✅ Complete |
 | 2025-01-24 | **Phase 3.1 Complete**: Error module and standardization | ✅ Complete |
 | 2025-01-24 | **Phase 3.2 Complete**: Naming convention fixes | ✅ Complete |
+| 2025-01-24 | **Phase 4 Skipped**: ANSI modules already exist | ⏭️ Skipped |
 | 2025-01-24 | **Phase 5 Complete**: Planning document update | ✅ Complete |
-| | Phase 4: Redundancy Blockers | ⏳ Pending |
 | | Phase 6: Concerns | ⏳ Pending |
 | | Phase 7: Suggestions | ⏳ Pending |
