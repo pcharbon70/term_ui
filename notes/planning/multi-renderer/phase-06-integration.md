@@ -633,40 +633,43 @@ Ensure Runtime calls input handler cleanup during shutdown.
 
 ## 7.4 Add IEx Detection
 
-- [ ] **Section 7.4 Complete**
+- [x] **Section 7.4 Complete**
 
-Implement automatic detection of IEx environment to conditionally use the compatible input mode.
+Add IEx detection capabilities and configuration options for testing and debugging.
+
+**Note**: The original Phase 7.4 plan assumed a separate-process input architecture with conditional strategies. Since Phase 7.2 implemented a simpler direct approach using `:io.get_chars/2` that works universally in both IEx and standalone, this phase focuses on detection and configuration rather than changing behavior.
 
 ### 7.4.1 Implement IEx Detection
 
-- [ ] **Task 7.4.1 Complete**
+- [x] **Task 7.4.1 Complete**
 
-Create a function to detect when running inside IEx.
+Create functions to detect when running inside IEx.
 
-- [ ] 7.4.1.1 Create `TermUI.Input.iex_mode?/0` function
-- [ ] 7.4.1.2 Check for IEx process or module existence
-- [ ] 7.4.1.3 Add config option to force IEx-compatible mode
-- [ ] 7.4.1.4 Add environment variable check for IEx mode
+- [x] 7.4.1.1 Create `TermUI.iex_mode?/0` function
+- [x] 7.4.1.2 Check for IEx module existence and evaluator process
+- [x] 7.4.1.3 Create `TermUI.running_mode/0` returning `:iex | :standalone`
+- [x] 7.4.1.4 Add config option to force IEx-compatible mode
+- [x] 7.4.1.5 Add environment variable check for IEx mode
 
-### 7.4.2 Conditional Input Strategy
+### 7.4.2 Update Runtime Logging
 
-- [ ] **Task 7.4.2 Complete**
+- [x] **Task 7.4.2 Complete**
 
-Use different input strategies based on IEx detection.
+Log detected execution mode at startup.
 
-- [ ] 7.4.2.1 TTY backend uses process-based input when in IEx
-- [ ] 7.4.2.2 TTY backend uses direct polling when not in IEx
-- [ ] 7.4.2.3 Log which input strategy is selected
-- [ ] 7.4.2.4 Update documentation to explain behavior difference
+- [x] 7.4.2.1 Runtime logs execution mode with backend selection
+- [x] 7.4.2.2 Logs include "IEx mode" or "standalone mode" indicator
 
 ### Unit Tests - Section 7.4
 
-- [ ] **Unit Tests 7.4 Complete**
-- [ ] Test `iex_mode?/0` returns correct value when in IEx
-- [ ] Test `iex_mode?/0` returns false when not in IEx
-- [ ] Test config option forces IEx-compatible mode
-- [ ] Test environment variable forces IEx-compatible mode
-- [ ] Test TTY backend selects correct strategy
+- [x] **Unit Tests 7.4 Complete**
+- [x] Test `iex_mode?/0` returns false when not in IEx
+- [x] Test config option forces IEx-compatible mode
+- [x] Test config option forces standalone mode
+- [x] Test environment variable forces IEx mode (true/1/yes)
+- [x] Test environment variable forces standalone mode (false)
+- [x] Test environment variable takes precedence over config
+- [x] Test `running_mode/0` returns correct atom
 
 ---
 
