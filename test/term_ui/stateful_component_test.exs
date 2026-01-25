@@ -2,7 +2,6 @@ defmodule TermUI.StatefulComponentTest do
   use ExUnit.Case, async: true
 
   alias TermUI.Component.RenderNode
-  alias TermUI.Renderer.Style
 
   # Test counter component
   defmodule Counter do
