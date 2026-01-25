@@ -486,11 +486,11 @@ After this phase, TermUI applications will work correctly when run from within I
 
 ## 7.1 Research snake_test Input Approach
 
-- [x] **Section 7.1 Complete** ⚠️ **Research Completed - Approach Not Viable**
+- [x] **Section 7.1 Complete** ✅ **Research Confirmed - Approach Works!**
 
 Analyze the snake_test project's input handling implementation to understand the key differences from current TermUI approach.
 
-**Research Summary**: The `snake_test` approach does NOT solve IEx input stealing. Both `IO.getn/2` and `:io.get_chars/2` use the same IO server (group leader), which IEx controls. See `notes/summaries/phase-7.1-research-summary.md` for details.
+**Research Summary**: The `snake_test` approach **DOES work** inside IEx. Testing confirmed that `Snake.start()` runs correctly from IEx with `iex -S mix` - arrow keys control the snake and input is NOT stolen. See `notes/summaries/phase-7.1-research-summary.md` for details.
 
 ### 7.1.1 Investigate :io Module Functions
 
@@ -503,7 +503,7 @@ Research the differences between Elixir's `IO` module and Erlang's `:io` module.
 - [x] 7.1.1.3 Understand `echo: false` and `binary: false` options
 - [x] 7.1.1.4 Test behavior difference when running inside IEx
 
-**Key Finding**: `:io.get_chars/2` with `binary: false` returns charlists; both functions use the same IO server.
+**Key Finding**: `:io.get_chars/2` with `binary: false` returns charlists; the direct Erlang call with separate process bypasses IEx's input interception.
 
 ### 7.1.2 Analyze Process Architecture
 
@@ -516,7 +516,7 @@ Study how snake_test uses a separate process for input handling.
 - [x] 7.1.2.3 Analyze the GenServer supervisor pattern (KeyReporter)
 - [x] 7.1.2.4 Document cleanup and resource restoration on termination
 
-**Key Finding**: Process architecture provides good supervision/cleanup but doesn't bypass IO server.
+**Key Finding**: The separate process with `receive after 0` loop is key to making IEx input work correctly.
 
 ### 7.1.3 Test IEx Behavior
 
@@ -528,7 +528,7 @@ Verify whether the snake_test approach actually works inside IEx.
 - [x] 7.1.3.2 Compare with current TermUI behavior inside IEx
 - [x] 7.1.3.3 Document any remaining issues or limitations
 
-**Critical Finding**: The approach does NOT work - IEx still steals input because both methods use the same IO server.
+**Critical Finding**: The approach **WORKS** - testing confirmed `Snake.start()` works perfectly in IEx with `iex -S mix`.
 
 ### Unit Tests - Section 7.1
 

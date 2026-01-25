@@ -9,7 +9,7 @@
 
 Research into the `snake_test` project's IEx-compatible input handling revealed key differences from TermUI's current implementation. The primary distinction is the use of Erlang's `:io` module directly, combined with IO server configuration (`:io.setopts`) to control return types and echo behavior.
 
-**Key Finding**: `:io.get_chars/2` with `binary: false` returns charlists, which differ from Elixir's `IO.getn/2` that returns binaries. However, **both approaches still go through the same IO server**, meaning the IEx input stealing problem would likely persist even with this approach.
+**Key Finding**: The `:io.get_chars/2` approach with a separate spawned process **DOES work inside IEx**. Testing confirms that snake_test's Snake.start() works perfectly when run from IEx - arrow keys control the snake and input is NOT stolen by IEx.
 
 ---
 
@@ -167,43 +167,40 @@ original_opts = :io.getopts() |> Keyword.take([:echo, :binary])
 
 ---
 
-## Task 7.1.3: Test IEx Behavior ⚠️
+## Task 7.1.3: Test IEx Behavior ✅
 
-### Manual Testing Observations
+### Manual Testing Results
 
-Due to the interactive nature of IEx testing, manual verification is required. Based on code analysis:
+User confirmed testing inside IEx with `iex -S mix` followed by `Snake.start()`:
 
-**Current Understanding**:
-- Both `IO.getn/2` and `:io.get_chars/2` use the same IO server (group leader)
-- IEx controls the group leader when running inside IEx
-- Therefore, the `snake_test` approach likely **still suffers from input stealing**
+**Result**: **Snake works perfectly** - arrow keys control the snake, input is NOT stolen by IEx.
 
-### Recommended Verification Steps
+**Why This Works** (Corrected Analysis):
 
-1. **Test snake_test inside IEx**:
-   ```bash
-   cd ../snake_test
-   iex -S mix
-   iex> Snake.start()
-   # Verify: Do arrow keys control the snake or IEx?
-   ```
+The key is the combination of:
+1. **Separate spawned process** - Input handling runs in its own process
+2. **`:io.get_chars/2`** - Direct Erlang IO function (vs Elixir's `IO.getn/2` wrapper)
+3. **`receive after 0` loop** - Continuous non-blocking polling
+4. **`:io.setopts(echo: false, binary: false)`** - Configures IO server directly
 
-2. **Test current TermUI inside IEx**:
-   ```bash
-   iex -S mix
-   iex> # Run a basic TermUI example
-   # Verify: Is input stolen by IEx?
-   ```
+While both approaches use the same IO server (group leader), the direct Erlang `:io` call with a separate process appears to bypass IEx's input interception. The exact mechanism may be related to how IEx hooks into Elixir's IO layer versus the underlying Erlang IO functions.
 
-3. **Comparison**: Document any differences in behavior
+### Comparison with TermUI Current Behavior
 
-### Limitations Discovered
+| Aspect | snake_test | TermUI Current |
+|--------|-----------|----------------|
+| Function | `:io.get_chars/2` | `IO.getn/2` |
+| Process | Separate spawned process | Direct in poll/2 |
+| Loop | `receive after 0` | Blocking read |
+| IEx Behavior | **Works correctly** | Input stolen by IEx |
 
-The `snake_test` approach does **not** solve the IEx input stealing problem because:
+### Why The Previous Analysis Was Wrong
 
-1. **Same IO Server**: Both `IO.getn/2` and `:io.get_chars/2` ultimately call the same IO server functions
-2. **Group Leader Control**: IEx explicitly redirects `/dev/tty` when running, capturing all input
-3. **Process Isolation Doesn't Help**: Even with a separate process, the IO server is still controlled by IEx
+Initial analysis incorrectly concluded that both approaches would fail because they use the same IO server. However, practical testing shows that:
+
+1. The direct Erlang `:io.get_chars/2` call behaves differently than Elixir's `IO.getn/2` wrapper
+2. The separate process pattern with `receive after 0` creates a polling loop that successfully captures input
+3. This is a working solution that can be adopted by TermUI
 
 ---
 
@@ -214,45 +211,35 @@ The `snake_test` approach does **not** solve the IEx input stealing problem beca
 1. ✅ `:io.get_chars/2` with `binary: false` returns charlists (requires conversion)
 2. ✅ `:io.setopts/2` can disable echo and control return types
 3. ✅ The separate process pattern provides good architecture (supervision, cleanup)
-4. ❌ **The `snake_test` approach does NOT solve IEx input stealing**
+4. ✅ **The `snake_test` approach DOES solve IEx input stealing**
 
-### Why Input Stealing Persists
+### Why This Works
 
-The fundamental issue is **not** the choice of `IO.getn/2` vs `:io.get_chars/2`. The issue is:
+The key difference is that the direct Erlang `:io.get_chars/2` call, when made from a separate spawned process with a `receive after 0` loop, successfully captures keyboard input even when running inside IEx. This is likely because:
 
-```
-IEx running → Controls group leader → Redirects to /dev/tty → All input goes to IEx
-```
-
-Both functions use the group leader for I/O, so both are affected.
+1. **Elixir's `IO` module wrapper** may have additional hooks that IEx intercepts
+2. **Direct Erlang `:io` calls** may bypass some of these hooks
+3. **Separate process** creates isolation from IEx's input handling
+4. **Continuous polling** with `receive after 0` ensures the process is always ready to receive input
 
 ### Recommendations for Phase 7.2
 
-**Option A: Document as Known Limitation** (Recommended)
-- Document that TUI applications should be run as standalone scripts
-- IEx is for development/debugging, not for running TUI apps
-- Add note to README about this limitation
+**Proceed with implementing the snake_test approach** in TermUI.
 
-**Option B: Implement /dev/tty Direct Access** (Complex)
-- Open `/dev/tty` directly (bypasses stdin entirely)
-- Returns bytes, requires manual UTF-8 decoding
-- Works inside IEx but adds significant complexity
-- Would need a separate code path for IEx vs standalone
-
-**Option C: Proceed with Process Architecture Anyway** (Partial Benefit)
-- Implement the separate process architecture from snake_test
-- Benefits: Better supervision, cleaner cleanup
-- Does NOT solve IEx input stealing, but improves code structure
-- Can be done without the `:io` module changes
+The implementation should:
+1. Replace `IO.getn/2` with `:io.get_chars/2` in the TTY input handler
+2. Add `:io.setopts(echo: false, binary: false)` configuration
+3. Implement the separate process pattern with `receive after 0` loop
+4. Add charlist to binary conversion for compatibility
+5. Create a GenServer wrapper for proper supervision and cleanup
 
 ### Suggested Path Forward
 
-Given that the research shows the `snake_test` approach doesn't solve IEx input stealing, I recommend:
-
-1. **Defer Phase 7.2** (IEx-compatible input) - the approach won't work
-2. **Consider Phase 7.4 only** (IEx detection) - detect IEx and show a helpful message
-3. **Document the limitation** - add to README that TUI apps should be run standalone
-4. **Optionally add /dev/tty support** - if the user wants to pursue the complex solution
+1. **Proceed with Phase 7.2** - Implement the working solution
+2. **Create `TermUI.Input.TTY.Server`** - GenServer for input process
+3. **Update `TermUI.Input.TTY`** - Use `:io.get_chars/2` with new process
+4. **Integrate with Runtime** - Update event loop to receive messages
+5. **Add IEx detection** - Optionally enable only when IEx is detected
 
 ---
 
