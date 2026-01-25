@@ -464,3 +464,327 @@ config :term_ui, :backend, :tty
 # Force specific render mode
 config :term_ui, :tty_render_mode, :full_redraw
 ```
+
+---
+
+# Phase 7: IEx Compatibility
+
+## Overview
+
+Phase 7 implements IEx-compatible input handling for TUI applications. Currently, when TermUI applications run inside IEx, keyboard input is captured by IEx instead of the application. This phase implements an alternative input strategy inspired by the `snake_test` project that uses direct Erlang IO functions and a separate input process.
+
+The key changes are:
+
+1. Use `:io.get_chars/2` instead of `IO.getn/2` for TTY backend input
+2. Configure the IO server directly with `:io.setopts/2`
+3. Input handling runs in a separate spawned process
+4. Non-blocking poll pattern with `receive after 0`
+
+After this phase, TermUI applications will work correctly when run from within IEx, enabling interactive development and testing.
+
+---
+
+## 7.1 Research snake_test Input Approach
+
+- [x] **Section 7.1 Complete** ⚠️ **Research Completed - Approach Not Viable**
+
+Analyze the snake_test project's input handling implementation to understand the key differences from current TermUI approach.
+
+**Research Summary**: The `snake_test` approach does NOT solve IEx input stealing. Both `IO.getn/2` and `:io.get_chars/2` use the same IO server (group leader), which IEx controls. See `notes/summaries/phase-7.1-research-summary.md` for details.
+
+### 7.1.1 Investigate :io Module Functions
+
+- [x] **Task 7.1.1 Complete**
+
+Research the differences between Elixir's `IO` module and Erlang's `:io` module.
+
+- [x] 7.1.1.1 Document differences between `IO.getn/2` and `:io.get_chars/2`
+- [x] 7.1.1.2 Research `:io.getopts/0` and `:io.setopts/2` behavior
+- [x] 7.1.1.3 Understand `echo: false` and `binary: false` options
+- [x] 7.1.1.4 Test behavior difference when running inside IEx
+
+**Key Finding**: `:io.get_chars/2` with `binary: false` returns charlists; both functions use the same IO server.
+
+### 7.1.2 Analyze Process Architecture
+
+- [x] **Task 7.1.2 Complete**
+
+Study how snake_test uses a separate process for input handling.
+
+- [x] 7.1.2.1 Document the `Process.spawn/3` pattern for input process
+- [x] 7.1.2.2 Understand the message-passing architecture for key events
+- [x] 7.1.2.3 Analyze the GenServer supervisor pattern (KeyReporter)
+- [x] 7.1.2.4 Document cleanup and resource restoration on termination
+
+**Key Finding**: Process architecture provides good supervision/cleanup but doesn't bypass IO server.
+
+### 7.1.3 Test IEx Behavior
+
+- [x] **Task 7.1.3 Complete**
+
+Verify whether the snake_test approach actually works inside IEx.
+
+- [x] 7.1.3.1 Run snake_test inside IEx and verify input is not stolen
+- [x] 7.1.3.2 Compare with current TermUI behavior inside IEx
+- [x] 7.1.3.3 Document any remaining issues or limitations
+
+**Critical Finding**: The approach does NOT work - IEx still steals input because both methods use the same IO server.
+
+### Unit Tests - Section 7.1
+
+- [x] **Unit Tests 7.1 Complete**
+- [x] Test scripts created for manual verification
+- [x] Research documentation complete
+- [x] Summary written with recommendations
+
+**Note**: Test scripts created in `notes/features/` for manual IEx verification.
+
+---
+
+## 7.2 Update TTY Input Handler
+
+- [ ] **Section 7.2 Complete**
+
+Modify `TermUI.Input.TTY` to use `:io.get_chars/2` and the separate process pattern.
+
+### 7.2.1 Replace IO.getn with :io.get_chars
+
+- [ ] **Task 7.2.1 Complete**
+
+Update the character reading function to use Erlang's `:io` module.
+
+- [ ] 7.2.1.1 Replace `IO.getn("", 1)` with `:io.get_chars("", 1)` in `Input.TTY.read_char/0`
+- [ ] 7.2.1.2 Update return type handling for charlist vs binary
+- [ ] 7.2.1.3 Add conversion from charlist to binary for compatibility
+- [ ] 7.2.1.4 Update error handling for `:io` module error formats
+
+### 7.2.2 Add IO Server Configuration
+
+- [ ] **Task 7.2.2 Complete**
+
+Implement direct IO server configuration like snake_test does.
+
+- [ ] 7.2.2.1 Add `:io.getopts/0` call to save original options in `new/0`
+- [ ] 7.2.2.2 Add `:io.setopts(echo: false, binary: false)` call in `new/0`
+- [ ] 7.2.2.3 Store original opts in state struct
+- [ ] 7.2.2.4 Implement cleanup function to restore original opts
+
+### 7.2.3 Implement Separate Process Input
+
+- [ ] **Task 7.2.3 Complete**
+
+Restructure input handling to use a separate spawned process like snake_test.
+
+- [ ] 7.2.3.1 Create `TermUI.Input.TTY.Server` GenServer for input process
+- [ ] 7.2.3.2 Implement continuous polling loop with `receive after 0`
+- [ ] 7.2.3.3 Send parsed key events as messages to caller
+- [ ] 7.2.3.4 Handle process cleanup and termination
+
+### Unit Tests - Section 7.2
+
+- [ ] **Unit Tests 7.2 Complete**
+- [ ] Test `:io.get_chars/2` returns correct character data
+- [ ] Test IO server options are set correctly
+- [ ] Test original options are restored on cleanup
+- [ ] Test input process sends key event messages
+- [ ] Test input process terminates cleanly
+
+---
+
+## 7.3 Integrate with Runtime
+
+- [ ] **Section 7.3 Complete**
+
+Update the Runtime to use the new TTY input process architecture.
+
+### 7.3.1 Update Event Loop
+
+- [ ] **Task 7.3.1 Complete**
+
+Modify the runtime event loop to receive messages from input process instead of polling directly.
+
+- [ ] 7.3.1.1 Start TTY input process in runtime initialization
+- [ ] 7.3.1.2 Update event loop to receive key messages instead of polling
+- [ ] 7.3.1.3 Handle input process crashes and restarts
+- [ ] 7.3.1.4 Ensure input process is terminated on runtime shutdown
+
+### 7.3.2 Preserve Raw Backend Behavior
+
+- [ ] **Task 7.3.2 Complete**
+
+Ensure Raw backend continues to work correctly.
+
+- [ ] 7.3.2.1 Verify Raw backend input is unchanged
+- [ ] 7.3.2.2 Test that Raw backend still works outside IEx
+- [ ] 7.3.2.3 Test that Raw backend still works inside IEx (if applicable)
+
+### Unit Tests - Section 7.3
+
+- [ ] **Unit Tests 7.3 Complete**
+- [ ] Test runtime starts TTY input process when TTY backend selected
+- [ ] Test runtime receives key messages from input process
+- [ ] Test runtime handles input process crashes
+- [ ] Test runtime cleanup terminates input process
+- [ ] Test Raw backend behavior is unchanged
+
+---
+
+## 7.4 Add IEx Detection
+
+- [ ] **Section 7.4 Complete**
+
+Implement automatic detection of IEx environment to conditionally use the compatible input mode.
+
+### 7.4.1 Implement IEx Detection
+
+- [ ] **Task 7.4.1 Complete**
+
+Create a function to detect when running inside IEx.
+
+- [ ] 7.4.1.1 Create `TermUI.Input.iex_mode?/0` function
+- [ ] 7.4.1.2 Check for IEx process or module existence
+- [ ] 7.4.1.3 Add config option to force IEx-compatible mode
+- [ ] 7.4.1.4 Add environment variable check for IEx mode
+
+### 7.4.2 Conditional Input Strategy
+
+- [ ] **Task 7.4.2 Complete**
+
+Use different input strategies based on IEx detection.
+
+- [ ] 7.4.2.1 TTY backend uses process-based input when in IEx
+- [ ] 7.4.2.2 TTY backend uses direct polling when not in IEx
+- [ ] 7.4.2.3 Log which input strategy is selected
+- [ ] 7.4.2.4 Update documentation to explain behavior difference
+
+### Unit Tests - Section 7.4
+
+- [ ] **Unit Tests 7.4 Complete**
+- [ ] Test `iex_mode?/0` returns correct value when in IEx
+- [ ] Test `iex_mode?/0` returns false when not in IEx
+- [ ] Test config option forces IEx-compatible mode
+- [ ] Test environment variable forces IEx-compatible mode
+- [ ] Test TTY backend selects correct strategy
+
+---
+
+## 7.5 Update Examples and Documentation
+
+- [ ] **Section 7.5 Complete**
+
+Update examples and documentation to reflect IEx compatibility.
+
+### 7.5.1 Update Examples
+
+- [ ] **Task 7.5.1 Complete**
+
+Ensure all examples work inside IEx.
+
+- [ ] 7.5.1.1 Test basic example inside IEx
+- [ ] 7.5.1.2 Test text_input example inside IEx
+- [ ] 7.5.1.3 Test capabilities example inside IEx
+- [ ] 7.5.1.4 Add IEx-specific usage instructions to examples
+
+### 7.5.2 Update Documentation
+
+- [ ] **Task 7.5.2 Complete**
+
+Document IEx compatibility and any limitations.
+
+- [ ] 7.5.2.1 Add IEx compatibility section to App module documentation
+- [ ] 7.5.2.2 Document behavior differences between IEx and standalone
+- [ ] 7.5.2.3 Add troubleshooting guide for IEx input issues
+- [ ] 7.5.2.4 Update README with IEx usage examples
+
+### Unit Tests - Section 7.5
+
+- [ ] **Unit Tests 7.5 Complete**
+- [ ] Test examples compile and run
+- [ ] Test examples work inside IEx
+- [ ] Test documentation examples are accurate
+
+---
+
+## 7.6 Integration Tests
+
+- [ ] **Section 7.6 Complete**
+
+Integration tests verify IEx compatibility end-to-end.
+
+### 7.6.1 IEx Lifecycle Tests
+
+- [ ] **Task 7.6.1 Complete**
+
+Test complete application lifecycle inside IEx.
+
+- [ ] 7.6.1.1 Test start → render → input → update → render → shutdown in IEx
+- [ ] 7.6.1.2 Test keyboard input works correctly in IEx
+- [ ] 7.6.1.3 Test cleanup on crash in IEx
+- [ ] 7.6.1.4 Test multiple start/stop cycles in IEx session
+
+### 7.6.2 Cross-Mode Tests
+
+- [ ] **Task 7.6.2 Complete**
+
+Verify behavior consistency across modes.
+
+- [ ] 7.6.2.1 Test same app works identically in IEx and standalone
+- [ ] 7.6.2.2 Test Raw backend still works when not in IEx
+- [ ] 7.6.2.3 Test switching between IEx and standalone modes
+
+### Unit Tests - Section 7.6
+
+- [ ] **Unit Tests 7.6 Complete**
+- [ ] Test full application lifecycle in IEx
+- [ ] Test keyboard input handling in IEx
+- [ ] Test cross-mode consistency
+- [ ] Test resource cleanup in IEx
+
+---
+
+## Success Criteria
+
+1. **IEx Input Works**: Keyboard input is not stolen by IEx
+2. **Backward Compatibility**: Existing standalone applications work unchanged
+3. **Auto-Detection**: IEx mode is detected automatically
+4. **Documentation**: IEx usage is documented with examples
+5. **Test Coverage**: All integration tests pass
+
+---
+
+## Provides Foundation
+
+This phase enables TermUI applications to be developed and tested interactively within IEx, significantly improving the developer experience for debugging and experimentation.
+
+---
+
+## Key Outputs
+
+- `lib/term_ui/input/tty_server.ex` - New GenServer for input process
+- Updated `lib/term_ui/input/tty.ex` - Uses `:io` module and process pattern
+- Updated `lib/term_ui/runtime.ex` - Integrates with input process
+- Updated examples with IEx usage documentation
+- Integration tests for IEx compatibility
+
+---
+
+## Critical Files to Modify
+
+- `lib/term_ui/input/tty.ex` - Core input handler changes
+- `lib/term_ui/runtime.ex` - Event loop integration
+- `examples/multi_renderer/*.ex` - Update for IEx compatibility
+
+---
+
+## Migration Guide
+
+For existing TermUI applications:
+
+1. **No changes required** - IEx compatibility is automatic
+2. **Optional**: Force IEx-compatible mode with config
+3. **Optional**: Use `TermUI.Input.iex_mode?/0` to check mode
+
+```elixir
+# Force IEx-compatible mode (for debugging)
+config :term_ui, :iex_compatible, true
+```
