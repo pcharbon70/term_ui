@@ -360,51 +360,51 @@ Create example showing capability queries.
 
 ## 6.8 Integration Tests
 
-- [ ] **Section 6.8 Complete**
+- [x] **Section 6.8 Complete**
 
 Integration tests verify the complete system works end-to-end.
 
 ### 6.8.1 Full Application Lifecycle Tests
 
-- [ ] **Task 6.8.1 Complete**
+- [x] **Task 6.8.1 Complete**
 
 Test complete application lifecycle.
 
-- [ ] 6.8.1.1 Test start → render → input → update → render → shutdown
-- [ ] 6.8.1.2 Test in raw mode (if available)
-- [ ] 6.8.1.3 Test in TTY mode (forced)
-- [ ] 6.8.1.4 Test cleanup on crash
+- [x] 6.8.1.1 Test start → render → input → update → render → shutdown
+- [x] 6.8.1.2 Test in raw mode (if available)
+- [x] 6.8.1.3 Test in TTY mode (forced)
+- [x] 6.8.1.4 Test cleanup on crash
 
 ### 6.8.2 Backend Switching Tests
 
-- [ ] **Task 6.8.2 Complete**
+- [x] **Task 6.8.2 Complete**
 
 Test backend selection scenarios.
 
-- [ ] 6.8.2.1 Test auto-detection selects appropriate backend
-- [ ] 6.8.2.2 Test forced raw mode works when available
-- [ ] 6.8.2.3 Test forced TTY mode skips raw attempt
-- [ ] 6.8.2.4 Test error on forced raw when unavailable
+- [x] 6.8.2.1 Test auto-detection selects appropriate backend
+- [x] 6.8.2.2 Test forced raw mode works when available
+- [x] 6.8.2.3 Test forced TTY mode skips raw attempt
+- [x] 6.8.2.4 Test error on forced raw when unavailable
 
 ### 6.8.3 Input Consistency Tests
 
-- [ ] **Task 6.8.3 Complete**
+- [x] **Task 6.8.3 Complete**
 
 Test input works consistently.
 
-- [ ] 6.8.3.1 Test arrow keys work in both modes
-- [ ] 6.8.3.2 Test Enter/Tab/Escape work in both modes
-- [ ] 6.8.3.3 Test widgets respond identically to input
+- [x] 6.8.3.1 Test arrow keys work in both modes
+- [x] 6.8.3.2 Test Enter/Tab/Escape work in both modes
+- [x] 6.8.3.3 Test widgets respond identically to input
 
 ### 6.8.4 Rendering Consistency Tests
 
-- [ ] **Task 6.8.4 Complete**
+- [x] **Task 6.8.4 Complete**
 
 Test rendering works consistently.
 
-- [ ] 6.8.4.1 Test same widget renders in both modes
-- [ ] 6.8.4.2 Test colors degrade correctly
-- [ ] 6.8.4.3 Test characters degrade correctly
+- [x] 6.8.4.1 Test same widget renders in both modes
+- [x] 6.8.4.2 Test colors degrade correctly
+- [x] 6.8.4.3 Test characters degrade correctly
 
 ---
 
