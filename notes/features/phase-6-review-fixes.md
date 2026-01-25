@@ -153,15 +153,26 @@ No new external dependencies required. All changes use existing Elixir/OTP featu
 - Updated `lib/term_ui/terminal/size_detector.ex` to use TermUtils
 - 15 security tests added - all passing
 
-#### 1.2 Bounded Event Queue
-- [ ] Create `lib/term_ui/event_queue.ex`
+#### 1.2 Bounded Event Queue ✅
+- [x] Create `lib/term_ui/event_queue.ex`
   - Max size configuration (default 1000)
   - Drop-oldest strategy when full
   - Warning logging on overflow
-- [ ] Update `lib/term_ui/runtime.ex:589-602`
+- [x] Update `lib/term_ui/runtime.ex:589-602`
   - Replace unbounded queue with bounded version
-- [ ] Add overflow tests
-- [ ] Add performance tests
+- [x] Add overflow tests
+- [x] Add performance tests
+
+**Implementation Details**:
+- Created `TermUI.EventQueue` module with bounded queue using Erlang `:queue`
+- Default max size: 1000 events (~16 seconds at 60 FPS)
+- Drop-oldest strategy when full (prevents queue from growing unbounded)
+- Rate-limited warning logging (once per 5 seconds max)
+- Added `event_queue` field to `Runtime.State`
+- Updated `Runtime.handle_cast({:event, _})` to use bounded queue
+- Updated `Runtime.handle_info({:input, _})` to use bounded queue
+- Added `process_event_queue/1` function to process queued events
+- 18 comprehensive tests added - all passing
 
 #### 1.3 Terminal Escape Injection
 - [ ] Create `lib/term_ui/sanitize.ex`
@@ -423,8 +434,8 @@ mix credo --strict
 | 2025-01-24 | Created planning document | ✅ Complete |
 | 2025-01-24 | Created feature branch | ✅ Complete |
 | 2025-01-24 | **Phase 1.1 Complete**: Command injection fix | ✅ Complete |
-| | Phase 1.2: Bounded Event Queue | 🔄 In Progress |
-| | Phase 1.3: Terminal Escape Injection | ⏳ Pending |
+| 2025-01-24 | **Phase 1.2 Complete**: Bounded event queue | ✅ Complete |
+| | Phase 1.3: Terminal Escape Injection | 🔄 In Progress |
 | | Phase 2: OTP Blockers | ⏳ Pending |
 | | Phase 3: Consistency Blockers | ⏳ Pending |
 | | Phase 4: Redundancy Blockers | ⏳ Pending |

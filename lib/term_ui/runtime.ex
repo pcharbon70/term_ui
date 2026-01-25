@@ -29,6 +29,7 @@ defmodule TermUI.Runtime do
   alias TermUI.Backend.Selector
   alias TermUI.Config
   alias TermUI.Elm
+  alias TermUI.EventQueue
   alias TermUI.Event
   alias TermUI.Input.Selector, as: InputSelector
   alias TermUI.MessageQueue
@@ -296,6 +297,7 @@ defmodule TermUI.Runtime do
       root_module: root_module,
       root_state: root_state,
       message_queue: MessageQueue.new(),
+      event_queue: EventQueue.new(),
       render_interval: render_interval,
       # Initial render needed
       dirty: true,
@@ -505,7 +507,16 @@ defmodule TermUI.Runtime do
     if state.shutting_down do
       {:noreply, state}
     else
-      state = dispatch_event(event, state)
+      # Add to bounded event queue (may drop oldest if full)
+      {result, new_queue} = EventQueue.push(state.event_queue, event)
+      state = %{state | event_queue: new_queue}
+      # Log if event was dropped
+      case result do
+        {:dropped, _} -> :ok  # EventQueue already logged
+        :ok -> :ok
+      end
+      # Process queued events
+      state = process_event_queue(state)
       {:noreply, state}
     end
   end
@@ -577,7 +588,16 @@ defmodule TermUI.Runtime do
     if state.shutting_down do
       {:noreply, state}
     else
-      state = dispatch_event(event, state)
+      # Add to bounded event queue (may drop oldest if full)
+      {result, new_queue} = EventQueue.push(state.event_queue, event)
+      state = %{state | event_queue: new_queue}
+      # Process queued events
+      state = process_event_queue(state)
+      # Log if event was dropped (EventQueue handles rate limiting)
+      case result do
+        {:dropped, _} -> :ok
+        :ok -> :ok
+      end
       {:noreply, state}
     end
   end
@@ -718,6 +738,21 @@ defmodule TermUI.Runtime do
   end
 
   # --- Event Dispatch ---
+
+  # Processes events from the bounded event queue.
+  #
+  # Processes one event per call to prevent event loop starvation.
+  # Multiple events will be processed across multiple GenServer handle_info/call cycles.
+  defp process_event_queue(state) do
+    case EventQueue.pop(state.event_queue) do
+      {{:value, event}, new_queue} ->
+        state = %{state | event_queue: new_queue}
+        dispatch_event(event, state)
+
+      {:empty, _} ->
+        state
+    end
+  end
 
   defp dispatch_event(%Event.Key{} = event, state) do
     # Keyboard events go to focused component
