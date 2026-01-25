@@ -657,6 +657,15 @@ defmodule TermUI.Runtime do
       _ -> :ok
     end
 
+    # Stop input handler to restore IO options (TTY mode)
+    try do
+      if state.input_handler and state.input_state do
+        state.input_handler.stop(state.input_state)
+      end
+    rescue
+      _ -> :ok
+    end
+
     # Unregister from resize callbacks
     try do
       if state.terminal_started do

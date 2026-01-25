@@ -236,6 +236,7 @@ defmodule TermUI.Input.TTY do
 
       :ok = TTY.stop(state)
   """
+  @impl TermUI.Input
   @spec stop(t()) :: :ok
   def stop(%__MODULE__{}) do
     restore_io_opts()

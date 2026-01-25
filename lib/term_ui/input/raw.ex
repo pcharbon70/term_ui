@@ -169,6 +169,21 @@ defmodule TermUI.Input.Raw do
   @spec mode(t()) :: :raw
   def mode(%__MODULE__{}), do: :raw
 
+  @doc """
+  Stops the Raw input handler.
+
+  For the Raw handler, this is a no-op since the InputReader GenServer
+  is managed separately by the Runtime. This function exists for
+  compatibility with the `TermUI.Input` behaviour.
+
+  ## Examples
+
+      :ok = Raw.stop(state)
+  """
+  @impl TermUI.Input
+  @spec stop(t()) :: :ok
+  def stop(%__MODULE__{}), do: :ok
+
   # Private Functions
 
   # Try to parse a complete event from the buffer
