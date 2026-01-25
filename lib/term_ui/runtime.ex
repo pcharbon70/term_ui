@@ -33,6 +33,7 @@ defmodule TermUI.Runtime do
   alias TermUI.Event
   alias TermUI.Input.Selector, as: InputSelector
   alias TermUI.MessageQueue
+  alias TermUI.PersistentTerms
   alias TermUI.Renderer.Buffer
   alias TermUI.Renderer.BufferManager
   alias TermUI.Renderer.Cell
@@ -203,9 +204,7 @@ defmodule TermUI.Runtime do
       :tty = Runtime.backend_mode()
   """
   @spec backend_mode() :: State.backend_mode()
-  def backend_mode do
-    :persistent_term.get(:term_ui_backend_mode, nil)
-  end
+  def backend_mode, do: PersistentTerms.backend_mode()
 
   @doc """
   Gets the detected terminal capabilities.
@@ -223,9 +222,7 @@ defmodule TermUI.Runtime do
       %{colors: :true_color, unicode: true} = Runtime.capabilities()
   """
   @spec capabilities() :: State.capabilities() | nil
-  def capabilities do
-    :persistent_term.get(:term_ui_capabilities, nil)
-  end
+  def capabilities, do: PersistentTerms.capabilities()
 
   @doc """
   Forces an immediate render (bypassing framerate limiter).
@@ -295,7 +292,7 @@ defmodule TermUI.Runtime do
       end
 
     # Store backend info in persistent_term for global access
-    store_backend_context(backend_mode, capabilities)
+    PersistentTerms.store_backend_context(backend_mode, capabilities)
 
     # Initialize root component state
     root_state = root_module.init(opts)
@@ -475,62 +472,6 @@ defmodule TermUI.Runtime do
       {:ok, {rows, cols}} -> {rows, cols}
       {:error, _reason} -> {24, 80}
     end
-  end
-
-  defp store_backend_context(backend_mode, capabilities) do
-    # Store in persistent_term for global access
-    :persistent_term.put(:term_ui_backend_mode, backend_mode)
-
-    # Store capabilities (use empty map for raw mode)
-    caps_to_store =
-      if backend_mode == :raw do
-        # Detect capabilities even in raw mode for consistency
-        Selector.detect_capabilities()
-      else
-        capabilities
-      end
-
-    :persistent_term.put(:term_ui_capabilities, caps_to_store)
-
-    # Determine and store character set (:unicode or :ascii)
-    # Default to :unicode if not specified
-    charset = determine_character_set(caps_to_store)
-    :persistent_term.put(:term_ui_character_set, charset)
-
-    # Log capabilities at debug level
-    log_capabilities(caps_to_store, charset)
-  end
-
-  # Determines character set from capabilities map
-  defp determine_character_set(capabilities) when is_map(capabilities) do
-    case Map.get(capabilities, :unicode, true) do
-      true -> :unicode
-      false -> :ascii
-      _ -> :unicode
-    end
-  end
-
-  defp determine_character_set(_capabilities), do: :unicode
-
-  # Logs detected capabilities at debug level
-  defp log_capabilities(capabilities, charset) when is_map(capabilities) do
-    color_mode = Map.get(capabilities, :colors, :unknown)
-    unicode = Map.get(capabilities, :unicode, :unknown)
-    dimensions = Map.get(capabilities, :dimensions, :unknown)
-    terminal = Map.get(capabilities, :terminal, :unknown)
-
-    Logger.debug("""
-    TermUI: Capabilities detected:\
-    \n  Color mode: #{inspect(color_mode)}\
-    \n  Character set: #{inspect(charset)}\
-    \n  Unicode: #{inspect(unicode)}\
-    \n  Terminal size: #{inspect(dimensions)}\
-    \n  Terminal: #{inspect(terminal)}\
-    """)
-  end
-
-  defp log_capabilities(_capabilities, charset) do
-    Logger.debug("TermUI: Character set: #{inspect(charset)}")
   end
 
   @impl true
@@ -761,6 +702,13 @@ defmodule TermUI.Runtime do
       IO.write("\e[?1006l\e[?1003l\e[?1002l\e[?1000l")
       # Show cursor
       IO.write("\e[?25h")
+    rescue
+      _ -> :ok
+    end
+
+    # Clean up persistent_term storage to prevent memory leaks
+    try do
+      PersistentTerms.cleanup()
     rescue
       _ -> :ok
     end

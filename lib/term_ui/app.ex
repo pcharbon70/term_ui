@@ -90,6 +90,7 @@ defmodule TermUI.App do
   See `TermUI.Component` for full protocol documentation.
   """
 
+  alias TermUI.PersistentTerms
   alias TermUI.Runtime
 
   @type root_module :: module()
@@ -199,7 +200,7 @@ defmodule TermUI.App do
   Possible values:
   - `:raw` - Full terminal control (OTP 28+)
   - `:tty` - Line-based input (fallback)
-  - `nil` - No app running or backend not initialized
+  - `:nil` - No app running or backend not initialized
 
   ## Examples
 
@@ -211,9 +212,7 @@ defmodule TermUI.App do
 
   """
   @spec backend_mode() :: :raw | :tty | nil
-  def backend_mode do
-    :persistent_term.get(:term_ui_backend_mode, nil)
-  end
+  def backend_mode, do: PersistentTerms.backend_mode()
 
   @doc """
   Checks if a capability is supported by the current terminal.
@@ -249,7 +248,7 @@ defmodule TermUI.App do
   """
   @spec supports?(supports_query()) :: boolean()
   def supports?(query) do
-    capabilities = :persistent_term.get(:term_ui_capabilities, %{})
+    capabilities = PersistentTerms.capabilities() || %{}
 
     case query do
       :unicode ->
