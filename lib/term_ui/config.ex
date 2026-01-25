@@ -16,7 +16,8 @@ defmodule TermUI.Config do
         backend: :auto,
         color_mode: :auto,
         character_set: :auto,
-        render_interval: 16
+        render_interval: 16,
+        iex_compatible: :auto
 
   ## Options
 
@@ -65,6 +66,24 @@ defmodule TermUI.Config do
 
   Example:
       config :term_ui, render_interval: 33  # ~30 FPS
+
+  ### `:iex_compatible`
+
+  Controls IEx compatibility mode detection.
+
+  - `:auto` - (default) Automatically detect if running in IEx
+  - `true` - Force IEx-compatible mode
+  - `false` - Force standalone mode
+
+  This can also be controlled via the `TERM_UI_IEX_MODE` environment variable.
+
+  Example:
+      config :term_ui, iex_compatible: true
+
+  To override via environment variable:
+      export TERM_UI_IEX_MODE=true
+
+  See `TermUI.iex_mode?/0` for more details on IEx detection.
 
   ## Runtime Options Override
 

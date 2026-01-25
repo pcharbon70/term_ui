@@ -87,4 +87,120 @@ defmodule TermUITest do
       end
     end
   end
+
+  describe "iex_mode?/0" do
+    test "returns false when not in IEx (default)" do
+      # We're not running in IEx during tests
+      refute TermUI.iex_mode?()
+    end
+
+    test "returns true when config forces IEx-compatible mode" do
+      # Set config to force IEx mode
+      Application.put_env(:term_ui, :iex_compatible, true)
+
+      try do
+        assert TermUI.iex_mode?() == true
+      after
+        # Clean up
+        Application.delete_env(:term_ui, :iex_compatible)
+      end
+    end
+
+    test "returns false when config forces standalone mode" do
+      # Set config to force standalone mode
+      Application.put_env(:term_ui, :iex_compatible, false)
+
+      try do
+        # Even if we were in IEx, config forces standalone
+        assert TermUI.iex_mode?() == false
+      after
+        # Clean up
+        Application.delete_env(:term_ui, :iex_compatible)
+      end
+    end
+
+    test "environment variable override works" do
+      # Set environment variable to force IEx mode
+      System.put_env("TERM_UI_IEX_MODE", "true")
+
+      try do
+        assert TermUI.iex_mode?() == true
+      after
+        # Clean up
+        System.delete_env("TERM_UI_IEX_MODE")
+      end
+    end
+
+    test "environment variable '1' also forces IEx mode" do
+      System.put_env("TERM_UI_IEX_MODE", "1")
+
+      try do
+        assert TermUI.iex_mode?() == true
+      after
+        System.delete_env("TERM_UI_IEX_MODE")
+      end
+    end
+
+    test "environment variable 'yes' also forces IEx mode" do
+      System.put_env("TERM_UI_IEX_MODE", "yes")
+
+      try do
+        assert TermUI.iex_mode?() == true
+      after
+        System.delete_env("TERM_UI_IEX_MODE")
+      end
+    end
+
+    test "environment variable 'false' forces standalone mode" do
+      System.put_env("TERM_UI_IEX_MODE", "false")
+
+      try do
+        # Even with config set to true, env var takes precedence
+        Application.put_env(:term_ui, :iex_compatible, true)
+        assert TermUI.iex_mode?() == false
+      after
+        System.delete_env("TERM_UI_IEX_MODE")
+        Application.delete_env(:term_ui, :iex_compatible)
+      end
+    end
+
+    test "environment variable takes precedence over config" do
+      System.put_env("TERM_UI_IEX_MODE", "true")
+      Application.put_env(:term_ui, :iex_compatible, false)
+
+      try do
+        # Env var should override config
+        assert TermUI.iex_mode?() == true
+      after
+        System.delete_env("TERM_UI_IEX_MODE")
+        Application.delete_env(:term_ui, :iex_compatible)
+      end
+    end
+  end
+
+  describe "running_mode/0" do
+    test "returns :standalone when not in IEx" do
+      assert TermUI.running_mode() == :standalone
+    end
+
+    test "returns :iex when config forces IEx-compatible mode" do
+      Application.put_env(:term_ui, :iex_compatible, true)
+
+      try do
+        assert TermUI.running_mode() == :iex
+      after
+        Application.delete_env(:term_ui, :iex_compatible)
+      end
+    end
+
+    test "returns :iex when environment variable forces IEx mode" do
+      System.put_env("TERM_UI_IEX_MODE", "true")
+
+      try do
+        assert TermUI.running_mode() == :iex
+      after
+        System.delete_env("TERM_UI_IEX_MODE")
+      end
+    end
+  end
 end

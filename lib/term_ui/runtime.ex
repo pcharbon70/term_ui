@@ -345,10 +345,11 @@ defmodule TermUI.Runtime do
       input_state: input_state
     }
 
-    # Log backend selection
+    # Log backend selection and execution mode
     if backend_mode && backend_mode != :skip do
       require Logger
-      Logger.info("TermUI.Runtime started with #{backend_mode} backend")
+      mode_str = if TermUI.iex_mode?(), do: "IEx", else: "standalone"
+      Logger.info("TermUI.Runtime started with #{backend_mode} backend (#{mode_str} mode)")
     end
 
     # Schedule first render
