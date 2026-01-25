@@ -29,10 +29,10 @@ defmodule TermUI.Input.TTYTest do
       assert state.event_queue == []
     end
 
-    test "state struct has only buffer and event_queue fields" do
+    test "state struct has buffer, event_queue, and IO opts fields" do
       state = TTY.new()
-      # Verify the struct only has the expected fields
-      assert Map.keys(state) -- [:__struct__] == [:buffer, :event_queue]
+      # Verify the struct has the expected fields (including IO opts fields)
+      assert Map.keys(state) -- [:__struct__] == [:buffer, :event_queue, :io_opts_restored, :io_opts_set]
     end
   end
 
@@ -315,9 +315,9 @@ defmodule TermUI.Input.TTYTest do
       assert String.contains?(moduledoc, "TTY")
     end
 
-    test "moduledoc mentions IO.getn" do
+    test "moduledoc mentions :io.get_chars" do
       {:docs_v1, _, :elixir, _, %{"en" => moduledoc}, _, _} = Code.fetch_docs(TTY)
-      assert String.contains?(moduledoc, "IO.getn")
+      assert String.contains?(moduledoc, ":io.get_chars") or String.contains?(moduledoc, "get_chars")
     end
 
     test "moduledoc explains arrow keys work normally" do
@@ -373,16 +373,28 @@ defmodule TermUI.Input.TTYTest do
 
       assert new_doc != nil
     end
+
+    test "moduledoc explains IEx compatibility" do
+      {:docs_v1, _, :elixir, _, %{"en" => moduledoc}, _, _} = Code.fetch_docs(TTY)
+      assert String.contains?(moduledoc, "IEx")
+      assert String.contains?(moduledoc, "Compatible") or String.contains?(moduledoc, "IEx compatible")
+    end
+
+    test "moduledoc mentions snake_test" do
+      {:docs_v1, _, :elixir, _, %{"en" => moduledoc}, _, _} = Code.fetch_docs(TTY)
+      assert String.contains?(moduledoc, "snake_test")
+    end
   end
 
   describe "comparison with Raw handler" do
-    test "TTY and Raw have the same struct fields" do
+    test "TTY and Raw have mostly the same struct fields" do
       tty_state = TTY.new()
       raw_state = TermUI.Input.Raw.new()
 
-      tty_fields = Map.keys(tty_state) -- [:__struct__]
+      tty_fields = Map.keys(tty_state) -- [:__struct__, :io_opts_restored, :io_opts_set]
       raw_fields = Map.keys(raw_state) -- [:__struct__]
 
+      # TTY has additional IO opts fields, but the core fields match
       assert tty_fields == raw_fields
     end
 
