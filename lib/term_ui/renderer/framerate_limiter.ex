@@ -63,7 +63,8 @@ defmodule TermUI.Renderer.FramerateLimiter do
           skipped_frames: non_neg_integer(),
           render_times: [non_neg_integer()],
           slow_frames: non_neg_integer(),
-          frame_timestamps: [integer()]
+          frame_timestamps: [integer()],
+          internal_dirty: :atomics.atomics_ref() | nil
         }
 
   defstruct fps: 60,
@@ -78,7 +79,8 @@ defmodule TermUI.Renderer.FramerateLimiter do
             skipped_frames: 0,
             render_times: [],
             slow_frames: 0,
-            frame_timestamps: []
+            frame_timestamps: [],
+            internal_dirty: nil
 
   # Client API
 
@@ -233,13 +235,13 @@ defmodule TermUI.Renderer.FramerateLimiter do
     interval_ms = fps_to_interval(fps)
 
     # Set up dirty callbacks - use provided ones or create internal atomics
-    {dirty_check, dirty_clear} =
+    {dirty_check, dirty_clear, internal_dirty} =
       case {Keyword.get(opts, :dirty_check), Keyword.get(opts, :dirty_clear)} do
         {check, clear} when is_function(check, 0) and is_function(clear, 0) ->
-          {check, clear}
+          {check, clear, nil}
 
         _ ->
-          # Create internal atomic for standalone use
+          # Create internal atomic for standalone use (stored in state, not process dict)
           dirty = :atomics.new(1, signed: false)
           check = fn -> :atomics.get(dirty, 1) == 1 end
 
@@ -248,9 +250,7 @@ defmodule TermUI.Renderer.FramerateLimiter do
             :ok
           end
 
-          # Store atomics ref for mark_dirty
-          Process.put(:internal_dirty, dirty)
-          {check, clear}
+          {check, clear, dirty}
       end
 
     state = %__MODULE__{
@@ -259,7 +259,8 @@ defmodule TermUI.Renderer.FramerateLimiter do
       render_callback: render_callback,
       dirty_check: dirty_check,
       dirty_clear: dirty_clear,
-      last_tick: System.monotonic_time(:microsecond)
+      last_tick: System.monotonic_time(:microsecond),
+      internal_dirty: internal_dirty
     }
 
     # Schedule first tick
@@ -272,9 +273,8 @@ defmodule TermUI.Renderer.FramerateLimiter do
   @impl true
   def handle_call(:mark_dirty, _from, state) do
     # Use internal dirty flag if available (standalone mode)
-    case Process.get(:internal_dirty) do
-      nil -> :ok
-      dirty -> :atomics.put(dirty, 1, 1)
+    if state.internal_dirty do
+      :atomics.put(state.internal_dirty, 1, 1)
     end
 
     {:reply, :ok, state}
@@ -283,9 +283,8 @@ defmodule TermUI.Renderer.FramerateLimiter do
   @impl true
   def handle_call(:clear_dirty, _from, state) do
     # Use internal dirty flag if available (standalone mode)
-    case Process.get(:internal_dirty) do
-      nil -> :ok
-      dirty -> :atomics.put(dirty, 1, 0)
+    if state.internal_dirty do
+      :atomics.put(state.internal_dirty, 1, 0)
     end
 
     {:reply, :ok, state}
@@ -295,9 +294,10 @@ defmodule TermUI.Renderer.FramerateLimiter do
   def handle_call(:dirty?, _from, state) do
     # Use internal dirty flag if available (standalone mode)
     result =
-      case Process.get(:internal_dirty) do
-        nil -> false
-        dirty -> :atomics.get(dirty, 1) == 1
+      if state.internal_dirty do
+        :atomics.get(state.internal_dirty, 1) == 1
+      else
+        false
       end
 
     {:reply, result, state}

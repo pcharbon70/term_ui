@@ -22,6 +22,59 @@ TermUI leverages BEAM's unique strengths—fault tolerance, actor model, hot cod
 - **Themable** - True color RGB support (16 million colors)
 - **Cross-Platform** - Linux, macOS, Windows 10+ terminal support
 - **OTP Integration** - Supervision trees, fault tolerance, hot code reload
+- **IEx Compatible** - Run TUI applications directly in IEx for interactive development
+
+## IEx Compatibility
+
+TermUI applications work directly in IEx with no code changes. This is perfect for:
+- Interactive debugging and development
+- Admin tools and dashboards in production IEx sessions
+- Prototyping and testing TUI interfaces
+
+### Running in IEx
+
+```elixir
+# In your IEx session
+iex> TermUI.Runtime.run(root: MyApp.Counter)
+# Use arrow keys, press Q to quit, returns to IEx prompt
+```
+
+### How It Works
+
+TermUI uses Erlang's `:io.get_chars/2` for input instead of Elixir's `IO` module wrapper. This bypasses IEx's input interception, allowing TUI applications to receive keyboard input directly.
+
+### Detection and Configuration
+
+You can detect if your application is running in IEx:
+
+```elixir
+iex> TermUI.iex_mode?()
+true
+
+iex> TermUI.running_mode()
+:iex
+```
+
+Force IEx-compatible mode via configuration:
+
+```elixir
+# config/config.exs
+config :term_ui,
+  iex_compatible: true
+```
+
+Or via environment variable:
+
+```bash
+export TERM_UI_IEX_MODE=true
+```
+
+### Important Notes
+
+- **Arrow keys work immediately** - No need to press Enter for navigation
+- **All keyboard shortcuts work** - Including Tab, Enter, Escape, function keys
+- **Clean shutdown** - Terminal state is restored when the app exits
+- **IEx remains responsive** - The TUI app can be exited to return to IEx prompt
 
 ## Widgets
 

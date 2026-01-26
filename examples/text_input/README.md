@@ -20,11 +20,43 @@ cd examples/text_input
 mix deps.get
 ```
 
-## Running
+## Running the Example
+
+### Raw Mode (Full TUI Experience)
+
+For the best experience with full terminal control and alternate screen:
 
 ```bash
-mix run run.exs
+cd examples/text_input
+mix termui.run
 ```
+
+Or manually:
+
+```bash
+cd examples/text_input
+mix run -e "TextInput.run()" --no-halt
+```
+
+### TTY Mode (IEx Compatible)
+
+To run from IEx without taking over the shell:
+
+```bash
+cd examples/text_input
+iex -S mix
+```
+
+Then in IEx:
+
+```elixir
+TextInput.run()
+```
+
+**Note:** TTY mode works inside IEx but has limitations:
+- No alternate screen buffer (output mixes with IEx prompt)
+- Character input works immediately (no Enter needed)
+- For full TUI, use raw mode instead
 
 ## Controls
 

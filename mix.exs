@@ -1,7 +1,7 @@
 defmodule TermUI.MixProject do
   use Mix.Project
 
-  @version "0.2.0"
+  @version "1.0.0-rc"
   @source_url "https://github.com/pcharbon70/term_ui"
 
   def project do
@@ -36,8 +36,8 @@ defmodule TermUI.MixProject do
     ]
   end
 
-  defp elixirc_paths(:test), do: ["lib", "test/support"]
-  defp elixirc_paths(_), do: ["lib"]
+  defp elixirc_paths(:test), do: ["lib", "test/support", "mix/tasks"]
+  defp elixirc_paths(_), do: ["lib", "mix/tasks"]
 
   def application do
     [
@@ -60,6 +60,13 @@ defmodule TermUI.MixProject do
       # Streaming
       {:gen_stage, "~> 1.2"},
 
+      # Markdown processing
+      {:mdex, "~> 0.10"},
+
+      # Syntax highlighting for code blocks
+      {:makeup, "~> 1.1"},
+      {:makeup_elixir, "~> 1.0"},
+
       # LLM usage rules
       {:usage_rules, "~> 0.1", only: :dev, runtime: false}
     ]
@@ -74,10 +81,13 @@ defmodule TermUI.MixProject do
       },
       files: ~w(
         lib
+        mix/tasks
+        guides
         mix.exs
         README.md
         LICENSE
         CHANGELOG.md
+        usage-rules.md
       )
     ]
   end

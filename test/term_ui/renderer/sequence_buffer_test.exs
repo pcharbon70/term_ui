@@ -437,6 +437,75 @@ defmodule TermUI.Renderer.SequenceBufferTest do
     end
   end
 
+  # =============================================================================
+  # BUG FIX TEST: append!/2 was discarding auto-flushed data
+  #
+  # Bug: When threshold exceeded, append!/2 returned {:flush, _data, buffer}
+  # and silently discarded _data instead of writing it to IO.
+  # This caused large renders (>4KB) to lose most of their output.
+  # =============================================================================
+
+  describe "append!/2 auto-flush data preservation (bug fix)" do
+    import ExUnit.CaptureIO
+
+    test "append!/2 writes flushed data to IO when threshold exceeded" do
+      # Create buffer with small threshold to trigger auto-flush
+      buffer = SequenceBuffer.new(threshold: 50)
+
+      # First append stays under threshold
+      buffer = SequenceBuffer.append!(buffer, String.duplicate("A", 30))
+      assert SequenceBuffer.size(buffer) == 30
+
+      # Second append exceeds threshold - should trigger auto-flush
+      # Bug: the flushed data was being discarded
+      output =
+        capture_io(fn ->
+          _buffer = SequenceBuffer.append!(buffer, String.duplicate("B", 30))
+        end)
+
+      # The auto-flushed data (AAA...BBB...) should have been written to IO
+      # Bug behavior: output == "" (data discarded)
+      # Fixed behavior: output contains the flushed data
+      assert String.length(output) >= 50,
+             "Auto-flushed data should be written to IO. " <>
+               "Expected >= 50 bytes, got #{String.length(output)} bytes. " <>
+               "Output: #{inspect(output)}"
+
+      assert String.contains?(output, "AAAA"),
+             "Output should contain the first append's data"
+    end
+
+    test "append!/2 preserves all data across multiple auto-flushes" do
+      buffer = SequenceBuffer.new(threshold: 20)
+
+      # Accumulate data across multiple auto-flushes
+      total_output =
+        capture_io(fn ->
+          buffer = SequenceBuffer.append!(buffer, String.duplicate("1", 15))
+          buffer = SequenceBuffer.append!(buffer, String.duplicate("2", 15))
+          buffer = SequenceBuffer.append!(buffer, String.duplicate("3", 15))
+          {final_data, _} = SequenceBuffer.flush(buffer)
+          IO.write(final_data)
+        end)
+
+      # Should have all data: 111...222...333...
+      assert String.contains?(total_output, "1111"),
+             "Should contain first batch"
+
+      assert String.contains?(total_output, "2222"),
+             "Should contain second batch"
+
+      assert String.contains?(total_output, "3333"),
+             "Should contain third batch"
+
+      # Total should be 45 characters
+      total_chars = String.length(String.replace(total_output, ~r/[^123]/, ""))
+
+      assert total_chars == 45,
+             "Should have all 45 characters. Got #{total_chars}"
+    end
+  end
+
   describe "edge cases for coverage" do
     test "style with only attributes emits attribute codes" do
       buffer = SequenceBuffer.new()

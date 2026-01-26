@@ -34,6 +34,7 @@ defmodule TermUI.Widgets.Viewport do
 
   use TermUI.StatefulComponent
 
+  alias TermUI.CharacterSet
   alias TermUI.Event
 
   @doc """
@@ -183,6 +184,8 @@ defmodule TermUI.Widgets.Viewport do
 
   @impl true
   def render(state, _area) do
+    # Get character set for scrollbar characters
+    chars = CharacterSet.current_charset()
     vp_width = viewport_width(state)
     vp_height = viewport_height(state)
 
@@ -195,21 +198,22 @@ defmodule TermUI.Widgets.Viewport do
         content
 
       :vertical ->
-        v_bar = render_vertical_bar(state, vp_height)
+        v_bar = render_vertical_bar(state, vp_height, chars)
         stack(:horizontal, [content, v_bar])
 
       :horizontal ->
-        h_bar = render_horizontal_bar(state, vp_width)
+        h_bar = render_horizontal_bar(state, vp_width, chars)
         stack(:vertical, [content, h_bar])
 
       :both ->
+        chars = CharacterSet.current_charset()
         v_bar = render_vertical_bar(state, vp_height)
         h_bar = render_horizontal_bar(state, vp_width)
 
         # Content + vertical bar on top, horizontal bar on bottom
         top_row = stack(:horizontal, [content, v_bar])
         # Add corner piece
-        corner = text("░")
+        corner = text(chars.bar_empty)
         bottom_row = stack(:horizontal, [h_bar, corner])
 
         stack(:vertical, [top_row, bottom_row])
@@ -277,7 +281,7 @@ defmodule TermUI.Widgets.Viewport do
     }
   end
 
-  defp render_vertical_bar(state, height) do
+  defp render_vertical_bar(state, height, chars) do
     vp_height = viewport_height(state)
 
     # Calculate thumb position and size
@@ -293,14 +297,16 @@ defmodule TermUI.Widgets.Viewport do
 
     thumb_pos = round((height - thumb_size) * scroll_fraction)
 
+    charset = CharacterSet.current_charset()
+
     # Build the bar
     lines =
       for y <- 0..(height - 1) do
         char =
           if y >= thumb_pos and y < thumb_pos + thumb_size do
-            "█"
+            charset.bar_full
           else
-            "░"
+            charset.bar_empty
           end
 
         text(char)
@@ -310,6 +316,7 @@ defmodule TermUI.Widgets.Viewport do
   end
 
   defp render_horizontal_bar(state, width) do
+    charset = CharacterSet.current_charset()
     vp_width = viewport_width(state)
 
     # Calculate thumb position and size
@@ -326,16 +333,16 @@ defmodule TermUI.Widgets.Viewport do
     thumb_pos = round((width - thumb_size) * scroll_fraction)
 
     # Build the bar
-    chars =
+    bar_chars =
       for x <- 0..(width - 1) do
         if x >= thumb_pos and x < thumb_pos + thumb_size do
-          "█"
+          charset.bar_full
         else
-          "░"
+          charset.bar_empty
         end
       end
 
-    text(Enum.join(chars))
+    text(Enum.join(bar_chars))
   end
 
   defp click_on_vertical_bar?(state, x, _y) do

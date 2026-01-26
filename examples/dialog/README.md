@@ -57,11 +57,41 @@ dialog/
 
 ## Running the Example
 
+### Raw Mode (Full TUI Experience)
+
+For the best experience with full terminal control and alternate screen:
+
 ```bash
-# From the dialog directory
-mix deps.get
+cd examples/dialog
+mix termui.run
+```
+
+Or manually:
+
+```bash
+cd examples/dialog
 mix run -e "Dialog.App.run()" --no-halt
 ```
+
+### TTY Mode (IEx Compatible)
+
+To run from IEx without taking over the shell:
+
+```bash
+cd examples/dialog
+iex -S mix
+```
+
+Then in IEx:
+
+```elixir
+Dialog.App.run()
+```
+
+**Note:** TTY mode works inside IEx but has limitations:
+- No alternate screen buffer (output mixes with IEx prompt)
+- Character input works immediately (no Enter needed)
+- For full TUI, use raw mode instead
 
 ## Controls
 

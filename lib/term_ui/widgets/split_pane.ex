@@ -26,6 +26,8 @@ defmodule TermUI.Widgets.SplitPane do
 
   ## Keyboard Controls
 
+  ### With Focused Divider (use Tab to focus)
+
   - Tab: Move focus between dividers
   - Left/Up: Move divider left/up (decrease pane before)
   - Right/Down: Move divider right/down (increase pane before)
@@ -34,11 +36,23 @@ defmodule TermUI.Widgets.SplitPane do
   - Enter: Toggle collapse of pane after divider
   - Home: Move divider to minimum position
   - End: Move divider to maximum position
+
+  ### Without Focused Divider (TTY-friendly)
+
+  - Ctrl+Left: Decrease first pane width (horizontal split)
+  - Ctrl+Right: Increase first pane width (horizontal split)
+  - Ctrl+Up: Decrease first pane height (vertical split)
+  - Ctrl+Down: Increase first pane height (vertical split)
+
+  These Ctrl+arrow shortcuts always target the first divider, making them
+  useful in TTY mode where mouse interaction may not be available.
   """
 
   use TermUI.StatefulComponent
 
+  alias TermUI.CharacterSet
   alias TermUI.Event
+  alias TermUI.Theme
 
   @type orientation :: :horizontal | :vertical
 
@@ -61,16 +75,8 @@ defmodule TermUI.Widgets.SplitPane do
           computed_size: non_neg_integer()
         }
 
-  @default_divider_style Style.new(fg: :white)
-  @focused_divider_style Style.new(fg: :cyan, attrs: [:bold])
   @resize_step 1
   @large_resize_step 5
-
-  # Divider characters
-  @vertical_divider "│"
-  @vertical_divider_focused "┃"
-  @horizontal_divider "─"
-  @horizontal_divider_focused "━"
 
   # ----------------------------------------------------------------------------
   # Pane Constructors
@@ -102,6 +108,11 @@ defmodule TermUI.Widgets.SplitPane do
   # Props
   # ----------------------------------------------------------------------------
 
+  # Default configuration for Ctrl+arrow resize
+  @default_ctrl_resize_step 0.05
+  @default_min_ratio 0.1
+  @default_max_ratio 0.9
+
   @doc """
   Creates new SplitPane widget props.
 
@@ -116,20 +127,57 @@ defmodule TermUI.Widgets.SplitPane do
   - `:on_resize` - Callback when panes are resized: `fn panes -> ... end`
   - `:on_collapse` - Callback when pane is collapsed/expanded: `fn {id, collapsed} -> ... end`
   - `:persist_key` - Key for layout persistence (optional)
+  - `:ctrl_resize_step` - Step size for Ctrl+arrow resize as ratio 0.0-1.0 (default: 0.05 = 5%)
+  - `:min_ratio` - Minimum ratio for first pane when using Ctrl+arrows (default: 0.1 = 10%)
+  - `:max_ratio` - Maximum ratio for first pane when using Ctrl+arrows (default: 0.9 = 90%)
   """
   @spec new(keyword()) :: map()
   def new(opts) do
+    # Validate and normalize Ctrl+arrow resize configuration
+    {ctrl_resize_step, min_ratio, max_ratio} =
+      validate_resize_config(
+        Keyword.get(opts, :ctrl_resize_step, @default_ctrl_resize_step),
+        Keyword.get(opts, :min_ratio, @default_min_ratio),
+        Keyword.get(opts, :max_ratio, @default_max_ratio)
+      )
+
     %{
       orientation: Keyword.get(opts, :orientation, :horizontal),
       panes: Keyword.fetch!(opts, :panes),
       divider_size: Keyword.get(opts, :divider_size, 1),
-      divider_style: Keyword.get(opts, :divider_style, @default_divider_style),
-      focused_divider_style: Keyword.get(opts, :focused_divider_style, @focused_divider_style),
+      divider_style: Keyword.get(opts, :divider_style),
+      focused_divider_style: Keyword.get(opts, :focused_divider_style),
       resizable: Keyword.get(opts, :resizable, true),
       on_resize: Keyword.get(opts, :on_resize),
       on_collapse: Keyword.get(opts, :on_collapse),
-      persist_key: Keyword.get(opts, :persist_key)
+      persist_key: Keyword.get(opts, :persist_key),
+      ctrl_resize_step: ctrl_resize_step,
+      min_ratio: min_ratio,
+      max_ratio: max_ratio
     }
+  end
+
+  # Validates and normalizes resize configuration options.
+  # Returns defaults if values are invalid.
+  @spec validate_resize_config(term(), term(), term()) :: {float(), float(), float()}
+  defp validate_resize_config(step, min_r, max_r) do
+    # Ensure step is in valid range (0.001 to 1.0)
+    step =
+      if is_number(step) and step > 0 and step <= 1.0, do: step, else: @default_ctrl_resize_step
+
+    # Ensure ratios are in valid range (0.0 to 1.0)
+    min_r =
+      if is_number(min_r) and min_r >= 0.0 and min_r < 1.0, do: min_r, else: @default_min_ratio
+
+    max_r =
+      if is_number(max_r) and max_r > 0.0 and max_r <= 1.0, do: max_r, else: @default_max_ratio
+
+    # Ensure min < max, otherwise reset to defaults
+    if min_r >= max_r do
+      {@default_ctrl_resize_step, @default_min_ratio, @default_max_ratio}
+    else
+      {step, min_r, max_r}
+    end
   end
 
   # ----------------------------------------------------------------------------
@@ -144,12 +192,18 @@ defmodule TermUI.Widgets.SplitPane do
         Map.merge(pane_spec, %{computed_size: 0})
       end)
 
+    # Set theme-based default styles if not provided
+    divider_style = props.divider_style || Theme.get_component_style(:divider, :normal)
+
+    focused_divider_style =
+      props.focused_divider_style || Theme.get_component_style(:divider, :focused)
+
     state = %{
       orientation: props.orientation,
       panes: panes,
       divider_size: props.divider_size,
-      divider_style: props.divider_style,
-      focused_divider_style: props.focused_divider_style,
+      divider_style: divider_style,
+      focused_divider_style: focused_divider_style,
       resizable: props.resizable,
       focused_divider: nil,
       dragging: false,
@@ -158,6 +212,10 @@ defmodule TermUI.Widgets.SplitPane do
       on_resize: props.on_resize,
       on_collapse: props.on_collapse,
       persist_key: props.persist_key,
+      # Ctrl+arrow resize configuration (validated in new/1)
+      ctrl_resize_step: props.ctrl_resize_step,
+      min_ratio: props.min_ratio,
+      max_ratio: props.max_ratio,
       # Will be set on first render
       total_size: 0,
       last_area: nil
@@ -175,7 +233,7 @@ defmodule TermUI.Widgets.SplitPane do
     end
   end
 
-  # Arrow keys for resizing
+  # Arrow keys for resizing (focused divider)
   def handle_event(%Event.Key{key: key, modifiers: modifiers}, state)
       when key in [:left, :up] and state.focused_divider != nil and state.resizable do
     step = if :shift in modifiers, do: @large_resize_step, else: @resize_step
@@ -186,6 +244,28 @@ defmodule TermUI.Widgets.SplitPane do
       when key in [:right, :down] and state.focused_divider != nil and state.resizable do
     step = if :shift in modifiers, do: @large_resize_step, else: @resize_step
     move_divider(state, state.focused_divider, step)
+  end
+
+  # Ctrl+Arrow keys for resizing (no focus required - targets first divider)
+  # Useful in TTY mode where mouse click to focus divider may not be available
+  def handle_event(%Event.Key{key: key, modifiers: modifiers}, state)
+      when key in [:left, :up] and state.focused_divider == nil and state.resizable do
+    if :ctrl in modifiers do
+      # Ctrl+Left/Up: decrease first pane size
+      move_divider_by_ratio(state, 0, -state.ctrl_resize_step)
+    else
+      {:ok, state}
+    end
+  end
+
+  def handle_event(%Event.Key{key: key, modifiers: modifiers}, state)
+      when key in [:right, :down] and state.focused_divider == nil and state.resizable do
+    if :ctrl in modifiers do
+      # Ctrl+Right/Down: increase first pane size
+      move_divider_by_ratio(state, 0, state.ctrl_resize_step)
+    else
+      {:ok, state}
+    end
   end
 
   # Home/End for min/max positions
@@ -498,16 +578,20 @@ defmodule TermUI.Widgets.SplitPane do
   # ----------------------------------------------------------------------------
 
   defp render_horizontal(state, area) do
-    children = build_horizontal_children(state, area)
+    children = build_children(state, area, &render_vertical_divider/3, area.height)
     stack(:horizontal, children)
   end
 
   defp render_vertical(state, area) do
-    children = build_vertical_children(state, area)
+    children = build_children(state, area, &render_horizontal_divider/3, area.width)
     stack(:vertical, children)
   end
 
-  defp build_horizontal_children(state, area) do
+  # Consolidated child building - parameterized by divider renderer and size
+  @spec build_children(map(), map(), function(), non_neg_integer()) :: [term()]
+  defp build_children(state, area, divider_fn, divider_size) do
+    pane_count = length(state.panes)
+
     state.panes
     |> Enum.with_index()
     |> Enum.flat_map(fn {pane, idx} ->
@@ -520,31 +604,8 @@ defmodule TermUI.Widgets.SplitPane do
 
       # Add divider after each pane except the last
       divider_element =
-        if idx < length(state.panes) - 1 do
-          [render_vertical_divider(state, idx, area.height)]
-        else
-          []
-        end
-
-      pane_element ++ divider_element
-    end)
-  end
-
-  defp build_vertical_children(state, area) do
-    state.panes
-    |> Enum.with_index()
-    |> Enum.flat_map(fn {pane, idx} ->
-      pane_element =
-        if pane.collapsed do
-          []
-        else
-          [render_pane_content(pane, area, state.orientation)]
-        end
-
-      # Add divider after each pane except the last
-      divider_element =
-        if idx < length(state.panes) - 1 do
-          [render_horizontal_divider(state, idx, area.width)]
+        if idx < pane_count - 1 do
+          [divider_fn.(state, idx, divider_size)]
         else
           []
         end
@@ -574,9 +635,11 @@ defmodule TermUI.Widgets.SplitPane do
   defp wrap_content(content), do: [content]
 
   defp render_vertical_divider(state, divider_idx, height) do
+    chars = CharacterSet.current_charset()
     is_focused = state.focused_divider == divider_idx
     style = if is_focused, do: state.focused_divider_style, else: state.divider_style
-    char = if is_focused, do: @vertical_divider_focused, else: @vertical_divider
+    chars = CharacterSet.current_charset()
+    char = if is_focused, do: chars.v_line_heavy, else: chars.v_line
 
     lines =
       for _ <- 1..height do
@@ -587,9 +650,11 @@ defmodule TermUI.Widgets.SplitPane do
   end
 
   defp render_horizontal_divider(state, divider_idx, width) do
+    chars = CharacterSet.current_charset()
     is_focused = state.focused_divider == divider_idx
     style = if is_focused, do: state.focused_divider_style, else: state.divider_style
-    char = if is_focused, do: @horizontal_divider_focused, else: @horizontal_divider
+    chars = CharacterSet.current_charset()
+    char = if is_focused, do: chars.h_line_heavy, else: chars.h_line
 
     text(String.duplicate(char, width), style)
   end
@@ -597,6 +662,62 @@ defmodule TermUI.Widgets.SplitPane do
   # ----------------------------------------------------------------------------
   # Private: Divider Movement
   # ----------------------------------------------------------------------------
+
+  # Moves divider by a ratio (0.0-1.0) of total space, enforcing min/max ratio bounds.
+  # Used by Ctrl+arrow shortcuts.
+  @spec move_divider_by_ratio(map(), non_neg_integer(), float()) :: {:ok, map()}
+  defp move_divider_by_ratio(state, divider_idx, ratio_delta) do
+    pane_before = Enum.at(state.panes, divider_idx)
+    pane_after = Enum.at(state.panes, divider_idx + 1)
+
+    cond do
+      is_nil(pane_before) or is_nil(pane_after) ->
+        {:ok, state}
+
+      pane_before.collapsed or pane_after.collapsed ->
+        {:ok, state}
+
+      true ->
+        apply_ratio_resize(state, divider_idx, pane_before, pane_after, ratio_delta)
+    end
+  end
+
+  @spec apply_ratio_resize(map(), non_neg_integer(), pane(), pane(), float()) :: {:ok, map()}
+  defp apply_ratio_resize(state, divider_idx, pane_before, pane_after, ratio_delta) do
+    total_ratio = pane_before.size + pane_after.size
+
+    # Guard against division by zero
+    if total_ratio <= 0 do
+      {:ok, state}
+    else
+      current_ratio = pane_before.size / total_ratio
+      new_ratio = current_ratio + ratio_delta
+      clamped_ratio = new_ratio |> max(state.min_ratio) |> min(state.max_ratio)
+
+      if clamped_ratio == current_ratio do
+        {:ok, state}
+      else
+        panes = update_pane_ratios(state.panes, divider_idx, clamped_ratio, total_ratio)
+        maybe_call_resize_callback(%{state | panes: panes})
+      end
+    end
+  end
+
+  @spec update_pane_ratios([pane()], non_neg_integer(), float(), float()) :: [pane()]
+  defp update_pane_ratios(panes, divider_idx, new_ratio, total_ratio) do
+    panes
+    |> Enum.with_index()
+    |> Enum.map(fn
+      {pane, idx} when idx == divider_idx ->
+        %{pane | size: new_ratio * total_ratio}
+
+      {pane, idx} when idx == divider_idx + 1 ->
+        %{pane | size: (1.0 - new_ratio) * total_ratio}
+
+      {pane, _idx} ->
+        pane
+    end)
+  end
 
   defp move_divider(state, _divider_idx, delta) when delta == 0 do
     {:ok, state}
@@ -723,44 +844,23 @@ defmodule TermUI.Widgets.SplitPane do
   # ----------------------------------------------------------------------------
 
   defp divider_at(state, x, y) do
-    case state.orientation do
-      :horizontal -> divider_at_horizontal(state, x)
-      :vertical -> divider_at_vertical(state, y)
-    end
+    pos = if state.orientation == :horizontal, do: x, else: y
+    find_divider_at_position(state, pos)
   end
 
-  defp divider_at_horizontal(state, x) do
-    # Calculate cumulative positions
+  # Consolidated divider hit testing - works for both orientations
+  @spec find_divider_at_position(map(), integer()) :: non_neg_integer() | nil
+  defp find_divider_at_position(state, pos) do
     {_, result} =
       state.panes
       |> Enum.take(length(state.panes) - 1)
       |> Enum.with_index()
-      |> Enum.reduce({0, nil}, fn {pane, idx}, {pos, found} ->
-        pane_end = pos + pane.computed_size
+      |> Enum.reduce({0, nil}, fn {pane, idx}, {cumulative_pos, found} ->
+        pane_end = cumulative_pos + pane.computed_size
         divider_start = pane_end
         divider_end = divider_start + state.divider_size
 
-        if found == nil && x >= divider_start && x < divider_end do
-          {divider_end, idx}
-        else
-          {divider_end, found}
-        end
-      end)
-
-    result
-  end
-
-  defp divider_at_vertical(state, y) do
-    {_, result} =
-      state.panes
-      |> Enum.take(length(state.panes) - 1)
-      |> Enum.with_index()
-      |> Enum.reduce({0, nil}, fn {pane, idx}, {pos, found} ->
-        pane_end = pos + pane.computed_size
-        divider_start = pane_end
-        divider_end = divider_start + state.divider_size
-
-        if found == nil && y >= divider_start && y < divider_end do
+        if found == nil && pos >= divider_start && pos < divider_end do
           {divider_end, idx}
         else
           {divider_end, found}
@@ -828,7 +928,14 @@ defmodule TermUI.Widgets.SplitPane do
   defp maybe_call_resize_callback(state) do
     if state.on_resize do
       sizes = Enum.map(state.panes, fn p -> {p.id, p.size} end)
-      state.on_resize.(sizes)
+
+      try do
+        state.on_resize.(sizes)
+      rescue
+        e ->
+          require Logger
+          Logger.error("SplitPane on_resize callback error: #{inspect(e)}")
+      end
     end
 
     {:ok, state}

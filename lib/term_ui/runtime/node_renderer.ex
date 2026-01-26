@@ -27,6 +27,19 @@ defmodule TermUI.Runtime.NodeRenderer do
     render_node(node, buffer, start_row, start_col, nil)
   end
 
+  @doc """
+  Renders a node tree directly to a Buffer struct (not via BufferManager).
+
+  This is used for TTY mode where we create temporary buffers per frame.
+
+  Returns the bounds of the rendered content as {width, height}.
+  """
+  @spec render_to_buffer_direct(term(), Buffer.t(), pos_integer(), pos_integer()) ::
+          {non_neg_integer(), non_neg_integer()}
+  def render_to_buffer_direct(node, buffer, start_row \\ 1, start_col \\ 1) do
+    render_node(node, buffer, start_row, start_col, nil)
+  end
+
   # Handle RenderNode structs
   defp render_node(%RenderNode{type: :empty}, _buffer, _row, _col, _style), do: {0, 0}
 
@@ -49,7 +62,9 @@ defmodule TermUI.Runtime.NodeRenderer do
          parent_style
        ) do
     effective_style = merge_styles(parent_style, style)
-    {rendered_width, rendered_height} = render_children_vertical(children, buffer, row, col, effective_style)
+
+    {rendered_width, rendered_height} =
+      render_children_vertical(children, buffer, row, col, effective_style)
 
     # Return specified dimensions if provided, otherwise use rendered dimensions
     final_width = width || rendered_width

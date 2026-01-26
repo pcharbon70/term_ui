@@ -32,6 +32,7 @@ defmodule TermUI.Renderer.SequenceBuffer do
   """
 
   alias TermUI.Renderer.Style
+  alias TermUI.SGR
 
   @type t :: %__MODULE__{
           buffer: iolist(),
@@ -95,15 +96,22 @@ defmodule TermUI.Renderer.SequenceBuffer do
   end
 
   @doc """
-  Appends data to the buffer, ignoring auto-flush result.
+  Appends data to the buffer, automatically writing flushed data to IO.
 
-  Simpler API when you don't need to handle auto-flush immediately.
+  When the buffer threshold is exceeded, the accumulated data is written
+  to IO immediately and the buffer is reset. This ensures no data is lost
+  during large render operations.
   """
   @spec append!(t(), iodata()) :: t()
   def append!(%__MODULE__{} = buffer, data) do
     case append(buffer, data) do
-      {:ok, new_buffer} -> new_buffer
-      {:flush, _data, new_buffer} -> new_buffer
+      {:ok, new_buffer} ->
+        new_buffer
+
+      {:flush, flushed_data, new_buffer} ->
+        # Write the flushed data immediately instead of discarding it
+        IO.write(flushed_data)
+        new_buffer
     end
   end
 
@@ -120,7 +128,7 @@ defmodule TermUI.Renderer.SequenceBuffer do
       # No change from last style
       buffer
     else
-      sgr_sequence = build_sgr_sequence(sgr_params)
+      sgr_sequence = SGR.build_sequence(sgr_params)
       new_buffer = append!(buffer, sgr_sequence)
       %{new_buffer | last_style: style}
     end
@@ -144,7 +152,7 @@ defmodule TermUI.Renderer.SequenceBuffer do
 
   def emit_pending_sgr(%__MODULE__{pending_sgr: params} = buffer) do
     # Reverse to maintain order
-    sgr_sequence = build_sgr_sequence(Enum.reverse(params))
+    sgr_sequence = SGR.build_sequence(Enum.reverse(params))
     new_buffer = append!(buffer, sgr_sequence)
     %{new_buffer | pending_sgr: []}
   end
@@ -236,7 +244,7 @@ defmodule TermUI.Renderer.SequenceBuffer do
       if style.fg != last.fg do
         # Use :default when fg is nil to reset to default foreground
         fg = style.fg || :default
-        [color_to_sgr(:fg, fg) | params]
+        [SGR.color_param(:fg, fg) | params]
       else
         params
       end
@@ -245,95 +253,29 @@ defmodule TermUI.Renderer.SequenceBuffer do
       if style.bg != last.bg do
         # Use :default when bg is nil to reset to default background
         bg = style.bg || :default
-        [color_to_sgr(:bg, bg) | params]
+        [SGR.color_param(:bg, bg) | params]
       else
         params
       end
 
     # Check for new attributes
     new_attrs = MapSet.difference(style.attrs, last.attrs)
-    params = Enum.reduce(new_attrs, params, fn attr, acc -> [attr_to_sgr(attr) | acc] end)
+    params = Enum.reduce(new_attrs, params, fn attr, acc -> [SGR.attr_param(attr) | acc] end)
 
     # Check for removed attributes (need reset)
     removed_attrs = MapSet.difference(last.attrs, style.attrs)
 
     params =
-      Enum.reduce(removed_attrs, params, fn attr, acc -> [attr_off_sgr(attr) | acc] end)
+      Enum.reduce(removed_attrs, params, fn attr, acc -> [SGR.attr_off_param(attr) | acc] end)
 
     Enum.reverse(params) |> Enum.reject(&is_nil/1)
   end
 
   defp build_full_sgr_params(%Style{fg: fg, bg: bg, attrs: attrs}) do
     params = []
-    params = if fg && fg != :default, do: [color_to_sgr(:fg, fg) | params], else: params
-    params = if bg && bg != :default, do: [color_to_sgr(:bg, bg) | params], else: params
-    params = Enum.reduce(attrs, params, fn attr, acc -> [attr_to_sgr(attr) | acc] end)
+    params = if fg && fg != :default, do: [SGR.color_param(:fg, fg) | params], else: params
+    params = if bg && bg != :default, do: [SGR.color_param(:bg, bg) | params], else: params
+    params = Enum.reduce(attrs, params, fn attr, acc -> [SGR.attr_param(attr) | acc] end)
     Enum.reverse(params) |> Enum.reject(&is_nil/1)
   end
-
-  defp build_sgr_sequence([]), do: []
-
-  defp build_sgr_sequence(params) do
-    ["\e[", Enum.intersperse(params, ";"), "m"]
-  end
-
-  defp color_to_sgr(:fg, :default), do: "39"
-  defp color_to_sgr(:fg, :black), do: "30"
-  defp color_to_sgr(:fg, :red), do: "31"
-  defp color_to_sgr(:fg, :green), do: "32"
-  defp color_to_sgr(:fg, :yellow), do: "33"
-  defp color_to_sgr(:fg, :blue), do: "34"
-  defp color_to_sgr(:fg, :magenta), do: "35"
-  defp color_to_sgr(:fg, :cyan), do: "36"
-  defp color_to_sgr(:fg, :white), do: "37"
-  defp color_to_sgr(:fg, :bright_black), do: "90"
-  defp color_to_sgr(:fg, :bright_red), do: "91"
-  defp color_to_sgr(:fg, :bright_green), do: "92"
-  defp color_to_sgr(:fg, :bright_yellow), do: "93"
-  defp color_to_sgr(:fg, :bright_blue), do: "94"
-  defp color_to_sgr(:fg, :bright_magenta), do: "95"
-  defp color_to_sgr(:fg, :bright_cyan), do: "96"
-  defp color_to_sgr(:fg, :bright_white), do: "97"
-  defp color_to_sgr(:fg, n) when is_integer(n), do: "38;5;#{n}"
-  defp color_to_sgr(:fg, {r, g, b}), do: "38;2;#{r};#{g};#{b}"
-  defp color_to_sgr(:fg, nil), do: nil
-
-  defp color_to_sgr(:bg, :default), do: "49"
-  defp color_to_sgr(:bg, :black), do: "40"
-  defp color_to_sgr(:bg, :red), do: "41"
-  defp color_to_sgr(:bg, :green), do: "42"
-  defp color_to_sgr(:bg, :yellow), do: "43"
-  defp color_to_sgr(:bg, :blue), do: "44"
-  defp color_to_sgr(:bg, :magenta), do: "45"
-  defp color_to_sgr(:bg, :cyan), do: "46"
-  defp color_to_sgr(:bg, :white), do: "47"
-  defp color_to_sgr(:bg, :bright_black), do: "100"
-  defp color_to_sgr(:bg, :bright_red), do: "101"
-  defp color_to_sgr(:bg, :bright_green), do: "102"
-  defp color_to_sgr(:bg, :bright_yellow), do: "103"
-  defp color_to_sgr(:bg, :bright_blue), do: "104"
-  defp color_to_sgr(:bg, :bright_magenta), do: "105"
-  defp color_to_sgr(:bg, :bright_cyan), do: "106"
-  defp color_to_sgr(:bg, :bright_white), do: "107"
-  defp color_to_sgr(:bg, n) when is_integer(n), do: "48;5;#{n}"
-  defp color_to_sgr(:bg, {r, g, b}), do: "48;2;#{r};#{g};#{b}"
-  defp color_to_sgr(:bg, nil), do: nil
-
-  defp attr_to_sgr(:bold), do: "1"
-  defp attr_to_sgr(:dim), do: "2"
-  defp attr_to_sgr(:italic), do: "3"
-  defp attr_to_sgr(:underline), do: "4"
-  defp attr_to_sgr(:blink), do: "5"
-  defp attr_to_sgr(:reverse), do: "7"
-  defp attr_to_sgr(:hidden), do: "8"
-  defp attr_to_sgr(:strikethrough), do: "9"
-
-  defp attr_off_sgr(:bold), do: "22"
-  defp attr_off_sgr(:dim), do: "22"
-  defp attr_off_sgr(:italic), do: "23"
-  defp attr_off_sgr(:underline), do: "24"
-  defp attr_off_sgr(:blink), do: "25"
-  defp attr_off_sgr(:reverse), do: "27"
-  defp attr_off_sgr(:hidden), do: "28"
-  defp attr_off_sgr(:strikethrough), do: "29"
 end

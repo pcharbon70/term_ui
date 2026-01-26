@@ -142,7 +142,15 @@ defmodule TermUI.ThemeTest do
       theme = %Theme{
         name: :invalid,
         colors: %{background: :black},
-        semantic: %{success: :green, warning: :yellow, error: :red, info: :cyan, muted: :white},
+        semantic: %{
+          success: :green,
+          warning: :yellow,
+          error: :red,
+          info: :cyan,
+          muted: :white,
+          help: :white,
+          placeholder: :white
+        },
         components: %{}
       }
 
@@ -362,6 +370,102 @@ defmodule TermUI.ThemeTest do
       # Unmodified variants preserved
       assert theme.components.button.focused != nil
       assert theme.components.button.disabled != nil
+    end
+  end
+
+  describe "monochrome compatibility" do
+    test "selected items have reverse attribute in dark theme" do
+      {:ok, theme} = Theme.get_builtin(:dark)
+      style = theme.components.item.selected
+
+      assert MapSet.member?(style.attrs, :reverse)
+    end
+
+    test "focused items have bold attribute in dark theme" do
+      {:ok, theme} = Theme.get_builtin(:dark)
+      style = theme.components.item.focused
+
+      assert MapSet.member?(style.attrs, :bold)
+    end
+
+    test "error status has underline attribute in dark theme" do
+      {:ok, theme} = Theme.get_builtin(:dark)
+      style = theme.components.status.error
+
+      assert MapSet.member?(style.attrs, :underline)
+    end
+
+    test "terminated status has underline attribute in dark theme" do
+      {:ok, theme} = Theme.get_builtin(:dark)
+      style = theme.components.status.terminated
+
+      assert MapSet.member?(style.attrs, :underline)
+    end
+
+    test "warning status has bold attribute in dark theme" do
+      {:ok, theme} = Theme.get_builtin(:dark)
+      style = theme.components.status.warning
+
+      assert MapSet.member?(style.attrs, :bold)
+    end
+
+    test "unknown status has dim attribute in dark theme" do
+      {:ok, theme} = Theme.get_builtin(:dark)
+      style = theme.components.status.unknown
+
+      assert MapSet.member?(style.attrs, :dim)
+    end
+
+    test "focused divider has reverse attribute in dark theme" do
+      {:ok, theme} = Theme.get_builtin(:dark)
+      style = theme.components.divider.focused
+
+      assert MapSet.member?(style.attrs, :reverse)
+      assert MapSet.member?(style.attrs, :bold)
+    end
+
+    test "selected items have reverse attribute in light theme" do
+      {:ok, theme} = Theme.get_builtin(:light)
+      style = theme.components.item.selected
+
+      assert MapSet.member?(style.attrs, :reverse)
+    end
+
+    test "focused items have bold attribute in light theme" do
+      {:ok, theme} = Theme.get_builtin(:light)
+      style = theme.components.item.focused
+
+      assert MapSet.member?(style.attrs, :bold)
+    end
+
+    test "error status has underline attribute in light theme" do
+      {:ok, theme} = Theme.get_builtin(:light)
+      style = theme.components.status.error
+
+      assert MapSet.member?(style.attrs, :underline)
+    end
+
+    test "selected items have reverse attribute in high_contrast theme" do
+      {:ok, theme} = Theme.get_builtin(:high_contrast)
+      style = theme.components.item.selected
+
+      assert MapSet.member?(style.attrs, :reverse)
+      assert MapSet.member?(style.attrs, :bold)
+    end
+
+    test "focused items have bold attribute in high_contrast theme" do
+      {:ok, theme} = Theme.get_builtin(:high_contrast)
+      style = theme.components.item.focused
+
+      assert MapSet.member?(style.attrs, :bold)
+    end
+
+    test "error status has underline and bold attributes in high_contrast theme" do
+      {:ok, theme} = Theme.get_builtin(:high_contrast)
+      style = theme.components.status.error
+
+      assert MapSet.member?(style.attrs, :underline)
+      assert MapSet.member?(style.attrs, :bold)
     end
   end
 end

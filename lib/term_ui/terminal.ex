@@ -11,27 +11,17 @@ defmodule TermUI.Terminal do
   require Logger
 
   alias TermUI.Terminal.State
+  alias TermUI.Terminal.SizeDetector
+  alias TermUI.ANSI
+  alias TermUI.TermUtils
 
   @ets_table :term_ui_terminal_state
 
-  # Escape sequences
-  @enter_alternate_screen "\e[?1049h"
-  @leave_alternate_screen "\e[?1049l"
-  @hide_cursor "\e[?25l"
-  @show_cursor "\e[?25h"
+  # Full terminal reset sequence (not in ANSI module as it's rarely needed)
   @reset_terminal "\ec"
 
-  # Mouse tracking escape sequences
-  @mouse_click_on "\e[?1000h"
-  @mouse_click_off "\e[?1000l"
-  @mouse_drag_on "\e[?1002h"
-  @mouse_drag_off "\e[?1002l"
-  @mouse_all_on "\e[?1003h"
-  @mouse_all_off "\e[?1003l"
-  @mouse_sgr_on "\e[?1006h"
-  @mouse_sgr_off "\e[?1006l"
-
   # Comprehensive mouse disable - disables ALL mouse modes defensively
+  # This is kept as a constant for performance in cleanup paths
   @all_mouse_off "\e[?1006l\e[?1003l\e[?1002l\e[?1000l"
 
   # Client API
@@ -42,6 +32,20 @@ defmodule TermUI.Terminal do
   @spec start_link(keyword()) :: GenServer.on_start()
   def start_link(opts \\ []) do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
+  end
+
+  @doc """
+  Returns a child specification for starting the terminal in a supervisor.
+  """
+  @spec child_spec(keyword()) :: Supervisor.child_spec()
+  def child_spec(opts \\ []) do
+    %{
+      id: __MODULE__,
+      start: {__MODULE__, :start_link, [opts]},
+      restart: :permanent,
+      shutdown: 5000,
+      type: :worker
+    }
   end
 
   @doc """
@@ -230,7 +234,7 @@ defmodule TermUI.Terminal do
     if state.alternate_screen_active do
       {:reply, :ok, state}
     else
-      write_to_terminal(@enter_alternate_screen)
+      write_to_terminal(ANSI.enter_alternate_screen())
       new_state = %{state | alternate_screen_active: true}
       {:reply, :ok, new_state}
     end
@@ -239,7 +243,7 @@ defmodule TermUI.Terminal do
   @impl true
   def handle_call(:leave_alternate_screen, _from, state) do
     if state.alternate_screen_active do
-      write_to_terminal(@leave_alternate_screen)
+      write_to_terminal(ANSI.leave_alternate_screen())
       new_state = %{state | alternate_screen_active: false}
       {:reply, :ok, new_state}
     else
@@ -249,14 +253,14 @@ defmodule TermUI.Terminal do
 
   @impl true
   def handle_call(:hide_cursor, _from, state) do
-    write_to_terminal(@hide_cursor)
+    write_to_terminal(ANSI.cursor_hide())
     new_state = %{state | cursor_visible: false}
     {:reply, :ok, new_state}
   end
 
   @impl true
   def handle_call(:show_cursor, _from, state) do
-    write_to_terminal(@show_cursor)
+    write_to_terminal(ANSI.cursor_show())
     new_state = %{state | cursor_visible: true}
     {:reply, :ok, new_state}
   end
@@ -311,19 +315,17 @@ defmodule TermUI.Terminal do
     end
 
     # Enable new tracking mode with SGR
-    case mode do
-      :click ->
-        write_to_terminal(@mouse_click_on)
-        write_to_terminal(@mouse_sgr_on)
+    # Map user-friendly mode names to ANSI protocol modes:
+    # :click -> :normal (1000), :drag -> :button (1002), :all -> :all (1003)
+    ansi_mode =
+      case mode do
+        :click -> :normal
+        :drag -> :button
+        :all -> :all
+      end
 
-      :drag ->
-        write_to_terminal(@mouse_drag_on)
-        write_to_terminal(@mouse_sgr_on)
-
-      :all ->
-        write_to_terminal(@mouse_all_on)
-        write_to_terminal(@mouse_sgr_on)
-    end
+    write_to_terminal(ANSI.enable_mouse_tracking(ansi_mode))
+    write_to_terminal(ANSI.enable_sgr_mouse())
 
     new_state = %{state | mouse_tracking: mode}
     {:reply, :ok, new_state}
@@ -333,7 +335,7 @@ defmodule TermUI.Terminal do
   def handle_call(:disable_mouse_tracking, _from, state) do
     if state.mouse_tracking != :off do
       disable_current_mouse_mode(state.mouse_tracking)
-      write_to_terminal(@mouse_sgr_off)
+      write_to_terminal(ANSI.disable_sgr_mouse())
     end
 
     new_state = %{state | mouse_tracking: :off}
@@ -439,9 +441,13 @@ defmodule TermUI.Terminal do
   end
 
   defp save_terminal_settings do
-    case System.cmd("stty", ["-g"], stderr_to_stdout: true) do
-      {output, 0} ->
-        String.trim(output)
+    case TermUtils.safe_stty(["-g"]) do
+      {:ok, output} ->
+        # Validate output format before storing
+        case TermUtils.validate_stty_settings(output) do
+          :ok -> output
+          {:error, _} -> nil
+        end
 
       _ ->
         nil
@@ -458,18 +464,13 @@ defmodule TermUI.Terminal do
     # time 0: timeout in tenths of a second (0 = no timeout)
     # -isig: disable signal generation (Ctrl+C etc handled by app)
     # -ixon: disable XON/XOFF flow control
-    case System.cmd("stty", ["raw", "-echo", "-isig", "-ixon", "min", "1", "time", "0"],
-           stderr_to_stdout: true
-         ) do
-      {_output, 0} ->
+    case TermUtils.safe_stty(["raw", "-echo", "-isig", "-ixon", "1", "0"]) do
+      {:ok, _output} ->
         :ok
 
-      {error, _code} ->
-        {:error, {:stty_failed, error}}
+      {:error, reason} ->
+        {:error, {:stty_failed, reason}}
     end
-  rescue
-    e ->
-      {:error, {:stty_exception, Exception.message(e)}}
   end
 
   defp do_disable_raw_mode(original_settings) do
@@ -491,80 +492,25 @@ defmodule TermUI.Terminal do
   end
 
   defp restore_terminal_settings(settings) do
-    System.cmd("stty", [settings], stderr_to_stdout: true)
-    :ok
-  rescue
-    _ -> :ok
+    # Restore original settings - settings was validated when captured
+    # We pass it as a single argument which stty accepts for restoration
+    case TermUtils.safe_stty([settings]) do
+      {:ok, _} -> :ok
+      {:error, _} -> :ok
+    end
   end
 
   defp restore_stty_sane do
     # Restore terminal to reasonable defaults
-    System.cmd("stty", ["sane"], stderr_to_stdout: true)
-    :ok
-  rescue
-    _ -> :ok
+    case TermUtils.safe_stty(["sane"]) do
+      {:ok, _} -> :ok
+      {:error, _} -> :ok
+    end
   end
 
+  # Delegates to SizeDetector for consistent size detection across modules.
   defp do_get_terminal_size do
-    if function_exported?(:io, :columns, 0) and function_exported?(:io, :rows, 0) do
-      case {:io.columns(), :io.rows()} do
-        {{:ok, cols}, {:ok, rows}} ->
-          {:ok, {rows, cols}}
-
-        _ ->
-          get_size_from_env()
-      end
-    else
-      get_size_from_env()
-    end
-  end
-
-  defp get_size_from_env do
-    # Try LINES and COLUMNS environment variables
-    with {:ok, lines} <- get_env_int("LINES"),
-         {:ok, columns} <- get_env_int("COLUMNS") do
-      {:ok, {lines, columns}}
-    else
-      _ ->
-        # Try stty as last resort
-        get_size_from_stty()
-    end
-  end
-
-  defp get_env_int(var) do
-    case System.get_env(var) do
-      nil ->
-        {:error, :not_set}
-
-      value ->
-        case Integer.parse(value) do
-          {int, ""} when int > 0 -> {:ok, int}
-          _ -> {:error, :invalid}
-        end
-    end
-  end
-
-  defp get_size_from_stty do
-    case System.cmd("stty", ["size"], stderr_to_stdout: true) do
-      {output, 0} ->
-        case String.split(String.trim(output)) do
-          [rows_str, cols_str] ->
-            with {rows, ""} <- Integer.parse(rows_str),
-                 {cols, ""} <- Integer.parse(cols_str) do
-              {:ok, {rows, cols}}
-            else
-              _ -> {:error, :parse_failed}
-            end
-
-          _ ->
-            {:error, :invalid_output}
-        end
-
-      {_, _} ->
-        {:error, :stty_failed}
-    end
-  rescue
-    _ -> {:error, :stty_failed}
+    SizeDetector.auto_detect()
   end
 
   defp do_restore(state) do
@@ -573,11 +519,11 @@ defmodule TermUI.Terminal do
     write_to_terminal(@all_mouse_off)
 
     if not state.cursor_visible do
-      write_to_terminal(@show_cursor)
+      write_to_terminal(ANSI.cursor_show())
     end
 
     if state.alternate_screen_active do
-      write_to_terminal(@leave_alternate_screen)
+      write_to_terminal(ANSI.leave_alternate_screen())
     end
 
     if state.raw_mode_active do
@@ -585,7 +531,7 @@ defmodule TermUI.Terminal do
     end
 
     # Reset terminal attributes (colors, styles)
-    write_to_terminal("\e[0m")
+    write_to_terminal(ANSI.reset())
 
     if :ets.whereis(@ets_table) != :undefined do
       :ets.insert(@ets_table, {:raw_mode_active, false})
@@ -595,11 +541,17 @@ defmodule TermUI.Terminal do
   end
 
   defp disable_current_mouse_mode(mode) do
-    case mode do
-      :click -> write_to_terminal(@mouse_click_off)
-      :drag -> write_to_terminal(@mouse_drag_off)
-      :all -> write_to_terminal(@mouse_all_off)
-      _ -> :ok
+    # Map user-friendly mode names to ANSI protocol modes
+    ansi_mode =
+      case mode do
+        :click -> :normal
+        :drag -> :button
+        :all -> :all
+        _ -> nil
+      end
+
+    if ansi_mode do
+      write_to_terminal(ANSI.disable_mouse_tracking(ansi_mode))
     end
   end
 
@@ -632,12 +584,10 @@ defmodule TermUI.Terminal do
   end
 
   defp check_tty do
-    case System.cmd("test", ["-t", "0"], stderr_to_stdout: true) do
-      {_, 0} -> true
+    case TermUtils.safe_test(["-t", "0"]) do
+      {:ok, _} -> true
       _ -> false
     end
-  rescue
-    _ -> false
   end
 
   defp create_ets_table do
@@ -653,8 +603,8 @@ defmodule TermUI.Terminal do
           Logger.warning("Detected unclean termination from previous run, resetting terminal")
           # Disable all mouse tracking modes first
           write_to_terminal(@all_mouse_off)
-          write_to_terminal(@show_cursor)
-          write_to_terminal(@leave_alternate_screen)
+          write_to_terminal(ANSI.cursor_show())
+          write_to_terminal(ANSI.leave_alternate_screen())
           write_to_terminal(@reset_terminal)
 
         _ ->

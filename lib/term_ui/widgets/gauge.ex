@@ -26,10 +26,10 @@ defmodule TermUI.Widgets.Gauge do
   """
 
   import TermUI.Component.RenderNode
+  alias TermUI.CharacterSet
+  alias TermUI.Renderer.Style
+  alias TermUI.Theme
   alias TermUI.Widgets.VisualizationHelper, as: VizHelper
-
-  @bar_char "█"
-  @empty_char "░"
 
   @doc """
   Renders a gauge.
@@ -62,6 +62,7 @@ defmodule TermUI.Widgets.Gauge do
   end
 
   defp do_render(value, opts) do
+    chars = CharacterSet.current_charset()
     min = Keyword.get(opts, :min, 0)
     max = Keyword.get(opts, :max, 100)
     width = opts |> Keyword.get(:width, 40) |> VizHelper.clamp_width()
@@ -71,8 +72,8 @@ defmodule TermUI.Widgets.Gauge do
     show_range = Keyword.get(opts, :show_range, true)
     zones = Keyword.get(opts, :zones, [])
     label = Keyword.get(opts, :label)
-    bar_char = Keyword.get(opts, :bar_char, @bar_char)
-    empty_char = Keyword.get(opts, :empty_char, @empty_char)
+    bar_char = Keyword.get(opts, :bar_char, chars.bar_full)
+    empty_char = Keyword.get(opts, :empty_char, chars.bar_empty)
 
     case gauge_type do
       :bar ->
@@ -204,6 +205,8 @@ defmodule TermUI.Widgets.Gauge do
   end
 
   defp render_arc(value, min, max, width, show_value, _zones, label) do
+    chars = CharacterSet.current_charset()
+
     # Simple arc using block characters
     normalized = VizHelper.normalize(value, min, max)
 
@@ -212,19 +215,19 @@ defmodule TermUI.Widgets.Gauge do
     arc_position = max(0, min(arc_position, width - 3))
 
     # Build arc visualization with safe duplicate
-    top = "╭" <> VizHelper.safe_duplicate("─", width - 2) <> "╮"
+    top = chars.tl_round <> VizHelper.safe_duplicate(chars.h_line, width - 2) <> chars.tr_round
 
     # Middle shows value position
     right_padding = max(0, width - arc_position - 3)
 
     indicator_line =
       VizHelper.safe_duplicate(" ", arc_position) <>
-        "▼" <>
+        chars.triangle_down <>
         VizHelper.safe_duplicate(" ", right_padding)
 
-    middle = "│" <> indicator_line <> "│"
+    middle = chars.v_line <> indicator_line <> chars.v_line
 
-    bottom = "╰" <> VizHelper.safe_duplicate("─", width - 2) <> "╯"
+    bottom = chars.bl_round <> VizHelper.safe_duplicate(chars.h_line, width - 2) <> chars.br_round
 
     parts = [text(top), text(middle), text(bottom)]
 
@@ -278,13 +281,17 @@ defmodule TermUI.Widgets.Gauge do
   @doc """
   Creates a gauge with traffic light colors (green/yellow/red).
 
+  Uses theme-based semantic colors for visual feedback:
+  - Green zone (0-warning): success
+  - Yellow zone (warning-danger): warning
+  - Red zone (danger+): error
+
   ## Options
 
   - `:value` - Current value (required)
   - `:warning` - Yellow zone threshold (default: 60)
   - `:danger` - Red zone threshold (default: 80)
-
-  Note: You need to provide actual Style structs for the zones to be visible.
+  - `:zones` - Override with custom zones
   """
   @spec traffic_light(keyword()) :: TermUI.Component.RenderNode.t()
   def traffic_light(opts) do
@@ -292,16 +299,14 @@ defmodule TermUI.Widgets.Gauge do
     warning = Keyword.get(opts, :warning, 60)
     danger = Keyword.get(opts, :danger, 80)
 
-    # Create zones - users should provide actual Style structs
-    # These nil values mean no styling will be applied by default
-    zones = [
-      # green zone (default)
-      {0, nil},
-      # yellow zone
-      {warning, nil},
-      # red zone
-      {danger, nil}
+    # Create theme-based default zones
+    default_zones = [
+      {0, Style.new() |> Style.fg(Theme.get_semantic(:success))},
+      {warning, Style.new() |> Style.fg(Theme.get_semantic(:warning))},
+      {danger, Style.new() |> Style.fg(Theme.get_semantic(:error))}
     ]
+
+    zones = Keyword.get(opts, :zones, default_zones)
 
     opts = opts |> Keyword.put(:value, value) |> Keyword.merge(zones: zones)
     render(opts)

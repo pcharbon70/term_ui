@@ -22,6 +22,10 @@ defmodule TermUI.Terminal.EscapeParser do
   @escape 0x1B
   @delete 0x7F
 
+  # Maximum coordinate value for mouse events.
+  # Provides defense against malicious input with huge coordinates.
+  @max_mouse_coordinate 9999
+
   @doc """
   Parses input bytes into a list of events and remaining bytes.
 
@@ -308,7 +312,10 @@ defmodule TermUI.Terminal.EscapeParser do
       [cb_str, cx_str, cy_str] ->
         with {cb, ""} <- Integer.parse(cb_str),
              {cx, ""} <- Integer.parse(cx_str),
-             {cy, ""} <- Integer.parse(cy_str) do
+             {cy, ""} <- Integer.parse(cy_str),
+             true <- cb >= 0 and cb <= 255,
+             true <- cx >= 0 and cx <= @max_mouse_coordinate,
+             true <- cy >= 0 and cy <= @max_mouse_coordinate do
           {:ok, cb, cx, cy}
         else
           _ -> :error

@@ -2,7 +2,18 @@ defmodule TermUI.Widgets.DialogTest do
   use ExUnit.Case, async: true
 
   alias TermUI.Event
+  alias TermUI.Theme
   alias TermUI.Widgets.Dialog
+
+  setup do
+    # Start Theme server for color support (ignore if already started)
+    case Theme.start_link(theme: :dark) do
+      {:ok, _pid} -> :ok
+      {:error, {:already_started, _pid}} -> :ok
+    end
+
+    :ok
+  end
 
   describe "new/1" do
     test "creates dialog props with required fields" do

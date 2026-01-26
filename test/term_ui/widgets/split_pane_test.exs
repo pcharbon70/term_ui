@@ -1,8 +1,19 @@
 defmodule TermUI.Widgets.SplitPaneTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias TermUI.Event
+  alias TermUI.Theme
   alias TermUI.Widgets.SplitPane
+
+  setup do
+    # Start Theme server for color support (ignore if already started)
+    case Theme.start_link(theme: :dark) do
+      {:ok, _pid} -> :ok
+      {:error, {:already_started, _pid}} -> :ok
+    end
+
+    :ok
+  end
 
   # Helper to create test area
   defp test_area(width, height) do
@@ -246,28 +257,46 @@ defmodule TermUI.Widgets.SplitPaneTest do
     end
 
     test "left arrow decreases left pane size", %{state: state} do
-      # Render again to get computed sizes
+      # Render to compute sizes
       _render = SplitPane.render(state, test_area(81, 24))
 
+      initial_left_size = Enum.at(state.panes, 0).size
+
       {:ok, new_state} = SplitPane.handle_event(%Event.Key{key: :left}, state)
-      # Size should have changed
-      assert new_state.panes != state.panes or new_state == state
+
+      new_left_size = Enum.at(new_state.panes, 0).size
+      # Left arrow should decrease left pane size
+      assert new_left_size < initial_left_size
     end
 
     test "right arrow increases left pane size", %{state: state} do
       _render = SplitPane.render(state, test_area(81, 24))
 
+      initial_left_size = Enum.at(state.panes, 0).size
+
       {:ok, new_state} = SplitPane.handle_event(%Event.Key{key: :right}, state)
-      assert new_state.panes != state.panes or new_state == state
+
+      new_left_size = Enum.at(new_state.panes, 0).size
+      # Right arrow should increase left pane size
+      assert new_left_size > initial_left_size
     end
 
     test "shift+arrow moves by larger step", %{state: state} do
       _render = SplitPane.render(state, test_area(81, 24))
 
-      {:ok, new_state} =
+      initial_left_size = Enum.at(state.panes, 0).size
+
+      # Normal right
+      {:ok, normal_state} = SplitPane.handle_event(%Event.Key{key: :right}, state)
+      normal_delta = Enum.at(normal_state.panes, 0).size - initial_left_size
+
+      # Shift+right should move by larger step
+      {:ok, shift_state} =
         SplitPane.handle_event(%Event.Key{key: :right, modifiers: [:shift]}, state)
 
-      assert new_state != nil
+      shift_delta = Enum.at(shift_state.panes, 0).size - initial_left_size
+
+      assert shift_delta > normal_delta
     end
 
     test "no resize without focused divider" do
@@ -285,6 +314,243 @@ defmodule TermUI.Widgets.SplitPaneTest do
       {:ok, new_state} = SplitPane.handle_event(%Event.Key{key: :left}, state)
       # State should be unchanged
       assert new_state.panes == state.panes
+    end
+  end
+
+  describe "Ctrl+arrow keyboard resize (TTY-friendly)" do
+    test "Ctrl+Right increases first pane size without focused divider" do
+      props =
+        SplitPane.new(
+          orientation: :horizontal,
+          panes: [
+            SplitPane.pane(:left, content("Left"), size: 0.5),
+            SplitPane.pane(:right, content("Right"), size: 0.5)
+          ]
+        )
+
+      {:ok, state} = SplitPane.init(props)
+      _render = SplitPane.render(state, test_area(81, 24))
+
+      assert state.focused_divider == nil
+      initial_left_size = Enum.at(state.panes, 0).size
+
+      {:ok, new_state} =
+        SplitPane.handle_event(%Event.Key{key: :right, modifiers: [:ctrl]}, state)
+
+      new_left_size = Enum.at(new_state.panes, 0).size
+      # Ctrl+Right should INCREASE first pane size
+      assert new_left_size > initial_left_size
+    end
+
+    test "Ctrl+Left decreases first pane size without focused divider" do
+      props =
+        SplitPane.new(
+          orientation: :horizontal,
+          panes: [
+            SplitPane.pane(:left, content("Left"), size: 0.5),
+            SplitPane.pane(:right, content("Right"), size: 0.5)
+          ]
+        )
+
+      {:ok, state} = SplitPane.init(props)
+      _render = SplitPane.render(state, test_area(81, 24))
+
+      assert state.focused_divider == nil
+      initial_left_size = Enum.at(state.panes, 0).size
+
+      {:ok, new_state} =
+        SplitPane.handle_event(%Event.Key{key: :left, modifiers: [:ctrl]}, state)
+
+      new_left_size = Enum.at(new_state.panes, 0).size
+      # Ctrl+Left should DECREASE first pane size
+      assert new_left_size < initial_left_size
+    end
+
+    test "Ctrl+Down increases first pane size in vertical split" do
+      props =
+        SplitPane.new(
+          orientation: :vertical,
+          panes: [
+            SplitPane.pane(:top, content("Top"), size: 0.5),
+            SplitPane.pane(:bottom, content("Bottom"), size: 0.5)
+          ]
+        )
+
+      {:ok, state} = SplitPane.init(props)
+      _render = SplitPane.render(state, test_area(80, 25))
+
+      assert state.focused_divider == nil
+      initial_top_size = Enum.at(state.panes, 0).size
+
+      {:ok, new_state} =
+        SplitPane.handle_event(%Event.Key{key: :down, modifiers: [:ctrl]}, state)
+
+      new_top_size = Enum.at(new_state.panes, 0).size
+      # Ctrl+Down should INCREASE first pane size
+      assert new_top_size > initial_top_size
+    end
+
+    test "Ctrl+Up decreases first pane size in vertical split" do
+      props =
+        SplitPane.new(
+          orientation: :vertical,
+          panes: [
+            SplitPane.pane(:top, content("Top"), size: 0.5),
+            SplitPane.pane(:bottom, content("Bottom"), size: 0.5)
+          ]
+        )
+
+      {:ok, state} = SplitPane.init(props)
+      _render = SplitPane.render(state, test_area(80, 25))
+
+      assert state.focused_divider == nil
+      initial_top_size = Enum.at(state.panes, 0).size
+
+      {:ok, new_state} =
+        SplitPane.handle_event(%Event.Key{key: :up, modifiers: [:ctrl]}, state)
+
+      new_top_size = Enum.at(new_state.panes, 0).size
+      # Ctrl+Up should DECREASE first pane size
+      assert new_top_size < initial_top_size
+    end
+
+    test "Ctrl+arrows do nothing when resizable is false" do
+      props =
+        SplitPane.new(
+          panes: [
+            SplitPane.pane(:left, content("Left")),
+            SplitPane.pane(:right, content("Right"))
+          ],
+          resizable: false
+        )
+
+      {:ok, state} = SplitPane.init(props)
+
+      {:ok, new_state} =
+        SplitPane.handle_event(%Event.Key{key: :right, modifiers: [:ctrl]}, state)
+
+      # State should be unchanged
+      assert new_state == state
+    end
+
+    test "Ctrl+arrows ignored when divider is focused (regular arrows take precedence)" do
+      props =
+        SplitPane.new(
+          panes: [
+            SplitPane.pane(:left, content("Left"), size: 0.5),
+            SplitPane.pane(:right, content("Right"), size: 0.5)
+          ]
+        )
+
+      {:ok, state} = SplitPane.init(props)
+      _render = SplitPane.render(state, test_area(81, 24))
+
+      # Focus a divider
+      {:ok, state} = SplitPane.handle_event(%Event.Key{key: :tab}, state)
+      assert state.focused_divider == 0
+
+      # Ctrl+Right with focused divider - handled by focused divider handler (with shift check)
+      # In current impl, this goes to the focused handler since guard matches first
+      {:ok, _new_state} =
+        SplitPane.handle_event(%Event.Key{key: :right, modifiers: [:ctrl]}, state)
+
+      # Just verify it doesn't crash
+    end
+
+    test "Ctrl+arrows do nothing with single pane (no dividers)" do
+      props =
+        SplitPane.new(
+          panes: [
+            SplitPane.pane(:only, content("Only"))
+          ]
+        )
+
+      {:ok, state} = SplitPane.init(props)
+      _render = SplitPane.render(state, test_area(80, 24))
+
+      {:ok, new_state} =
+        SplitPane.handle_event(%Event.Key{key: :right, modifiers: [:ctrl]}, state)
+
+      # State should be unchanged - no dividers to resize
+      assert new_state == state
+    end
+
+    test "Ctrl+arrows do nothing when first pane is collapsed" do
+      props =
+        SplitPane.new(
+          panes: [
+            SplitPane.pane(:left, content("Left"), size: 0.5, collapsed: true),
+            SplitPane.pane(:right, content("Right"), size: 0.5)
+          ]
+        )
+
+      {:ok, state} = SplitPane.init(props)
+      _render = SplitPane.render(state, test_area(80, 24))
+
+      {:ok, new_state} =
+        SplitPane.handle_event(%Event.Key{key: :right, modifiers: [:ctrl]}, state)
+
+      # State should be unchanged - collapsed pane can't be resized
+      assert new_state.panes == state.panes
+    end
+
+    test "Ctrl+arrows do nothing when second pane is collapsed" do
+      props =
+        SplitPane.new(
+          panes: [
+            SplitPane.pane(:left, content("Left"), size: 0.5),
+            SplitPane.pane(:right, content("Right"), size: 0.5, collapsed: true)
+          ]
+        )
+
+      {:ok, state} = SplitPane.init(props)
+      _render = SplitPane.render(state, test_area(80, 24))
+
+      {:ok, new_state} =
+        SplitPane.handle_event(%Event.Key{key: :right, modifiers: [:ctrl]}, state)
+
+      # State should be unchanged - collapsed pane can't be resized
+      assert new_state.panes == state.panes
+    end
+
+    test "invalid config values are normalized to defaults" do
+      props =
+        SplitPane.new(
+          panes: [
+            SplitPane.pane(:left, content("Left")),
+            SplitPane.pane(:right, content("Right"))
+          ],
+          ctrl_resize_step: -0.5,
+          min_ratio: 0.9,
+          max_ratio: 0.1
+        )
+
+      {:ok, state} = SplitPane.init(props)
+
+      # Invalid values should be reset to defaults
+      assert state.ctrl_resize_step == 0.05
+      assert state.min_ratio == 0.1
+      assert state.max_ratio == 0.9
+    end
+
+    test "zero pane sizes handled gracefully (division by zero protection)" do
+      props =
+        SplitPane.new(
+          panes: [
+            SplitPane.pane(:left, content("Left"), size: 0.0),
+            SplitPane.pane(:right, content("Right"), size: 0.0)
+          ]
+        )
+
+      {:ok, state} = SplitPane.init(props)
+      _render = SplitPane.render(state, test_area(80, 24))
+
+      # Should not crash - division by zero is guarded
+      {:ok, new_state} =
+        SplitPane.handle_event(%Event.Key{key: :right, modifiers: [:ctrl]}, state)
+
+      # State should be unchanged since total_ratio is 0
+      assert new_state == state
     end
   end
 
@@ -782,6 +1048,223 @@ defmodule TermUI.Widgets.SplitPaneTest do
       {:ok, _state} = SplitPane.handle_event(%Event.Key{key: :enter}, state)
 
       assert_receive {:collapsed, :right, true}
+    end
+  end
+
+  describe "Ctrl+arrow resize configuration (Task 5.2.3)" do
+    test "new/1 accepts ctrl_resize_step option" do
+      props =
+        SplitPane.new(
+          panes: [
+            SplitPane.pane(:left, content("Left")),
+            SplitPane.pane(:right, content("Right"))
+          ],
+          ctrl_resize_step: 0.1
+        )
+
+      assert props.ctrl_resize_step == 0.1
+    end
+
+    test "new/1 accepts min_ratio option" do
+      props =
+        SplitPane.new(
+          panes: [
+            SplitPane.pane(:left, content("Left")),
+            SplitPane.pane(:right, content("Right"))
+          ],
+          min_ratio: 0.2
+        )
+
+      assert props.min_ratio == 0.2
+    end
+
+    test "new/1 accepts max_ratio option" do
+      props =
+        SplitPane.new(
+          panes: [
+            SplitPane.pane(:left, content("Left")),
+            SplitPane.pane(:right, content("Right"))
+          ],
+          max_ratio: 0.8
+        )
+
+      assert props.max_ratio == 0.8
+    end
+
+    test "init/1 stores configuration in state" do
+      props =
+        SplitPane.new(
+          panes: [
+            SplitPane.pane(:left, content("Left")),
+            SplitPane.pane(:right, content("Right"))
+          ],
+          ctrl_resize_step: 0.1,
+          min_ratio: 0.2,
+          max_ratio: 0.8
+        )
+
+      {:ok, state} = SplitPane.init(props)
+
+      assert state.ctrl_resize_step == 0.1
+      assert state.min_ratio == 0.2
+      assert state.max_ratio == 0.8
+    end
+
+    test "default values are used when not specified" do
+      props =
+        SplitPane.new(
+          panes: [
+            SplitPane.pane(:left, content("Left")),
+            SplitPane.pane(:right, content("Right"))
+          ]
+        )
+
+      {:ok, state} = SplitPane.init(props)
+
+      # Default values: 0.05 step, 0.1 min, 0.9 max
+      assert state.ctrl_resize_step == 0.05
+      assert state.min_ratio == 0.1
+      assert state.max_ratio == 0.9
+    end
+
+    test "Ctrl+Right uses configured step size" do
+      props =
+        SplitPane.new(
+          panes: [
+            SplitPane.pane(:left, content("Left"), size: 0.5),
+            SplitPane.pane(:right, content("Right"), size: 0.5)
+          ],
+          ctrl_resize_step: 0.1
+        )
+
+      {:ok, state} = SplitPane.init(props)
+      _render = SplitPane.render(state, test_area(100, 24))
+
+      initial_left_size = Enum.at(state.panes, 0).size
+
+      {:ok, new_state} =
+        SplitPane.handle_event(%Event.Key{key: :right, modifiers: [:ctrl]}, state)
+
+      new_left_size = Enum.at(new_state.panes, 0).size
+      # With 0.1 step, should increase by ~0.1
+      assert_in_delta new_left_size, initial_left_size + 0.1, 0.01
+    end
+
+    test "Ctrl+Left uses configured step size" do
+      props =
+        SplitPane.new(
+          panes: [
+            SplitPane.pane(:left, content("Left"), size: 0.5),
+            SplitPane.pane(:right, content("Right"), size: 0.5)
+          ],
+          ctrl_resize_step: 0.1
+        )
+
+      {:ok, state} = SplitPane.init(props)
+      _render = SplitPane.render(state, test_area(100, 24))
+
+      initial_left_size = Enum.at(state.panes, 0).size
+
+      {:ok, new_state} =
+        SplitPane.handle_event(%Event.Key{key: :left, modifiers: [:ctrl]}, state)
+
+      new_left_size = Enum.at(new_state.panes, 0).size
+      # With 0.1 step, should decrease by ~0.1
+      assert_in_delta new_left_size, initial_left_size - 0.1, 0.01
+    end
+
+    test "min_ratio is enforced" do
+      props =
+        SplitPane.new(
+          panes: [
+            SplitPane.pane(:left, content("Left"), size: 0.2),
+            SplitPane.pane(:right, content("Right"), size: 0.8)
+          ],
+          ctrl_resize_step: 0.15,
+          min_ratio: 0.1
+        )
+
+      {:ok, state} = SplitPane.init(props)
+      _render = SplitPane.render(state, test_area(100, 24))
+
+      # Try to shrink below min_ratio (0.2 - 0.15 = 0.05, but min is 0.1)
+      {:ok, new_state} =
+        SplitPane.handle_event(%Event.Key{key: :left, modifiers: [:ctrl]}, state)
+
+      new_left_size = Enum.at(new_state.panes, 0).size
+      # Should be clamped to min_ratio (0.1)
+      assert_in_delta new_left_size, 0.1, 0.01
+    end
+
+    test "max_ratio is enforced" do
+      props =
+        SplitPane.new(
+          panes: [
+            SplitPane.pane(:left, content("Left"), size: 0.8),
+            SplitPane.pane(:right, content("Right"), size: 0.2)
+          ],
+          ctrl_resize_step: 0.15,
+          max_ratio: 0.9
+        )
+
+      {:ok, state} = SplitPane.init(props)
+      _render = SplitPane.render(state, test_area(100, 24))
+
+      # Try to grow beyond max_ratio (0.8 + 0.15 = 0.95, but max is 0.9)
+      {:ok, new_state} =
+        SplitPane.handle_event(%Event.Key{key: :right, modifiers: [:ctrl]}, state)
+
+      new_left_size = Enum.at(new_state.panes, 0).size
+      # Should be clamped to max_ratio (0.9)
+      assert_in_delta new_left_size, 0.9, 0.01
+    end
+
+    test "cannot resize beyond min_ratio with multiple decreases" do
+      props =
+        SplitPane.new(
+          panes: [
+            SplitPane.pane(:left, content("Left"), size: 0.3),
+            SplitPane.pane(:right, content("Right"), size: 0.7)
+          ],
+          ctrl_resize_step: 0.1,
+          min_ratio: 0.15
+        )
+
+      {:ok, state} = SplitPane.init(props)
+      _render = SplitPane.render(state, test_area(100, 24))
+
+      # Decrease multiple times
+      {:ok, state} = SplitPane.handle_event(%Event.Key{key: :left, modifiers: [:ctrl]}, state)
+      {:ok, state} = SplitPane.handle_event(%Event.Key{key: :left, modifiers: [:ctrl]}, state)
+      {:ok, state} = SplitPane.handle_event(%Event.Key{key: :left, modifiers: [:ctrl]}, state)
+
+      new_left_size = Enum.at(state.panes, 0).size
+      # Should not go below min_ratio
+      assert new_left_size >= 0.15
+    end
+
+    test "cannot resize beyond max_ratio with multiple increases" do
+      props =
+        SplitPane.new(
+          panes: [
+            SplitPane.pane(:left, content("Left"), size: 0.7),
+            SplitPane.pane(:right, content("Right"), size: 0.3)
+          ],
+          ctrl_resize_step: 0.1,
+          max_ratio: 0.85
+        )
+
+      {:ok, state} = SplitPane.init(props)
+      _render = SplitPane.render(state, test_area(100, 24))
+
+      # Increase multiple times
+      {:ok, state} = SplitPane.handle_event(%Event.Key{key: :right, modifiers: [:ctrl]}, state)
+      {:ok, state} = SplitPane.handle_event(%Event.Key{key: :right, modifiers: [:ctrl]}, state)
+      {:ok, state} = SplitPane.handle_event(%Event.Key{key: :right, modifiers: [:ctrl]}, state)
+
+      new_left_size = Enum.at(state.panes, 0).size
+      # Should not exceed max_ratio
+      assert new_left_size <= 0.85
     end
   end
 

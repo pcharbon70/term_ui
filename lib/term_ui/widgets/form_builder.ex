@@ -39,7 +39,10 @@ defmodule TermUI.Widgets.FormBuilder do
 
   use TermUI.StatefulComponent
 
+  alias TermUI.CharacterSet
   alias TermUI.Event
+  alias TermUI.Renderer.Style
+  alias TermUI.Theme
   alias TermUI.Widgets.WidgetHelpers, as: Helpers
 
   @type field_type :: :text | :password | :checkbox | :radio | :select | :multi_select
@@ -299,13 +302,16 @@ defmodule TermUI.Widgets.FormBuilder do
 
   @impl true
   def render(state, area) do
+    # Get character set for group indicators
+    chars = CharacterSet.current_charset()
+
     # Group fields by their group
     grouped_fields = group_fields(state)
 
     # Render each group
     rendered_groups =
       Enum.flat_map(grouped_fields, fn {group_id, fields} ->
-        render_group(state, group_id, fields, area)
+        render_group(state, group_id, fields, area, chars)
       end)
 
     # Add submit button if enabled
@@ -560,15 +566,15 @@ defmodule TermUI.Widgets.FormBuilder do
 
   # Rendering
 
-  defp render_group(state, nil, fields, _area) do
+  defp render_group(state, nil, fields, _area, _chars) do
     # Ungrouped fields - just render them
     Enum.flat_map(fields, &render_field(state, &1))
   end
 
-  defp render_group(state, group, fields, _area) when is_map(group) do
+  defp render_group(state, group, fields, _area, chars) when is_map(group) do
     collapsed = MapSet.member?(state.collapsed_groups, group.id)
 
-    header = render_group_header(group, collapsed)
+    header = render_group_header(group, collapsed, chars)
 
     if collapsed do
       [header]
@@ -579,7 +585,8 @@ defmodule TermUI.Widgets.FormBuilder do
   end
 
   defp render_group_header(group, collapsed) do
-    indicator = if collapsed, do: "▶", else: "▼"
+    chars = CharacterSet.current_charset()
+    indicator = if collapsed, do: chars.triangle_right, else: chars.triangle_down
     text("#{indicator} #{group.label}")
   end
 
@@ -610,10 +617,12 @@ defmodule TermUI.Widgets.FormBuilder do
 
     # Add error messages
     if errors != [] do
+      error_style = Style.new() |> Style.fg(Theme.get_semantic(:error))
+
       error_rows =
         Enum.map(errors, fn err ->
           padding = String.duplicate(" ", label_width + 5)
-          styled(text("#{padding}! #{err}"), Style.new(fg: :red))
+          styled(text("#{padding}! #{err}"), error_style)
         end)
 
       [row | error_rows]

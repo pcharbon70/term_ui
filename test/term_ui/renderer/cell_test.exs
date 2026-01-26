@@ -348,6 +348,89 @@ defmodule TermUI.Renderer.CellTest do
       cell = Cell.new("1️⃣")
       assert cell.char == "1️⃣"
     end
+
+    # Bidirectional override character filtering (Security)
+    test "strips LRE bidirectional override (U+202A)" do
+      cell = Cell.new("\u202A")
+      assert cell.char == " "
+    end
+
+    test "strips RLE bidirectional override (U+202B)" do
+      cell = Cell.new("\u202B")
+      assert cell.char == " "
+    end
+
+    test "strips PDF bidirectional override (U+202C)" do
+      cell = Cell.new("\u202C")
+      assert cell.char == " "
+    end
+
+    test "strips LRO bidirectional override (U+202D)" do
+      cell = Cell.new("\u202D")
+      assert cell.char == " "
+    end
+
+    test "strips RLO bidirectional override (U+202E)" do
+      cell = Cell.new("\u202E")
+      assert cell.char == " "
+    end
+
+    test "strips LRI isolate (U+2066)" do
+      cell = Cell.new("\u2066")
+      assert cell.char == " "
+    end
+
+    test "strips RLI isolate (U+2067)" do
+      cell = Cell.new("\u2067")
+      assert cell.char == " "
+    end
+
+    test "strips FSI isolate (U+2068)" do
+      cell = Cell.new("\u2068")
+      assert cell.char == " "
+    end
+
+    test "strips PDI isolate (U+2069)" do
+      cell = Cell.new("\u2069")
+      assert cell.char == " "
+    end
+
+    test "strips bidi override from mixed content" do
+      # Text with RLO embedded could reverse direction visually
+      cell = Cell.new("Hello\u202EWorld")
+      assert cell.char == "HelloWorld"
+    end
+
+    # Unicode non-character filtering (Security)
+    test "strips U+FFFE non-character" do
+      cell = Cell.new("\uFFFE")
+      assert cell.char == " "
+    end
+
+    test "strips U+FFFF non-character" do
+      cell = Cell.new("\uFFFF")
+      assert cell.char == " "
+    end
+
+    test "strips U+FDD0 non-character" do
+      cell = Cell.new("\uFDD0")
+      assert cell.char == " "
+    end
+
+    test "strips U+FDEF non-character" do
+      cell = Cell.new("\uFDEF")
+      assert cell.char == " "
+    end
+
+    test "strips non-character from middle of range (U+FDD8)" do
+      cell = Cell.new("\uFDD8")
+      assert cell.char == " "
+    end
+
+    test "strips non-character from mixed content" do
+      cell = Cell.new("A\uFFFEB")
+      assert cell.char == "AB"
+    end
   end
 
   describe "wide character support" do

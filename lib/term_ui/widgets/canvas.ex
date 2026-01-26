@@ -34,6 +34,8 @@ defmodule TermUI.Widgets.Canvas do
 
   use TermUI.StatefulComponent
 
+  alias TermUI.CharacterSet
+
   # Braille patterns
   @braille_base 0x2800
 
@@ -215,7 +217,9 @@ defmodule TermUI.Widgets.Canvas do
   Draws a horizontal line.
   """
   @spec draw_hline(map(), integer(), integer(), integer(), String.t()) :: map()
-  def draw_hline(state, x, y, length, char \\ "─") do
+  def draw_hline(state, x, y, length, char \\ nil) do
+    char = char || CharacterSet.current_charset().h_line
+
     Enum.reduce(0..(length - 1), state, fn i, acc ->
       set_char(acc, x + i, y, char)
     end)
@@ -225,7 +229,9 @@ defmodule TermUI.Widgets.Canvas do
   Draws a vertical line.
   """
   @spec draw_vline(map(), integer(), integer(), integer(), String.t()) :: map()
-  def draw_vline(state, x, y, length, char \\ "│") do
+  def draw_vline(state, x, y, length, char \\ nil) do
+    char = char || CharacterSet.current_charset().v_line
+
     Enum.reduce(0..(length - 1), state, fn i, acc ->
       set_char(acc, x, y + i, char)
     end)
@@ -235,7 +241,8 @@ defmodule TermUI.Widgets.Canvas do
   Draws a line between two points using Bresenham's algorithm.
   """
   @spec draw_line(map(), integer(), integer(), integer(), integer(), String.t()) :: map()
-  def draw_line(state, x1, y1, x2, y2, char \\ "•") do
+  def draw_line(state, x1, y1, x2, y2, char \\ nil) do
+    char = char || CharacterSet.current_charset().dot
     dx = abs(x2 - x1)
     dy = abs(y2 - y1)
     sx = if x1 < x2, do: 1, else: -1
@@ -299,12 +306,13 @@ defmodule TermUI.Widgets.Canvas do
   """
   @spec draw_rect(map(), integer(), integer(), integer(), integer(), map()) :: map()
   def draw_rect(state, x, y, width, height, border \\ %{}) do
-    h = Map.get(border, :h, "─")
-    v = Map.get(border, :v, "│")
-    tl = Map.get(border, :tl, "┌")
-    tr = Map.get(border, :tr, "┐")
-    bl = Map.get(border, :bl, "└")
-    br = Map.get(border, :br, "┘")
+    chars = CharacterSet.current_charset()
+    h = Map.get(border, :h, chars.h_line)
+    v = Map.get(border, :v, chars.v_line)
+    tl = Map.get(border, :tl, chars.tl)
+    tr = Map.get(border, :tr, chars.tr)
+    bl = Map.get(border, :bl, chars.bl)
+    br = Map.get(border, :br, chars.br)
 
     # Top edge
     state = set_char(state, x, y, tl)

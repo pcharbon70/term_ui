@@ -115,6 +115,20 @@ defmodule TermUI.Renderer.BufferManager do
   end
 
   @doc """
+  Returns a child specification for starting in a supervisor.
+  """
+  @spec child_spec(keyword()) :: Supervisor.child_spec()
+  def child_spec(opts) do
+    %{
+      id: __MODULE__,
+      start: {__MODULE__, :start_link, [opts]},
+      restart: :permanent,
+      shutdown: 5000,
+      type: :worker
+    }
+  end
+
+  @doc """
   Returns the current buffer for writing.
 
   Components use this buffer for all cell modifications.

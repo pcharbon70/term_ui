@@ -349,6 +349,18 @@ defmodule TermUI.Renderer.Cell do
   # Allow printable ASCII (space through tilde), and Unicode above 0x9F
   # Block: control chars (0x00-0x1F), DEL (0x7F), and C1 controls (0x80-0x9F)
   defp safe_codepoint?(cp) when cp >= 0x20 and cp <= 0x7E, do: true
+
+  # Block bidirectional formatting characters (can cause visual text direction confusion)
+  # LRE, RLE, PDF, LRO, RLO (U+202A-U+202E)
+  defp safe_codepoint?(cp) when cp >= 0x202A and cp <= 0x202E, do: false
+  # LRI, RLI, FSI, PDI (U+2066-U+2069)
+  defp safe_codepoint?(cp) when cp >= 0x2066 and cp <= 0x2069, do: false
+
+  # Block Unicode non-characters (should never appear in interchange per Unicode spec)
+  defp safe_codepoint?(0xFFFE), do: false
+  defp safe_codepoint?(0xFFFF), do: false
+  defp safe_codepoint?(cp) when cp >= 0xFDD0 and cp <= 0xFDEF, do: false
+
   defp safe_codepoint?(cp) when cp >= 0xA0, do: true
   defp safe_codepoint?(_), do: false
 end

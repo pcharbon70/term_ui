@@ -72,18 +72,41 @@ This example contains:
 
 ## Running the Example
 
-From the `examples/line_chart` directory:
+### Raw Mode (Full TUI Experience)
+
+For the best experience with full terminal control and alternate screen:
 
 ```bash
-mix deps.get
-mix run -e "LineChart.App.run()"
+cd examples/line_chart
+mix termui.run
 ```
 
-Or using the Mix task:
+Or manually:
 
 ```bash
-mix line_chart
+cd examples/line_chart
+mix run -e "LineChart.App.run()" --no-halt
 ```
+
+### TTY Mode (IEx Compatible)
+
+To run from IEx without taking over the shell:
+
+```bash
+cd examples/line_chart
+iex -S mix
+```
+
+Then in IEx:
+
+```elixir
+LineChart.App.run()
+```
+
+**Note:** TTY mode works inside IEx but has limitations:
+- No alternate screen buffer (output mixes with IEx prompt)
+- Character input works immediately (no Enter needed)
+- For full TUI, use raw mode instead
 
 ## Controls
 

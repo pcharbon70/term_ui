@@ -40,6 +40,11 @@ defmodule TermUI.Renderer.CursorOptimizer do
   # Cost threshold for using spaces instead of cursor right
   @space_threshold 3
 
+  # Maximum cursor position supported by most terminals.
+  # ANSI escape sequence parameters beyond this may be truncated or
+  # cause undefined behavior on some terminals.
+  @max_cursor_pos 9999
+
   @doc """
   Creates a new cursor optimizer with cursor at position (1, 1).
   """
@@ -94,10 +99,13 @@ defmodule TermUI.Renderer.CursorOptimizer do
   Advances the cursor position after text output.
 
   Call this after outputting text to keep cursor position synchronized.
+  The new column position is clamped to `@max_cursor_pos` to prevent
+  integer overflow issues with ANSI escape sequences.
   """
   @spec advance(t(), non_neg_integer()) :: t()
   def advance(%__MODULE__{} = optimizer, cols) do
-    %{optimizer | col: optimizer.col + cols}
+    new_col = min(optimizer.col + cols, @max_cursor_pos)
+    %{optimizer | col: new_col}
   end
 
   @doc """
@@ -123,6 +131,14 @@ defmodule TermUI.Renderer.CursorOptimizer do
   def reset(%__MODULE__{} = optimizer) do
     %{optimizer | row: 1, col: 1}
   end
+
+  @doc """
+  Returns the maximum cursor position supported.
+
+  Positions beyond this value may cause undefined behavior on some terminals.
+  """
+  @spec max_position() :: pos_integer()
+  def max_position, do: @max_cursor_pos
 
   # Cost calculation functions
 

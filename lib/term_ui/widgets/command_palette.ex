@@ -30,11 +30,23 @@ defmodule TermUI.Widgets.CommandPalette do
   - Enter: Execute selected command
   - Escape: Close dropdown
   - Backspace: Delete character
+
+  ## Monochrome Compatibility
+
+  This widget is fully functional in monochrome terminals:
+  - Selected items use reverse video for visibility
+  - Filter input uses bold text for focus indication
+  - All visual states remain distinguishable without color
+
+  The widget automatically uses theme component styles which include
+  monochrome-visible attributes (reverse, bold).
   """
 
   use TermUI.StatefulComponent
 
   alias TermUI.Event
+  alias TermUI.Renderer.Style
+  alias TermUI.Theme
 
   @doc """
   Creates new CommandPalette widget props.
@@ -181,7 +193,7 @@ defmodule TermUI.Widgets.CommandPalette do
           padded_label = String.pad_trailing(cmd.label, min_width)
 
           if is_selected do
-            text("  " <> padded_label, Style.new(fg: :black, bg: :cyan))
+            text("  " <> padded_label, Theme.get_component_style(:item, :selected))
           else
             text("  " <> padded_label, nil)
           end

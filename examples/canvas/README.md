@@ -67,17 +67,41 @@ The example consists of:
 
 ## Running the Example
 
+### Raw Mode (Full TUI Experience)
+
+For the best experience with full terminal control and alternate screen:
+
 ```bash
 cd examples/canvas
-mix deps.get
+mix termui.run
+```
+
+Or manually:
+
+```bash
+cd examples/canvas
+mix run -e "Canvas.App.run()" --no-halt
+```
+
+### TTY Mode (IEx Compatible)
+
+To run from IEx without taking over the shell:
+
+```bash
+cd examples/canvas
 iex -S mix
 ```
 
-Then in the IEx shell:
+Then in IEx:
 
 ```elixir
 Canvas.App.run()
 ```
+
+**Note:** TTY mode works inside IEx but has limitations:
+- No alternate screen buffer (output mixes with IEx prompt)
+- Character input works immediately (no Enter needed)
+- For full TUI, use raw mode instead
 
 ## Controls
 

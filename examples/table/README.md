@@ -64,18 +64,41 @@ This example consists of:
 
 ## Running the Example
 
-From this directory:
+### Raw Mode (Full TUI Experience)
+
+For the best experience with full terminal control and alternate screen:
 
 ```bash
-# Install dependencies
-mix deps.get
+cd examples/table
+mix termui.run
+```
 
-# Run with the helper script
-elixir run.exs
+Or manually:
 
-# Or run directly with mix
+```bash
+cd examples/table
 mix run -e "Table.App.run()" --no-halt
 ```
+
+### TTY Mode (IEx Compatible)
+
+To run from IEx without taking over the shell:
+
+```bash
+cd examples/table
+iex -S mix
+```
+
+Then in IEx:
+
+```elixir
+Table.App.run()
+```
+
+**Note:** TTY mode works inside IEx but has limitations:
+- No alternate screen buffer (output mixes with IEx prompt)
+- Character input works immediately (no Enter needed)
+- For full TUI, use raw mode instead
 
 ## Controls
 

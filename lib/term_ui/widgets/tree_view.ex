@@ -42,11 +42,25 @@ defmodule TermUI.Widgets.TreeView do
   - Shift+Up/Down: Extend selection (multi-select mode)
   - /: Start search filter
   - Escape: Clear filter or deselect
+
+  ## Monochrome Compatibility
+
+  This widget is fully functional in monochrome terminals:
+  - Selected nodes use reverse video for visibility
+  - Cursor position uses bold text for focus indication
+  - Disabled nodes use dim text for de-emphasis
+  - Search matches highlighted with bold
+  - All interactive states remain distinguishable without color
+
+  The widget uses theme component styles for monochrome support.
   """
 
   use TermUI.StatefulComponent
 
+  alias TermUI.CharacterSet
   alias TermUI.Event
+  alias TermUI.Renderer.Style
+  alias TermUI.Theme
 
   @type node_id :: term()
 
@@ -59,12 +73,17 @@ defmodule TermUI.Widgets.TreeView do
           metadata: map()
         }
 
-  @default_icons %{
-    expanded: "▼",
-    collapsed: "▶",
-    leaf: " ",
-    loading: "⟳"
-  }
+  # Helper to get default icons from CharacterSet
+  defp default_icons do
+    chars = CharacterSet.current_charset()
+
+    %{
+      expanded: chars.triangle_down,
+      collapsed: chars.triangle_right,
+      leaf: " ",
+      loading: chars.loading
+    }
+  end
 
   # ----------------------------------------------------------------------------
   # Node Constructors
@@ -146,7 +165,7 @@ defmodule TermUI.Widgets.TreeView do
       selection_mode: Keyword.get(opts, :selection_mode, :single),
       show_root: Keyword.get(opts, :show_root, true),
       indent_size: Keyword.get(opts, :indent_size, 2),
-      icons: Map.merge(@default_icons, Keyword.get(opts, :icons, %{})),
+      icons: Map.merge(default_icons(), Keyword.get(opts, :icons, %{})),
       initially_expanded: Keyword.get(opts, :initially_expanded, []),
       initially_selected: Keyword.get(opts, :initially_selected, [])
     }
@@ -707,11 +726,13 @@ defmodule TermUI.Widgets.TreeView do
       end
 
     # Build selection indicator
+    chars = CharacterSet.current_charset()
+
     selection_prefix =
       cond do
-        is_cursor && is_selected -> "●"
-        is_cursor -> "►"
-        is_selected -> "○"
+        is_cursor && is_selected -> chars.bullet
+        is_cursor -> chars.pointer
+        is_selected -> chars.bullet_empty
         true -> " "
       end
 
@@ -722,19 +743,24 @@ defmodule TermUI.Widgets.TreeView do
     # Apply styling
     cond do
       node.disabled ->
-        styled(text(line), Style.new(fg: :bright_black))
+        styled(text(line), Style.new() |> Style.fg(Theme.get_semantic(:muted)))
 
       is_cursor && is_match ->
-        styled(text(line), Style.new(fg: :black, bg: :yellow))
+        cursor_match_style =
+          Style.new()
+          |> Style.fg(Theme.get_color(:background))
+          |> Style.bg(Theme.get_semantic(:warning))
+
+        styled(text(line), cursor_match_style)
 
       is_cursor ->
-        styled(text(line), Style.new(attrs: [:reverse]))
+        styled(text(line), Theme.get_component_style(:item, :focused))
 
       is_match ->
-        styled(text(line), Style.new(fg: :yellow))
+        styled(text(line), Style.new() |> Style.fg(Theme.get_semantic(:warning)))
 
       is_selected ->
-        styled(text(line), Style.new(fg: :cyan))
+        styled(text(line), Style.new() |> Style.fg(Theme.get_color(:primary)))
 
       true ->
         text(line)
@@ -746,7 +772,8 @@ defmodule TermUI.Widgets.TreeView do
     match_count = MapSet.size(state.filter_matches)
     count_text = if match_count > 0, do: " (#{match_count} matches)", else: " (no matches)"
 
-    styled(text(filter_text <> count_text), Style.new(fg: :yellow, attrs: [:bold]))
+    filter_style = Style.new() |> Style.fg(Theme.get_semantic(:warning)) |> Style.bold()
+    styled(text(filter_text <> count_text), filter_style)
   end
 
   # ----------------------------------------------------------------------------

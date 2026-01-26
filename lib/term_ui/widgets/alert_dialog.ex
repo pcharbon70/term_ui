@@ -34,15 +34,17 @@ defmodule TermUI.Widgets.AlertDialog do
 
   use TermUI.StatefulComponent
 
+  alias TermUI.CharacterSet
   alias TermUI.Event
 
-  @type_icons %{
-    info: "ℹ",
-    success: "✓",
-    warning: "⚠",
-    error: "✗",
-    confirm: "?",
-    ok_cancel: "?"
+  # Icon keys mapped to CharacterSet fields (or literal strings for ?)
+  @type_icon_keys %{
+    info: :info,
+    success: :check,
+    warning: :warning,
+    error: :cross_mark,
+    confirm: :literal_question,
+    ok_cancel: :literal_question
   }
 
   @type_buttons %{
@@ -78,13 +80,14 @@ defmodule TermUI.Widgets.AlertDialog do
   @spec new(keyword()) :: map()
   def new(opts) do
     type = Keyword.fetch!(opts, :type)
+    type_icons = get_type_icons()
 
     %{
       type: type,
       title: Keyword.fetch!(opts, :title),
       message: Keyword.fetch!(opts, :message),
       buttons: Map.get(@type_buttons, type, [%{id: :ok, label: "OK"}]),
-      icon: Map.get(@type_icons, type, ""),
+      icon_key: Map.get(@type_icon_keys, type, nil),
       width: Keyword.get(opts, :width, 50),
       on_result: Keyword.get(opts, :on_result),
       icon_style: Keyword.get(opts, :icon_style),
@@ -101,7 +104,7 @@ defmodule TermUI.Widgets.AlertDialog do
       title: props.title,
       message: props.message,
       buttons: props.buttons,
-      icon: props.icon,
+      icon_key: props.icon_key,
       width: props.width,
       focused_button: get_default_focus(props.buttons),
       on_result: props.on_result,
@@ -222,21 +225,23 @@ defmodule TermUI.Widgets.AlertDialog do
   end
 
   defp render_dialog(state, width) do
+    chars = CharacterSet.current_charset()
+
     # Border
-    top_border = text("┌" <> String.duplicate("─", width - 2) <> "┐")
-    bottom_border = text("└" <> String.duplicate("─", width - 2) <> "┘")
+    top_border = text(chars.tl <> String.duplicate(chars.h_line, width - 2) <> chars.tr)
+    bottom_border = text(chars.bl <> String.duplicate(chars.h_line, width - 2) <> chars.br)
 
     # Title
-    title = render_title(state, width)
+    title = render_title(state, width, chars)
 
     # Separator
-    separator = text("├" <> String.duplicate("─", width - 2) <> "┤")
+    separator = text(chars.t_right <> String.duplicate(chars.h_line, width - 2) <> chars.t_left)
 
     # Icon and message
-    content = render_content(state, width)
+    content = render_content(state, width, chars)
 
     # Buttons
-    buttons = render_buttons(state, width)
+    buttons = render_buttons(state, width, chars)
 
     stack(:vertical, [
       top_border,
@@ -249,12 +254,20 @@ defmodule TermUI.Widgets.AlertDialog do
     ])
   end
 
-  defp render_title(state, width) do
+  defp render_title(state, width, chars) do
+    # Get icon from charset (or use "?" for confirm/ok_cancel)
+    icon =
+      case state.icon_key do
+        :literal_question -> "?"
+        nil -> ""
+        key -> Map.get(chars, key, "")
+      end
+
     # Include icon in title if present
     # Extra space after icon to account for unicode width variations
     title_text =
-      if state.icon != "" do
-        state.icon <> "  " <> state.title
+      if icon != "" do
+        icon <> "  " <> state.title
       else
         state.title
       end
@@ -264,15 +277,17 @@ defmodule TermUI.Widgets.AlertDialog do
     right_pad = padding - left_pad
 
     line =
-      "│ " <>
+      chars.v_line <>
+        " " <>
         String.duplicate(" ", left_pad) <>
         title_text <>
-        String.duplicate(" ", right_pad) <> " │"
+        String.duplicate(" ", right_pad) <>
+        " " <> chars.v_line
 
     text(line)
   end
 
-  defp render_content(state, width) do
+  defp render_content(state, width, chars) do
     # Message only (icon is now in title)
     message = state.message
 
@@ -281,7 +296,7 @@ defmodule TermUI.Widgets.AlertDialog do
     padded = String.pad_trailing(message, inner_width)
     padded = String.slice(padded, 0, inner_width)
 
-    line = "│ " <> padded <> " │"
+    line = chars.v_line <> " " <> padded <> " " <> chars.v_line
 
     if state.message_style do
       styled(text(line), state.message_style)
@@ -290,7 +305,7 @@ defmodule TermUI.Widgets.AlertDialog do
     end
   end
 
-  defp render_buttons(state, width) do
+  defp render_buttons(state, width, chars) do
     button_texts =
       Enum.map(state.buttons, fn button ->
         label = button.label
@@ -310,11 +325,12 @@ defmodule TermUI.Widgets.AlertDialog do
     left_pad = max(0, div(padding, 2))
 
     line =
-      "│ " <>
+      chars.v_line <>
+        " " <>
         String.duplicate(" ", left_pad) <>
         buttons_line <>
         String.duplicate(" ", max(0, inner_width - left_pad - String.length(buttons_line))) <>
-        " │"
+        " " <> chars.v_line
 
     text(line)
   end

@@ -2,6 +2,7 @@ defmodule TermUI.Widgets.SupervisionTreeViewerTest do
   use ExUnit.Case, async: false
 
   alias TermUI.Event
+  alias TermUI.Theme
   alias TermUI.Widgets.SupervisionTreeViewer
 
   @area %{x: 0, y: 0, width: 100, height: 30}
@@ -77,6 +78,14 @@ defmodule TermUI.Widgets.SupervisionTreeViewerTest do
   end
 
   setup do
+    # Start Theme server for color support
+    {:ok, _theme_pid} = Theme.start_link(theme: :dark)
+
+    on_exit(fn ->
+      # Theme server will be automatically stopped when test process exits
+      :ok
+    end)
+
     # Each test will start its own supervisor
     :ok
   end

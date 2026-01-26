@@ -28,11 +28,35 @@ defmodule TermUI.Widgets.ContextMenu do
   - Closes on selection or escape
   - Closes on click outside menu bounds
   - Z-order above other content
+
+  ## Callback Error Handling
+
+  The `on_select` and `on_close` callbacks are executed synchronously within
+  the menu's event handling process. If a callback raises an exception, the
+  widget process will crash and be restarted by its supervisor.
+
+  **Best Practices:**
+  - Callbacks should not raise exceptions
+  - Use try/catch within callbacks for error handling
+  - Return quickly to avoid blocking the UI
+  - Dispatch long-running work to separate processes
+
+  Example:
+
+      on_select: fn id ->
+        try do
+          handle_menu_action(id)
+        rescue
+          e -> Logger.error("Menu action failed: \#{inspect(e)}")
+        end
+      end
   """
 
   use TermUI.StatefulComponent
 
+  alias TermUI.CharacterSet
   alias TermUI.Event
+  alias TermUI.Widgets.ContextMenu.Behavior
 
   # Item constructors
 
@@ -65,8 +89,10 @@ defmodule TermUI.Widgets.ContextMenu do
 
   - `:items` - List of menu items (required)
   - `:position` - {x, y} tuple for menu position (required)
-  - `:on_select` - Callback when item is selected
-  - `:on_close` - Callback when menu is closed
+  - `:on_select` - Callback when item is selected: `fn item_id -> ... end`
+    Called synchronously. Should not raise exceptions.
+  - `:on_close` - Callback when menu is closed: `fn -> ... end`
+    Called synchronously. Should not raise exceptions.
   - `:item_style` - Style for normal items
   - `:selected_style` - Style for focused item
   - `:disabled_style` - Style for disabled items
@@ -86,10 +112,14 @@ defmodule TermUI.Widgets.ContextMenu do
 
   @impl true
   def init(props) do
+    # Build ID-to-item map for O(1) lookups
+    item_map = Map.new(props.items, fn item -> {item.id, item} end)
+
     state = %{
       items: props.items,
+      item_map: item_map,
       position: props.position,
-      cursor: find_first_selectable(props.items),
+      cursor: Behavior.find_first_selectable(props.items),
       on_select: props.on_select,
       on_close: props.on_close,
       item_style: props.item_style,
@@ -103,22 +133,22 @@ defmodule TermUI.Widgets.ContextMenu do
 
   @impl true
   def handle_event(%Event.Key{key: :up}, state) do
-    state = move_cursor(state, -1)
+    state = Behavior.move_cursor(state, -1)
     {:ok, state}
   end
 
   def handle_event(%Event.Key{key: :down}, state) do
-    state = move_cursor(state, 1)
+    state = Behavior.move_cursor(state, 1)
     {:ok, state}
   end
 
   def handle_event(%Event.Key{key: key}, state) when key in [:enter, " "] do
-    state = select_at_cursor(state)
+    state = Behavior.select_at_cursor(state)
     {:ok, state}
   end
 
   def handle_event(%Event.Key{key: :escape}, state) do
-    state = close_menu(state)
+    state = Behavior.close_menu(state)
     {:ok, state}
   end
 
@@ -134,22 +164,23 @@ defmodule TermUI.Widgets.ContextMenu do
       relative_y = y - pos_y
       item = Enum.at(state.items, relative_y)
 
-      if item && selectable?(item) do
+      if item && Behavior.selectable?(item) do
         state = %{state | cursor: item.id}
-        state = select_at_cursor(state)
+        state = Behavior.select_at_cursor(state)
         {:ok, state}
       else
         {:ok, state}
       end
     else
       # Click outside menu - close
-      state = close_menu(state)
+      state = Behavior.close_menu(state)
       {:ok, state}
     end
   end
 
   # Mouse move/drag - highlight item under cursor
-  def handle_event(%Event.Mouse{action: action, x: x, y: y}, state) when action in [:move, :drag] do
+  def handle_event(%Event.Mouse{action: action, x: x, y: y}, state)
+      when action in [:move, :drag] do
     {pos_x, pos_y} = state.position
     menu_width = calculate_width(state.items)
     menu_height = length(state.items)
@@ -160,7 +191,7 @@ defmodule TermUI.Widgets.ContextMenu do
       relative_y = y - pos_y
       item = Enum.at(state.items, relative_y)
 
-      if item && selectable?(item) do
+      if item && Behavior.selectable?(item) do
         {:ok, %{state | cursor: item.id}}
       else
         {:ok, state}
@@ -177,12 +208,14 @@ defmodule TermUI.Widgets.ContextMenu do
   @impl true
   def render(state, _area) do
     if state.visible do
+      # Get character set for menu separators
+      chars = CharacterSet.current_charset()
       {pos_x, pos_y} = state.position
       width = calculate_width(state.items)
 
       rows =
         Enum.map(state.items, fn item ->
-          render_item(state, item, width)
+          render_item(state, item, width, chars)
         end)
 
       content = stack(:vertical, rows)
@@ -203,56 +236,6 @@ defmodule TermUI.Widgets.ContextMenu do
 
   # Private functions
 
-  defp find_first_selectable(items) do
-    items
-    |> Enum.find(fn item -> selectable?(item) end)
-    |> case do
-      nil -> nil
-      item -> item.id
-    end
-  end
-
-  defp selectable?(item) do
-    item.type == :action and not Map.get(item, :disabled, false)
-  end
-
-  defp move_cursor(state, direction) do
-    selectable_items = Enum.filter(state.items, &selectable?/1)
-
-    case Enum.find_index(selectable_items, fn item -> item.id == state.cursor end) do
-      nil ->
-        state
-
-      current_idx ->
-        new_idx = current_idx + direction
-        new_idx = max(0, min(new_idx, length(selectable_items) - 1))
-        item = Enum.at(selectable_items, new_idx)
-        %{state | cursor: item.id}
-    end
-  end
-
-  defp select_at_cursor(state) do
-    case Enum.find(state.items, fn item -> item.id == state.cursor end) do
-      %{type: :action} = item ->
-        if state.on_select && not Map.get(item, :disabled, false) do
-          state.on_select.(item.id)
-        end
-
-        close_menu(state)
-
-      _ ->
-        state
-    end
-  end
-
-  defp close_menu(state) do
-    if state.on_close do
-      state.on_close.()
-    end
-
-    %{state | visible: false}
-  end
-
   defp calculate_width(items) do
     items
     |> Enum.map(fn item ->
@@ -270,10 +253,11 @@ defmodule TermUI.Widgets.ContextMenu do
     |> Enum.max(fn -> 10 end)
   end
 
-  defp render_item(state, item, width) do
+  defp render_item(state, item, width, chars) do
     case item.type do
       :separator ->
-        text(String.duplicate("─", width))
+        chars = CharacterSet.current_charset()
+        text(String.duplicate(chars.h_line, width))
 
       _ ->
         render_action_item(state, item, width)

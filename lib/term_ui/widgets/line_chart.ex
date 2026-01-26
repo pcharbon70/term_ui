@@ -29,6 +29,7 @@ defmodule TermUI.Widgets.LineChart do
   """
 
   import TermUI.Component.RenderNode
+  alias TermUI.CharacterSet
   alias TermUI.Widgets.VisualizationHelper, as: VizHelper
 
   # Braille base character
@@ -116,6 +117,9 @@ defmodule TermUI.Widgets.LineChart do
   end
 
   defp do_render(series, width, height, show_axis, style, opts) do
+    # Get character set for axis characters
+    chars = CharacterSet.current_charset()
+
     # Get all values for scaling
     all_values = series |> Enum.flat_map(& &1.data)
     {min, max} = VizHelper.calculate_range(all_values, opts)
@@ -136,13 +140,13 @@ defmodule TermUI.Widgets.LineChart do
       # Convert canvas to braille characters
       rows =
         for y <- 0..(height - 1) do
-          chars =
+          chars_row =
             for x <- 0..(width - 1) do
               pattern = get_cell_pattern(canvas, x, y)
               <<@braille_base + pattern::utf8>>
             end
 
-          Enum.join(chars)
+          Enum.join(chars_row)
         end
 
       # Build render tree
@@ -151,7 +155,8 @@ defmodule TermUI.Widgets.LineChart do
       result =
         if show_axis do
           # Add axis
-          axis_row = text("└" <> VizHelper.safe_duplicate("─", width - 1))
+          chars = CharacterSet.current_charset()
+          axis_row = text(chars.bl <> VizHelper.safe_duplicate(chars.h_line, width - 1))
           stack(:vertical, row_nodes ++ [axis_row])
         else
           stack(:vertical, row_nodes)

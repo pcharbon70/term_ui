@@ -19,7 +19,7 @@ defmodule TermUI.Widgets.ToastTest do
       props = Toast.new(message: "Success!", type: :success)
 
       assert props.type == :success
-      assert props.icon == "✓"
+      assert props.icon_key == :check
     end
 
     test "creates toast with custom duration" do
@@ -40,17 +40,17 @@ defmodule TermUI.Widgets.ToastTest do
       assert props.position == :top_center
     end
 
-    test "uses correct icons for each type" do
-      types_and_icons = [
-        {:info, "ℹ"},
-        {:success, "✓"},
-        {:warning, "⚠"},
-        {:error, "✗"}
+    test "uses correct icon_keys for each type" do
+      types_and_icon_keys = [
+        {:info, :info},
+        {:success, :check},
+        {:warning, :warning},
+        {:error, :cross_mark}
       ]
 
-      for {type, expected_icon} <- types_and_icons do
+      for {type, expected_icon_key} <- types_and_icon_keys do
         props = Toast.new(message: "Test", type: type)
-        assert props.icon == expected_icon
+        assert props.icon_key == expected_icon_key
       end
     end
   end
@@ -286,7 +286,7 @@ defmodule TermUI.Widgets.ToastTest do
       assert result.type == :empty
     end
 
-    test "render returns stack for multiple toasts" do
+    test "render returns list of overlays for multiple toasts" do
       manager = ToastManager.new()
       manager = ToastManager.add_toast(manager, "Message 1")
       manager = ToastManager.add_toast(manager, "Message 2")
@@ -294,8 +294,9 @@ defmodule TermUI.Widgets.ToastTest do
 
       result = ToastManager.render(manager, area)
 
-      assert result.type == :stack
-      assert length(result.children) == 2
+      # render returns a list of toast overlays
+      assert is_list(result)
+      assert length(result) == 2
     end
   end
 end
