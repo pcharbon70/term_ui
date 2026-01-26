@@ -16,7 +16,7 @@ defmodule TermUI.Widgets.AlertDialogTest do
       assert props.type == :info
       assert props.title == "Information"
       assert props.message == "This is an info message"
-      assert props.icon == "i"
+      assert props.icon_key == :info
     end
 
     test "creates alert with correct buttons for info type" do
@@ -59,18 +59,18 @@ defmodule TermUI.Widgets.AlertDialogTest do
       assert :cancel in button_ids
     end
 
-    test "uses correct icons for each type" do
-      types_and_icons = [
-        {:info, "i"},
-        {:success, "x"},
-        {:warning, "!"},
-        {:error, "x"},
-        {:confirm, "?"}
+    test "uses correct icon_keys for each type" do
+      types_and_icon_keys = [
+        {:info, :info},
+        {:success, :check},
+        {:warning, :warning},
+        {:error, :cross_mark},
+        {:confirm, :literal_question}
       ]
 
-      for {type, expected_icon} <- types_and_icons do
+      for {type, expected_icon_key} <- types_and_icon_keys do
         props = AlertDialog.new(type: type, title: "T", message: "M")
-        assert props.icon == expected_icon, "Expected #{expected_icon} for #{type}"
+        assert props.icon_key == expected_icon_key, "Expected #{expected_icon_key} for #{type}"
       end
     end
   end

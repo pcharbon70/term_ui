@@ -36,8 +36,8 @@ defmodule TermUI.MixProject do
     ]
   end
 
-  defp elixirc_paths(:test), do: ["lib", "test/support"]
-  defp elixirc_paths(_), do: ["lib"]
+  defp elixirc_paths(:test), do: ["lib", "test/support", "mix/tasks"]
+  defp elixirc_paths(_), do: ["lib", "mix/tasks"]
 
   def application do
     [
@@ -81,6 +81,8 @@ defmodule TermUI.MixProject do
       },
       files: ~w(
         lib
+        mix/tasks
+        guides
         mix.exs
         README.md
         LICENSE

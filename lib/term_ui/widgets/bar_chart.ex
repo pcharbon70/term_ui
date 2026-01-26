@@ -61,16 +61,13 @@ defmodule TermUI.Widgets.BarChart do
         empty()
 
       :ok ->
+        chars = CharacterSet.current_charset()
         direction = Keyword.get(opts, :direction, :horizontal)
         width = opts |> Keyword.get(:width, 40) |> VizHelper.clamp_width()
         height = opts |> Keyword.get(:height, 10) |> VizHelper.clamp_height()
         show_values = Keyword.get(opts, :show_values, true)
         show_labels = Keyword.get(opts, :show_labels, true)
-
-        # Get character set for bar character
-        chars = CharacterSet.current_charset()
         bar_char = Keyword.get(opts, :bar_char, chars.bar_full)
-
         colors = Keyword.get(opts, :colors, [])
         style = Keyword.get(opts, :style)
 
@@ -140,7 +137,7 @@ defmodule TermUI.Widgets.BarChart do
         bar_length = min(bar_length, bar_width)
 
         bar = VizHelper.safe_duplicate(bar_char, bar_length)
-        empty_part = VizHelper.safe_duplicate(empty_char, bar_width - bar_length)
+        empty_part = String.duplicate(" ", bar_width - bar_length)
 
         # Value
         value_str =
@@ -228,8 +225,8 @@ defmodule TermUI.Widgets.BarChart do
     {bar_char, color}
   end
 
-  defp build_bar_char(_row, _bar_height, _index, _bar_char, empty_char, _colors) do
-    {empty_char, nil}
+  defp build_bar_char(_row, _bar_height, _index, _bar_char, _colors) do
+    {" ", nil}
   end
 
   defp style_bar_char({char, color}) do
@@ -251,12 +248,10 @@ defmodule TermUI.Widgets.BarChart do
   """
   @spec bar(keyword()) :: TermUI.Component.RenderNode.t()
   def bar(opts) do
+    chars = CharacterSet.current_charset()
     value = Keyword.get(opts, :value, 0)
     max = Keyword.get(opts, :max, 100)
     width = opts |> Keyword.get(:width, 20) |> VizHelper.clamp_width()
-
-    # Get character set for bar characters
-    chars = CharacterSet.current_charset()
     bar_char = Keyword.get(opts, :bar_char, chars.bar_full)
     empty_char = Keyword.get(opts, :empty_char, chars.bar_empty)
 

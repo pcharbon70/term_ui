@@ -162,11 +162,15 @@ defmodule TermUI.Widgets.SplitPane do
   @spec validate_resize_config(term(), term(), term()) :: {float(), float(), float()}
   defp validate_resize_config(step, min_r, max_r) do
     # Ensure step is in valid range (0.001 to 1.0)
-    step = if is_number(step) and step > 0 and step <= 1.0, do: step, else: @default_ctrl_resize_step
+    step =
+      if is_number(step) and step > 0 and step <= 1.0, do: step, else: @default_ctrl_resize_step
 
     # Ensure ratios are in valid range (0.0 to 1.0)
-    min_r = if is_number(min_r) and min_r >= 0.0 and min_r < 1.0, do: min_r, else: @default_min_ratio
-    max_r = if is_number(max_r) and max_r > 0.0 and max_r <= 1.0, do: max_r, else: @default_max_ratio
+    min_r =
+      if is_number(min_r) and min_r >= 0.0 and min_r < 1.0, do: min_r, else: @default_min_ratio
+
+    max_r =
+      if is_number(max_r) and max_r > 0.0 and max_r <= 1.0, do: max_r, else: @default_max_ratio
 
     # Ensure min < max, otherwise reset to defaults
     if min_r >= max_r do
@@ -634,8 +638,8 @@ defmodule TermUI.Widgets.SplitPane do
     chars = CharacterSet.current_charset()
     is_focused = state.focused_divider == divider_idx
     style = if is_focused, do: state.focused_divider_style, else: state.divider_style
-    # Use v_line for both focused and unfocused; style provides visual distinction
-    char = chars.v_line
+    chars = CharacterSet.current_charset()
+    char = if is_focused, do: chars.v_line_heavy, else: chars.v_line
 
     lines =
       for _ <- 1..height do
@@ -649,8 +653,8 @@ defmodule TermUI.Widgets.SplitPane do
     chars = CharacterSet.current_charset()
     is_focused = state.focused_divider == divider_idx
     style = if is_focused, do: state.focused_divider_style, else: state.divider_style
-    # Use h_line for both focused and unfocused; style provides visual distinction
-    char = chars.h_line
+    chars = CharacterSet.current_charset()
+    char = if is_focused, do: chars.h_line_heavy, else: chars.h_line
 
     text(String.duplicate(char, width), style)
   end
@@ -924,7 +928,14 @@ defmodule TermUI.Widgets.SplitPane do
   defp maybe_call_resize_callback(state) do
     if state.on_resize do
       sizes = Enum.map(state.panes, fn p -> {p.id, p.size} end)
-      state.on_resize.(sizes)
+
+      try do
+        state.on_resize.(sizes)
+      rescue
+        e ->
+          require Logger
+          Logger.error("SplitPane on_resize callback error: #{inspect(e)}")
+      end
     end
 
     {:ok, state}

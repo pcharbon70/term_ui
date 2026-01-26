@@ -69,18 +69,41 @@ The example maintains:
 
 ## Running the Example
 
-From the `examples/pick_list` directory:
+### Raw Mode (Full TUI Experience)
+
+For the best experience with full terminal control and alternate screen:
 
 ```bash
-mix deps.get
-mix run -e "PickList.App.run()"
+cd examples/pick_list
+mix termui.run
 ```
 
-Or using the Mix task:
+Or manually:
 
 ```bash
-mix pick_list
+cd examples/pick_list
+mix run -e "PickList.App.run()" --no-halt
 ```
+
+### TTY Mode (IEx Compatible)
+
+To run from IEx without taking over the shell:
+
+```bash
+cd examples/pick_list
+iex -S mix
+```
+
+Then in IEx:
+
+```elixir
+PickList.App.run()
+```
+
+**Note:** TTY mode works inside IEx but has limitations:
+- No alternate screen buffer (output mixes with IEx prompt)
+- Character input works immediately (no Enter needed)
+- For full TUI, use raw mode instead
 
 ## Controls
 

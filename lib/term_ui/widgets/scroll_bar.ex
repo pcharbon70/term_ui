@@ -47,13 +47,12 @@ defmodule TermUI.Widgets.ScrollBar do
   - `:position` - Current scroll position (default: 0)
   - `:length` - Bar length in characters (default: 20)
   - `:on_scroll` - Callback when position changes
-  - `:track_char` - Character for track (default: "░")
-  - `:thumb_char` - Character for thumb (default: "█")
+  - `:track_char` - Character for track (default from CharacterSet)
+  - `:thumb_char` - Character for thumb (default from CharacterSet)
   - `:min_thumb_size` - Minimum thumb size (default: 1)
   """
   @spec new(keyword()) :: map()
   def new(opts) do
-    # Get character set for scroll bar characters
     chars = CharacterSet.current_charset()
 
     %{

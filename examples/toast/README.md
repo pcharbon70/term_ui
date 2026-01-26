@@ -13,11 +13,41 @@ This example demonstrates the `TermUI.Widgets.Toast` and `TermUI.Widgets.ToastMa
 
 ## Running the Example
 
+### Raw Mode (Full TUI Experience)
+
+For the best experience with full terminal control and alternate screen:
+
 ```bash
 cd examples/toast
-mix deps.get
-mix run run.exs
+mix termui.run
 ```
+
+Or manually:
+
+```bash
+cd examples/toast
+mix run -e "Toast.App.run()" --no-halt
+```
+
+### TTY Mode (IEx Compatible)
+
+To run from IEx without taking over the shell:
+
+```bash
+cd examples/toast
+iex -S mix
+```
+
+Then in IEx:
+
+```elixir
+Toast.App.run()
+```
+
+**Note:** TTY mode works inside IEx but has limitations:
+- No alternate screen buffer (output mixes with IEx prompt)
+- Character input works immediately (no Enter needed)
+- For full TUI, use raw mode instead
 
 ## Controls
 

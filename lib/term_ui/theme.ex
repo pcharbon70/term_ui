@@ -263,7 +263,12 @@ defmodule TermUI.Theme do
         },
         item: %{
           normal: Style.new() |> Style.fg(:bright_white),
-          selected: Style.new() |> Style.fg(:black) |> Style.bg(:bright_cyan) |> Style.bold() |> Style.reverse(),
+          selected:
+            Style.new()
+            |> Style.fg(:black)
+            |> Style.bg(:bright_cyan)
+            |> Style.bold()
+            |> Style.reverse(),
           focused: Style.new() |> Style.fg(:black) |> Style.bg(:bright_yellow) |> Style.bold()
         },
         divider: %{
@@ -425,7 +430,7 @@ defmodule TermUI.Theme do
   @spec style_from_theme(atom(), atom(), keyword(), GenServer.server()) :: Style.t()
   def style_from_theme(component, variant, overrides \\ [], server \\ __MODULE__) do
     base = get_component_style(component, variant, server) || Style.new()
-    override_style = Style.from(overrides)
+    override_style = Style.new(overrides)
     Style.merge(base, override_style)
   end
 

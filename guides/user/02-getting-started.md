@@ -20,6 +20,69 @@ Then fetch dependencies:
 mix deps.get
 ```
 
+## Understanding Backends: Raw vs TTY
+
+TermUI supports two terminal backends that are automatically selected based on your environment:
+
+### Raw Mode (Full TUI Experience)
+
+Raw mode provides complete terminal control:
+
+- **Alternate screen buffer** - Preserves your shell history
+- **Character-by-character input** - No line buffering
+- **Full mouse support** - Click, drag, and scroll events
+- **Live UI updates** - Smooth 60 FPS rendering
+
+**When it's used:**
+- Running from command line (`mix run`, `mix termui.run`)
+- Terminal supports raw mode (OTP 28+)
+- No other shell is running
+
+### TTY Mode (IEx Compatible)
+
+TTY mode works inside IEx and other constrained environments:
+
+- **No alternate screen** - Output appears directly in terminal
+- **Immediate character input** - Uses `:io.get_chars/2` for IEx compatibility
+- **Reduced feature set** - Mouse support may be limited
+- **Works in IEx** - Perfect for development and debugging
+
+**When it's used:**
+- Running inside IEx
+- A shell is already running
+- Raw mode activation fails
+
+### Automatic Backend Selection
+
+TermUI automatically selects the appropriate backend:
+
+1. Attempts raw mode first
+2. Falls back to TTY mode if:
+   - IEx is detected
+   - A shell is already running
+   - Raw mode is unavailable
+
+You can also force a specific mode:
+
+```elixir
+# Force raw mode
+TermUI.Runtime.run(root: MyApp.Counter, backend: :raw)
+
+# Force TTY mode
+TermUI.Runtime.run(root: MyApp.Counter, backend: :tty)
+```
+
+### Which Should You Use?
+
+| Scenario | Recommended Mode |
+|----------|------------------|
+| Production application | Raw (auto-detected) |
+| Development in IEx | TTY (auto-detected) |
+| Testing/Debugging | TTY for IEx convenience |
+| SSH sessions | Auto (usually TTY) |
+
+The same code works in both modes - no changes needed!
+
 ## Your First Application
 
 Let's build a simple counter that responds to keyboard input.
@@ -199,15 +262,34 @@ end
 
 ## Running in IEx
 
-For development, you can start the app without blocking:
+For development and debugging, you can run your app in IEx using TTY mode:
 
-```elixir
+```bash
 iex -S mix
-iex> MyApp.start()
-{:ok, #PID<0.123.0>}
 ```
 
-The terminal UI will appear, and you'll return to the IEx prompt. Use `TermUI.Runtime.shutdown(pid)` to stop it.
+Then in IEx:
+
+```elixir
+iex> MyApp.run()
+```
+
+The app will run in TTY mode, which:
+- Works inside IEx without taking over the shell completely
+- Provides immediate character input (no Enter needed)
+- Displays output directly in the terminal
+
+For the full TUI experience with alternate screen, run from command line instead:
+
+```bash
+mix termui.run
+```
+
+or
+
+```bash
+mix run -e "MyApp.run()" --no-halt
+```
 
 ## Next Steps
 

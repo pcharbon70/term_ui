@@ -24,7 +24,7 @@ The main work in this phase is:
 
 ## 5.1 Create TextInput.Line Widget
 
-- [ ] **Section 5.1 Complete**
+- [x] **Section 5.1 Complete**
 
 Create a TTY-friendly variant of TextInput that uses `IO.gets/1` for line-based input. This widget is useful when shell line editing (backspace, history, cursor movement) is desirable.
 
@@ -86,12 +86,14 @@ Implement focus handling for the widget.
 
 ### Unit Tests - Section 5.1
 
-- [ ] **Unit Tests 5.1 Complete**
-- [ ] Test TextInput.Line initializes with default state
-- [ ] Test rendering includes label and prompt
-- [ ] Test `read/1` returns entered value (mock LineReader)
-- [ ] Test validator is applied to input
-- [ ] Test invalid input returns error with message
+- [x] **Unit Tests 5.1 Complete**
+- [x] Test TextInput.Line initializes with default state
+- [x] Test rendering includes label and prompt
+- [x] Test `read/1` returns entered value (mock LineReader)
+- [x] Test validator is applied to input
+- [x] Test invalid input returns error with message
+- [x] Test EOF/cancellation behavior (`:eof` and `:cancelled` return values)
+- [x] Test edge cases (unicode, long input, special characters)
 
 ---
 
@@ -197,7 +199,7 @@ Note: Completed as part of Task 5.3.1 (ContextMenu.Inline implementation)
 
 ## 5.4 Ensure Color Degradation in Widgets
 
-- [ ] **Section 5.4 Complete**
+- [x] **Section 5.4 Complete**
 
 Ensure all widgets that use colors query backend capabilities and degrade gracefully.
 
@@ -234,18 +236,18 @@ Ensure widgets remain usable in monochrome mode.
 
 ### Unit Tests - Section 5.4
 
-- [ ] **Unit Tests 5.4 Complete**
-- [ ] Test widgets render correctly in true_color mode
-- [ ] Test widgets render correctly in color_256 mode
-- [ ] Test widgets render correctly in color_16 mode
-- [ ] Test widgets render correctly in monochrome mode
-- [ ] Test selection is visible in all color modes
+- [x] **Unit Tests 5.4 Complete**
+- [x] Test widgets render correctly in true_color mode (integration tests)
+- [x] Test widgets render correctly in color_256 mode (integration tests)
+- [x] Test widgets render correctly in color_16 mode (integration tests)
+- [x] Test widgets render correctly in monochrome mode (integration tests)
+- [x] Test selection is visible in all color modes (theme tests: monochrome compatibility)
 
 ---
 
 ## 5.5 Ensure Character Set Handling in Widgets
 
-- [ ] **Section 5.5 Complete**
+- [x] **Section 5.5 Complete**
 
 Ensure all widgets that use box-drawing or special characters query the character set and use appropriate fallbacks.
 
@@ -262,122 +264,118 @@ Identify all widgets using special characters.
 
 ### 5.5.2 Use CharacterSet Module
 
-- [ ] **Task 5.5.2 Complete** (In Progress - P0 complete: 4 of 21 widgets, 17 remaining)
+- [x] **Task 5.5.2 Complete**
 
 Ensure widgets use CharacterSet for special characters.
 
-- [x] 5.5.2.1 Replace hardcoded box chars with `CharacterSet` (Dialog, AlertDialog complete - pattern established)
-- [x] 5.5.2.2 Replace hardcoded arrows with `CharacterSet` (Table, TreeView complete - P0 done, 17 widgets remaining)
-- [ ] 5.5.2.3 Replace hardcoded progress chars with `CharacterSet` (6 visualization widgets remaining in P2)
-
-**P0 Widgets Complete (Critical):** Dialog (25 tests), AlertDialog (22 tests), Table (41 tests), TreeView (65 tests) - 153 total tests passing
-
-**Remaining Work:** P1 (3 widgets), P2 (10 widgets), P3 (3 widgets with special handling)
+- [x] 5.5.2.1 Replace hardcoded box chars with `CharacterSet.current_charset().tl` etc.
+- [x] 5.5.2.2 Replace hardcoded arrows with `CharacterSet.current_charset().arrow_right` etc.
+- [x] 5.5.2.3 Replace hardcoded progress chars with `CharacterSet.current_charset().bar_full` etc.
 
 ### 5.5.3 Verify ASCII Fallbacks
 
-- [ ] **Task 5.5.3 Complete**
+- [x] **Task 5.5.3 Complete**
 
 Verify ASCII fallbacks render correctly.
 
-- [ ] 5.5.3.1 Test box borders render with +, -, | in ASCII mode
-- [ ] 5.5.3.2 Test arrows render with <, >, ^, v in ASCII mode
-- [ ] 5.5.3.3 Test progress bars render with #, - in ASCII mode
+- [x] 5.5.3.1 Test box borders render with +, -, | in ASCII mode
+- [x] 5.5.3.2 Test arrows render with <, >, ^, v in ASCII mode
+- [x] 5.5.3.3 Test progress bars render with #, . in ASCII mode
 
 ### Unit Tests - Section 5.5
 
-- [ ] **Unit Tests 5.5 Complete**
-- [ ] Test widgets render correctly with Unicode character set
-- [ ] Test widgets render correctly with ASCII character set
-- [ ] Test box-drawing degrades to ASCII correctly
-- [ ] Test arrows degrade to ASCII correctly
-- [ ] Test gauges/progress degrade to ASCII correctly
+- [x] **Unit Tests 5.5 Complete**
+- [x] Test widgets render correctly with Unicode character set (existing tests)
+- [x] Test widgets render correctly with ASCII character set
+- [x] Test box-drawing degrades to ASCII correctly
+- [x] Test arrows degrade to ASCII correctly
+- [x] Test gauges/progress degrade to ASCII correctly
 
 ---
 
 ## 5.6 Document Widget Compatibility
 
-- [ ] **Section 5.6 Complete**
+- [x] **Section 5.6 Complete**
 
 Create documentation explaining widget behavior across backends.
 
 ### 5.6.1 Create Compatibility Matrix
 
-- [ ] **Task 5.6.1 Complete**
+- [x] **Task 5.6.1 Complete**
 
 Document widget compatibility.
 
-- [ ] 5.6.1.1 Create table: Widget | Raw Mode | TTY Mode | Notes
-- [ ] 5.6.1.2 List fully compatible widgets (majority)
-- [ ] 5.6.1.3 List widgets with variants (TextInput → TextInput.Line)
-- [ ] 5.6.1.4 List features requiring keyboard alternatives (SplitPane drag, ContextMenu position)
+- [x] 5.6.1.1 Create table: Widget | Raw Mode | TTY Mode | Notes
+- [x] 5.6.1.2 List fully compatible widgets (majority)
+- [x] 5.6.1.3 List widgets with variants (TextInput → TextInput.Line)
+- [x] 5.6.1.4 List features requiring keyboard alternatives (SplitPane drag, ContextMenu position)
 
 ### 5.6.2 Document Best Practices
 
-- [ ] **Task 5.6.2 Complete**
+- [x] **Task 5.6.2 Complete**
 
 Document best practices for widget development.
 
-- [ ] 5.6.2.1 Always use Theme for colors
-- [ ] 5.6.2.2 Always use CharacterSet for special characters
-- [ ] 5.6.2.3 Provide keyboard alternatives for mouse features
-- [ ] 5.6.2.4 Test with both backends during development
+- [x] 5.6.2.1 Always use Theme for colors
+- [x] 5.6.2.2 Always use CharacterSet for special characters
+- [x] 5.6.2.3 Provide keyboard alternatives for mouse features
+- [x] 5.6.2.4 Test with both backends during development
 
 ### Unit Tests - Section 5.6
 
-- [ ] **Unit Tests 5.6 Complete**
-- [ ] Test documentation compiles without errors
-- [ ] Test code examples in documentation work
+- [x] **Unit Tests 5.6 Complete**
+- [x] Test documentation compiles without errors
+- [x] Test code examples in documentation work
 
 ---
 
 ## 5.7 Integration Tests
 
-- [ ] **Section 5.7 Complete**
+- [x] **Section 5.7 Complete**
 
 Integration tests verify widgets work correctly across both backends.
 
 ### 5.7.1 TextInput.Line Integration
 
-- [ ] **Task 5.7.1 Complete**
+- [x] **Task 5.7.1 Complete**
 
 Test TextInput.Line works correctly.
 
-- [ ] 5.7.1.1 Test line input with shell editing
-- [ ] 5.7.1.2 Test validation feedback
-- [ ] 5.7.1.3 Test focus flow
+- [x] 5.7.1.1 Test line input with shell editing
+- [x] 5.7.1.2 Test validation feedback
+- [x] 5.7.1.3 Test focus flow
 
 ### 5.7.2 Keyboard Navigation Tests
 
-- [ ] **Task 5.7.2 Complete**
+- [x] **Task 5.7.2 Complete**
 
 Test keyboard navigation works identically in both modes.
 
-- [ ] 5.7.2.1 Test List arrow navigation in raw mode
-- [ ] 5.7.2.2 Test List arrow navigation in TTY mode
-- [ ] 5.7.2.3 Test Menu navigation in both modes
-- [ ] 5.7.2.4 Test Tabs navigation in both modes
-- [ ] 5.7.2.5 Verify identical behavior between modes
+- [x] 5.7.2.1 Test List arrow navigation in raw mode
+- [x] 5.7.2.2 Test List arrow navigation in TTY mode
+- [x] 5.7.2.3 Test Menu navigation in both modes
+- [x] 5.7.2.4 Test Tabs navigation in both modes
+- [x] 5.7.2.5 Verify identical behavior between modes
 
 ### 5.7.3 Mouse Fallback Tests
 
-- [ ] **Task 5.7.3 Complete**
+- [x] **Task 5.7.3 Complete**
 
 Test mouse feature fallbacks work correctly.
 
-- [ ] 5.7.3.1 Test SplitPane keyboard resize
-- [ ] 5.7.3.2 Test ContextMenu.Inline number selection
-- [ ] 5.7.3.3 Test scrollbar keyboard alternatives
+- [x] 5.7.3.1 Test SplitPane keyboard resize
+- [x] 5.7.3.2 Test ContextMenu.Inline number selection
+- [x] 5.7.3.3 Test scrollbar keyboard alternatives (covered by keyboard navigation tests)
 
 ### 5.7.4 Visual Degradation Tests
 
-- [ ] **Task 5.7.4 Complete**
+- [x] **Task 5.7.4 Complete**
 
 Test visual degradation across capability levels.
 
-- [ ] 5.7.4.1 Test rendering in each color mode
-- [ ] 5.7.4.2 Test rendering with Unicode vs ASCII
-- [ ] 5.7.4.3 Test combined degradation (monochrome + ASCII)
+- [x] 5.7.4.1 Test rendering in each color mode
+- [x] 5.7.4.2 Test rendering with Unicode vs ASCII
+- [x] 5.7.4.3 Test combined degradation (monochrome + ASCII)
 
 ---
 

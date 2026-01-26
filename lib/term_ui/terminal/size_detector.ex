@@ -34,6 +34,7 @@ defmodule TermUI.Terminal.SizeDetector do
   """
 
   require Logger
+  alias TermUI.TermUtils
 
   # Maximum terminal dimension (rows or columns).
   # No production terminal exceeds this size. This provides defense against
@@ -141,20 +142,20 @@ defmodule TermUI.Terminal.SizeDetector do
   Detects terminal size from the `stty size` command.
 
   This is a fallback method that works on most Unix-like systems.
-  It spawns a subprocess to run `stty size`.
+  It spawns a subprocess to run `stty size` with safety protections.
   """
   @spec detect_from_stty() :: {:ok, {pos_integer(), pos_integer()}} | {:error, term()}
   def detect_from_stty do
-    case System.cmd("stty", ["size"], stderr_to_stdout: true) do
-      {output, 0} ->
+    case TermUtils.safe_stty(["size"]) do
+      {:ok, output} ->
         parse_stty_output(output)
 
-      _ ->
+      {:error, :timeout} ->
+        {:error, :stty_timeout}
+
+      {:error, _} ->
         {:error, :stty_failed}
     end
-  rescue
-    # Handle case where stty command doesn't exist
-    _ -> {:error, :stty_not_available}
   end
 
   @doc """

@@ -3,6 +3,7 @@ defmodule TermUI.Widgets.ContextMenu.InlineTest do
 
   import TermUI.Test.ContextMenuHelpers
 
+  alias TermUI.CharacterSet
   alias TermUI.Widgets.ContextMenu
   alias TermUI.Widgets.ContextMenu.Inline
   alias TermUI.Event
@@ -11,11 +12,12 @@ defmodule TermUI.Widgets.ContextMenu.InlineTest do
   # Test helpers
 
   defp create_test_props(opts \\ []) do
-    items = Keyword.get(opts, :items, [
-      ContextMenu.action(:copy, "Copy"),
-      ContextMenu.action(:paste, "Paste"),
-      ContextMenu.action(:delete, "Delete")
-    ])
+    items =
+      Keyword.get(opts, :items, [
+        ContextMenu.action(:copy, "Copy"),
+        ContextMenu.action(:paste, "Paste"),
+        ContextMenu.action(:delete, "Delete")
+      ])
 
     Inline.new(
       items: items,
@@ -64,6 +66,7 @@ defmodule TermUI.Widgets.ContextMenu.InlineTest do
         ContextMenu.action(:paste, "Paste", disabled: true),
         ContextMenu.action(:delete, "Delete")
       ]
+
       props = create_test_props(items: items)
       {:ok, state} = Inline.init(props)
 
@@ -77,6 +80,7 @@ defmodule TermUI.Widgets.ContextMenu.InlineTest do
         ContextMenu.separator(),
         ContextMenu.action(:paste, "Paste")
       ]
+
       props = create_test_props(items: items)
       {:ok, state} = Inline.init(props)
 
@@ -141,6 +145,7 @@ defmodule TermUI.Widgets.ContextMenu.InlineTest do
         ContextMenu.separator(),
         ContextMenu.action(:paste, "Paste")
       ]
+
       props = create_test_props(items: items)
       {:ok, state} = Inline.init(props)
 
@@ -152,10 +157,13 @@ defmodule TermUI.Widgets.ContextMenu.InlineTest do
 
     test "applies item_style to normal items" do
       item_style = Style.new(fg: :white, bg: :black)
-      props = Inline.new(
-        items: [ContextMenu.action(:copy, "Copy")],
-        item_style: item_style
-      )
+
+      props =
+        Inline.new(
+          items: [ContextMenu.action(:copy, "Copy")],
+          item_style: item_style
+        )
+
       {:ok, state} = Inline.init(props)
       # Move cursor away from first item to make it normal
       state = %{state | cursor: :other}
@@ -170,13 +178,16 @@ defmodule TermUI.Widgets.ContextMenu.InlineTest do
 
     test "applies selected_style to cursor item" do
       selected_style = Style.new(fg: :black, bg: :cyan)
-      props = Inline.new(
-        items: [
-          ContextMenu.action(:copy, "Copy"),
-          ContextMenu.action(:paste, "Paste")
-        ],
-        selected_style: selected_style
-      )
+
+      props =
+        Inline.new(
+          items: [
+            ContextMenu.action(:copy, "Copy"),
+            ContextMenu.action(:paste, "Paste")
+          ],
+          selected_style: selected_style
+        )
+
       {:ok, state} = Inline.init(props)
       # Cursor starts at first item (:copy)
 
@@ -190,13 +201,16 @@ defmodule TermUI.Widgets.ContextMenu.InlineTest do
 
     test "applies disabled_style to disabled items" do
       disabled_style = Style.new(fg: :bright_black, bg: :black)
-      props = Inline.new(
-        items: [
-          ContextMenu.action(:copy, "Copy"),
-          ContextMenu.action(:paste, "Paste", disabled: true)
-        ],
-        disabled_style: disabled_style
-      )
+
+      props =
+        Inline.new(
+          items: [
+            ContextMenu.action(:copy, "Copy"),
+            ContextMenu.action(:paste, "Paste", disabled: true)
+          ],
+          disabled_style: disabled_style
+        )
+
       {:ok, state} = Inline.init(props)
 
       render = Inline.render(state, test_area(80, 24))
@@ -211,11 +225,13 @@ defmodule TermUI.Widgets.ContextMenu.InlineTest do
       selected_style = Style.new(fg: :black, bg: :cyan)
       disabled_style = Style.new(fg: :bright_black, bg: :black)
 
-      props = Inline.new(
-        items: [ContextMenu.action(:paste, "Paste", disabled: true)],
-        selected_style: selected_style,
-        disabled_style: disabled_style
-      )
+      props =
+        Inline.new(
+          items: [ContextMenu.action(:paste, "Paste", disabled: true)],
+          selected_style: selected_style,
+          disabled_style: disabled_style
+        )
+
       {:ok, state} = Inline.init(props)
       # Try to select disabled item
       state = %{state | cursor: :paste}
@@ -229,9 +245,7 @@ defmodule TermUI.Widgets.ContextMenu.InlineTest do
     end
 
     test "renders without styles when none provided" do
-      props = Inline.new(
-        items: [ContextMenu.action(:copy, "Copy")]
-      )
+      props = Inline.new(items: [ContextMenu.action(:copy, "Copy")])
       {:ok, state} = Inline.init(props)
 
       render = Inline.render(state, test_area(80, 24))
@@ -275,6 +289,7 @@ defmodule TermUI.Widgets.ContextMenu.InlineTest do
         ContextMenu.separator(),
         ContextMenu.action(:paste, "Paste")
       ]
+
       props = create_test_props(items: items)
       {:ok, state} = Inline.init(props)
 
@@ -283,8 +298,9 @@ defmodule TermUI.Widgets.ContextMenu.InlineTest do
       # Separator should be between items
       [_item1, _space1, separator, _space2, _item2] = render.children
 
+      chars = CharacterSet.current_charset()
       assert separator.type == :text
-      assert separator.content == "|"
+      assert separator.content == chars.v_line
     end
 
     test "renders separators as horizontal lines in vertical mode" do
@@ -293,6 +309,7 @@ defmodule TermUI.Widgets.ContextMenu.InlineTest do
         ContextMenu.separator(),
         ContextMenu.action(:paste, "Paste")
       ]
+
       props = create_test_props(items: items, orientation: :vertical)
       {:ok, state} = Inline.init(props)
 
@@ -311,6 +328,7 @@ defmodule TermUI.Widgets.ContextMenu.InlineTest do
         ContextMenu.action(:paste, "Paste", disabled: true),
         ContextMenu.action(:delete, "Delete")
       ]
+
       props = create_test_props(items: items)
       {:ok, state} = Inline.init(props)
 
@@ -327,6 +345,7 @@ defmodule TermUI.Widgets.ContextMenu.InlineTest do
         ContextMenu.action(:copy, "Copy"),
         ContextMenu.separator()
       ]
+
       props = create_test_props(items: items)
       {:ok, state} = Inline.init(props)
 
@@ -335,15 +354,18 @@ defmodule TermUI.Widgets.ContextMenu.InlineTest do
       # Separator has no number
       [_item1, _space, separator] = render.children
 
+      chars = CharacterSet.current_charset()
       assert separator.type == :text
-      assert separator.content == "|"
+      assert separator.content == chars.v_line
     end
 
     test "limits numbers to 1-9" do
       # Create 10 items
-      items = for i <- 1..10 do
-        ContextMenu.action(:"item_#{i}", "Item #{i}")
-      end
+      items =
+        for i <- 1..10 do
+          ContextMenu.action(:"item_#{i}", "Item #{i}")
+        end
+
       props = create_test_props(items: items)
       {:ok, state} = Inline.init(props)
 
@@ -440,6 +462,7 @@ defmodule TermUI.Widgets.ContextMenu.InlineTest do
         ContextMenu.separator(),
         ContextMenu.action(:paste, "Paste")
       ]
+
       props = create_test_props(items: items)
       {:ok, state} = Inline.init(props)
 
@@ -455,6 +478,7 @@ defmodule TermUI.Widgets.ContextMenu.InlineTest do
         ContextMenu.action(:paste, "Paste", disabled: true),
         ContextMenu.action(:delete, "Delete")
       ]
+
       props = create_test_props(items: items)
       {:ok, state} = Inline.init(props)
 
@@ -531,6 +555,7 @@ defmodule TermUI.Widgets.ContextMenu.InlineTest do
         ContextMenu.action(:paste, "Paste", disabled: true),
         ContextMenu.action(:delete, "Delete")
       ]
+
       props = create_test_props(items: items, on_select: on_select)
       {:ok, state} = Inline.init(props)
 

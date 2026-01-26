@@ -33,11 +33,12 @@ defmodule TermUI.Widgets.Toast do
   alias TermUI.CharacterSet
   alias TermUI.Event
 
-  @type_icons %{
-    info: "ℹ",
-    success: "✓",
-    warning: "⚠",
-    error: "✗"
+  # Icon keys mapped to CharacterSet fields
+  @type_icon_keys %{
+    info: :info,
+    success: :check,
+    warning: :warning,
+    error: :cross_mark
   }
 
   @doc """
@@ -62,7 +63,7 @@ defmodule TermUI.Widgets.Toast do
     %{
       message: Keyword.fetch!(opts, :message),
       type: type,
-      icon: Map.get(@type_icons, type, ""),
+      icon_key: Map.get(@type_icon_keys, type, nil),
       duration: Keyword.get(opts, :duration, 3000),
       position: Keyword.get(opts, :position, :bottom_right),
       width: Keyword.get(opts, :width, 40),
@@ -78,7 +79,7 @@ defmodule TermUI.Widgets.Toast do
     state = %{
       message: props.message,
       toast_type: props.type,
-      icon: props.icon,
+      icon_key: props.icon_key,
       duration: props.duration,
       position: props.position,
       width: props.width,
@@ -149,12 +150,16 @@ defmodule TermUI.Widgets.Toast do
   end
 
   defp render_toast(state) do
-    # Get character set for box drawing
     chars = CharacterSet.current_charset()
     width = state.width
 
-    # Icon + message
-    icon = state.icon
+    # Get icon from charset
+    icon =
+      case state.icon_key do
+        nil -> ""
+        key -> Map.get(chars, key, "")
+      end
+
     message = state.message
 
     content_text =

@@ -49,6 +49,104 @@ defmodule TermUI do
     Terminal.get_terminal_size()
   end
 
+  @doc """
+  Returns whether the application is running inside IEx.
+
+  This function checks multiple indicators to determine if the code is
+  executing within an IEx session:
+
+  1. Whether the IEx module is loaded
+  2. Whether the current process is an IEx evaluator
+  3. Configuration overrides (config or environment variable)
+
+  The result can be overridden by:
+  - Setting `config :term_ui, iex_compatible: true` in config
+  - Setting the `TERM_UI_IEX_MODE` environment variable to `"true"` or `"false"`
+
+  ## Examples
+
+      iex> TermUI.iex_mode?()
+      true
+
+      # In a standalone script:
+      TermUI.iex_mode?()
+      false
+
+  ## Configuration
+
+  To force IEx-compatible mode (useful for testing):
+
+      # config/config.exs
+      config :term_ui, iex_compatible: true
+
+  To override via environment variable:
+
+      export TERM_UI_IEX_MODE=true
+
+  """
+  @spec iex_mode?() :: boolean()
+  def iex_mode? do
+    cond do
+      # Environment variable override takes precedence
+      env_var = System.get_env("TERM_UI_IEX_MODE") ->
+        env_var in ["true", "1", "yes"]
+
+      # Config override
+      config = Application.get_env(:term_ui, :iex_compatible) ->
+        config == true
+
+      # Auto-detection
+      true ->
+        iex_running?()
+    end
+  end
+
+  @doc """
+  Returns the current execution mode.
+
+  Returns `:iex` if running inside IEx, `:standalone` otherwise.
+
+  ## Examples
+
+      iex> TermUI.running_mode()
+      :iex
+
+      # In a standalone script:
+      TermUI.running_mode()
+      :standalone
+
+  """
+  @spec running_mode() :: :iex | :standalone
+  def running_mode do
+    if iex_mode?(), do: :iex, else: :standalone
+  end
+
+  # Check if IEx is actually running (not just loaded)
+  defp iex_running? do
+    # Check if IEx module is available and loaded
+    Code.ensure_loaded?(IEx) and
+      # Check if we're in an IEx evaluator process
+      iex_evaluator_process?()
+  end
+
+  # Check if current process or any ancestor is an IEx evaluator
+  defp iex_evaluator_process? do
+    # Get the current process's dictionary and check for IEx-specific keys
+    # IEx evaluator processes have the :iex_server key in their dictionary
+    Process.info(self(), :dictionary)
+    |> case do
+      {:dictionary, dictionary} ->
+        # Check for IEx evaluator indicator
+        Enum.any?(dictionary, fn
+          {:iex_server, _} -> true
+          _ -> false
+        end)
+
+      _ ->
+        false
+    end
+  end
+
   defp ensure_terminal_started do
     case Process.whereis(Terminal) do
       nil ->

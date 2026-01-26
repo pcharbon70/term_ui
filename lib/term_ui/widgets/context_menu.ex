@@ -256,6 +256,7 @@ defmodule TermUI.Widgets.ContextMenu do
   defp render_item(state, item, width, chars) do
     case item.type do
       :separator ->
+        chars = CharacterSet.current_charset()
         text(String.duplicate(chars.h_line, width))
 
       _ ->

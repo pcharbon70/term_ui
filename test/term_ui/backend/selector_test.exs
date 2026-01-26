@@ -1,5 +1,6 @@
 defmodule TermUI.Backend.SelectorTest do
   use ExUnit.Case, async: true
+  import ExUnit.CaptureLog
 
   alias TermUI.Backend.Selector
   import TermUI.Backend.SelectorTestHelpers
@@ -613,6 +614,34 @@ defmodule TermUI.Backend.SelectorTest do
           # Raw mode succeeded - also valid
           assert_valid_raw_state(state)
       end
+    end
+  end
+
+  describe "logging" do
+    test "logs backend selection at info level" do
+      log = capture_log(fn ->
+        Selector.select()
+      end)
+
+      assert log =~ "TermUI: Backend selected"
+    end
+
+    test "logs forced backend selection" do
+      log = capture_log(fn ->
+        Selector.select(TermUI.Backend.TTY)
+      end)
+
+      assert log =~ "TermUI: Using forced backend"
+      assert log =~ "TermUI.Backend.TTY"
+    end
+
+    test "logs forced backend with options" do
+      log = capture_log(fn ->
+        Selector.select({TermUI.Backend.TTY, [line_mode: :full_redraw]})
+      end)
+
+      assert log =~ "TermUI: Using forced backend"
+      assert log =~ "TermUI.Backend.TTY"
     end
   end
 end

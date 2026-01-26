@@ -191,15 +191,16 @@ defmodule TermUI.Widgets.ContextMenu.Behavior do
   @spec select_at_cursor(map()) :: map()
   def select_at_cursor(state) do
     # Use O(1) map lookup if available, otherwise fall back to O(n) list search
-    item = case Map.get(state, :item_map) do
-      nil -> Enum.find(state.items, fn item -> item.id == state.cursor end)
-      item_map -> Map.get(item_map, state.cursor)
-    end
+    item =
+      case Map.get(state, :item_map) do
+        nil -> Enum.find(state.items, fn item -> item.id == state.cursor end)
+        item_map -> Map.get(item_map, state.cursor)
+      end
 
     case item do
       %{type: :action} = item ->
         if state.on_select && not Map.get(item, :disabled, false) do
-          state.on_select.(item.id)
+          safe_callback(state.on_select, [item.id], "on_select")
         end
 
         close_menu(state)
@@ -245,9 +246,29 @@ defmodule TermUI.Widgets.ContextMenu.Behavior do
   @spec close_menu(map()) :: map()
   def close_menu(state) do
     if state.on_close do
-      state.on_close.()
+      safe_callback(state.on_close, [], "on_close")
     end
 
     %{state | visible: false}
+  end
+
+  # ----------------------------------------------------------------------------
+  # Private: Safe Callback Execution
+  # ----------------------------------------------------------------------------
+
+  @doc false
+  @spec safe_callback(function(), list(), String.t()) :: :ok | {:error, term()}
+  defp safe_callback(callback, args, callback_name) do
+    try do
+      apply(callback, args)
+      :ok
+    rescue
+      e ->
+        require Logger
+
+        Logger.error("ContextMenu #{callback_name} callback error: #{inspect(e)}")
+
+        {:error, e}
+    end
   end
 end

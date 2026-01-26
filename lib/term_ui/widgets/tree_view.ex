@@ -73,14 +73,15 @@ defmodule TermUI.Widgets.TreeView do
           metadata: map()
         }
 
-  # Default icons - function instead of module attribute to support runtime charset
-  defp get_default_icons do
+  # Helper to get default icons from CharacterSet
+  defp default_icons do
     chars = CharacterSet.current_charset()
+
     %{
-      expanded: chars.arrow_down,
-      collapsed: chars.arrow_right,
+      expanded: chars.triangle_down,
+      collapsed: chars.triangle_right,
       leaf: " ",
-      loading: "o"  # ASCII fallback for loading spinner
+      loading: chars.loading
     }
   end
 
@@ -164,7 +165,7 @@ defmodule TermUI.Widgets.TreeView do
       selection_mode: Keyword.get(opts, :selection_mode, :single),
       show_root: Keyword.get(opts, :show_root, true),
       indent_size: Keyword.get(opts, :indent_size, 2),
-      icons: Map.merge(get_default_icons(), Keyword.get(opts, :icons, %{})),
+      icons: Map.merge(default_icons(), Keyword.get(opts, :icons, %{})),
       initially_expanded: Keyword.get(opts, :initially_expanded, []),
       initially_selected: Keyword.get(opts, :initially_selected, [])
     }
@@ -725,11 +726,13 @@ defmodule TermUI.Widgets.TreeView do
       end
 
     # Build selection indicator
+    chars = CharacterSet.current_charset()
+
     selection_prefix =
       cond do
-        is_cursor && is_selected -> "●"
-        is_cursor -> "►"
-        is_selected -> "○"
+        is_cursor && is_selected -> chars.bullet
+        is_cursor -> chars.pointer
+        is_selected -> chars.bullet_empty
         true -> " "
       end
 

@@ -39,17 +39,41 @@ The example includes sample commands like `/help`, `/save`, `/quit`, `/settings`
 
 ## Running the Example
 
+### Raw Mode (Full TUI Experience)
+
+For the best experience with full terminal control and alternate screen:
+
 ```bash
 cd examples/command_palette
-mix deps.get
+mix termui.run
+```
+
+Or manually:
+
+```bash
+cd examples/command_palette
+mix run -e "CommandPalette.run()" --no-halt
+```
+
+### TTY Mode (IEx Compatible)
+
+To run from IEx without taking over the shell:
+
+```bash
+cd examples/command_palette
 iex -S mix
 ```
 
-Then in the IEx shell:
+Then in IEx:
 
 ```elixir
-CommandPalette.App.run()
+CommandPalette.run()
 ```
+
+**Note:** TTY mode works inside IEx but has limitations:
+- No alternate screen buffer (output mixes with IEx prompt)
+- Character input works immediately (no Enter needed)
+- For full TUI, use raw mode instead
 
 ## Controls
 

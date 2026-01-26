@@ -114,10 +114,12 @@ stack(:horizontal, [
 
 ### Terminal Features
 
-- **Raw Mode** - Character-by-character input without line buffering
-- **Alternate Screen** - Preserves user's shell history
-- **Mouse Tracking** - Click, drag, and scroll events
-- **Focus Events** - Know when the terminal gains/loses focus
+TermUI supports two backend modes with automatic selection:
+
+- **Raw Mode** - Full TUI experience with alternate screen, character-by-character input, and mouse support
+- **TTY Mode** - IEx-compatible mode for development and debugging
+
+See [Getting Started: Backends](02-getting-started.md#understanding-backends-raw-vs-tty) for details on when each mode is used.
 
 ## Requirements
 

@@ -27,7 +27,7 @@ defmodule TermUI.Backend.State do
           %State{
             backend_module: TermUI.Backend.Raw,
             backend_state: raw_state,
-            mode: :raw,
+            backend_mode: :raw,
             capabilities: %{},
             initialized: false
           }
@@ -36,7 +36,7 @@ defmodule TermUI.Backend.State do
           %State{
             backend_module: TermUI.Backend.TTY,
             backend_state: nil,
-            mode: :tty,
+            backend_mode: :tty,
             capabilities: capabilities,
             initialized: false
           }
@@ -46,17 +46,23 @@ defmodule TermUI.Backend.State do
 
   - `:backend_module` - The backend implementation module (required)
   - `:backend_state` - Backend-specific internal state
-  - `:mode` - Current terminal mode, `:raw` or `:tty` (required)
+  - `:backend_mode` - Current terminal mode, `:raw` or `:tty` (required)
   - `:capabilities` - Map of detected terminal capabilities
   - `:size` - Cached terminal dimensions as `{rows, cols}` or `nil`
   - `:initialized` - Whether the backend has been fully initialized
+
+  ## Naming Convention
+
+  This field is named `:backend_mode` (not `:mode`) to be consistent with
+  `Runtime.State.backend_mode` and to avoid confusion with other mode fields
+  throughout the codebase (e.g., `line_mode`, `mouse_mode`, `color_mode`).
 
   ## Constructors
 
   Instead of creating structs directly, use the constructor functions:
 
       # General constructor with explicit backend module
-      State.new(MyBackend, mode: :tty, capabilities: %{colors: :true_color})
+      State.new(MyBackend, backend_mode: :tty, capabilities: %{colors: :true_color})
 
       # Convenience constructor for raw mode
       State.new_raw()
@@ -77,7 +83,7 @@ defmodule TermUI.Backend.State do
   @typedoc """
   Terminal mode indicating which backend type is active.
   """
-  @type mode :: :raw | :tty
+  @type backend_mode :: :raw | :tty
 
   @typedoc """
   Cached terminal dimensions as `{rows, cols}`.
@@ -92,17 +98,17 @@ defmodule TermUI.Backend.State do
   @type t :: %__MODULE__{
           backend_module: module(),
           backend_state: term(),
-          mode: mode(),
+          backend_mode: backend_mode(),
           capabilities: map(),
           size: dimensions(),
           initialized: boolean()
         }
 
-  @enforce_keys [:backend_module, :mode]
+  @enforce_keys [:backend_module, :backend_mode]
   defstruct [
     :backend_module,
     :backend_state,
-    :mode,
+    :backend_mode,
     capabilities: %{},
     size: nil,
     initialized: false
@@ -115,7 +121,7 @@ defmodule TermUI.Backend.State do
 
   - `backend_module` - The backend implementation module
   - `opts` - Keyword list of options:
-    - `:mode` - Required. The terminal mode (`:raw` or `:tty`)
+    - `:backend_mode` - Required. The terminal mode (`:raw` or `:tty`)
     - `:backend_state` - Optional. Backend-specific internal state
     - `:capabilities` - Optional. Map of terminal capabilities (default: `%{}`)
     - `:size` - Optional. Cached dimensions as `{rows, cols}` (default: `nil`)
@@ -123,20 +129,20 @@ defmodule TermUI.Backend.State do
 
   ## Examples
 
-      iex> State.new(MyBackend, mode: :tty)
-      %State{backend_module: MyBackend, mode: :tty, ...}
+      iex> State.new(MyBackend, backend_mode: :tty)
+      %State{backend_module: MyBackend, backend_mode: :tty, ...}
 
-      iex> State.new(MyBackend, mode: :tty, capabilities: %{colors: :true_color})
-      %State{backend_module: MyBackend, mode: :tty, capabilities: %{colors: :true_color}, ...}
+      iex> State.new(MyBackend, backend_mode: :tty, capabilities: %{colors: :true_color})
+      %State{backend_module: MyBackend, backend_mode: :tty, capabilities: %{colors: :true_color}, ...}
 
   ## Raises
 
-  - `ArgumentError` if `:mode` is not provided in options
+  - `ArgumentError` if `:backend_mode` is not provided in options
   """
   @spec new(module(), keyword()) :: t()
   def new(backend_module, opts \\ []) do
-    unless Keyword.has_key?(opts, :mode) do
-      raise ArgumentError, "the :mode option is required"
+    unless Keyword.has_key?(opts, :backend_mode) do
+      raise ArgumentError, "the :backend_mode option is required"
     end
 
     struct!(__MODULE__, [{:backend_module, backend_module} | opts])
@@ -147,7 +153,7 @@ defmodule TermUI.Backend.State do
 
   This is a convenience function that sets:
   - `backend_module` to `TermUI.Backend.Raw`
-  - `mode` to `:raw`
+  - `backend_mode` to `:raw`
   - `capabilities` to `%{}`
 
   ## Arguments
@@ -157,17 +163,17 @@ defmodule TermUI.Backend.State do
   ## Examples
 
       iex> State.new_raw()
-      %State{backend_module: TermUI.Backend.Raw, mode: :raw, ...}
+      %State{backend_module: TermUI.Backend.Raw, backend_mode: :raw, ...}
 
       iex> State.new_raw(%{raw_mode_started: true})
-      %State{backend_module: TermUI.Backend.Raw, mode: :raw, backend_state: %{raw_mode_started: true}, ...}
+      %State{backend_module: TermUI.Backend.Raw, backend_mode: :raw, backend_state: %{raw_mode_started: true}, ...}
   """
   @spec new_raw(term()) :: t()
   def new_raw(backend_state \\ nil) do
     %__MODULE__{
       backend_module: TermUI.Backend.Raw,
       backend_state: backend_state,
-      mode: :raw,
+      backend_mode: :raw,
       capabilities: %{},
       size: nil,
       initialized: false
@@ -179,7 +185,7 @@ defmodule TermUI.Backend.State do
 
   This is a convenience function that sets:
   - `backend_module` to `TermUI.Backend.TTY`
-  - `mode` to `:tty`
+  - `backend_mode` to `:tty`
 
   ## Arguments
 
@@ -189,17 +195,17 @@ defmodule TermUI.Backend.State do
   ## Examples
 
       iex> State.new_tty(%{colors: :color_256, unicode: true})
-      %State{backend_module: TermUI.Backend.TTY, mode: :tty, capabilities: %{colors: :color_256, unicode: true}, ...}
+      %State{backend_module: TermUI.Backend.TTY, backend_mode: :tty, capabilities: %{colors: :color_256, unicode: true}, ...}
 
       iex> State.new_tty(%{colors: :true_color}, %{some: :state})
-      %State{backend_module: TermUI.Backend.TTY, mode: :tty, capabilities: %{colors: :true_color}, backend_state: %{some: :state}, ...}
+      %State{backend_module: TermUI.Backend.TTY, backend_mode: :tty, capabilities: %{colors: :true_color}, backend_state: %{some: :state}, ...}
   """
   @spec new_tty(map(), term()) :: t()
   def new_tty(capabilities, backend_state \\ nil) when is_map(capabilities) do
     %__MODULE__{
       backend_module: TermUI.Backend.TTY,
       backend_state: backend_state,
-      mode: :tty,
+      backend_mode: :tty,
       capabilities: capabilities,
       size: nil,
       initialized: false

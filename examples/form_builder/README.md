@@ -81,11 +81,41 @@ form_builder/
 
 ## Running the Example
 
+### Raw Mode (Full TUI Experience)
+
+For the best experience with full terminal control and alternate screen:
+
 ```bash
-# From the form_builder directory
-mix deps.get
-mix run -e "FormBuilder.App.run()" --no-halt
+cd examples/form_builder
+mix termui.run
 ```
+
+Or manually:
+
+```bash
+cd examples/form_builder
+mix run -e "FormBuilder.run()" --no-halt
+```
+
+### TTY Mode (IEx Compatible)
+
+To run from IEx without taking over the shell:
+
+```bash
+cd examples/form_builder
+iex -S mix
+```
+
+Then in IEx:
+
+```elixir
+FormBuilder.run()
+```
+
+**Note:** TTY mode works inside IEx but has limitations:
+- No alternate screen buffer (output mixes with IEx prompt)
+- Character input works immediately (no Enter needed)
+- For full TUI, use raw mode instead
 
 ## Controls
 

@@ -374,6 +374,7 @@ defmodule TermUI.Widgets.Menu do
   defp render_item(state, item, depth, width, chars) do
     case item.type do
       :separator ->
+        chars = CharacterSet.current_charset()
         text(String.duplicate(chars.h_line, width))
 
       _ ->
@@ -405,14 +406,20 @@ defmodule TermUI.Widgets.Menu do
     end
   end
 
-  defp get_item_prefix(%{type: :checkbox, checked: true}, _state, _chars), do: "[x] "
-  defp get_item_prefix(%{type: :checkbox}, _state, _chars), do: "[ ] "
+  defp get_item_prefix(%{type: :checkbox, checked: true}, _state) do
+    chars = CharacterSet.current_charset()
+    "[#{chars.check}] "
+  end
 
-  defp get_item_prefix(%{type: :submenu, id: id}, state, chars) do
+  defp get_item_prefix(%{type: :checkbox}, _state), do: "[ ] "
+
+  defp get_item_prefix(%{type: :submenu, id: id}, state) do
+    chars = CharacterSet.current_charset()
+
     if MapSet.member?(state.expanded, id) do
-      "#{chars.arrow_down} "
+      "#{chars.triangle_down} "
     else
-      "#{chars.arrow_right} "
+      "#{chars.triangle_right} "
     end
   end
 

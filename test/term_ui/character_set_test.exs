@@ -63,17 +63,17 @@ defmodule TermUI.CharacterSetTest do
 
     test "all characters are strings" do
       chars = CharacterSet.get(:unicode)
+      # These keys are lists, not single strings
+      list_keys = [:bar_levels, :sparkline_levels]
 
       for key <- CharacterSet.keys() do
         value = Map.get(chars, key)
 
-        case key do
-          :bar_levels ->
-            assert is_list(value), "#{key} should be a list"
-            assert Enum.all?(value, &is_binary/1), "#{key} elements should be strings"
-
-          _ ->
-            assert is_binary(value), "#{key} should be a string, got: #{inspect(value)}"
+        if key in list_keys do
+          assert is_list(value), "#{key} should be a list"
+          assert Enum.all?(value, &is_binary/1), "#{key} elements should be strings"
+        else
+          assert is_binary(value), "#{key} should be a string, got: #{inspect(value)}"
         end
       end
     end
@@ -135,17 +135,17 @@ defmodule TermUI.CharacterSetTest do
 
     test "all characters are strings" do
       chars = CharacterSet.get(:ascii)
+      # These keys are lists, not single strings
+      list_keys = [:bar_levels, :sparkline_levels]
 
       for key <- CharacterSet.keys() do
         value = Map.get(chars, key)
 
-        case key do
-          :bar_levels ->
-            assert is_list(value), "#{key} should be a list"
-            assert Enum.all?(value, &is_binary/1), "#{key} elements should be strings"
-
-          _ ->
-            assert is_binary(value), "#{key} should be a string, got: #{inspect(value)}"
+        if key in list_keys do
+          assert is_list(value), "#{key} should be a list"
+          assert Enum.all?(value, &is_binary/1), "#{key} elements should be strings"
+        else
+          assert is_binary(value), "#{key} should be a string, got: #{inspect(value)}"
         end
       end
     end
@@ -365,19 +365,19 @@ defmodule TermUI.CharacterSetTest do
   describe "ASCII character validity" do
     test "ASCII characters are all printable" do
       chars = CharacterSet.get(:ascii)
+      # These keys are lists, not single strings
+      list_keys = [:bar_levels, :sparkline_levels]
 
       for key <- CharacterSet.keys() do
         value = Map.get(chars, key)
 
-        case key do
-          :bar_levels ->
-            for {level, _} <- Enum.with_index(value) do
-              assert String.printable?(level),
-                     "bar_levels contains non-printable: #{inspect(level)}"
-            end
-
-          _ ->
-            assert String.printable?(value), "#{key} is not printable: #{inspect(value)}"
+        if key in list_keys do
+          for {level, _} <- Enum.with_index(value) do
+            assert String.printable?(level),
+                   "#{key} contains non-printable: #{inspect(level)}"
+          end
+        else
+          assert String.printable?(value), "#{key} is not printable: #{inspect(value)}"
         end
       end
     end
@@ -411,6 +411,96 @@ defmodule TermUI.CharacterSetTest do
         value = Map.get(chars, key)
         assert byte_size(value) == 1, "#{key} should be single byte, got: #{inspect(value)}"
       end
+    end
+  end
+
+  # ===========================================================================
+  # Line Drawing Convenience Functions Tests
+  # ===========================================================================
+
+  describe "horizontal_line/1" do
+    test "creates line of specified width" do
+      Application.put_env(:term_ui, :character_set, :unicode)
+      line = CharacterSet.horizontal_line(5)
+      assert line == "─────"
+    end
+
+    test "returns empty string for width 0" do
+      assert CharacterSet.horizontal_line(0) == ""
+    end
+
+    test "uses ascii characters when configured" do
+      Application.put_env(:term_ui, :character_set, :ascii)
+      line = CharacterSet.horizontal_line(5)
+      assert line == "-----"
+      Application.put_env(:term_ui, :character_set, :unicode)
+    end
+  end
+
+  describe "vertical_line/1" do
+    test "creates list of vertical characters" do
+      Application.put_env(:term_ui, :character_set, :unicode)
+      lines = CharacterSet.vertical_line(3)
+      assert lines == ["│", "│", "│"]
+    end
+
+    test "returns empty list for height 0" do
+      assert CharacterSet.vertical_line(0) == []
+    end
+
+    test "uses ascii characters when configured" do
+      Application.put_env(:term_ui, :character_set, :ascii)
+      lines = CharacterSet.vertical_line(3)
+      assert lines == ["|", "|", "|"]
+      Application.put_env(:term_ui, :character_set, :unicode)
+    end
+  end
+
+  describe "box_top/1" do
+    test "creates top border with corners" do
+      Application.put_env(:term_ui, :character_set, :unicode)
+      top = CharacterSet.box_top(10)
+      assert top == "┌────────┐"
+    end
+
+    test "handles minimum width of 2" do
+      Application.put_env(:term_ui, :character_set, :unicode)
+      top = CharacterSet.box_top(2)
+      assert top == "┌┐"
+    end
+
+    test "handles width of 1" do
+      Application.put_env(:term_ui, :character_set, :unicode)
+      top = CharacterSet.box_top(1)
+      assert top == "─"
+    end
+
+    test "uses ascii characters when configured" do
+      Application.put_env(:term_ui, :character_set, :ascii)
+      top = CharacterSet.box_top(10)
+      assert top == "+--------+"
+      Application.put_env(:term_ui, :character_set, :unicode)
+    end
+  end
+
+  describe "box_bottom/1" do
+    test "creates bottom border with corners" do
+      Application.put_env(:term_ui, :character_set, :unicode)
+      bottom = CharacterSet.box_bottom(10)
+      assert bottom == "└────────┘"
+    end
+
+    test "handles minimum width of 2" do
+      Application.put_env(:term_ui, :character_set, :unicode)
+      bottom = CharacterSet.box_bottom(2)
+      assert bottom == "└┘"
+    end
+
+    test "uses ascii characters when configured" do
+      Application.put_env(:term_ui, :character_set, :ascii)
+      bottom = CharacterSet.box_bottom(10)
+      assert bottom == "+--------+"
+      Application.put_env(:term_ui, :character_set, :unicode)
     end
   end
 end

@@ -155,6 +155,7 @@ defmodule TermUI.Widgets.LineChart do
       result =
         if show_axis do
           # Add axis
+          chars = CharacterSet.current_charset()
           axis_row = text(chars.bl <> VizHelper.safe_duplicate(chars.h_line, width - 1))
           stack(:vertical, row_nodes ++ [axis_row])
         else

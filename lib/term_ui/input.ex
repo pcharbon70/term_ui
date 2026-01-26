@@ -36,10 +36,11 @@ defmodule TermUI.Input do
 
   ## Implementing the Behaviour
 
-  Input handlers must implement two callbacks:
+  Input handlers must implement three callbacks:
 
   - `poll/2` - Read input with optional timeout
   - `mode/1` - Return the input mode (`:raw` or `:tty`)
+  - `stop/1` - Cleanup and release resources
 
   ## Example Implementation
 
@@ -186,4 +187,41 @@ defmodule TermUI.Input do
       # => :raw or :tty
   """
   @callback mode(state()) :: mode()
+
+  @doc """
+  Stop the input handler and release any resources.
+
+  This callback is called during runtime shutdown to allow the handler
+  to perform cleanup operations such as:
+
+  - Restoring terminal IO options
+  - Stopping any background processes
+  - Closing file descriptors or ports
+
+  The function should be idempotent—calling it multiple times should
+  have the same effect as calling it once.
+
+  ## Parameters
+
+  - `state` - Handler-specific state
+
+  ## Returns
+
+  - `:ok` - Cleanup completed successfully
+
+  ## Examples
+
+      :ok = MyInput.stop(state)
+
+  ## Implementation Notes
+
+  - **Raw handler**: Typically a no-op since InputReader is managed separately
+  - **TTY handler**: Should restore IO options (echo, binary mode)
+  - Custom handlers: Implement any necessary cleanup
+
+  This callback is always called during runtime shutdown, even if
+  the handler was never successfully started or has already been
+  stopped due to EOF.
+  """
+  @callback stop(state()) :: :ok
 end

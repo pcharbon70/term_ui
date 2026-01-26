@@ -116,9 +116,7 @@ defmodule TermUI.Widgets.Sparkline do
   """
   @spec value_to_bar(number(), number(), number()) :: String.t()
   def value_to_bar(value, min, max) when is_number(value) and is_number(min) and is_number(max) do
-    # Get character set for bar levels
-    chars = CharacterSet.current_charset()
-    bars = chars.bar_levels
+    bars = bar_characters()
     bar_count = length(bars)
 
     if max > min do
@@ -136,17 +134,17 @@ defmodule TermUI.Widgets.Sparkline do
 
   def value_to_bar(_value, _min, _max) do
     # Invalid input, return middle bar
-    chars = CharacterSet.current_charset()
-    bars = chars.bar_levels
+    bars = bar_characters()
     Enum.at(bars, div(length(bars), 2))
   end
 
   @doc """
   Returns the list of bar characters used by sparklines.
+  Uses CharacterSet for proper ASCII/Unicode degradation.
   """
   @spec bar_characters() :: [String.t()]
   def bar_characters do
-    CharacterSet.current_charset().bar_levels
+    CharacterSet.current_charset().sparkline_levels
   end
 
   @doc """

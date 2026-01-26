@@ -206,8 +206,9 @@ defmodule TermUI.Widgets.Viewport do
         stack(:vertical, [content, h_bar])
 
       :both ->
-        v_bar = render_vertical_bar(state, vp_height, chars)
-        h_bar = render_horizontal_bar(state, vp_width, chars)
+        chars = CharacterSet.current_charset()
+        v_bar = render_vertical_bar(state, vp_height)
+        h_bar = render_horizontal_bar(state, vp_width)
 
         # Content + vertical bar on top, horizontal bar on bottom
         top_row = stack(:horizontal, [content, v_bar])
@@ -296,14 +297,16 @@ defmodule TermUI.Widgets.Viewport do
 
     thumb_pos = round((height - thumb_size) * scroll_fraction)
 
+    charset = CharacterSet.current_charset()
+
     # Build the bar
     lines =
       for y <- 0..(height - 1) do
         char =
           if y >= thumb_pos and y < thumb_pos + thumb_size do
-            chars.bar_full
+            charset.bar_full
           else
-            chars.bar_empty
+            charset.bar_empty
           end
 
         text(char)
@@ -312,7 +315,8 @@ defmodule TermUI.Widgets.Viewport do
     stack(:vertical, lines)
   end
 
-  defp render_horizontal_bar(state, width, charset) do
+  defp render_horizontal_bar(state, width) do
+    charset = CharacterSet.current_charset()
     vp_width = viewport_width(state)
 
     # Calculate thumb position and size
@@ -329,7 +333,7 @@ defmodule TermUI.Widgets.Viewport do
     thumb_pos = round((width - thumb_size) * scroll_fraction)
 
     # Build the bar
-    chars =
+    bar_chars =
       for x <- 0..(width - 1) do
         if x >= thumb_pos and x < thumb_pos + thumb_size do
           charset.bar_full
@@ -338,7 +342,7 @@ defmodule TermUI.Widgets.Viewport do
         end
       end
 
-    text(Enum.join(chars))
+    text(Enum.join(bar_chars))
   end
 
   defp click_on_vertical_bar?(state, x, _y) do

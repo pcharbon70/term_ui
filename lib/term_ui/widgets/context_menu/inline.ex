@@ -54,6 +54,7 @@ defmodule TermUI.Widgets.ContextMenu.Inline do
 
   use TermUI.StatefulComponent
 
+  alias TermUI.CharacterSet
   alias TermUI.Event
   alias TermUI.Widgets.ContextMenu.Behavior
 
@@ -267,7 +268,7 @@ defmodule TermUI.Widgets.ContextMenu.Inline do
         case Map.get(state.item_map, item_id) do
           %{type: :action} = item ->
             if state.on_select && not Map.get(item, :disabled, false) do
-              state.on_select.(item.id)
+              safe_callback(state.on_select, [item.id], "on_select")
             end
 
             Behavior.close_menu(state)
@@ -275,6 +276,19 @@ defmodule TermUI.Widgets.ContextMenu.Inline do
           _ ->
             state
         end
+    end
+  end
+
+  # Safe callback execution with error handling
+  defp safe_callback(callback, args, callback_name) do
+    try do
+      apply(callback, args)
+      :ok
+    rescue
+      e ->
+        require Logger
+        Logger.error("ContextMenu.Inline #{callback_name} callback error: #{inspect(e)}")
+        {:error, e}
     end
   end
 
@@ -294,9 +308,11 @@ defmodule TermUI.Widgets.ContextMenu.Inline do
   end
 
   defp render_separator(state) do
+    chars = CharacterSet.current_charset()
+
     case state.orientation do
-      :horizontal -> text("|")
-      :vertical -> text("───")
+      :horizontal -> text(chars.v_line)
+      :vertical -> text(String.duplicate(chars.h_line, 3))
     end
   end
 

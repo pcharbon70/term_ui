@@ -37,17 +37,15 @@ defmodule TermUI.Widgets.AlertDialog do
   alias TermUI.CharacterSet
   alias TermUI.Event
 
-  # Type icons - function instead of module attribute to support runtime charset
-  defp get_type_icons do
-    %{
-      info: "i",
-      success: "x",
-      warning: "!",
-      error: "x",
-      confirm: "?",
-      ok_cancel: "?"
-    }
-  end
+  # Icon keys mapped to CharacterSet fields (or literal strings for ?)
+  @type_icon_keys %{
+    info: :info,
+    success: :check,
+    warning: :warning,
+    error: :cross_mark,
+    confirm: :literal_question,
+    ok_cancel: :literal_question
+  }
 
   @type_buttons %{
     info: [%{id: :ok, label: "OK", default: true}],
@@ -89,7 +87,7 @@ defmodule TermUI.Widgets.AlertDialog do
       title: Keyword.fetch!(opts, :title),
       message: Keyword.fetch!(opts, :message),
       buttons: Map.get(@type_buttons, type, [%{id: :ok, label: "OK"}]),
-      icon: Map.get(type_icons, type, ""),
+      icon_key: Map.get(@type_icon_keys, type, nil),
       width: Keyword.get(opts, :width, 50),
       on_result: Keyword.get(opts, :on_result),
       icon_style: Keyword.get(opts, :icon_style),
@@ -106,7 +104,7 @@ defmodule TermUI.Widgets.AlertDialog do
       title: props.title,
       message: props.message,
       buttons: props.buttons,
-      icon: props.icon,
+      icon_key: props.icon_key,
       width: props.width,
       focused_button: get_default_focus(props.buttons),
       on_result: props.on_result,
@@ -227,7 +225,6 @@ defmodule TermUI.Widgets.AlertDialog do
   end
 
   defp render_dialog(state, width) do
-    # Get character set for box-drawing
     chars = CharacterSet.current_charset()
 
     # Border
@@ -258,11 +255,19 @@ defmodule TermUI.Widgets.AlertDialog do
   end
 
   defp render_title(state, width, chars) do
+    # Get icon from charset (or use "?" for confirm/ok_cancel)
+    icon =
+      case state.icon_key do
+        :literal_question -> "?"
+        nil -> ""
+        key -> Map.get(chars, key, "")
+      end
+
     # Include icon in title if present
     # Extra space after icon to account for unicode width variations
     title_text =
-      if state.icon != "" do
-        state.icon <> "  " <> state.title
+      if icon != "" do
+        icon <> "  " <> state.title
       else
         state.title
       end
@@ -272,10 +277,12 @@ defmodule TermUI.Widgets.AlertDialog do
     right_pad = padding - left_pad
 
     line =
-      "#{chars.v_line} " <>
+      chars.v_line <>
+        " " <>
         String.duplicate(" ", left_pad) <>
         title_text <>
-        String.duplicate(" ", right_pad) <> " #{chars.v_line}"
+        String.duplicate(" ", right_pad) <>
+        " " <> chars.v_line
 
     text(line)
   end
@@ -289,7 +296,7 @@ defmodule TermUI.Widgets.AlertDialog do
     padded = String.pad_trailing(message, inner_width)
     padded = String.slice(padded, 0, inner_width)
 
-    line = "#{chars.v_line} " <> padded <> " #{chars.v_line}"
+    line = chars.v_line <> " " <> padded <> " " <> chars.v_line
 
     if state.message_style do
       styled(text(line), state.message_style)
@@ -318,11 +325,12 @@ defmodule TermUI.Widgets.AlertDialog do
     left_pad = max(0, div(padding, 2))
 
     line =
-      "#{chars.v_line} " <>
+      chars.v_line <>
+        " " <>
         String.duplicate(" ", left_pad) <>
         buttons_line <>
         String.duplicate(" ", max(0, inner_width - left_pad - String.length(buttons_line))) <>
-        " #{chars.v_line}"
+        " " <> chars.v_line
 
     text(line)
   end

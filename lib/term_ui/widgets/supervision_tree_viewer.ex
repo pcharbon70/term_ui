@@ -930,6 +930,7 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
     count = length(state.flattened)
 
     style = Style.new() |> Style.fg(Theme.get_semantic(:info)) |> Style.bold()
+
     text(
       "Supervision Tree: #{root_name} | Nodes: #{count}",
       style
@@ -1049,6 +1050,7 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
 
         node ->
           info_style = Style.new() |> Style.fg(Theme.get_semantic(:info))
+
           lines = [
             text("#{String.duplicate(chars.h_line, 3)} Process Info #{String.duplicate(chars.h_line, 3)}", info_style),
             text("  ID: #{inspect(node.id)}", nil),
@@ -1111,6 +1113,7 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
 
   defp render_footer(_state, chars) do
     style = Style.new() |> Style.fg(Theme.get_semantic(:help)) |> Style.dim()
+
     text(
       "[#{chars.arrow_up}#{chars.arrow_down}] Navigate [#{chars.arrow_left}#{chars.arrow_right}] Expand/Collapse [i] Info [r] Restart [k] Kill [R] Refresh [/] Filter",
       style

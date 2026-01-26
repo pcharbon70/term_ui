@@ -2,7 +2,6 @@ defmodule TermUI.ContainerTest do
   use ExUnit.Case, async: true
 
   alias TermUI.Component.RenderNode
-  alias TermUI.Renderer.Style
 
   # Simple panel container
   defmodule Panel do

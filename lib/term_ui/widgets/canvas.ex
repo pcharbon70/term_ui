@@ -218,8 +218,7 @@ defmodule TermUI.Widgets.Canvas do
   """
   @spec draw_hline(map(), integer(), integer(), integer(), String.t()) :: map()
   def draw_hline(state, x, y, length, char \\ nil) do
-    chars = CharacterSet.current_charset()
-    char = char || chars.h_line
+    char = char || CharacterSet.current_charset().h_line
 
     Enum.reduce(0..(length - 1), state, fn i, acc ->
       set_char(acc, x + i, y, char)
@@ -231,8 +230,7 @@ defmodule TermUI.Widgets.Canvas do
   """
   @spec draw_vline(map(), integer(), integer(), integer(), String.t()) :: map()
   def draw_vline(state, x, y, length, char \\ nil) do
-    chars = CharacterSet.current_charset()
-    char = char || chars.v_line
+    char = char || CharacterSet.current_charset().v_line
 
     Enum.reduce(0..(length - 1), state, fn i, acc ->
       set_char(acc, x, y + i, char)
@@ -243,7 +241,8 @@ defmodule TermUI.Widgets.Canvas do
   Draws a line between two points using Bresenham's algorithm.
   """
   @spec draw_line(map(), integer(), integer(), integer(), integer(), String.t()) :: map()
-  def draw_line(state, x1, y1, x2, y2, char \\ "•") do
+  def draw_line(state, x1, y1, x2, y2, char \\ nil) do
+    char = char || CharacterSet.current_charset().dot
     dx = abs(x2 - x1)
     dy = abs(y2 - y1)
     sx = if x1 < x2, do: 1, else: -1
@@ -307,9 +306,7 @@ defmodule TermUI.Widgets.Canvas do
   """
   @spec draw_rect(map(), integer(), integer(), integer(), integer(), map()) :: map()
   def draw_rect(state, x, y, width, height, border \\ %{}) do
-    # Get character set for box-drawing
     chars = CharacterSet.current_charset()
-
     h = Map.get(border, :h, chars.h_line)
     v = Map.get(border, :v, chars.v_line)
     tl = Map.get(border, :tl, chars.tl)

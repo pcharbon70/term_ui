@@ -240,7 +240,6 @@ defmodule TermUI.Widgets.Dialog do
   end
 
   defp render_dialog(state, width) do
-    # Get character set for box-drawing
     chars = CharacterSet.current_charset()
 
     # Title bar
@@ -275,10 +274,12 @@ defmodule TermUI.Widgets.Dialog do
     right_pad = padding - left_pad
 
     line =
-      "#{chars.v_line} " <>
+      chars.v_line <>
+        " " <>
         String.duplicate(" ", left_pad) <>
         title_text <>
-        String.duplicate(" ", right_pad) <> " #{chars.v_line}"
+        String.duplicate(" ", right_pad) <>
+        " " <> chars.v_line
 
     if state.title_style do
       styled(text(line), state.title_style)
@@ -308,7 +309,7 @@ defmodule TermUI.Widgets.Dialog do
       Enum.map(lines, fn line_text ->
         padded = String.pad_trailing(line_text, inner_width)
         padded = String.slice(padded, 0, inner_width)
-        line = "#{chars.v_line} " <> padded <> " #{chars.v_line}"
+        line = chars.v_line <> " " <> padded <> " " <> chars.v_line
 
         if state.content_style do
           styled(text(line), state.content_style)
@@ -340,10 +341,12 @@ defmodule TermUI.Widgets.Dialog do
     left_pad = div(padding, 2)
 
     line =
-      "#{chars.v_line} " <>
+      chars.v_line <>
+        " " <>
         String.duplicate(" ", left_pad) <>
         buttons_line <>
-        String.duplicate(" ", inner_width - left_pad - String.length(buttons_line)) <> " #{chars.v_line}"
+        String.duplicate(" ", inner_width - left_pad - String.length(buttons_line)) <>
+        " " <> chars.v_line
 
     if state.focused_button_style do
       styled(text(line), state.focused_button_style)
