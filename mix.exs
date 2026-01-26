@@ -1,7 +1,7 @@
 defmodule TermUI.MixProject do
   use Mix.Project
 
-  @version "0.2.0"
+  @version "1.0.0-rc"
   @source_url "https://github.com/pcharbon70/term_ui"
 
   def project do
