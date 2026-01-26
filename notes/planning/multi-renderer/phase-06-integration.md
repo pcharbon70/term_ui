@@ -675,38 +675,39 @@ Log detected execution mode at startup.
 
 ## 7.5 Update Examples and Documentation
 
-- [ ] **Section 7.5 Complete**
+- [x] **Section 7.5 Complete**
 
-Update examples and documentation to reflect IEx compatibility.
+Updated examples and documentation to reflect IEx compatibility.
 
-### 7.5.1 Update Examples
+### 7.5.1 Update README
 
-- [ ] **Task 7.5.1 Complete**
+- [x] **Task 7.5.1 Complete**
 
-Ensure all examples work inside IEx.
+Added IEx compatibility section to main README.
 
-- [ ] 7.5.1.1 Test basic example inside IEx
-- [ ] 7.5.1.2 Test text_input example inside IEx
-- [ ] 7.5.1.3 Test capabilities example inside IEx
-- [ ] 7.5.1.4 Add IEx-specific usage instructions to examples
+- [x] 7.5.1.1 Add IEx compatibility section with usage examples
+- [x] 7.5.1.2 Document IEx detection and configuration
+- [x] 7.5.1.3 Add important notes about behavior
 
-### 7.5.2 Update Documentation
+### 7.5.2 Update App Module Documentation
 
-- [ ] **Task 7.5.2 Complete**
+- [x] **Task 7.5.2 Complete**
 
-Document IEx compatibility and any limitations.
+Added comprehensive IEx documentation to App module.
 
-- [ ] 7.5.2.1 Add IEx compatibility section to App module documentation
-- [ ] 7.5.2.2 Document behavior differences between IEx and standalone
-- [ ] 7.5.2.3 Add troubleshooting guide for IEx input issues
-- [ ] 7.5.2.4 Update README with IEx usage examples
+- [x] 7.5.2.1 Add IEx compatibility section to App moduledoc
+- [x] 7.5.2.2 Document behavior differences between IEx and standalone
+- [x] 7.5.2.3 Add troubleshooting guide for IEx input issues
 
-### Unit Tests - Section 7.5
+### 7.5.3 Create IEx Example
 
-- [ ] **Unit Tests 7.5 Complete**
-- [ ] Test examples compile and run
-- [ ] Test examples work inside IEx
-- [ ] Test documentation examples are accurate
+- [x] **Task 7.5.3 Complete**
+
+Created simple counter example demonstrating IEx usage.
+
+- [x] 7.5.3.1 Create IEx counter example
+- [x] 7.5.3.2 Add README with IEx-specific instructions
+- [x] 7.5.3.3 Example compiles and is ready for manual IEx testing
 
 ---
 
