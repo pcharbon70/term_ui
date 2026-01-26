@@ -19,6 +19,65 @@ defmodule TermUI.App do
   - **Raw mode**: Full terminal control (mouse, colors, Unicode) - OTP 28+
   - **TTY mode**: Line-based input with graceful degradation
 
+  ## IEx Compatibility
+
+  TermUI applications work directly in IEx with no code changes. This enables:
+  - Interactive debugging and development
+  - Admin tools and dashboards in production IEx sessions
+  - Prototyping and testing TUI interfaces
+
+  ### Running in IEx
+
+  Start any TermUI application from an IEx session:
+
+      iex> TermUI.App.run(MyApp.Counter)
+      # Use keyboard input, press Q to quit
+      # Returns to IEx prompt when done
+
+  All keyboard input works correctly in IEx:
+  - Arrow keys for navigation (no Enter required)
+  - Tab for field switching
+  - Function keys (F1-F12)
+  - Ctrl+key combinations
+  - Alt+key combinations
+
+  ### IEx Detection
+
+  Detect if your application is running in IEx:
+
+      iex> TermUI.iex_mode?()
+      true
+
+      iex> TermUI.running_mode()
+      :iex
+
+  ### Configuration
+
+  Force IEx-compatible mode via configuration:
+
+      # config/config.exs
+      config :term_ui,
+        iex_compatible: true
+
+  Or via environment variable:
+
+      export TERM_UI_IEX_MODE=true
+
+  ### Troubleshooting IEx Issues
+
+  **Input not reaching the application:**
+  - Ensure the application is started from IEx (not `mix run`)
+  - Check that `TermUI.iex_mode?()` returns `true`
+  - Try forcing IEx mode with `TERM_UI_IEX_MODE=true`
+
+  **Terminal state not restored after exit:**
+  - The Runtime should restore terminal state automatically
+  - If problems persist, call `TermUI.shutdown()` manually
+
+  **Performance issues in IEx:**
+  - IEx adds some overhead due to process inspection
+  - Use `backend: :raw` for better performance (when OTP 28+ is available)
+
   ## Usage
 
   ### Non-blocking start (for supervisors)
