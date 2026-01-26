@@ -713,38 +713,38 @@ Created simple counter example demonstrating IEx usage.
 
 ## 7.6 Integration Tests
 
-- [ ] **Section 7.6 Complete**
+- [x] **Section 7.6 Complete**
 
 Integration tests verify IEx compatibility end-to-end.
 
 ### 7.6.1 IEx Lifecycle Tests
 
-- [ ] **Task 7.6.1 Complete**
+- [x] **Task 7.6.1 Complete**
 
 Test complete application lifecycle inside IEx.
 
-- [ ] 7.6.1.1 Test start → render → input → update → render → shutdown in IEx
-- [ ] 7.6.1.2 Test keyboard input works correctly in IEx
-- [ ] 7.6.1.3 Test cleanup on crash in IEx
-- [ ] 7.6.1.4 Test multiple start/stop cycles in IEx session
+- [x] 7.6.1.1 Test start → render → input → update → render → shutdown in IEx
+- [x] 7.6.1.2 Test keyboard input works correctly in IEx
+- [x] 7.6.1.3 Test cleanup on crash in IEx
+- [x] 7.6.1.4 Test multiple start/stop cycles in IEx session
 
 ### 7.6.2 Cross-Mode Tests
 
-- [ ] **Task 7.6.2 Complete**
+- [x] **Task 7.6.2 Complete**
 
 Verify behavior consistency across modes.
 
-- [ ] 7.6.2.1 Test same app works identically in IEx and standalone
-- [ ] 7.6.2.2 Test Raw backend still works when not in IEx
-- [ ] 7.6.2.3 Test switching between IEx and standalone modes
+- [x] 7.6.2.1 Test same app works identically in IEx and standalone
+- [x] 7.6.2.2 Test Raw backend still works when not in IEx
+- [x] 7.6.2.3 Test switching between IEx and standalone modes
 
 ### Unit Tests - Section 7.6
 
-- [ ] **Unit Tests 7.6 Complete**
-- [ ] Test full application lifecycle in IEx
-- [ ] Test keyboard input handling in IEx
-- [ ] Test cross-mode consistency
-- [ ] Test resource cleanup in IEx
+- [x] **Unit Tests 7.6 Complete**
+- [x] Test full application lifecycle in IEx
+- [x] Test keyboard input handling in IEx
+- [x] Test cross-mode consistency
+- [x] Test resource cleanup in IEx
 
 ---
 
