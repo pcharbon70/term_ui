@@ -37,19 +37,41 @@ The example consists of:
 
 ## Running the Example
 
-### Single Node (Non-Distributed)
+### Raw Mode (Full TUI Experience)
+
+For the best experience with full terminal control and alternate screen:
 
 ```bash
 cd examples/cluster_dashboard
-mix deps.get
+mix termui.run
+```
+
+Or manually:
+
+```bash
+cd examples/cluster_dashboard
+mix run -e "ClusterDashboardExample.App.run()" --no-halt
+```
+
+### TTY Mode (IEx Compatible)
+
+To run from IEx without taking over the shell:
+
+```bash
+cd examples/cluster_dashboard
 iex -S mix
 ```
 
-Then in the IEx shell:
+Then in IEx:
 
 ```elixir
 ClusterDashboardExample.App.run()
 ```
+
+**Note:** TTY mode works inside IEx but has limitations:
+- No alternate screen buffer (output mixes with IEx prompt)
+- Character input works immediately (no Enter needed)
+- For full TUI, use raw mode instead
 
 ### Multiple Nodes (Distributed)
 

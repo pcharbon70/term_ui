@@ -281,7 +281,7 @@ defmodule TermUI.Runtime do
     render_interval = Keyword.get(opts, :render_interval, @default_render_interval)
     skip_terminal = Keyword.get(opts, :skip_terminal, false)
     backend_opt = Keyword.get(opts, :backend, :auto)
-    use_input_handler = Keyword.get(opts, :use_input_handler, false)
+    use_input_handler = Keyword.get(opts, :use_input_handler, true)
 
     # Select backend using Backend.Selector
     {backend_mode, backend, backend_state, capabilities, terminal_started, buffer_manager, dimensions} =
@@ -317,8 +317,12 @@ defmodule TermUI.Runtime do
       end
 
     # Register for resize callbacks if using new input handler
-    if use_input_handler and terminal_started do
-      Terminal.register_resize_callback(self())
+    # TTY backend also needs resize events even though terminal_started=false
+    if use_input_handler and backend_mode in [:raw, :tty] do
+      # Only register if Terminal GenServer is running
+      if Process.whereis(Terminal) do
+        Terminal.register_resize_callback(self())
+      end
     end
 
     state = %State{
@@ -951,8 +955,8 @@ defmodule TermUI.Runtime do
   end
 
   defp do_render(state) do
-    # Skip rendering if terminal not available or no backend
-    if state.terminal_started and state.backend do
+    # Render if backend is available (TTY backend works even without terminal_started)
+    if state.backend do
       # Call view on root component with error handling
       %{module: module, state: component_state} = Map.get(state.components, :root)
 
@@ -967,31 +971,93 @@ defmodule TermUI.Runtime do
             {:text, "[Render Error]"}
         end
 
-      # Clear current buffer
-      BufferManager.clear_current(state.buffer_manager)
-
-      # Render tree to buffer
-      NodeRenderer.render_to_buffer(render_tree, state.buffer_manager)
-
-      # Get buffers for diffing
-      current = BufferManager.get_current_buffer(state.buffer_manager)
-      previous = BufferManager.get_previous_buffer(state.buffer_manager)
-
-      # Get changed cells and convert to backend format
-      cells = get_changed_cells(current, previous)
+      # Different rendering paths for Raw vs TTY backends
+      {cells, new_backend_state} =
+        if state.buffer_manager do
+          # Raw backend: use double buffering with diffing
+          render_with_buffer_manager(render_tree, state)
+        else
+          # TTY backend: create temporary buffer, render all cells
+          render_to_tty_backend(render_tree, state)
+        end
 
       # Delegate rendering to backend
-      {:ok, new_backend_state} = state.backend.draw_cells(state.backend_state, cells)
+      {:ok, new_backend_state} = state.backend.draw_cells(new_backend_state, cells)
 
       # Flush any pending output
       {:ok, ^new_backend_state} = state.backend.flush(new_backend_state)
 
-      # Swap buffers
-      BufferManager.swap_buffers(state.buffer_manager)
-
       %{state | dirty: false, backend_state: new_backend_state}
     else
       %{state | dirty: false}
+    end
+  end
+
+  # Renders using BufferManager with double buffering and diffing (Raw backend)
+  defp render_with_buffer_manager(render_tree, state) do
+    # Clear current buffer
+    BufferManager.clear_current(state.buffer_manager)
+
+    # Render tree to buffer
+    NodeRenderer.render_to_buffer(render_tree, state.buffer_manager)
+
+    # Get buffers for diffing
+    current = BufferManager.get_current_buffer(state.buffer_manager)
+    previous = BufferManager.get_previous_buffer(state.buffer_manager)
+
+    # Get changed cells and convert to backend format
+    cells = get_changed_cells(current, previous)
+
+    # Swap buffers
+    BufferManager.swap_buffers(state.buffer_manager)
+
+    {cells, state.backend_state}
+  end
+
+  # Renders to TTY backend without double buffering
+  defp render_to_tty_backend(render_tree, state) do
+    # Get terminal size from backend state or capabilities
+    {rows, cols} =
+      case state.backend_state do
+        %{size: {r, c}} -> {r, c}
+        _ -> {24, 80}
+      end
+
+    # Create temporary buffer for this frame
+    case TermUI.Renderer.Buffer.new(rows, cols) do
+      {:ok, temp_buffer} ->
+        # Render tree directly to temporary buffer (bypassing BufferManager)
+        NodeRenderer.render_to_buffer_direct(render_tree, temp_buffer)
+
+        # Extract all non-empty cells for TTY backend
+        cells = extract_all_cells(temp_buffer)
+
+        # Clean up temporary buffer
+        TermUI.Renderer.Buffer.destroy(temp_buffer)
+
+        {cells, state.backend_state}
+
+      {:error, _reason} ->
+        # If buffer creation fails, render nothing
+        {[], state.backend_state}
+    end
+  end
+
+  # Extracts all non-empty cells from buffer for TTY backend
+  defp extract_all_cells(buffer) do
+    {rows, _cols} = TermUI.Renderer.Buffer.dimensions(buffer)
+
+    for row <- 1..rows, reduce: [] do
+      acc ->
+        buffer_row = TermUI.Renderer.Buffer.get_row(buffer, row)
+
+        cells_in_row =
+          buffer_row
+          |> Enum.with_index(1)
+          |> Enum.filter(fn {%TermUI.Renderer.Cell{char: char}, _col} -> char != " " end)
+          |> Enum.flat_map(fn {cell, col} -> cell_to_backend_tuple(cell, row, col) end)
+
+        cells_in_row ++ acc
     end
   end
 

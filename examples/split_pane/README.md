@@ -59,15 +59,41 @@ This example consists of:
 
 ## Running the Example
 
-From this directory:
+### Raw Mode (Full TUI Experience)
+
+For the best experience with full terminal control and alternate screen:
 
 ```bash
-# Run with the helper script
-elixir run.exs
+cd examples/split_pane
+mix termui.run
+```
 
-# Or run directly with mix
+Or manually:
+
+```bash
+cd examples/split_pane
 mix run -e "SplitPane.App.run()" --no-halt
 ```
+
+### TTY Mode (IEx Compatible)
+
+To run from IEx without taking over the shell:
+
+```bash
+cd examples/split_pane
+iex -S mix
+```
+
+Then in IEx:
+
+```elixir
+SplitPane.App.run()
+```
+
+**Note:** TTY mode works inside IEx but has limitations:
+- No alternate screen buffer (output mixes with IEx prompt)
+- Character input works immediately (no Enter needed)
+- For full TUI, use raw mode instead
 
 ## Controls
 

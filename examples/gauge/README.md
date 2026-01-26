@@ -73,11 +73,41 @@ gauge/
 
 ## Running the Example
 
+### Raw Mode (Full TUI Experience)
+
+For the best experience with full terminal control and alternate screen:
+
 ```bash
-# From the gauge directory
-mix deps.get
+cd examples/gauge
+mix termui.run
+```
+
+Or manually:
+
+```bash
+cd examples/gauge
 mix run -e "Gauge.App.run()" --no-halt
 ```
+
+### TTY Mode (IEx Compatible)
+
+To run from IEx without taking over the shell:
+
+```bash
+cd examples/gauge
+iex -S mix
+```
+
+Then in IEx:
+
+```elixir
+Gauge.App.run()
+```
+
+**Note:** TTY mode works inside IEx but has limitations:
+- No alternate screen buffer (output mixes with IEx prompt)
+- Character input works immediately (no Enter needed)
+- For full TUI, use raw mode instead
 
 ## Controls
 

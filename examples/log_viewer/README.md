@@ -67,18 +67,41 @@ This example contains:
 
 ## Running the Example
 
-From the `examples/log_viewer` directory:
+### Raw Mode (Full TUI Experience)
+
+For the best experience with full terminal control and alternate screen:
 
 ```bash
-mix deps.get
-mix run -e "LogViewer.App.run()"
+cd examples/log_viewer
+mix termui.run
 ```
 
-Or using the Mix task:
+Or manually:
 
 ```bash
-mix log_viewer
+cd examples/log_viewer
+mix run -e "LogViewer.App.run()" --no-halt
 ```
+
+### TTY Mode (IEx Compatible)
+
+To run from IEx without taking over the shell:
+
+```bash
+cd examples/log_viewer
+iex -S mix
+```
+
+Then in IEx:
+
+```elixir
+LogViewer.App.run()
+```
+
+**Note:** TTY mode works inside IEx but has limitations:
+- No alternate screen buffer (output mixes with IEx prompt)
+- Character input works immediately (no Enter needed)
+- For full TUI, use raw mode instead
 
 ## Controls
 

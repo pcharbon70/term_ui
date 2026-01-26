@@ -89,18 +89,41 @@ This example contains:
 
 ## Running the Example
 
-From the `examples/menu` directory:
+### Raw Mode (Full TUI Experience)
+
+For the best experience with full terminal control and alternate screen:
 
 ```bash
-mix deps.get
-mix run -e "Menu.App.run()"
+cd examples/menu
+mix termui.run
 ```
 
-Or using the Mix task:
+Or manually:
 
 ```bash
-mix menu
+cd examples/menu
+mix run -e "Menu.App.run()" --no-halt
 ```
+
+### TTY Mode (IEx Compatible)
+
+To run from IEx without taking over the shell:
+
+```bash
+cd examples/menu
+iex -S mix
+```
+
+Then in IEx:
+
+```elixir
+Menu.App.run()
+```
+
+**Note:** TTY mode works inside IEx but has limitations:
+- No alternate screen buffer (output mixes with IEx prompt)
+- Character input works immediately (no Enter needed)
+- For full TUI, use raw mode instead
 
 ## Controls
 

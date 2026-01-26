@@ -48,14 +48,41 @@ dashboard/
 
 ## Running the Example
 
-```bash
-# From the dashboard directory
-mix deps.get
-mix run --no-halt
+### Raw Mode (Full TUI Experience)
 
-# Or using mix.exs aliases
-mix start
+For the best experience with full terminal control and alternate screen:
+
+```bash
+cd examples/dashboard
+mix termui.run
 ```
+
+Or manually:
+
+```bash
+cd examples/dashboard
+mix run -e "Dashboard.run()" --no-halt
+```
+
+### TTY Mode (IEx Compatible)
+
+To run from IEx without taking over the shell:
+
+```bash
+cd examples/dashboard
+iex -S mix
+```
+
+Then in IEx:
+
+```elixir
+Dashboard.run()
+```
+
+**Note:** TTY mode works inside IEx but has limitations:
+- No alternate screen buffer (output mixes with IEx prompt)
+- Character input works immediately (no Enter needed)
+- For full TUI, use raw mode instead
 
 ## Controls
 

@@ -2,7 +2,9 @@
 
 A simple counter example demonstrating TermUI's IEx compatibility.
 
-## Running in IEx
+## Running
+
+### TTY Mode (IEx Compatible)
 
 This example is designed to be run directly in IEx:
 
@@ -15,6 +17,15 @@ Once in IEx, run the counter:
 
 ```elixir
 iex> IExCounter.App.run()
+```
+
+### Raw Mode (Full TUI Experience)
+
+You can also run this as a standalone application with full terminal control:
+
+```bash
+cd examples/iex_counter
+mix termui.run
 ```
 
 ## Controls
@@ -46,13 +57,3 @@ true
 iex> TermUI.running_mode()
 :iex
 ```
-
-## Running Standalone
-
-You can also run this as a standalone application:
-
-```bash
-mix run run.exs
-```
-
-This will start the app with normal Mix output (not in IEx).
