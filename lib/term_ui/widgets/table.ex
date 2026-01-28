@@ -361,16 +361,6 @@ defmodule TermUI.Widgets.Table do
     end
   end
 
-  defp format_header_text(header, column_key, %{sort_column: column_key, sort_direction: :asc}) do
-    chars = CharacterSet.current_charset()
-    header <> " " <> chars.triangle_up
-  end
-
-  defp format_header_text(header, column_key, %{sort_column: column_key, sort_direction: :desc}) do
-    chars = CharacterSet.current_charset()
-    header <> " " <> chars.triangle_down
-  end
-
   defp format_header_text(header, _column_key, _state, _chars) do
     header
   end

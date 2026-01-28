@@ -571,10 +571,10 @@ defmodule TermUI.Widgets.FormBuilder do
     Enum.flat_map(fields, &render_field(state, &1))
   end
 
-  defp render_group(state, group, fields, _area, chars) when is_map(group) do
+  defp render_group(state, group, fields, _area, _chars) when is_map(group) do
     collapsed = MapSet.member?(state.collapsed_groups, group.id)
 
-    header = render_group_header(group, collapsed, chars)
+    header = render_group_header(group, collapsed)
 
     if collapsed do
       [header]

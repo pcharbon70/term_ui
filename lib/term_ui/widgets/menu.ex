@@ -406,14 +406,13 @@ defmodule TermUI.Widgets.Menu do
     end
   end
 
-  defp get_item_prefix(%{type: :checkbox, checked: true}, _state) do
-    chars = CharacterSet.current_charset()
+  defp get_item_prefix(%{type: :checkbox, checked: true}, _state, chars) do
     "[#{chars.check}] "
   end
 
-  defp get_item_prefix(%{type: :checkbox}, _state), do: "[ ] "
+  defp get_item_prefix(%{type: :checkbox}, _state, _chars), do: "[ ] "
 
-  defp get_item_prefix(%{type: :submenu, id: id}, state) do
+  defp get_item_prefix(%{type: :submenu, id: id}, state, _chars) do
     chars = CharacterSet.current_charset()
 
     if MapSet.member?(state.expanded, id) do

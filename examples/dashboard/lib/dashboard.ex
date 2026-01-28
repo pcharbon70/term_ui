@@ -37,6 +37,8 @@ defmodule Dashboard do
   until the user quits. This is the main entry point for running as a standalone app.
   """
   def run do
+    # Ensure the Dashboard application is started (starts Metrics GenServer)
+    {:ok, _} = Application.ensure_all_started(:dashboard)
     TermUI.Runtime.run(root: Dashboard.App)
   end
 end

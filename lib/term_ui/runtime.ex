@@ -281,7 +281,7 @@ defmodule TermUI.Runtime do
     render_interval = Keyword.get(opts, :render_interval, @default_render_interval)
     skip_terminal = Keyword.get(opts, :skip_terminal, false)
     backend_opt = Keyword.get(opts, :backend, :auto)
-    use_input_handler = Keyword.get(opts, :use_input_handler, true)
+    use_input_handler = Keyword.get(opts, :use_input_handler, false)
 
     # Select backend using Backend.Selector
     {backend_mode, backend, backend_state, capabilities, terminal_started, buffer_manager, dimensions} =
@@ -296,6 +296,10 @@ defmodule TermUI.Runtime do
 
     # Initialize root component state
     root_state = root_module.init(opts)
+
+    # TTY mode requires the new input handler (IEx compatible)
+    # Raw mode can use either InputReader (legacy) or Input.Raw (new)
+    use_input_handler = use_input_handler or backend_mode == :tty
 
     # Select and initialize input handler (if enabled)
     {input_handler, input_state} =
@@ -448,8 +452,9 @@ defmodule TermUI.Runtime do
   end
 
   defp setup_terminal_and_buffers do
-    # Enable raw mode first
-    with {:ok, _} <- Terminal.enable_raw_mode(),
+    # Start Terminal GenServer first, before calling any Terminal API functions
+    # The Terminal GenServer will detect if raw mode is already active (e.g., from Selector)
+    with {:ok, _pid} <- Terminal.start_link(),
          :ok <- Terminal.enter_alternate_screen(),
          :ok <- Terminal.hide_cursor(),
          :ok <- Terminal.enable_mouse_tracking(:all),

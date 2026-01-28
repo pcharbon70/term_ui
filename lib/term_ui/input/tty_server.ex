@@ -38,7 +38,6 @@ defmodule TermUI.Input.TTY.Server do
   use GenServer
   require Logger
 
-  alias TermUI.Event
   alias TermUI.Terminal.EscapeParser
 
   @escape_timeout 100

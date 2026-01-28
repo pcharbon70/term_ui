@@ -692,7 +692,7 @@ defmodule TermUI.Widgets.TextInput do
     ])
   end
 
-  defp render_scroll_indicator(state, total_lines, visible_count, chars) do
+  defp render_scroll_indicator(state, total_lines, visible_count, _chars) do
     if total_lines > visible_count do
       chars = CharacterSet.current_charset()
       can_scroll_up = state.scroll_offset > 0

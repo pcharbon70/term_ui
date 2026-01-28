@@ -195,7 +195,40 @@ defmodule TermUI.Terminal do
     check_previous_crash()
     create_ets_table()
 
-    state = State.new()
+    # Check if raw mode is already active (e.g., activated by Backend.Selector)
+    # We detect this by checking if :shell.start_interactive returns {:error, :already_started}
+    raw_mode_active =
+      try do
+        case :shell.start_interactive({:noshell, :raw}) do
+          :ok ->
+            # Raw mode was just activated, disable it and re-enable via Terminal API
+            # to ensure consistent state management
+            do_disable_raw_mode(nil)
+            :ets.insert(@ets_table, {:raw_mode_active, false})
+            false
+
+          {:error, :already_started} ->
+            # Shell is already in raw mode (activated by Selector or externally)
+            # Mark as active in our state
+            :ets.insert(@ets_table, {:raw_mode_active, true})
+            true
+
+          {:error, _reason} ->
+            false
+        end
+      rescue
+        _ -> false
+      end
+
+    state =
+      if raw_mode_active do
+        # Raw mode is already active, but we don't have the original settings
+        # This is OK - we'll use default restoration on shutdown
+        %{State.new() | raw_mode_active: true}
+      else
+        State.new()
+      end
+
     {:ok, state}
   end
 

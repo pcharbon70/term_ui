@@ -638,7 +638,6 @@ defmodule TermUI.Widgets.SplitPane do
     chars = CharacterSet.current_charset()
     is_focused = state.focused_divider == divider_idx
     style = if is_focused, do: state.focused_divider_style, else: state.divider_style
-    chars = CharacterSet.current_charset()
     char = if is_focused, do: chars.v_line_heavy, else: chars.v_line
 
     lines =
@@ -653,7 +652,6 @@ defmodule TermUI.Widgets.SplitPane do
     chars = CharacterSet.current_charset()
     is_focused = state.focused_divider == divider_idx
     style = if is_focused, do: state.focused_divider_style, else: state.divider_style
-    chars = CharacterSet.current_charset()
     char = if is_focused, do: chars.h_line_heavy, else: chars.h_line
 
     text(String.duplicate(char, width), style)

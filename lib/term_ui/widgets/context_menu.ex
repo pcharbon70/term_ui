@@ -253,7 +253,7 @@ defmodule TermUI.Widgets.ContextMenu do
     |> Enum.max(fn -> 10 end)
   end
 
-  defp render_item(state, item, width, chars) do
+  defp render_item(state, item, width, _chars) do
     case item.type do
       :separator ->
         chars = CharacterSet.current_charset()

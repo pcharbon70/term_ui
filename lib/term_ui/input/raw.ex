@@ -29,9 +29,14 @@ defmodule TermUI.Input.Raw do
 
   ## How It Works
 
-  The module spawns a Task to read from stdin using `IO.getn/2`. Since `IO.getn`
-  blocks until input is available, using a Task allows us to implement timeout
-  semantics via `Task.yield/2`.
+  The module spawns a Task to read from stdin using `:io.get_chars/2` (Erlang's
+  IO module directly). This is critical for compatibility with raw mode activated
+  via `:shell.start_interactive({:noshell, :raw})`, which redirects standard
+  input. Elixir's `IO.getn/2` wrapper cannot access the redirected input, but
+  `:io.get_chars/2` works correctly.
+
+  Since `:io.get_chars/2` blocks until input is available, using a Task allows
+  us to implement timeout semantics via `Task.yield/2`.
 
   When an escape sequence spans multiple reads (e.g., arrow keys send multiple
   bytes), the partial sequence is buffered and completed on subsequent polls.
@@ -48,9 +53,12 @@ defmodule TermUI.Input.Raw do
   Unlike `TermUI.Terminal.InputReader` which is a GenServer that asynchronously
   sends events to a target process, this module provides synchronous polling
   suitable for use with the `TermUI.Input` behaviour interface. This module
-  uses direct `IO.getn/2` calls wrapped in Tasks for timeout support, rather
+  uses direct `:io.get_chars/2` calls wrapped in Tasks for timeout support, rather
   than delegating to InputReader, because InputReader's async message-based
   design is incompatible with the synchronous polling contract.
+
+  Both modules use the same underlying approach (`:io.get_chars/2`) for reading
+  from stdin, ensuring compatibility with raw mode's redirected input.
   """
 
   @behaviour TermUI.Input
@@ -328,14 +336,30 @@ defmodule TermUI.Input.Raw do
   end
 
   # Read a single character from stdin
+  # Uses :io.get_chars/2 (Erlang's IO module) for compatibility with
+  # :shell.start_interactive({:noshell, :raw}) which redirects standard input.
+  # Elixir's IO.getn/2 cannot access the redirected input.
   @spec read_char() :: {:ok, binary()} | :eof | {:error, term()}
   defp read_char do
-    case IO.getn("", 1) do
-      :eof -> :eof
-      {:error, reason} -> {:error, reason}
-      data when is_binary(data) -> {:ok, data}
-      # Handle unexpected return types
-      other -> {:error, {:unexpected_io_return, other}}
+    case :io.get_chars(~c"", 1) do
+      :eof ->
+        :eof
+
+      chars when is_list(chars) ->
+        # Convert charlist to binary
+        case :unicode.characters_to_binary(chars) do
+          binary when is_binary(binary) ->
+            {:ok, binary}
+
+          :error ->
+            {:error, :invalid_unicode}
+        end
+
+      {:error, reason} ->
+        {:error, reason}
+
+      other ->
+        {:error, {:unexpected_io_return, other}}
     end
   end
 end

@@ -80,7 +80,6 @@ defmodule TermUI.Widgets.AlertDialog do
   @spec new(keyword()) :: map()
   def new(opts) do
     type = Keyword.fetch!(opts, :type)
-    type_icons = get_type_icons()
 
     %{
       type: type,

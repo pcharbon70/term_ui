@@ -193,9 +193,8 @@ defmodule TermUI.App do
   @spec start(root_module(), [option()]) :: {:ok, pid()} | {:error, term()}
   def start(root_module, opts \\ []) do
     runtime_opts = [
-      {:root, root_module},
-      {:use_input_handler, true}
-      | Keyword.take(opts, [:name, :backend, :render_interval, :skip_terminal])
+      {:root, root_module}
+      | Keyword.take(opts, [:name, :backend, :render_interval, :skip_terminal, :use_input_handler])
     ]
 
     Runtime.start_link(runtime_opts)
