@@ -105,16 +105,18 @@ defmodule AlertDialog.App do
 
   @doc """
   Render the current state to a render tree.
+
+  When an alert is visible, return the alert overlay directly (not stacked).
+  This allows the overlay to be positioned absolutely over the main content.
   """
   def view(state) do
     main_content = render_main_content(state)
 
     if state.alert != nil do
-      stack(:vertical, [
-        main_content,
-        text("", nil),
-        AlertDialog.render(state.alert, %{width: 80, height: 24})
-      ])
+      # Render the overlay directly - it will be positioned absolutely
+      # First render the main content to a buffer, then overlay the alert
+      # We achieve this by wrapping in a box that handles both layers
+      {:overlay, main_content, AlertDialog.render(state.alert, %{width: 80, height: 24})}
     else
       main_content
     end

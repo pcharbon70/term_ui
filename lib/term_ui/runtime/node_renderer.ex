@@ -154,6 +154,14 @@ defmodule TermUI.Runtime.NodeRenderer do
     render_text(content, buffer, row, col, style)
   end
 
+  # Handle overlay tuple from Elm components (background content with overlay on top)
+  defp render_node({:overlay, background, %{} = overlay_map}, buffer, row, col, style) do
+    # First render the background content
+    render_node(background, buffer, row, col, style)
+    # Then render the overlay on top
+    render_node(overlay_map, buffer, 0, 0, style)
+  end
+
   defp render_node({:styled, content, style}, buffer, row, col, parent_style) do
     effective_style = merge_styles(parent_style, style)
     render_node(content, buffer, row, col, effective_style)
