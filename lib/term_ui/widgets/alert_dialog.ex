@@ -186,13 +186,17 @@ defmodule TermUI.Widgets.AlertDialog do
     # Render dialog content
     dialog = render_dialog(state, dialog_width)
 
-    # Return as overlay
+    # Return as overlay with background fill
     %{
       type: :overlay,
       content: dialog,
       x: pos_x,
       y: pos_y,
-      z: 100
+      z: 100,
+      # Provide dimensions and background for opaque fill
+      width: dialog_width,
+      height: dialog_height,
+      bg: state.background_style
     }
   end
 
