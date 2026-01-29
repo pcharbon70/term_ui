@@ -374,6 +374,8 @@ defmodule TermUI.Backend.Raw do
 
     # Leave alternate screen if it was entered
     if state.alternate_screen do
+      # Ensure newline before exiting so prompt appears on clean line
+      safe_write("\r\n")
       safe_write(ANSI.leave_alternate_screen())
     end
 

@@ -556,6 +556,8 @@ defmodule TermUI.Terminal do
     end
 
     if state.alternate_screen_active do
+      # Ensure newline before exiting so prompt appears on clean line
+      write_to_terminal("\r\n")
       write_to_terminal(ANSI.leave_alternate_screen())
     end
 
@@ -637,6 +639,7 @@ defmodule TermUI.Terminal do
           # Disable all mouse tracking modes first
           write_to_terminal(@all_mouse_off)
           write_to_terminal(ANSI.cursor_show())
+          write_to_terminal("\r\n")
           write_to_terminal(ANSI.leave_alternate_screen())
           write_to_terminal(@reset_terminal)
 
