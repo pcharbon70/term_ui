@@ -156,10 +156,13 @@ defmodule TermUI.Runtime.NodeRenderer do
 
   # Handle overlay tuple from Elm components (background content with overlay on top)
   defp render_node({:overlay, background, %{} = overlay_map}, buffer, row, col, style) do
-    # First render the background content
+    # First render the background content at current position
     render_node(background, buffer, row, col, style)
-    # Then render the overlay on top
-    render_node(overlay_map, buffer, 0, 0, style)
+    # Then render the overlay using its absolute positioning
+    # Extract x, y from overlay map and convert to 1-indexed buffer coordinates
+    x = Map.get(overlay_map, :x, 0)
+    y = Map.get(overlay_map, :y, 0)
+    render_node(overlay_map, buffer, y + 1, x + 1, style)
   end
 
   defp render_node({:styled, content, style}, buffer, row, col, parent_style) do

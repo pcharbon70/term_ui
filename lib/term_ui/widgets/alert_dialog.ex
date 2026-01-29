@@ -168,11 +168,30 @@ defmodule TermUI.Widgets.AlertDialog do
     handle_result(state, :no)
   end
 
-  def handle_event(_event, state) do
-    {:ok, state}
-  end
+  # Debug: Log all events to console (temporary)
+  def handle_event(event, state) do
+    # Log only key events, ignore mouse events to reduce spam
+    case event do
+      %TermUI.Event.Key{} ->
+        IO.inspect(event, label: "AlertDialog Key event")
+      _ ->
+        :ok
+    end
 
-  @impl true
+    # ESC key handling - more permissive pattern match
+    case event do
+      %TermUI.Event.Key{key: key} when key == :escape or key == :ESC ->
+        result = if state.alert_type == :confirm, do: :no, else: :cancel
+        handle_result(state, result)
+
+      %TermUI.Event.Mouse{} ->
+        # Ignore mouse events
+        {:ok, state}
+
+      _ ->
+        {:ok, state}
+    end
+  end
   def render(%{visible: false}, _area), do: empty()
 
   def render(state, area) do
