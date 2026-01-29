@@ -72,6 +72,8 @@ defmodule TermUI.Widgets.AlertDialog do
   - `:message` - Message to display (required)
   - `:on_result` - Callback with result (:ok, :cancel, :yes, :no)
   - `:width` - Dialog width (default: 50)
+  - `:background_style` - Style for the dialog background (default: black background)
+  - `:border_style` - Style for the border and title (default: cyan foreground)
   - `:icon_style` - Style for the icon
   - `:message_style` - Style for the message
   - `:button_style` - Style for buttons
@@ -89,11 +91,22 @@ defmodule TermUI.Widgets.AlertDialog do
       icon_key: Map.get(@type_icon_keys, type, nil),
       width: Keyword.get(opts, :width, 50),
       on_result: Keyword.get(opts, :on_result),
+      background_style: Keyword.get(opts, :background_style, default_background_style()),
+      border_style: Keyword.get(opts, :border_style, default_border_style()),
       icon_style: Keyword.get(opts, :icon_style),
       message_style: Keyword.get(opts, :message_style),
       button_style: Keyword.get(opts, :button_style),
       focused_button_style: Keyword.get(opts, :focused_button_style)
     }
+  end
+
+  # Default styles for the dialog
+  defp default_background_style do
+    TermUI.Renderer.Style.new(bg: :black)
+  end
+
+  defp default_border_style do
+    TermUI.Renderer.Style.new(fg: :cyan)
   end
 
   @impl true
@@ -107,6 +120,8 @@ defmodule TermUI.Widgets.AlertDialog do
       width: props.width,
       focused_button: get_default_focus(props.buttons),
       on_result: props.on_result,
+      background_style: props.background_style,
+      border_style: props.border_style,
       icon_style: props.icon_style,
       message_style: props.message_style,
       button_style: props.button_style,
@@ -226,20 +241,27 @@ defmodule TermUI.Widgets.AlertDialog do
   defp render_dialog(state, width) do
     chars = CharacterSet.current_charset()
 
-    # Border
-    top_border = text(chars.tl <> String.duplicate(chars.h_line, width - 2) <> chars.tr)
-    bottom_border = text(chars.bl <> String.duplicate(chars.h_line, width - 2) <> chars.br)
+    # Border - with border_style
+    top_border =
+      text(chars.tl <> String.duplicate(chars.h_line, width - 2) <> chars.tr)
+      |> styled(state.border_style)
 
-    # Title
-    title = render_title(state, width, chars)
+    bottom_border =
+      text(chars.bl <> String.duplicate(chars.h_line, width - 2) <> chars.br)
+      |> styled(state.border_style)
 
-    # Separator
-    separator = text(chars.t_right <> String.duplicate(chars.h_line, width - 2) <> chars.t_left)
+    # Title - with border_style
+    title = render_title(state, width, chars) |> styled(state.border_style)
 
-    # Icon and message
+    # Separator - with border_style
+    separator =
+      text(chars.t_right <> String.duplicate(chars.h_line, width - 2) <> chars.t_left)
+      |> styled(state.border_style)
+
+    # Icon and message - with background style handled in render_content
     content = render_content(state, width, chars)
 
-    # Buttons
+    # Buttons - with background style handled in render_buttons
     buttons = render_buttons(state, width, chars)
 
     stack(:vertical, [
@@ -251,6 +273,19 @@ defmodule TermUI.Widgets.AlertDialog do
       buttons,
       bottom_border
     ])
+  end
+
+  # Merge multiple styles, with later styles taking precedence
+  defp merge_style_options(styles) do
+    styles
+    |> Enum.reject(&is_nil/1)
+    |> Enum.reduce(fn style, acc ->
+      TermUI.Renderer.Style.merge(acc, style)
+    end)
+  end
+
+  defp merge_style_options(style1, style2) do
+    merge_style_options([style1, style2])
   end
 
   defp render_title(state, width, chars) do
@@ -297,8 +332,11 @@ defmodule TermUI.Widgets.AlertDialog do
 
     line = chars.v_line <> " " <> padded <> " " <> chars.v_line
 
-    if state.message_style do
-      styled(text(line), state.message_style)
+    # Merge message_style with background_style
+    style = merge_style_options(state.message_style, state.background_style)
+
+    if style do
+      styled(text(line), style)
     else
       text(line)
     end
@@ -331,7 +369,21 @@ defmodule TermUI.Widgets.AlertDialog do
         String.duplicate(" ", max(0, inner_width - left_pad - String.length(buttons_line))) <>
         " " <> chars.v_line
 
-    text(line)
+    # Merge button_style or focused_button_style with background_style
+    button_style =
+      if state.focused_button_style do
+        state.focused_button_style
+      else
+        state.button_style
+      end
+
+    style = merge_style_options(button_style, state.background_style)
+
+    if style do
+      styled(text(line), style)
+    else
+      text(line)
+    end
   end
 
   # Public API

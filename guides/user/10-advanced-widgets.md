@@ -99,13 +99,24 @@ Modal dialog for confirmations and messages with standard button configurations.
 
 ```elixir
 alias TermUI.Widgets.AlertDialog
+alias TermUI.Renderer.Style
 
 # Create props
 props = AlertDialog.new(
   type: :confirm,
   title: "Delete File",
   message: "Are you sure you want to delete this file?",
-  buttons: :yes_no,
+  on_result: fn result -> handle_result(result) end
+)
+
+# With custom styling
+props = AlertDialog.new(
+  type: :error,
+  title: "Error",
+  message: "Something went wrong",
+  background_style: Style.new(bg: :bright_black),
+  border_style: Style.new(fg: :red, attrs: [:bold]),
+  message_style: Style.new(fg: :white),
   on_result: fn result -> handle_result(result) end
 )
 
@@ -119,18 +130,31 @@ AlertDialog.render(dialog_state, %{width: 80, height: 24})
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `type` | atom | `:info` | `:info`, `:warning`, `:error`, `:success`, `:confirm` |
-| `title` | string | `""` | Dialog title |
+| `type` | atom | required | `:info`, `:success`, `:warning`, `:error`, `:confirm`, `:ok_cancel` |
+| `title` | string | required | Dialog title |
 | `message` | string | required | Dialog message |
-| `buttons` | atom/list | `:ok` | `:ok`, `:ok_cancel`, `:yes_no`, or custom list |
-| `on_result` | function | `nil` | Result callback |
+| `on_result` | function | `nil` | Callback with result (`:ok`, `:cancel`, `:yes`, `:no`) |
+| `width` | integer | `50` | Dialog width |
+| `background_style` | `Style.t()` | `Style.new(bg: :black)` | Dialog background style |
+| `border_style` | `Style.t()` | `Style.new(fg: :cyan)` | Border and title style |
+| `icon_style` | `Style.t()` | `nil` | Style for the icon |
+| `message_style` | `Style.t()` | `nil` | Style for the message |
+| `button_style` | `Style.t()` | `nil` | Style for buttons |
+| `focused_button_style` | `Style.t()` | `nil` | Style for focused button |
 
 **Type Icons:**
-- `:info` - ℹ (blue)
-- `:warning` - ⚠ (yellow)
-- `:error` - ✖ (red)
-- `:success` - ✔ (green)
-- `:confirm` - ? (cyan)
+- `:info` - ℹ (information)
+- `:warning` - ⚠ (warning)
+- `:error` - ✖ (error)
+- `:success` - ✔ (success)
+- `:confirm` - ? (confirmation)
+- `:ok_cancel` - ? (OK/Cancel)
+
+**Keyboard Navigation:**
+- `Tab` / `Shift+Tab` - Move between buttons
+- `Enter` / `Space` - Activate focused button
+- `Escape` - Close (same as Cancel/No)
+- `Y` / `N` - Yes/No (in confirm dialogs)
 
 ### Toast
 
