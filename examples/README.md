@@ -30,7 +30,7 @@ cd examples/<example_name>
 mix deps.get
 
 # Run the example
-mix run run.exs
+mix termui.run
 ```
 
 ## Requirements

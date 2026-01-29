@@ -162,19 +162,13 @@ defmodule MyApp do
 end
 ```
 
-### Step 3: Create a Run Script
-
-Create `run.exs`:
-
-```elixir
-MyApp.run()
-```
-
-### Step 4: Run the Application
+### Step 3: Run the Application
 
 ```bash
-mix run run.exs
+mix termui.run
 ```
+
+The `mix termui.run` command will automatically discover and run your root module (`MyApp` in this case).
 
 You should see your counter application. Press `↑` to increment, `↓` to decrement, and `Q` to quit.
 

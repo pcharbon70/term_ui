@@ -24,7 +24,7 @@ defmodule IExCounter.App do
 
   ## Running Standalone
 
-      mix run run.exs
+      mix termui.run
 
   ## What Works in IEx
 

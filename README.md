@@ -219,7 +219,7 @@ The `examples/` directory contains standalone applications demonstrating each wi
 # Run any example
 cd examples/dashboard
 mix deps.get
-mix run run.exs
+mix termui.run
 ```
 
 ## Requirements
