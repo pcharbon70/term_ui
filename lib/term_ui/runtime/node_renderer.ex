@@ -138,15 +138,26 @@ defmodule TermUI.Runtime.NodeRenderer do
     buf_col = x + 1
 
     # If width, height, and bg are provided, fill background first
-    case overlay do
-      %{width: width, height: height, bg: bg} when is_integer(width) and is_integer(height) ->
-        fill_background(buffer, buf_row, buf_col, width, height, bg)
+    # This creates an opaque background for the overlay content
+    _fill_result =
+      case overlay do
+        %{width: width, height: height, bg: %Style{} = bg_style}
+        when is_integer(width) and width > 0 and is_integer(height) and height > 0 ->
+          fill_background(buffer, buf_row, buf_col, width, height, bg_style)
 
-      _ ->
-        :ok
-    end
+        _ ->
+          :ok
+      end
 
-    render_node(content, buffer, buf_row, buf_col, style)
+    # Merge bg style with parent style so content inherits the background
+    # This ensures borders and text without explicit bg get the overlay background
+    effective_style =
+      case overlay do
+        %{bg: %Style{} = bg_style} -> merge_styles(style, bg_style)
+        _ -> style
+      end
+
+    render_node(content, buffer, buf_row, buf_col, effective_style)
   end
 
   # Handle tuple-based render nodes from Elm.Helpers
