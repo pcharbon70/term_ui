@@ -169,11 +169,61 @@ defmodule TermUI.Runtime.NodeRenderer do
   defp render_node({:overlay, background, %{} = overlay_map}, buffer, row, col, style) do
     # First render the background content at current position
     render_node(background, buffer, row, col, style)
+
     # Then render the overlay using its absolute positioning
     # Extract x, y from overlay map and convert to 1-indexed buffer coordinates
     x = Map.get(overlay_map, :x, 0)
     y = Map.get(overlay_map, :y, 0)
-    render_node(overlay_map, buffer, y + 1, x + 1, style)
+
+    # If overlay has width, height, and bg, fill the ENTIRE ROWS of the overlay area
+    # This is necessary because the TTY backend fills gaps with unstyled spaces
+    # which would show the background content through
+    case overlay_map do
+      %{width: width, height: height, bg: %Style{} = bg_style}
+      when is_integer(width) and width > 0 and is_integer(height) and height > 0 ->
+        # Get buffer dimensions to fill entire rows
+        {_buf_rows, buf_cols} = Buffer.dimensions(buffer)
+
+        # Fill entire rows of the overlay area (from column 1 to end of each row)
+        # This ensures there are no gaps that would show background content
+        for dy <- 0..(height - 1) do
+          buf_row = y + 1 + dy
+
+          # Fill from column 1 to x with parent style (or spaces with no style)
+          if x > 0 do
+            for dx <- 0..(x - 1) do
+              cell = create_cell(" ", style)
+              Buffer.set_cell(buffer, buf_row, dx + 1, cell)
+            end
+          end
+
+          # Fill the overlay area with background color
+          for dx <- 0..(width - 1) do
+            cell = create_cell(" ", bg_style)
+            Buffer.set_cell(buffer, buf_row, x + 1 + dx, cell)
+          end
+
+          # Fill from overlay end to buffer width with parent style
+          if x + width < buf_cols do
+            for dx <- 0..(buf_cols - x - width - 1) do
+              cell = create_cell(" ", style)
+              Buffer.set_cell(buffer, buf_row, x + width + 1 + dx, cell)
+            end
+          end
+        end
+
+      _ ->
+        :ok
+    end
+
+    # Merge overlay's bg style with parent style for proper background inheritance
+    overlay_style =
+      case Map.get(overlay_map, :bg) do
+        %Style{} = bg_style -> merge_styles(style, bg_style)
+        _ -> style
+      end
+
+    render_node(overlay_map, buffer, y + 1, x + 1, overlay_style)
   end
 
   defp render_node({:styled, content, style}, buffer, row, col, parent_style) do

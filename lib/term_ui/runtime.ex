@@ -1052,7 +1052,10 @@ defmodule TermUI.Runtime do
         cells_in_row =
           buffer_row
           |> Enum.with_index(1)
-          |> Enum.filter(fn {%TermUI.Renderer.Cell{char: char}, _col} -> char != " " end)
+          |> Enum.filter(fn {%TermUI.Renderer.Cell{} = cell, _col} ->
+            # Include non-space characters OR spaces with non-default background
+            cell.char != " " or (cell.bg != nil and cell.bg != :default)
+          end)
           |> Enum.flat_map(fn {cell, col} -> cell_to_backend_tuple(cell, row, col) end)
 
         cells_in_row ++ acc
@@ -1072,11 +1075,17 @@ defmodule TermUI.Runtime do
         current_row = Buffer.get_row(current, row)
         previous_row = Buffer.get_row(previous, row)
 
-        # Find changed cells in this row (non-empty cells only for efficiency)
+        # Find changed cells in this row
+        # Include cells that are:
+        # - Non-space characters (text/content)
+        # - Space characters with non-default background (for overlays, etc.)
         changed_in_row =
           current_row
           |> Enum.with_index(1)
-          |> Enum.filter(fn {%Cell{char: char}, _col} -> char != " " end)
+          |> Enum.filter(fn {%Cell{} = cell, _col} ->
+            # Include if: char is not space, OR has a non-default background color
+            cell.char != " " or (cell.bg != nil and cell.bg != :default)
+          end)
           |> Enum.filter(fn {cell, col} ->
             prev_cell = Enum.at(previous_row, col - 1, Cell.empty())
             not Cell.equal?(cell, prev_cell)
