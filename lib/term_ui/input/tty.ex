@@ -259,8 +259,11 @@ defmodule TermUI.Input.TTY do
   end
 
   defp restore_io_opts(original_opts) do
-    # Restore the original IO options (echo and binary mode)
-    :io.setopts(original_opts)
+    # Restore echo and binary mode from original options
+    # We use Keyword.get to safely extract values with defaults
+    echo = Keyword.get(original_opts, :echo, true)
+    binary = Keyword.get(original_opts, :binary, true)
+    :io.setopts(echo: echo, binary: binary)
   end
 
   # Try to parse a complete event from the buffer
