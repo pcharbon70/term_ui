@@ -32,7 +32,7 @@ defmodule TermUI.Input.TTYTest do
     test "state struct has buffer, event_queue, and IO opts fields" do
       state = TTY.new()
       # Verify the struct has the expected fields (including IO opts fields)
-      assert Map.keys(state) -- [:__struct__] == [:buffer, :event_queue, :io_opts_restored, :io_opts_set]
+      assert Map.keys(state) -- [:__struct__] == [:buffer, :event_queue, :io_opts_restored, :io_opts_set, :original_opts]
     end
   end
 
@@ -404,10 +404,11 @@ defmodule TermUI.Input.TTYTest do
       tty_state = TTY.new()
       raw_state = TermUI.Input.Raw.new()
 
-      tty_fields = Map.keys(tty_state) -- [:__struct__, :io_opts_restored, :io_opts_set]
+      # TTY has additional IO opts fields for IEx compatibility
+      tty_fields = Map.keys(tty_state) -- [:__struct__, :io_opts_restored, :io_opts_set, :original_opts]
       raw_fields = Map.keys(raw_state) -- [:__struct__]
 
-      # TTY has additional IO opts fields, but the core fields match
+      # The core fields match
       assert tty_fields == raw_fields
     end
 

@@ -132,7 +132,8 @@ defmodule TermUI.Input.TTY do
   defstruct buffer: <<>>,
             event_queue: [],
             io_opts_restored: false,
-            io_opts_set: false
+            io_opts_set: false,
+            original_opts: []
 
   @typedoc """
   State for the TTY input handler.
@@ -162,13 +163,14 @@ defmodule TermUI.Input.TTY do
   def new do
     # Set IO options for IEx-compatible TTY input
     # We save the original options so we can restore them later
-    _original_opts = setup_io_opts()
+    original_opts = setup_io_opts()
 
     %__MODULE__{
       buffer: <<>>,
       event_queue: [],
       io_opts_set: true,
-      io_opts_restored: false
+      io_opts_restored: false,
+      original_opts: original_opts
     }
   end
 
@@ -238,8 +240,8 @@ defmodule TermUI.Input.TTY do
   """
   @impl TermUI.Input
   @spec stop(t()) :: :ok
-  def stop(%__MODULE__{}) do
-    restore_io_opts()
+  def stop(%__MODULE__{original_opts: original_opts}) do
+    restore_io_opts(original_opts)
     :ok
   end
 
@@ -256,9 +258,9 @@ defmodule TermUI.Input.TTY do
     original
   end
 
-  defp restore_io_opts do
-    # Restore to binary mode (default)
-    :io.setopts(binary: true)
+  defp restore_io_opts(original_opts) do
+    # Restore the original IO options (echo and binary mode)
+    :io.setopts(original_opts)
   end
 
   # Try to parse a complete event from the buffer
