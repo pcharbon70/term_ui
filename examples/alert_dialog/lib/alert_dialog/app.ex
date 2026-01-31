@@ -98,7 +98,15 @@ defmodule AlertDialog.App do
 
   # Helper to create and initialize an alert dialog
   defp show_alert(state, type, title, message) do
-    props = AlertDialog.new(type: type, title: title, message: message)
+    # Confirm dialog (#5) gets a light blue background
+    bg_style =
+      if type == :confirm do
+        Style.new(bg: :bright_blue)
+      else
+        Style.new(bg: :black)
+      end
+
+    props = AlertDialog.new(type: type, title: title, message: message, background_style: bg_style)
     {:ok, alert} = AlertDialog.init(props)
     %{state | alert: alert}
   end

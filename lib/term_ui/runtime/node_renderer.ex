@@ -175,40 +175,20 @@ defmodule TermUI.Runtime.NodeRenderer do
     x = Map.get(overlay_map, :x, 0)
     y = Map.get(overlay_map, :y, 0)
 
-    # If overlay has width, height, and bg, fill the ENTIRE ROWS of the overlay area
-    # This is necessary because the TTY backend fills gaps with unstyled spaces
-    # which would show the background content through
+    # If overlay has width, height, and bg, fill the overlay area with background color
+    # This creates an opaque background for the overlay content
     case overlay_map do
       %{width: width, height: height, bg: %Style{} = bg_style}
       when is_integer(width) and width > 0 and is_integer(height) and height > 0 ->
-        # Get buffer dimensions to fill entire rows
-        {_buf_rows, buf_cols} = Buffer.dimensions(buffer)
-
-        # Fill entire rows of the overlay area (from column 1 to end of each row)
-        # This ensures there are no gaps that would show background content
+        # Fill only the overlay area with background color
+        # Background content to the left/right is preserved
         for dy <- 0..(height - 1) do
           buf_row = y + 1 + dy
-
-          # Fill from column 1 to x with parent style (or spaces with no style)
-          if x > 0 do
-            for dx <- 0..(x - 1) do
-              cell = create_cell(" ", style)
-              Buffer.set_cell(buffer, buf_row, dx + 1, cell)
-            end
-          end
 
           # Fill the overlay area with background color
           for dx <- 0..(width - 1) do
             cell = create_cell(" ", bg_style)
             Buffer.set_cell(buffer, buf_row, x + 1 + dx, cell)
-          end
-
-          # Fill from overlay end to buffer width with parent style
-          if x + width < buf_cols do
-            for dx <- 0..(buf_cols - x - width - 1) do
-              cell = create_cell(" ", style)
-              Buffer.set_cell(buffer, buf_row, x + width + 1 + dx, cell)
-            end
           end
         end
 
