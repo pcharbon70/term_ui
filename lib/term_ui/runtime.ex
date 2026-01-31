@@ -1069,17 +1069,14 @@ defmodule TermUI.Runtime do
     {rows, _cols} = Buffer.dimensions(current)
 
     # Iterate through all cells and collect changed ones
-    # For efficiency, we use the Diff module's row comparison
+    # We need to check BOTH current and previous to detect cells that need clearing
     for row <- 1..rows, reduce: [] do
       acc ->
         current_row = Buffer.get_row(current, row)
         previous_row = Buffer.get_row(previous, row)
 
-        # Find changed cells in this row
-        # Include cells that are:
-        # - Non-space characters (text/content)
-        # - Space characters with non-default background (for overlays, etc.)
-        changed_in_row =
+        # Build set of columns that need updating from current row
+        current_changed =
           current_row
           |> Enum.with_index(1)
           |> Enum.filter(fn {%Cell{} = cell, _col} ->
@@ -1090,11 +1087,36 @@ defmodule TermUI.Runtime do
             prev_cell = Enum.at(previous_row, col - 1, Cell.empty())
             not Cell.equal?(cell, prev_cell)
           end)
+
+        # Find columns in previous that had non-default styling but are now gone/changed
+        # This handles clearing overlay backgrounds when dialogs close
+        previous_changed =
+          previous_row
+          |> Enum.with_index(1)
+          |> Enum.filter(fn {%Cell{} = cell, _col} ->
+            # Previous cell had non-default styling that might need clearing
+            cell.char != " " or (cell.bg != nil and cell.bg != :default)
+          end)
+          |> Enum.filter(fn {prev_cell, col} ->
+            current_cell = Enum.at(current_row, col - 1, Cell.empty())
+            # Needs clearing if current cell is different AND current is now "empty"
+            not Cell.equal?(current_cell, prev_cell) and
+              (current_cell.char == " " and current_cell.bg == :default and
+                 current_cell.fg == :default and MapSet.size(current_cell.attrs) == 0)
+          end)
+          |> Enum.map(fn {_prev_cell, col} ->
+            # Send a clear cell (space with default styling)
+            {{row, col}, {" ", :default, :default, []}}
+          end)
+
+        # Convert current changed cells to backend format
+        current_cells =
+          current_changed
           |> Enum.flat_map(fn {cell, col} ->
             cell_to_backend_tuple(cell, row, col)
           end)
 
-        changed_in_row ++ acc
+        current_cells ++ previous_changed ++ acc
     end
   end
 
