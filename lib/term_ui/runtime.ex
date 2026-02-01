@@ -725,6 +725,14 @@ defmodule TermUI.Runtime do
       _ -> :ok
     end
 
+    # Final defense: ensure echo is enabled for IEx compatibility
+    # This must be the LAST thing we do, after all other cleanup
+    try do
+      :io.setopts(echo: true)
+    rescue
+      _ -> :ok
+    end
+
     :ok
   end
 
