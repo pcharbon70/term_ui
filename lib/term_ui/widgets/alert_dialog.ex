@@ -192,8 +192,11 @@ defmodule TermUI.Widgets.AlertDialog do
         {:ok, state}
     end
   end
+
+  @impl true
   def render(%{visible: false}, _area), do: empty()
 
+  @impl true
   def render(state, area) do
     # Calculate dialog position (centered)
     dialog_width = state.width

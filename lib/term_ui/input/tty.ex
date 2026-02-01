@@ -240,7 +240,7 @@ defmodule TermUI.Input.TTY do
   """
   @impl TermUI.Input
   @spec stop(t()) :: :ok
-  def stop(%__MODULE__{original_opts: original_opts} = state) do
+  def stop(%__MODULE__{original_opts: original_opts}) do
     restore_io_opts(original_opts)
     # Ensure echo is enabled after stopping (critical for IEx compatibility)
     # We do this unconditionally because IEx always needs echo on
