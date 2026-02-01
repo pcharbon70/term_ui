@@ -1,7 +1,7 @@
 defmodule TermUI.ThemeTest do
   use ExUnit.Case, async: true
 
-  alias TermUI.Style
+  alias TermUI.Renderer.Style
   alias TermUI.Theme
 
   setup do
@@ -266,7 +266,7 @@ defmodule TermUI.ThemeTest do
     test "get_component_style returns component variant", %{server: server} do
       style = Theme.get_component_style(:button, :focused, server)
       assert %Style{} = style
-      assert Style.has_attr?(style, :bold)
+      assert MapSet.member?(style.attrs, :bold)
     end
 
     test "get_component_style returns nil for unknown component", %{server: server} do

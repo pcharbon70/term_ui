@@ -320,9 +320,31 @@ defmodule TermUI.Theme do
   """
   @spec get_theme(GenServer.server()) :: t()
   def get_theme(server \\ __MODULE__) do
-    case :ets.lookup(ets_table(server), :current_theme) do
-      [{:current_theme, theme}] -> theme
-      [] -> GenServer.call(server, :get_theme)
+    table = ets_table(server)
+
+    case :ets.whereis(table) do
+      :undefined ->
+        # Table doesn't exist, check if GenServer is running
+        case Process.whereis(server) do
+          nil ->
+            # Neither table nor GenServer exist, return default theme
+            dark_theme()
+
+          _pid ->
+            # GenServer is running, call it
+            try do
+              GenServer.call(server, :get_theme)
+            catch
+              :exit, _ -> dark_theme()
+            end
+        end
+
+      _ref ->
+        # Table exists, try to lookup
+        case :ets.lookup(table, :current_theme) do
+          [{:current_theme, theme}] -> theme
+          [] -> GenServer.call(server, :get_theme)
+        end
     end
   end
 
