@@ -32,12 +32,21 @@ defmodule TermUI.Widgets.Dialog do
   - Tab/Shift+Tab: Move between buttons
   - Enter/Space: Activate focused button
   - Escape: Close dialog
+
+  ## Mouse Support
+
+  In raw mode, dialog buttons can be clicked with the mouse. Clicking a button
+  produces the same result as pressing Enter on that button. Mouse events are
+  ignored in TTY mode.
+
+  - Left click on button: Activate the button
   """
 
   use TermUI.StatefulComponent
 
   alias TermUI.CharacterSet
   alias TermUI.Event
+  alias TermUI.PersistentTerms
   alias TermUI.Renderer.Style
   alias TermUI.Theme
 
@@ -131,18 +140,23 @@ defmodule TermUI.Widgets.Dialog do
     {:ok, state}
   end
 
-  def handle_event(%Event.Mouse{action: :click, x: x, y: y}, state) do
-    # Check if click is on a button
-    case find_button_at_position(state, x, y) do
-      nil ->
-        {:ok, state}
+  def handle_event(%Event.Mouse{action: :press, button: :left, x: x, y: y}, state) do
+    # Only handle mouse events in raw mode
+    if PersistentTerms.backend_mode() == :raw do
+      case find_button_at_position(state, x, y) do
+        nil ->
+          {:ok, state}
 
-      button_id ->
-        if state.on_confirm do
-          state.on_confirm.(button_id)
-        end
+        button_id ->
+          if state.on_confirm do
+            state.on_confirm.(button_id)
+          end
 
-        {:ok, %{state | focused_button: button_id, visible: false}}
+          {:ok, %{state | focused_button: button_id, visible: false}}
+      end
+    else
+      # Ignore mouse events in TTY mode
+      {:ok, state}
     end
   end
 
@@ -215,9 +229,66 @@ defmodule TermUI.Widgets.Dialog do
     {:ok, %{state | visible: false}}
   end
 
-  defp find_button_at_position(_state, _x, _y) do
-    # Simplified - would need actual button positions from render
-    nil
+  defp find_button_at_position(state, click_x, click_y) do
+    # Standard terminal size for examples
+    area_width = 80
+    area_height = 24
+    dialog_width = state.width
+    dialog_height = calculate_height(state)
+
+    # Dialog position on screen (centered)
+    dialog_x = max(0, div(area_width - dialog_width, 2))
+    dialog_y = max(0, div(area_height - dialog_height, 2))
+
+    # Button row is at: top_border(1) + title(1) + separator(1) + content(N) + separator(1)
+    content_lines = estimate_content_lines(state.content)
+    button_row_in_dialog = 4 + content_lines
+    button_y = dialog_y + button_row_in_dialog
+
+    # Check if click is on button row
+    if click_y == button_y do
+      # Calculate button positions within the button line
+      inner_width = dialog_width - 4  # width inside borders
+
+      # Build button texts like render_buttons does
+      button_texts =
+        Enum.map(state.buttons, fn button ->
+          label = button.label
+          if button.id == state.focused_button do
+            "[ " <> label <> " ]"
+          else
+            "  " <> label <> "  "
+          end
+        end)
+
+      buttons_line = Enum.join(button_texts, " ")
+
+      # Center buttons (same as render_buttons)
+      padding = inner_width - String.length(buttons_line)
+      left_pad = max(0, div(padding, 2))
+
+      # Buttons start at: dialog_x + v_line(1) + space(1) + left_pad
+      buttons_start_x = dialog_x + 2 + left_pad
+
+      # Find which button was clicked
+      find_button_at_x(state.buttons, button_texts, buttons_start_x, click_x)
+    else
+      nil
+    end
+  end
+
+  defp find_button_at_x(buttons, button_texts, start_x, click_x) do
+    # Iterate through buttons to find which one contains click_x
+    Enum.reduce_while(buttons, {button_texts, start_x}, fn button, {texts, current_x} ->
+      [button_text | remaining_texts] = texts
+      button_width = String.length(button_text)
+
+      if click_x >= current_x and click_x < current_x + button_width do
+        {:halt, button.id}
+      else
+        {:cont, {remaining_texts, current_x + button_width + 1}}  # +1 for space between buttons
+      end
+    end)
   end
 
   defp calculate_height(state) do
