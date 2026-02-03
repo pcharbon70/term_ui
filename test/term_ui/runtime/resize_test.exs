@@ -16,7 +16,7 @@ defmodule TermUI.Runtime.ResizeTest do
 
     def update(_msg, state), do: state
 
-    def view(_state), do: TermUI.Elm.text("test")
+    def view(_state), do: TermUI.Elm.Helpers.text("test")
 
     def event_to_msg(%Event.Resize{width: w, height: h}, _state) do
       {:msg, {:resize, w, h}}

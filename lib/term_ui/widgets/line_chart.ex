@@ -117,9 +117,6 @@ defmodule TermUI.Widgets.LineChart do
   end
 
   defp do_render(series, width, height, show_axis, style, opts) do
-    # Get character set for axis characters
-    chars = CharacterSet.current_charset()
-
     # Get all values for scaling
     all_values = series |> Enum.flat_map(& &1.data)
     {min, max} = VizHelper.calculate_range(all_values, opts)

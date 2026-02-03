@@ -584,8 +584,7 @@ defmodule TermUI.Widgets.FormBuilder do
     end
   end
 
-  defp render_group_header(group, collapsed) do
-    chars = CharacterSet.current_charset()
+  defp render_group_header(group, collapsed, chars) do
     indicator = if collapsed, do: chars.triangle_right, else: chars.triangle_down
     text("#{indicator} #{group.label}")
   end

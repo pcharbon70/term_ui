@@ -635,7 +635,6 @@ defmodule TermUI.Widgets.SplitPane do
   defp wrap_content(content), do: [content]
 
   defp render_vertical_divider(state, divider_idx, height) do
-    chars = CharacterSet.current_charset()
     is_focused = state.focused_divider == divider_idx
     style = if is_focused, do: state.focused_divider_style, else: state.divider_style
     chars = CharacterSet.current_charset()
@@ -650,7 +649,6 @@ defmodule TermUI.Widgets.SplitPane do
   end
 
   defp render_horizontal_divider(state, divider_idx, width) do
-    chars = CharacterSet.current_charset()
     is_focused = state.focused_divider == divider_idx
     style = if is_focused, do: state.focused_divider_style, else: state.divider_style
     chars = CharacterSet.current_charset()

@@ -1,5 +1,5 @@
 defmodule TermUI.Layout.IntegrationTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias TermUI.Layout.Alignment
   alias TermUI.Layout.Cache

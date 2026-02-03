@@ -52,7 +52,7 @@ defmodule TermUI.ComponentTest do
     use TermUI.Component
 
     @impl true
-    def render(props, area) do
+    def render(_props, area) do
       box([
         text("Header"),
         stack(:vertical, [

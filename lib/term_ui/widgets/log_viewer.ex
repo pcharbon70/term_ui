@@ -72,19 +72,27 @@ defmodule TermUI.Widgets.LogViewer do
           highlight: boolean()
         }
 
-  @level_patterns [
-    {:emergency, ~r/\b(EMERGENCY|EMERG)\b/i},
-    {:alert, ~r/\b(ALERT)\b/i},
-    {:critical, ~r/\b(CRITICAL|CRIT|FATAL)\b/i},
-    {:error, ~r/\b(ERROR|ERR)\b/i},
-    {:warning, ~r/\b(WARNING|WARN)\b/i},
-    {:notice, ~r/\b(NOTICE)\b/i},
-    {:info, ~r/\b(INFO)\b/i},
-    {:debug, ~r/\b(DEBUG|DBG)\b/i}
-  ]
+  # Regex patterns defined as functions to avoid Elixir 1.18+ Regex escape issues
+  defp level_patterns do
+    [
+      {:emergency, ~r/\b(EMERGENCY|EMERG)\b/i},
+      {:alert, ~r/\b(ALERT)\b/i},
+      {:critical, ~r/\b(CRITICAL|CRIT|FATAL)\b/i},
+      {:error, ~r/\b(ERROR|ERR)\b/i},
+      {:warning, ~r/\b(WARNING|WARN)\b/i},
+      {:notice, ~r/\b(NOTICE)\b/i},
+      {:info, ~r/\b(INFO)\b/i},
+      {:debug, ~r/\b(DEBUG|DBG)\b/i}
+    ]
+  end
 
-  @timestamp_pattern ~r/\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?/
-  @source_pattern ~r/\[([^\]]+)\]/
+  defp timestamp_pattern do
+    ~r/\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?/
+  end
+
+  defp source_pattern do
+    ~r/\[([^\]]+)\]/
+  end
 
   @page_size 20
 
@@ -842,7 +850,7 @@ defmodule TermUI.Widgets.LogViewer do
   end
 
   defp extract_timestamp(line) do
-    case Regex.run(@timestamp_pattern, line) do
+    case Regex.run(timestamp_pattern(), line) do
       [match | _] ->
         case DateTime.from_iso8601(match) do
           {:ok, dt, _} -> dt
@@ -855,13 +863,13 @@ defmodule TermUI.Widgets.LogViewer do
   end
 
   defp extract_level(line) do
-    Enum.find_value(@level_patterns, fn {level, pattern} ->
+    Enum.find_value(level_patterns(), fn {level, pattern} ->
       if Regex.match?(pattern, line), do: level, else: nil
     end)
   end
 
   defp extract_source(line) do
-    case Regex.run(@source_pattern, line) do
+    case Regex.run(source_pattern(), line) do
       [_, source | _] -> source
       nil -> nil
     end

@@ -198,7 +198,7 @@ defmodule TermUI.Backend.TTYTest do
       # Verify shutdown pattern matches on the struct type
       assert_raise FunctionClauseError, fn ->
         capture_io(fn ->
-          TTY.shutdown(%{alternate_screen: false})
+          apply(TTY, :shutdown, [%{alternate_screen: false}])
         end)
       end
     end
@@ -688,8 +688,6 @@ defmodule TermUI.Backend.TTYTest do
     end
 
     test "buffer overflow truncates to 256 bytes keeping recent data" do
-      import ExUnit.CaptureLog
-
       {:ok, state} = init_tty([])
 
       # Create a buffer larger than 1024 bytes with incomplete escape at end
@@ -3016,8 +3014,8 @@ defmodule TermUI.Backend.TTYTest do
   # Section 3.8.1 Integration Tests - Full Redraw Lifecycle
   # ===========================================================================
 
-  @tag :integration
   describe "integration - full redraw lifecycle (Section 3.8.1)" do
+    @describetag :integration
     test "init -> draw_cells -> shutdown sequence works correctly" do
       # Initialize backend with full_redraw mode
       output =
@@ -3371,8 +3369,8 @@ defmodule TermUI.Backend.TTYTest do
   # Section 3.8.2 Integration Tests - Incremental Rendering
   # ===========================================================================
 
-  @tag :integration
   describe "integration - incremental rendering (Section 3.8.2)" do
+    @describetag :integration
     # -------------------------------------------------------------------------
     # 3.8.2.1 - Test first frame falls back to full redraw
     # -------------------------------------------------------------------------
@@ -3751,8 +3749,8 @@ defmodule TermUI.Backend.TTYTest do
   # Section 3.8.3 Integration Tests - Color Degradation
   # ===========================================================================
 
-  @tag :integration
   describe "integration - color degradation (Section 3.8.3)" do
+    @describetag :integration
     # -------------------------------------------------------------------------
     # 3.8.3.1 - Test rendering with true_color capabilities
     # -------------------------------------------------------------------------
@@ -4123,8 +4121,8 @@ defmodule TermUI.Backend.TTYTest do
   # Section 3.8.4 Integration Tests - Character Set Fallback
   # ===========================================================================
 
-  @tag :integration
   describe "integration - character set fallback (Section 3.8.4)" do
+    @describetag :integration
     # Get Unicode character set for reference in tests
     # (we test that Unicode chars are mapped to ASCII, so we only need the Unicode set)
     @unicode_chars TermUI.CharacterSet.get(:unicode)

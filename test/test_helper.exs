@@ -14,4 +14,9 @@ excludes =
     [:requires_terminal]
   end
 
+case TermUI.Theme.start_link(theme: :dark) do
+  {:ok, _pid} -> :ok
+  {:error, {:already_started, _pid}} -> :ok
+end
+
 ExUnit.start(exclude: excludes)

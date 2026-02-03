@@ -721,8 +721,11 @@ defmodule TermUI.Runtime do
     end
 
     # Clean up persistent_term storage to prevent memory leaks
+    # Only clean up if this runtime owns the current terms
     try do
-      PersistentTerms.cleanup()
+      if PersistentTerms.owns_terms?(self()) do
+        PersistentTerms.cleanup()
+      end
     rescue
       _ -> :ok
     end

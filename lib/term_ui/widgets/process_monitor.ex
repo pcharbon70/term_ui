@@ -85,15 +85,18 @@ defmodule TermUI.Widgets.ProcessMonitor do
   @sort_fields [:pid, :name, :reductions, :memory, :queue, :status]
 
   # System process patterns to optionally hide
-  @system_patterns [
-    ~r/^:application_controller$/,
-    ~r/^:kernel_sup$/,
-    ~r/^:code_server$/,
-    ~r/^:file_server/,
-    ~r/^:init$/,
-    ~r/^:logger/,
-    ~r/^:erl_prim_loader$/
-  ]
+  # Defined as function to avoid Elixir 1.18+ Regex escape issues
+  defp system_patterns do
+    [
+      ~r/^:application_controller$/,
+      ~r/^:kernel_sup$/,
+      ~r/^:code_server$/,
+      ~r/^:file_server/,
+      ~r/^:init$/,
+      ~r/^:logger/,
+      ~r/^:erl_prim_loader$/
+    ]
+  end
 
   # ----------------------------------------------------------------------------
   # Props
@@ -435,7 +438,7 @@ defmodule TermUI.Widgets.ProcessMonitor do
   defp maybe_filter_system(processes, false) do
     Enum.reject(processes, fn p ->
       name = process_name(p)
-      Enum.any?(@system_patterns, &Regex.match?(&1, name))
+      Enum.any?(system_patterns(), &Regex.match?(&1, name))
     end)
   end
 
