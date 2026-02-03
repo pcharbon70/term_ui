@@ -30,12 +30,53 @@ defmodule TermUI.Widgets.AlertDialog do
   - Escape: Close (same as Cancel/No)
   - Y: Yes (in confirm dialogs)
   - N: No (in confirm dialogs)
+
+  ## Mouse Support
+
+  In raw mode, dialog buttons can be clicked with the mouse. Clicking a button
+  produces the same result as pressing Enter on that button. Mouse events are
+  ignored in TTY mode.
+
+  **Important**: For accurate mouse click detection, you must call `update_area/2`
+  with the current terminal dimensions before mouse events occur.
+
+  - Left click on button: Activate the button
+
+  ## Example with Mouse Support
+
+      # In your component:
+      def init(_opts), do: %{alert: nil}
+
+      def update(:show_confirm, state) do
+        props = AlertDialog.new(type: :confirm, title: "Confirm", message: "Proceed?")
+        {:ok, alert} = AlertDialog.init(props)
+
+        # Set terminal area for accurate mouse clicks
+        alert = AlertDialog.update_area(alert, %{width: 80, height: 24})
+
+        {%{state | alert: alert}, []}
+      end
+
+      def update({:alert_event, event}, state) do
+        {:ok, new_alert} = AlertDialog.handle_event(event, state.alert)
+        {%{state | alert: new_alert}, []}
+      end
+
+      def view(state) do
+        if state.alert do
+          area = %{width: 80, height: 24}
+          {:overlay, main_content(), AlertDialog.render(state.alert, area)}
+        else
+          main_content()
+        end
+      end
   """
 
   use TermUI.StatefulComponent
 
   alias TermUI.CharacterSet
   alias TermUI.Event
+  alias TermUI.PersistentTerms
 
   # Icon keys mapped to CharacterSet fields (or literal strings for ?)
   @type_icon_keys %{
@@ -126,7 +167,10 @@ defmodule TermUI.Widgets.AlertDialog do
       message_style: props.message_style,
       button_style: props.button_style,
       focused_button_style: props.focused_button_style,
-      visible: true
+      visible: true,
+      # Store terminal area for accurate button click detection
+      # Can be updated with update_area/2
+      terminal_area: {80, 24}
     }
 
     {:ok, state}
@@ -168,24 +212,43 @@ defmodule TermUI.Widgets.AlertDialog do
     handle_result(state, :no)
   end
 
-  # Debug: Log all events to console (temporary)
   def handle_event(event, state) do
-    # Log only key events, ignore mouse events to reduce spam
-    case event do
-      %TermUI.Event.Key{} ->
-        IO.inspect(event, label: "AlertDialog Key event")
-      _ ->
-        :ok
-    end
-
     # ESC key handling - more permissive pattern match
     case event do
       %TermUI.Event.Key{key: key} when key == :escape or key == :ESC ->
         result = if state.alert_type == :confirm, do: :no, else: :cancel
         handle_result(state, result)
 
+      %TermUI.Event.Mouse{action: :press, button: :left, x: x, y: y} ->
+        # Only handle mouse events in raw mode
+        if PersistentTerms.backend_mode() == :raw do
+          {area_width, area_height} = state.terminal_area
+
+          # Calculate button bounds based on current focus (since button widths change with focus)
+          button_bounds = calculate_button_bounds_for_size(
+            state.width,
+            state.buttons,
+            state.focused_button,
+            area_width,
+            area_height
+          )
+
+          case find_button_at_position(button_bounds, x, y) do
+            nil ->
+              # Click not on any button
+              {:ok, state}
+
+            button_id ->
+              # Clicked on a button - activate it
+              handle_result(state, button_id)
+          end
+        else
+          # Ignore mouse events in TTY mode
+          {:ok, state}
+        end
+
       %TermUI.Event.Mouse{} ->
-        # Ignore mouse events
+        # Ignore other mouse events (not clicks)
         {:ok, state}
 
       _ ->
@@ -255,13 +318,89 @@ defmodule TermUI.Widgets.AlertDialog do
       state.on_result.(result)
     end
 
-    {:ok, %{state | visible: false}}
+    # Update focused_button to the result so get_focused_button returns the clicked button
+    {:ok, %{state | visible: false, focused_button: result}}
   end
 
   defp calculate_height(state) do
     # Title (1) + icon+message (1) + buttons (1) + borders (4) + padding (2)
     message_lines = String.split(state.message, "\n") |> length()
     6 + message_lines
+  end
+
+  # Calculate button bounds for a given terminal size and focus state
+  # Returns a map with button positions for click detection
+  defp calculate_button_bounds_for_size(dialog_width, buttons, focused_button, area_width, area_height) do
+    dialog_height = 7  # Base height for single-line message
+
+    # Dialog position on screen (centered)
+    dialog_x = max(0, div(area_width - dialog_width, 2))
+    dialog_y = max(0, div(area_height - dialog_height, 2))
+
+    # Button row is at: top_border(1) + title(1) + separator(1) + content(1) + separator(1) = 5
+    button_row_in_dialog = 5
+    button_y = dialog_y + button_row_in_dialog
+
+    # Calculate button positions within the button line
+    inner_width = dialog_width - 4  # width inside borders
+
+    # Build button texts - focused button gets brackets
+    button_texts =
+      Enum.map(buttons, fn button ->
+        label = button.label
+        if button.id == focused_button do
+          "[ " <> label <> " ]"
+        else
+          "  " <> label <> "  "
+        end
+      end)
+
+    buttons_line = Enum.join(button_texts, " ")
+
+    # Center buttons
+    padding = inner_width - String.length(buttons_line)
+    left_pad = max(0, div(padding, 2))
+
+    # Buttons start at: dialog_x + v_line(1) + space(1) + left_pad
+    buttons_start_x = dialog_x + 2 + left_pad
+
+    # Build bounds map for each button
+    {bounds_list, _} = Enum.map_reduce(buttons, {button_texts, buttons_start_x}, fn button, {texts, current_x} ->
+      [button_text | remaining_texts] = texts
+      button_width = String.length(button_text)
+
+      bounds = %{
+        id: button.id,
+        x: current_x,
+        y: button_y,
+        width: button_width,
+        height: 1
+      }
+
+      {bounds, {remaining_texts, current_x + button_width + 1}}  # +1 for space between buttons
+    end)
+
+    %{
+      button_y: button_y,
+      buttons: bounds_list
+    }
+  end
+
+  # Find which button was clicked based on pre-calculated bounds
+  defp find_button_at_position(button_bounds, click_x, click_y) do
+    # Check if click is on the button row
+    if click_y == button_bounds.button_y do
+      # Find which button contains the click x position
+      Enum.find_value(button_bounds.buttons, fn bounds ->
+        if click_x >= bounds.x and click_x < bounds.x + bounds.width do
+          bounds.id
+        else
+          nil
+        end
+      end)
+    else
+      nil
+    end
   end
 
   defp render_dialog(state, width) do
@@ -460,5 +599,26 @@ defmodule TermUI.Widgets.AlertDialog do
   @spec set_message(map(), String.t()) :: map()
   def set_message(state, message) do
     %{state | message: message}
+  end
+
+  @doc """
+  Updates the terminal area for accurate mouse click detection.
+
+  Call this when the terminal is resized or before rendering to ensure
+  mouse clicks are detected at the correct positions.
+
+  ## Example
+
+      # In your app's view/1, track the area:
+      def view(state) do
+        area = %{width: 80, height: 24}
+        # Update alert with current area before rendering
+        alert = AlertDialog.update_area(state.alert, area)
+        {:overlay, main_content, AlertDialog.render(alert, area)}
+      end
+  """
+  @spec update_area(map(), %{width: pos_integer(), height: pos_integer()}) :: map()
+  def update_area(state, area) do
+    %{state | terminal_area: {area.width, area.height}}
   end
 end

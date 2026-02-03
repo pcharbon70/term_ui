@@ -98,16 +98,13 @@ defmodule AlertDialog.App do
 
   # Helper to create and initialize an alert dialog
   defp show_alert(state, type, title, message) do
-    # Confirm dialog (#5) gets a light blue background
-    bg_style =
-      if type == :confirm do
-        Style.new(bg: :bright_blue)
-      else
-        Style.new(bg: :black)
-      end
-
-    props = AlertDialog.new(type: type, title: title, message: message, background_style: bg_style)
+    props = AlertDialog.new(type: type, title: title, message: message)
     {:ok, alert} = AlertDialog.init(props)
+
+    # Set terminal area for accurate mouse click detection
+    # (In a full implementation, this would be obtained from the runtime)
+    alert = AlertDialog.update_area(alert, %{width: 80, height: 24})
+
     %{state | alert: alert}
   end
 
@@ -121,10 +118,11 @@ defmodule AlertDialog.App do
     main_content = render_main_content(state)
 
     if state.alert != nil do
+      # Standard terminal size for this example
+      area = %{width: 80, height: 24}
+
       # Render the overlay directly - it will be positioned absolutely
-      # First render the main content to a buffer, then overlay the alert
-      # We achieve this by wrapping in a box that handles both layers
-      {:overlay, main_content, AlertDialog.render(state.alert, %{width: 80, height: 24})}
+      {:overlay, main_content, AlertDialog.render(state.alert, area)}
     else
       main_content
     end
