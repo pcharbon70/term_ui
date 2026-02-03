@@ -20,6 +20,7 @@ defmodule TermUI.Input.LineReaderTest do
 
   describe "read_line/1" do
     test "function exists with arity 0 and 1" do
+      assert Code.ensure_loaded?(LineReader)
       assert function_exported?(LineReader, :read_line, 0)
       assert function_exported?(LineReader, :read_line, 1)
     end
