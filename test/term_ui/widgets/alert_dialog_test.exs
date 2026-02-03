@@ -260,12 +260,8 @@ defmodule TermUI.Widgets.AlertDialogTest do
       props = AlertDialog.new(type: :ok_cancel, title: "Test", message: "Message")
       {:ok, state} = AlertDialog.init(props)
 
-      # Render first to set last_area
-      area = %{x: 0, y: 0, width: 80, height: 24}
-      _overlay = AlertDialog.render(state, area)
-      # Note: render updates state.last_area internally but doesn't return updated state
-      # For testing, we manually set last_area since render doesn't return state
-      state = %{state | last_area: area}
+      # Set terminal area for accurate button click detection
+      state = AlertDialog.update_area(state, %{width: 80, height: 24})
 
       on_result = fn result -> send(self(), {:result, result}) end
       state = %{state | on_result: on_result}
@@ -284,7 +280,7 @@ defmodule TermUI.Widgets.AlertDialogTest do
       # OK button at x=42, width=6 (positions 42-47)
 
       # Click on OK button (x=43, y=13)
-      event = %Event.Mouse{action: :click, x: 43, y: 13}
+      event = %Event.Mouse{action: :press, button: :left, x: 43, y: 13}
       {:ok, _state} = AlertDialog.handle_event(event, state)
 
       assert_receive {:result, :ok}
@@ -294,10 +290,8 @@ defmodule TermUI.Widgets.AlertDialogTest do
       props = AlertDialog.new(type: :ok_cancel, title: "Test", message: "Message")
       {:ok, state} = AlertDialog.init(props)
 
-      # Render first to set last_area
-      area = %{x: 0, y: 0, width: 80, height: 24}
-      _overlay = AlertDialog.render(state, area)
-      state = %{state | last_area: area}
+      # Set terminal area for accurate button click detection
+      state = AlertDialog.update_area(state, %{width: 80, height: 24})
 
       # Set to TTY mode
       :persistent_term.put(:term_ui_backend_mode, :tty)
@@ -306,7 +300,7 @@ defmodule TermUI.Widgets.AlertDialogTest do
       state = %{state | on_result: on_result}
 
       # Click on button position (OK button at x=43, y=13)
-      event = %Event.Mouse{action: :click, x: 43, y: 13}
+      event = %Event.Mouse{action: :press, button: :left, x: 43, y: 13}
       {:ok, _state} = AlertDialog.handle_event(event, state)
 
       # Should not receive result
@@ -317,16 +311,14 @@ defmodule TermUI.Widgets.AlertDialogTest do
       props = AlertDialog.new(type: :ok_cancel, title: "Test", message: "Message")
       {:ok, state} = AlertDialog.init(props)
 
-      # Render first to set last_area
-      area = %{x: 0, y: 0, width: 80, height: 24}
-      _overlay = AlertDialog.render(state, area)
-      state = %{state | last_area: area}
+      # Set terminal area for accurate button click detection
+      state = AlertDialog.update_area(state, %{width: 80, height: 24})
 
       on_result = fn result -> send(self(), {:result, result}) end
       state = %{state | on_result: on_result}
 
       # Click far outside the dialog
-      event = %Event.Mouse{action: :click, x: 0, y: 0}
+      event = %Event.Mouse{action: :press, button: :left, x: 0, y: 0}
       {:ok, _state} = AlertDialog.handle_event(event, state)
 
       # Should not receive result
@@ -337,16 +329,14 @@ defmodule TermUI.Widgets.AlertDialogTest do
       props = AlertDialog.new(type: :ok_cancel, title: "Test", message: "Message")
       {:ok, state} = AlertDialog.init(props)
 
-      # Render first to set last_area
-      area = %{x: 0, y: 0, width: 80, height: 24}
-      _overlay = AlertDialog.render(state, area)
-      state = %{state | last_area: area}
+      # Set terminal area for accurate button click detection
+      state = AlertDialog.update_area(state, %{width: 80, height: 24})
 
       on_result = fn result -> send(self(), {:result, result}) end
       state = %{state | on_result: on_result}
 
       # Click on button x but wrong y
-      event = %Event.Mouse{action: :click, x: 33, y: 10}
+      event = %Event.Mouse{action: :press, button: :left, x: 33, y: 10}
       {:ok, _state} = AlertDialog.handle_event(event, state)
 
       # Should not receive result
