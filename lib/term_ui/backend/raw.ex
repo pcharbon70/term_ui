@@ -144,6 +144,7 @@ defmodule TermUI.Backend.Raw do
   @behaviour TermUI.Backend
 
   alias TermUI.ANSI
+  alias TermUI.Backend.InputBuffer
   alias TermUI.Renderer.CursorOptimizer
   alias TermUI.Terminal.SizeDetector
   require Logger
@@ -556,18 +557,16 @@ defmodule TermUI.Backend.Raw do
        ) do
     # Use optimizer to find cheapest movement, with error recovery
     # Only catch expected exceptions, not system-level errors
-    try do
-      {sequence, _cost} = CursorOptimizer.optimal_move(from_row, from_col, to_row, to_col)
-      sequence
-    rescue
-      e in [ArgumentError, ArithmeticError, FunctionClauseError] ->
-        # Fall back to absolute positioning if optimizer fails
-        Logger.warning(
-          "CursorOptimizer failed (#{Exception.message(e)}), falling back to absolute positioning: from #{inspect({from_row, from_col})} to #{inspect({to_row, to_col})}"
-        )
+    {sequence, _cost} = CursorOptimizer.optimal_move(from_row, from_col, to_row, to_col)
+    sequence
+  rescue
+    e in [ArgumentError, ArithmeticError, FunctionClauseError] ->
+      # Fall back to absolute positioning if optimizer fails
+      Logger.warning(
+        "CursorOptimizer failed (#{Exception.message(e)}), falling back to absolute positioning: from #{inspect({from_row, from_col})} to #{inspect({to_row, to_col})}"
+      )
 
-        ANSI.cursor_position(to_row, to_col)
-    end
+      ANSI.cursor_position(to_row, to_col)
   end
 
   @impl true
@@ -797,8 +796,8 @@ defmodule TermUI.Backend.Raw do
   # advances one column. This function assumes single-width characters. Multi-width
   # characters (CJK, emoji) would require grapheme width tracking - a future enhancement.
   #
-  # TODO: Consider using CursorOptimizer here for ~40% byte savings on cursor
-  # movement. Current absolute positioning is simple and correct but not optimal.
+  # Note: Using CursorOptimizer could provide ~40% byte savings on cursor movement.
+  # Current absolute positioning is simple and correct but not optimal.
   # See move_cursor/2 for example of CursorOptimizer integration.
   @spec cursor_move_output({pos_integer(), pos_integer()} | nil, {pos_integer(), pos_integer()}) ::
           iodata()
@@ -1209,8 +1208,8 @@ defmodule TermUI.Backend.Raw do
   @spec read_input_with_timeout(t(), non_neg_integer()) ::
           {:ok, TermUI.Backend.event(), t()} | {:timeout, t()} | {:error, term(), t()}
   defp read_input_with_timeout(state, timeout) do
-    alias TermUI.Terminal.EscapeParser
     alias TermUI.Event
+    alias TermUI.Terminal.EscapeParser
 
     # For zero timeout, just check if there's input ready
     # Unfortunately, IO.getn blocks, so we use a Task with timeout
@@ -1239,8 +1238,8 @@ defmodule TermUI.Backend.Raw do
   @spec try_parse_or_continue(t(), non_neg_integer()) ::
           {:ok, TermUI.Backend.event(), t()} | {:timeout, t()} | {:error, term(), t()}
   defp try_parse_or_continue(state, _timeout) do
-    alias TermUI.Terminal.EscapeParser
     alias TermUI.Event
+    alias TermUI.Terminal.EscapeParser
 
     buffer = state.input_buffer
 
@@ -1268,8 +1267,8 @@ defmodule TermUI.Backend.Raw do
   @spec wait_for_escape_completion(t(), binary()) ::
           {:ok, TermUI.Backend.event(), t()} | {:timeout, t()} | {:error, term(), t()}
   defp wait_for_escape_completion(state, buffer) do
-    alias TermUI.Terminal.EscapeParser
     alias TermUI.Event
+    alias TermUI.Terminal.EscapeParser
 
     task = Task.async(fn -> read_one_byte() end)
 
@@ -1277,19 +1276,7 @@ defmodule TermUI.Backend.Raw do
       {:ok, {:ok, data}} ->
         # Got more data - try to parse again
         new_buffer = buffer <> data
-
-        case EscapeParser.parse(new_buffer) do
-          {[event | _], remaining} ->
-            {:ok, event, %{state | input_buffer: remaining}}
-
-          {[], remaining} ->
-            if EscapeParser.partial_sequence?(remaining) do
-              # Still partial - recurse with remaining timeout
-              wait_for_escape_completion(state, remaining)
-            else
-              {:timeout, %{state | input_buffer: remaining}}
-            end
-        end
+        handle_parse_result(EscapeParser.parse(new_buffer), state, new_buffer)
 
       {:ok, :eof} ->
         # EOF during escape sequence - emit what we have
@@ -1301,6 +1288,21 @@ defmodule TermUI.Backend.Raw do
       nil ->
         # Timeout - emit partial escape sequence
         emit_partial_escape(state, buffer)
+    end
+  end
+
+  # Handles the result of parsing escape sequence data.
+  defp handle_parse_result({[event | _], remaining}, state, _buffer) do
+    {:ok, event, %{state | input_buffer: remaining}}
+  end
+
+  defp handle_parse_result({[], remaining}, state, _buffer) do
+    alias TermUI.Terminal.EscapeParser
+
+    if EscapeParser.partial_sequence?(remaining) do
+      wait_for_escape_completion(state, remaining)
+    else
+      {:timeout, %{state | input_buffer: remaining}}
     end
   end
 
@@ -1323,8 +1325,8 @@ defmodule TermUI.Backend.Raw do
   # Emits events from a partial escape sequence (timeout disambiguation).
   @spec emit_partial_escape(t(), binary()) :: {:ok, TermUI.Backend.event(), t()}
   defp emit_partial_escape(state, buffer) do
-    alias TermUI.Terminal.EscapeParser
     alias TermUI.Event
+    alias TermUI.Terminal.EscapeParser
 
     # Handle known partial sequences
     case buffer do
@@ -1430,7 +1432,7 @@ defmodule TermUI.Backend.Raw do
   # Uses the shared InputBuffer module for rate-limited logging.
   @spec append_to_input_buffer(t(), binary()) :: t()
   defp append_to_input_buffer(state, data) do
-    TermUI.Backend.InputBuffer.append_with_limit(state, data, :input_buffer, source: __MODULE__)
+    InputBuffer.append_with_limit(state, data, :input_buffer, source: __MODULE__)
   end
 
   # Queues events with size limit protection.

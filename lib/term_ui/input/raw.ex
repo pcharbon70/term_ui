@@ -65,9 +65,9 @@ defmodule TermUI.Input.Raw do
 
   require Logger
 
+  alias TermUI.Backend.InputBuffer
   alias TermUI.Event
   alias TermUI.Terminal.EscapeParser
-  alias TermUI.Backend.InputBuffer
 
   # Escape sequence bytes
   @esc 0x1B

@@ -186,13 +186,11 @@ defmodule TermUI.Backend.Selector do
   @doc false
   @spec try_raw_mode() :: {:raw, raw_state()} | {:tty, capabilities()}
   def try_raw_mode do
-    try do
-      attempt_raw_mode()
-    rescue
-      # Handle pre-OTP 28 systems where :shell.start_interactive/1 doesn't exist
-      UndefinedFunctionError ->
-        {:tty, detect_capabilities()}
-    end
+    attempt_raw_mode()
+  rescue
+    # Handle pre-OTP 28 systems where :shell.start_interactive/1 doesn't exist
+    UndefinedFunctionError ->
+      {:tty, detect_capabilities()}
   end
 
   # Attempts to start raw mode using OTP 28's shell.start_interactive/1
@@ -237,26 +235,37 @@ defmodule TermUI.Backend.Selector do
     term = System.get_env("TERM") || ""
 
     cond do
-      # COLORTERM is the most reliable indicator for true color
-      colorterm in ["truecolor", "24bit"] ->
+      true_color_colorterm?(colorterm) ->
         :true_color
 
-      # TERM patterns for true color
-      String.contains?(term, "-direct") ->
+      true_color_term?(term) ->
         :true_color
 
-      # 256 color support
-      String.contains?(term, "-256color") or String.contains?(term, "256color") ->
+      color_256_term?(term) ->
         :color_256
 
-      # Standard terminals with 16 color support
-      term != "" and basic_terminal?(term) ->
+      basic_16_color_term?(term) ->
         :color_16
 
-      # Unknown or no terminal
       true ->
         :monochrome
     end
+  end
+
+  defp true_color_colorterm?(colorterm) do
+    colorterm in ["truecolor", "24bit"]
+  end
+
+  defp true_color_term?(term) do
+    String.contains?(term, "-direct")
+  end
+
+  defp color_256_term?(term) do
+    String.contains?(term, "-256color") or String.contains?(term, "256color")
+  end
+
+  defp basic_16_color_term?(term) do
+    term != "" and basic_terminal?(term)
   end
 
   # Checks if TERM indicates a basic terminal with at least 16 colors.

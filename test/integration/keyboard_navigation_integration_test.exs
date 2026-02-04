@@ -30,8 +30,8 @@ defmodule TermUI.Integration.KeyboardNavigationIntegrationTest do
   use ExUnit.Case, async: true
 
   alias TermUI.Event
-  alias TermUI.Widgets.{Menu, Tabs, TreeView}
   alias TermUI.Theme
+  alias TermUI.Widgets.{Menu, Tabs, TreeView}
 
   setup do
     # Start Theme server (ignore if already started)

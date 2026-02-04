@@ -114,7 +114,17 @@ defmodule TermUI.Runtime.NodeRenderer do
          col,
          style
        ) do
-    render_viewport(content, buffer, row, col, style, scroll_x, scroll_y, width, height)
+    render_viewport(%{
+      content: content,
+      buffer: buffer,
+      dest_row: row,
+      dest_col: col,
+      style: style,
+      scroll_x: scroll_x,
+      scroll_y: scroll_y,
+      vp_width: width,
+      vp_height: height
+    })
   end
 
   # Handle overlay nodes (from AlertDialog, Dialog, ContextMenu, Toast widgets)
@@ -171,37 +181,14 @@ defmodule TermUI.Runtime.NodeRenderer do
     render_node(background, buffer, row, col, style)
 
     # Then render the overlay using its absolute positioning
-    # Extract x, y from overlay map and convert to 1-indexed buffer coordinates
     x = Map.get(overlay_map, :x, 0)
     y = Map.get(overlay_map, :y, 0)
 
-    # If overlay has width, height, and bg, fill the overlay area with background color
-    # This creates an opaque background for the overlay content
-    case overlay_map do
-      %{width: width, height: height, bg: %Style{} = bg_style}
-      when is_integer(width) and width > 0 and is_integer(height) and height > 0 ->
-        # Fill only the overlay area with background color
-        # Background content to the left/right is preserved
-        for dy <- 0..(height - 1) do
-          buf_row = y + 1 + dy
-
-          # Fill the overlay area with background color
-          for dx <- 0..(width - 1) do
-            cell = create_cell(" ", bg_style)
-            Buffer.set_cell(buffer, buf_row, x + 1 + dx, cell)
-          end
-        end
-
-      _ ->
-        :ok
-    end
+    # Fill overlay background if specified
+    fill_overlay_background(buffer, overlay_map, x, y)
 
     # Merge overlay's bg style with parent style for proper background inheritance
-    overlay_style =
-      case Map.get(overlay_map, :bg) do
-        %Style{} = bg_style -> merge_styles(style, bg_style)
-        _ -> style
-      end
+    overlay_style = merge_overlay_style(style, overlay_map)
 
     render_node(overlay_map, buffer, y + 1, x + 1, overlay_style)
   end
@@ -234,6 +221,36 @@ defmodule TermUI.Runtime.NodeRenderer do
 
   # Fallback for unknown node types
   defp render_node(_node, _buffer, _row, _col, _style), do: {0, 0}
+
+  # Overlay helper functions
+  defp fill_overlay_background(buffer, overlay_map, x, y) do
+    case overlay_map do
+      %{width: width, height: height, bg: %Style{} = bg_style}
+      when is_integer(width) and width > 0 and is_integer(height) and height > 0 ->
+        fill_overlay_area(buffer, x, y, width, height, bg_style)
+
+      _ ->
+        :ok
+    end
+  end
+
+  defp fill_overlay_area(buffer, x, y, width, height, bg_style) do
+    for dy <- 0..(height - 1) do
+      buf_row = y + 1 + dy
+
+      for dx <- 0..(width - 1) do
+        cell = create_cell(" ", bg_style)
+        Buffer.set_cell(buffer, buf_row, x + 1 + dx, cell)
+      end
+    end
+  end
+
+  defp merge_overlay_style(parent_style, overlay_map) do
+    case Map.get(overlay_map, :bg) do
+      %Style{} = bg_style -> merge_styles(parent_style, bg_style)
+      _ -> parent_style
+    end
+  end
 
   # Text rendering
   defp render_text(nil, _buffer, _row, _col, _style), do: {0, 0}
@@ -311,53 +328,64 @@ defmodule TermUI.Runtime.NodeRenderer do
 
   # Viewport rendering - clips content to a region with scroll offsets
   # Creates a temporary buffer to render content, then copies visible portion
-  defp render_viewport(
-         content,
-         buffer,
-         dest_row,
-         dest_col,
-         style,
-         scroll_x,
-         scroll_y,
-         vp_width,
-         vp_height
-       ) do
-    # Estimate content size - we need a buffer large enough to hold the content
-    # Use a reasonable maximum to avoid excessive memory usage
+  defp render_viewport(params) do
+    %{content: content, buffer: buffer, dest_row: dest_row, dest_col: dest_col, style: style,
+            scroll_x: scroll_x, scroll_y: scroll_y, vp_width: vp_width, vp_height: vp_height} = params
+
+    {content_width, content_height} = calculate_viewport_content_size(scroll_x, scroll_y, vp_width, vp_height)
+
+    case Buffer.new(content_height, content_width) do
+      {:ok, temp_buffer} ->
+        opts = build_viewport_opts(buffer, dest_row, dest_col, scroll_x, scroll_y, vp_width, vp_height)
+        render_and_copy_viewport(temp_buffer, content, style, opts)
+
+      _error ->
+        {vp_width, vp_height}
+    end
+  end
+
+  defp build_viewport_opts(buffer, dest_row, dest_col, scroll_x, scroll_y, vp_width, vp_height) do
+    %{
+      buffer: buffer,
+      dest_row: dest_row,
+      dest_col: dest_col,
+      scroll_x: scroll_x,
+      scroll_y: scroll_y,
+      vp_width: vp_width,
+      vp_height: vp_height
+    }
+  end
+
+  defp calculate_viewport_content_size(scroll_x, scroll_y, vp_width, vp_height) do
     content_width = scroll_x + vp_width + 100
     content_height = scroll_y + vp_height + 100
 
-    # Cap at reasonable limits
     content_width = min(content_width, Buffer.max_cols())
     content_height = min(content_height, Buffer.max_rows())
 
-    # Create temporary buffer for content
-    case Buffer.new(content_height, content_width) do
-      {:ok, temp_buffer} ->
-        # Render content to temporary buffer
-        render_node(content, temp_buffer, 1, 1, style)
+    {content_width, content_height}
+  end
 
-        # Copy visible region to destination buffer
-        # Source region starts at (scroll_y + 1, scroll_x + 1) in temp buffer (1-indexed)
-        # Destination starts at (dest_row, dest_col) in main buffer
-        for dy <- 0..(vp_height - 1), dx <- 0..(vp_width - 1) do
-          src_row = scroll_y + 1 + dy
-          src_col = scroll_x + 1 + dx
+  defp render_and_copy_viewport(temp_buffer, content, style, opts) do
+    # Render content to temporary buffer
+    render_node(content, temp_buffer, 1, 1, style)
 
-          cell = Buffer.get_cell(temp_buffer, src_row, src_col)
+    # Copy visible region to destination buffer
+    copy_viewport_region(temp_buffer, opts)
 
-          # Only copy non-empty cells (or copy all for consistent background)
-          Buffer.set_cell(buffer, dest_row + dy, dest_col + dx, cell)
-        end
+    # Clean up temporary buffer
+    Buffer.destroy(temp_buffer)
 
-        # Clean up temporary buffer
-        Buffer.destroy(temp_buffer)
+    {opts.vp_width, opts.vp_height}
+  end
 
-        {vp_width, vp_height}
+  defp copy_viewport_region(temp_buffer, opts) do
+    for dy <- 0..(opts.vp_height - 1), dx <- 0..(opts.vp_width - 1) do
+      src_row = opts.scroll_y + 1 + dy
+      src_col = opts.scroll_x + 1 + dx
 
-      {:error, _reason} ->
-        # If we can't create a buffer, just return the viewport dimensions
-        {vp_width, vp_height}
+      cell = Buffer.get_cell(temp_buffer, src_row, src_col)
+      Buffer.set_cell(opts.buffer, opts.dest_row + dy, opts.dest_col + dx, cell)
     end
   end
 

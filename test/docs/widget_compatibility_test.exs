@@ -12,6 +12,7 @@ defmodule Docs.WidgetCompatibilityTest do
   alias TermUI.Widgets.ContextMenu.Inline, as: ContextMenuInline
   alias TermUI.Widgets.SplitPane
   alias TermUI.Widgets.TextInput
+  alias TermUI.Widgets.TextInput.Line
 
   setup do
     # Start Theme server for tests
@@ -30,7 +31,7 @@ defmodule Docs.WidgetCompatibilityTest do
     end
 
     test "TextInput.Line.new example compiles" do
-      props = TermUI.Widgets.TextInput.Line.new(prompt: "> ", label: "Enter command")
+      props = Line.new(prompt: "> ", label: "Enter command")
       assert props.prompt == "> "
       assert props.label == "Enter command"
     end

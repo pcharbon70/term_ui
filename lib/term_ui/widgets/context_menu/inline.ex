@@ -265,31 +265,37 @@ defmodule TermUI.Widgets.ContextMenu.Inline do
 
       item_id ->
         # Use O(1) map lookup instead of O(n) Enum.find
-        case Map.get(state.item_map, item_id) do
-          %{type: :action} = item ->
-            if state.on_select && not Map.get(item, :disabled, false) do
-              safe_callback(state.on_select, [item.id], "on_select")
-            end
-
-            Behavior.close_menu(state)
-
-          _ ->
-            state
-        end
+        handle_menu_item_selection(state, item_id)
     end
+  end
+
+  defp handle_menu_item_selection(state, item_id) do
+    case Map.get(state.item_map, item_id) do
+      %{type: :action} = item ->
+        execute_menu_action(state, item)
+
+      _ ->
+        state
+    end
+  end
+
+  defp execute_menu_action(state, item) do
+    if state.on_select && not Map.get(item, :disabled, false) do
+      safe_callback(state.on_select, [item.id], "on_select")
+    end
+
+    Behavior.close_menu(state)
   end
 
   # Safe callback execution with error handling
   defp safe_callback(callback, args, callback_name) do
-    try do
-      apply(callback, args)
-      :ok
-    rescue
-      e ->
-        require Logger
-        Logger.error("ContextMenu.Inline #{callback_name} callback error: #{inspect(e)}")
-        {:error, e}
-    end
+    apply(callback, args)
+    :ok
+  rescue
+    e ->
+      require Logger
+      Logger.error("ContextMenu.Inline #{callback_name} callback error: #{inspect(e)}")
+      {:error, e}
   end
 
   # ----------------------------------------------------------------------------

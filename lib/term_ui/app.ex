@@ -307,36 +307,19 @@ defmodule TermUI.App do
   @spec supports?(supports_query()) :: boolean()
   def supports?(query) do
     capabilities = PersistentTerms.capabilities() || %{}
-
-    case query do
-      :unicode ->
-        Map.get(capabilities, :unicode, true)
-
-      :mouse ->
-        Map.get(capabilities, :mouse, false)
-
-      :colors ->
-        color_mode = Map.get(capabilities, :colors, :true_color)
-        color_mode != :monochrome
-
-      :true_color ->
-        Map.get(capabilities, :colors, :true_color) == :true_color
-
-      :color_256 ->
-        color_mode = Map.get(capabilities, :colors, :true_color)
-        color_mode in [:color_256, :true_color]
-
-      :color_16 ->
-        color_mode = Map.get(capabilities, :colors, :true_color)
-        color_mode in [:color_16, :color_256, :true_color]
-
-      :monochrome ->
-        Map.get(capabilities, :colors, :true_color) == :monochrome
-
-      _ ->
-        false
-    end
+    supports?(query, capabilities)
   end
+
+  defp supports?(:unicode, capabilities), do: Map.get(capabilities, :unicode, true)
+  defp supports?(:mouse, capabilities), do: Map.get(capabilities, :mouse, false)
+  defp supports?(:colors, capabilities), do: get_color_mode(capabilities) != :monochrome
+  defp supports?(:true_color, capabilities), do: get_color_mode(capabilities) == :true_color
+  defp supports?(:color_256, capabilities), do: get_color_mode(capabilities) in [:color_256, :true_color]
+  defp supports?(:color_16, capabilities), do: get_color_mode(capabilities) in [:color_16, :color_256, :true_color]
+  defp supports?(:monochrome, capabilities), do: get_color_mode(capabilities) == :monochrome
+  defp supports?(_, _capabilities), do: false
+
+  defp get_color_mode(capabilities), do: Map.get(capabilities, :colors, :true_color)
 
   @doc """
   Shuts down a running TermUI application.
@@ -378,17 +361,15 @@ defmodule TermUI.App do
 
   # Private helper to ensure terminal cleanup on crash
   defp ensure_terminal_cleanup do
-    try do
-      # Try to restore terminal via direct escape sequences
-      # This ensures cleanup even if Runtime GenServer is dead
-      IO.write("\e[?1006l\e[?1003l\e[?1002l\e[?1000l")  # Disable mouse tracking
-      IO.write("\e[?25h")  # Show cursor
-      IO.write("\e[0m")  # Reset colors
-      IO.write("\e[2J")  # Clear screen
-      IO.write("\e[H")  # Move cursor to home
-      :ok
-    rescue
-      _ -> :error
-    end
+    # Try to restore terminal via direct escape sequences
+    # This ensures cleanup even if Runtime GenServer is dead
+    IO.write("\e[?1006l\e[?1003l\e[?1002l\e[?1000l")  # Disable mouse tracking
+    IO.write("\e[?25h")  # Show cursor
+    IO.write("\e[0m")  # Reset colors
+    IO.write("\e[2J")  # Clear screen
+    IO.write("\e[H")  # Move cursor to home
+    :ok
+  rescue
+    _ -> :error
   end
 end

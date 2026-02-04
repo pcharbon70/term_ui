@@ -453,16 +453,19 @@ defmodule TermUI.Widgets.TreeView do
 
       {node, _depth, _path} ->
         if has_children?(node) do
-          # Toggle expand/collapse
-          if MapSet.member?(state.expanded, node.id) do
-            collapse_node(state, node)
-          else
-            expand_node(state, node)
-          end
+          toggle_node_expand(state, node)
         else
           # Select leaf node
           select_node(state, node)
         end
+    end
+  end
+
+  defp toggle_node_expand(state, node) do
+    if MapSet.member?(state.expanded, node.id) do
+      collapse_node(state, node)
+    else
+      expand_node(state, node)
     end
   end
 
@@ -624,31 +627,51 @@ defmodule TermUI.Widgets.TreeView do
   end
 
   defp find_filter_matches(nodes, filter, path, matches, ancestors) do
-    Enum.reduce(nodes, {matches, ancestors}, fn node, {matches_acc, ancestors_acc} ->
-      label_lower = String.downcase(node.label)
-      is_match = String.contains?(label_lower, filter)
-
-      # Recurse into children
-      {child_matches, child_ancestors} =
-        case node.children do
-          children when is_list(children) ->
-            find_filter_matches(children, filter, path ++ [node.id], matches_acc, ancestors_acc)
-
-          _ ->
-            {matches_acc, ancestors_acc}
-        end
-
-      # If this node or any descendant matches, add this node's ancestors
-      has_descendant_match = MapSet.size(child_matches) > MapSet.size(matches_acc)
-
-      if is_match || has_descendant_match do
-        new_matches = if is_match, do: MapSet.put(child_matches, node.id), else: child_matches
-        new_ancestors = Enum.reduce(path, child_ancestors, &MapSet.put(&2, &1))
-        {new_matches, new_ancestors}
-      else
-        {child_matches, child_ancestors}
-      end
+    Enum.reduce(nodes, {matches, ancestors}, fn node, acc ->
+      process_filter_node(node, filter, path, acc)
     end)
+  end
+
+  defp process_filter_node(node, filter, path, {matches_acc, ancestors_acc}) do
+    label_lower = String.downcase(node.label)
+    is_match = String.contains?(label_lower, filter)
+
+    {child_matches, child_ancestors} = find_child_filter_matches(node, filter, path, matches_acc, ancestors_acc)
+
+    if should_include_in_filter?(is_match, child_matches, matches_acc) do
+      new_matches = update_filter_matches(child_matches, is_match, node.id)
+      new_ancestors = add_path_to_ancestors(path, child_ancestors)
+      {new_matches, new_ancestors}
+    else
+      {child_matches, child_ancestors}
+    end
+  end
+
+  defp find_child_filter_matches(node, filter, path, matches_acc, ancestors_acc) do
+    case node.children do
+      children when is_list(children) ->
+        find_filter_matches(children, filter, path ++ [node.id], matches_acc, ancestors_acc)
+
+      _ ->
+        {matches_acc, ancestors_acc}
+    end
+  end
+
+  defp should_include_in_filter?(is_match, child_matches, matches_acc) do
+    has_descendant_match = MapSet.size(child_matches) > MapSet.size(matches_acc)
+    is_match or has_descendant_match
+  end
+
+  defp update_filter_matches(child_matches, true, node_id) do
+    MapSet.put(child_matches, node_id)
+  end
+
+  defp update_filter_matches(child_matches, false, _node_id) do
+    child_matches
+  end
+
+  defp add_path_to_ancestors(path, child_ancestors) do
+    Enum.reduce(path, child_ancestors, &MapSet.put(&2, &1))
   end
 
   # ----------------------------------------------------------------------------
@@ -698,49 +721,48 @@ defmodule TermUI.Widgets.TreeView do
     is_loading = MapSet.member?(state.loading, node.id)
     is_match = state.filter != nil && MapSet.member?(state.filter_matches, node.id)
 
-    # Build indentation
     indent = String.duplicate(" ", depth * state.indent_size)
+    indicator = node_indicator(node, is_loading, state)
+    icon = node_icon(node)
+    selection_prefix = selection_prefix(is_cursor, is_selected)
 
-    # Build expand/collapse indicator
-    indicator =
-      cond do
-        is_loading ->
-          state.icons.loading
-
-        has_children?(node) && MapSet.member?(state.expanded, node.id) ->
-          state.icons.expanded
-
-        has_children?(node) ->
-          state.icons.collapsed
-
-        true ->
-          state.icons.leaf
-      end
-
-    # Build icon
-    icon =
-      if node.icon do
-        "#{node.icon} "
-      else
-        ""
-      end
-
-    # Build selection indicator
-    chars = CharacterSet.current_charset()
-
-    selection_prefix =
-      cond do
-        is_cursor && is_selected -> chars.bullet
-        is_cursor -> chars.pointer
-        is_selected -> chars.bullet_empty
-        true -> " "
-      end
-
-    # Build the line
     label = node.label
     line = "#{selection_prefix}#{indent}#{indicator} #{icon}#{label}"
 
-    # Apply styling
+    apply_node_style(line, node, is_cursor, is_selected, is_match)
+  end
+
+  defp node_indicator(node, is_loading, state) do
+    cond do
+      is_loading ->
+        state.icons.loading
+
+      has_children?(node) && MapSet.member?(state.expanded, node.id) ->
+        state.icons.expanded
+
+      has_children?(node) ->
+        state.icons.collapsed
+
+      true ->
+        state.icons.leaf
+    end
+  end
+
+  defp node_icon(%{icon: icon}) when is_binary(icon), do: "#{icon} "
+  defp node_icon(_), do: ""
+
+  defp selection_prefix(is_cursor, is_selected) do
+    chars = CharacterSet.current_charset()
+
+    cond do
+      is_cursor && is_selected -> chars.bullet
+      is_cursor -> chars.pointer
+      is_selected -> chars.bullet_empty
+      true -> " "
+    end
+  end
+
+  defp apply_node_style(line, node, is_cursor, is_selected, is_match) do
     cond do
       node.disabled ->
         styled(text(line), Style.new() |> Style.fg(Theme.get_semantic(:muted)))

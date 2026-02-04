@@ -3,10 +3,10 @@ defmodule TermUI.Widgets.ContextMenu.FactoryTest do
 
   import TermUI.Test.ContextMenuHelpers
 
+  alias TermUI.Capabilities
   alias TermUI.Widgets.ContextMenu
   alias TermUI.Widgets.ContextMenu.Factory
   alias TermUI.Widgets.ContextMenu.Inline
-  alias TermUI.Capabilities
 
   # Test helpers
 

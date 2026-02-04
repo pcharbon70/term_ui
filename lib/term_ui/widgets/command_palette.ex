@@ -188,18 +188,21 @@ defmodule TermUI.Widgets.CommandPalette do
 
       rows =
         Enum.map(visible_commands, fn {cmd, idx} ->
-          is_selected = idx == state.selected
-          # Pad label to consistent width
-          padded_label = String.pad_trailing(cmd.label, min_width)
-
-          if is_selected do
-            text("  " <> padded_label, Theme.get_component_style(:item, :selected))
-          else
-            text("  " <> padded_label, nil)
-          end
+          render_command_row(cmd, idx, state.selected, min_width)
         end)
 
       stack(:vertical, rows)
+    end
+  end
+
+  defp render_command_row(cmd, idx, selected_idx, min_width) do
+    padded_label = String.pad_trailing(cmd.label, min_width)
+    text_line = "  " <> padded_label
+
+    if idx == selected_idx do
+      text(text_line, Theme.get_component_style(:item, :selected))
+    else
+      text(text_line, nil)
     end
   end
 

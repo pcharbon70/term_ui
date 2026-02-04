@@ -12,9 +12,9 @@ defmodule TermUI.Integration.MultiRendererTest do
   use ExUnit.Case, async: false
 
   alias TermUI.Backend.Selector
+  alias TermUI.Config
   alias TermUI.Event
   alias TermUI.Runtime
-  alias TermUI.Config
 
   # Test component implementing the Elm Architecture
   defmodule Counter do

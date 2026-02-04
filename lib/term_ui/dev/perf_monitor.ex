@@ -177,16 +177,12 @@ defmodule TermUI.Dev.PerfMonitor do
   @spec get_scheduler_utilization() :: [float()]
   def get_scheduler_utilization do
     # The :scheduler module is only available in OTP 28+
-    # Use apply/3 to avoid compile-time warnings
-    case apply(:scheduler, :utilization, [1]) do
-      [{:total, _, total} | _schedulers] ->
-        [total]
-
-      _ ->
-        []
-    end
+    :scheduler.utilization(1)
   rescue
     UndefinedFunctionError -> []
+  else
+    [{:total, _, total} | _] -> [total]
+    _ -> []
   end
 
   @doc """

@@ -94,6 +94,10 @@ defmodule TermUI.Input.Selector do
   """
   @type handler :: module()
 
+  alias TermUI.Backend.Selector
+  alias TermUI.Input.Raw
+  alias TermUI.Input.TTY
+
   @doc """
   Selects the appropriate input handler based on the current backend mode.
 
@@ -121,9 +125,9 @@ defmodule TermUI.Input.Selector do
   """
   @spec select() :: handler()
   def select do
-    case TermUI.Backend.Selector.select() do
-      {:raw, _state} -> TermUI.Input.Raw
-      {:tty, _capabilities} -> TermUI.Input.TTY
+    case Selector.select() do
+      {:raw, _state} -> Raw
+      {:tty, _capabilities} -> TTY
     end
   end
 
@@ -165,8 +169,8 @@ defmodule TermUI.Input.Selector do
       # ** (ArgumentError) invalid input mode: :invalid, expected :raw or :tty
   """
   @spec select(mode()) :: handler()
-  def select(:raw), do: TermUI.Input.Raw
-  def select(:tty), do: TermUI.Input.TTY
+  def select(:raw), do: Raw
+  def select(:tty), do: TTY
 
   def select(mode) do
     raise ArgumentError, "invalid input mode: #{inspect(mode)}, expected :raw or :tty"

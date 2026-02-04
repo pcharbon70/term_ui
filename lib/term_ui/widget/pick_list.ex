@@ -215,17 +215,17 @@ defmodule TermUI.Widget.PickList do
     # Render items
     cells =
       cells ++
-        render_items(
-          state.filtered_items,
-          state.selected_index,
-          state.scroll_offset,
-          modal_x + 1,
-          content_start_y,
-          modal_width - 2,
-          content_height,
-          style,
-          highlight_style
-        )
+        render_items(%{
+          items: state.filtered_items,
+          selected_index: state.selected_index,
+          scroll_offset: state.scroll_offset,
+          x: modal_x + 1,
+          y: content_start_y,
+          width: modal_width - 2,
+          height: content_height,
+          style: style,
+          highlight_style: highlight_style
+        })
 
     # Render status line
     cells =
@@ -345,55 +345,66 @@ defmodule TermUI.Widget.PickList do
     end)
   end
 
-  defp render_items(
-         items,
-         selected_index,
-         scroll_offset,
-         x,
-         y,
-         width,
-         height,
-         style,
-         highlight_style
-       ) do
+  defp render_items(params) do
+    %{items: items, selected_index: selected_index, scroll_offset: scroll_offset,
+            x: x, y: y, width: width, height: height, style: style, highlight_style: highlight_style} = params
+
     if items == [] do
-      # Empty list message
-      msg = "(No items)"
-      msg = String.pad_leading(msg, div(width + String.length(msg), 2))
-      msg = String.pad_trailing(msg, width)
-
-      msg
-      |> String.graphemes()
-      |> Enum.with_index()
-      |> Enum.map(fn {char, i} ->
-        positioned_cell(x + i, y, char, style)
-      end)
+      render_empty_items(x, y, width, style)
     else
-      items
-      |> Enum.with_index()
-      |> Enum.drop(scroll_offset)
-      |> Enum.take(height)
-      |> Enum.with_index()
-      |> Enum.flat_map(fn {{item, item_index}, display_y} ->
-        is_selected = item_index == selected_index
-        item_style = if is_selected, do: highlight_style, else: style
+      render_item_list(params)
+    end
+  end
 
-        item_text = to_string(item)
+  defp render_empty_items(x, y, width, style) do
+    msg = "(No items)"
+    msg = String.pad_leading(msg, div(width + String.length(msg), 2))
+    msg = String.pad_trailing(msg, width)
 
-        item_text =
-          if String.length(item_text) > width do
-            String.slice(item_text, 0, width - 1) <> "…"
-          else
-            String.pad_trailing(item_text, width)
-          end
+    msg
+    |> String.graphemes()
+    |> Enum.with_index()
+    |> Enum.map(fn {char, i} ->
+      positioned_cell(x + i, y, char, style)
+    end)
+  end
 
-        item_text
-        |> String.graphemes()
-        |> Enum.with_index()
-        |> Enum.map(fn {char, i} ->
-          positioned_cell(x + i, y + display_y, char, item_style)
-        end)
-      end)
+  defp render_item_list(params) do
+    %{items: items, selected_index: selected_index, scroll_offset: scroll_offset,
+            x: x, y: y, width: width, height: height, style: style, highlight_style: highlight_style} = params
+
+    items
+    |> Enum.with_index()
+    |> Enum.drop(scroll_offset)
+    |> Enum.take(height)
+    |> Enum.with_index()
+    |> Enum.flat_map(fn {{item, item_index}, display_y} ->
+      item_style = item_style(item_index, selected_index, highlight_style, style)
+      render_item_cells(item, x, y + display_y, width, item_style)
+    end)
+  end
+
+  defp item_style(item_index, selected_index, highlight_style, style) do
+    if item_index == selected_index, do: highlight_style, else: style
+  end
+
+  defp render_item_cells(item, x, y, width, style) do
+    item_text = to_string(item)
+    item_text = truncate_item_text(item_text, width)
+
+    item_text
+    |> String.graphemes()
+    |> Enum.with_index()
+    |> Enum.map(fn {char, i} ->
+      positioned_cell(x + i, y, char, style)
+    end)
+  end
+
+  defp truncate_item_text(text, width) do
+    if String.length(text) > width do
+      String.slice(text, 0, width - 1) <> "…"
+    else
+      String.pad_trailing(text, width)
     end
   end
 

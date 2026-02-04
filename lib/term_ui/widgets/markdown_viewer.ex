@@ -28,9 +28,9 @@ defmodule TermUI.Widgets.MarkdownViewer do
 
   use TermUI.StatefulComponent
 
+  alias TermUI.Component.RenderNode
   alias TermUI.Event
   alias TermUI.Markdown
-  alias TermUI.Component.RenderNode
 
   @doc """
   Creates new MarkdownViewer props.

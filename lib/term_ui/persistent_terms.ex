@@ -36,6 +36,7 @@ defmodule TermUI.PersistentTerms do
       PersistentTerms.cleanup()
   """
 
+  alias TermUI.Backend.Selector
   require Logger
 
   @doc """
@@ -152,7 +153,7 @@ defmodule TermUI.PersistentTerms do
 
   defp detect_capabilities do
     # Defer to Backend.Selector for capability detection
-    case TermUI.Backend.Selector.detect_capabilities() do
+    case Selector.detect_capabilities() do
       caps when is_map(caps) -> caps
       _ -> %{}
     end

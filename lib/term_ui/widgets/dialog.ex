@@ -143,21 +143,29 @@ defmodule TermUI.Widgets.Dialog do
   def handle_event(%Event.Mouse{action: :press, button: :left, x: x, y: y}, state) do
     # Only handle mouse events in raw mode
     if PersistentTerms.backend_mode() == :raw do
-      case find_button_at_position(state, x, y) do
-        nil ->
-          {:ok, state}
-
-        button_id ->
-          if state.on_confirm do
-            state.on_confirm.(button_id)
-          end
-
-          {:ok, %{state | focused_button: button_id, visible: false}}
-      end
+      handle_button_click(state, x, y)
     else
       # Ignore mouse events in TTY mode
       {:ok, state}
     end
+  end
+
+  defp handle_button_click(state, x, y) do
+    case find_button_at_position(state, x, y) do
+      nil ->
+        {:ok, state}
+
+      button_id ->
+        activate_button(state, button_id)
+    end
+  end
+
+  defp activate_button(state, button_id) do
+    if state.on_confirm do
+      state.on_confirm.(button_id)
+    end
+
+    {:ok, %{state | focused_button: button_id, visible: false}}
   end
 
   def handle_event(_event, state) do
@@ -230,51 +238,56 @@ defmodule TermUI.Widgets.Dialog do
   end
 
   defp find_button_at_position(state, click_x, click_y) do
-    # Standard terminal size for examples
+    button_row_y = calculate_button_row_y(state)
+
+    if click_y == button_row_y do
+      find_button_by_x_position(state, click_x)
+    else
+      nil
+    end
+  end
+
+  defp calculate_button_row_y(state) do
     area_width = 80
     area_height = 24
     dialog_width = state.width
     dialog_height = calculate_height(state)
 
-    # Dialog position on screen (centered)
-    dialog_x = max(0, div(area_width - dialog_width, 2))
     dialog_y = max(0, div(area_height - dialog_height, 2))
-
-    # Button row is at: top_border(1) + title(1) + separator(1) + content(N) + separator(1)
     content_lines = estimate_content_lines(state.content)
     button_row_in_dialog = 4 + content_lines
-    button_y = dialog_y + button_row_in_dialog
 
-    # Check if click is on button row
-    if click_y == button_y do
-      # Calculate button positions within the button line
-      inner_width = dialog_width - 4  # width inside borders
+    dialog_y + button_row_in_dialog
+  end
 
-      # Build button texts like render_buttons does
-      button_texts =
-        Enum.map(state.buttons, fn button ->
-          label = button.label
-          if button.id == state.focused_button do
-            "[ " <> label <> " ]"
-          else
-            "  " <> label <> "  "
-          end
-        end)
+  defp find_button_by_x_position(state, click_x) do
+    dialog_x = calculate_dialog_x(state.width)
+    inner_width = state.width - 4
+    button_texts = build_button_texts(state)
+    left_pad = calculate_button_padding(button_texts, inner_width)
+    buttons_start_x = dialog_x + 2 + left_pad
 
-      buttons_line = Enum.join(button_texts, " ")
+    find_button_at_x(state.buttons, button_texts, buttons_start_x, click_x)
+  end
 
-      # Center buttons (same as render_buttons)
-      padding = inner_width - String.length(buttons_line)
-      left_pad = max(0, div(padding, 2))
+  defp calculate_dialog_x(dialog_width) do
+    max(0, div(80 - dialog_width, 2))
+  end
 
-      # Buttons start at: dialog_x + v_line(1) + space(1) + left_pad
-      buttons_start_x = dialog_x + 2 + left_pad
+  defp build_button_texts(state) do
+    Enum.map(state.buttons, fn button ->
+      label = button.label
+      if button.id == state.focused_button do
+        "[ " <> label <> " ]"
+      else
+        "  " <> label <> "  "
+      end
+    end)
+  end
 
-      # Find which button was clicked
-      find_button_at_x(state.buttons, button_texts, buttons_start_x, click_x)
-    else
-      nil
-    end
+  defp calculate_button_padding(button_texts, inner_width) do
+    buttons_line = Enum.join(button_texts, " ")
+    max(0, div(inner_width - String.length(buttons_line), 2))
   end
 
   defp find_button_at_x(buttons, button_texts, start_x, click_x) do

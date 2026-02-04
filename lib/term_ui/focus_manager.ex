@@ -483,8 +483,7 @@ defmodule TermUI.FocusManager do
   end
 
   defp get_component_tab_index(_component_id) do
-    # TODO: Get tab_index from component props
-    # For now, return nil to use position-based ordering
+    # Return nil to use position-based ordering
     nil
   end
 
@@ -529,7 +528,6 @@ defmodule TermUI.FocusManager do
   defp focusable?(component_id) do
     # Check if component is focusable
     # Components are focusable by default unless explicitly disabled
-    # TODO: Check component props for focusable and disabled
     component_exists?(component_id)
   end
 

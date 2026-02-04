@@ -263,20 +263,16 @@ defmodule TermUI.Widgets.ProcessMonitor do
   # p - pause/suspend process
   def handle_event(%Event.Key{char: "p"}, state)
       when state.filter_input == nil and state.pending_action == nil do
-    if length(state.processes) > 0 do
-      process = Enum.at(state.processes, state.selected_idx)
+    process = Enum.at(state.processes, state.selected_idx)
+    handle_suspend_action(state, process)
+  end
 
-      if process do
-        if process.status == :suspended do
-          resume_process(state, process.pid)
-        else
-          {:ok, %{state | pending_action: :suspend}}
-        end
-      else
-        {:ok, state}
-      end
+  defp handle_suspend_action(state, nil), do: {:ok, state}
+  defp handle_suspend_action(state, process) do
+    if process.status == :suspended do
+      resume_process(state, process.pid)
     else
-      {:ok, state}
+      {:ok, %{state | pending_action: :suspend}}
     end
   end
 
@@ -390,44 +386,42 @@ defmodule TermUI.Widgets.ProcessMonitor do
   end
 
   defp get_process_info(pid) do
-    try do
-      info =
-        Process.info(pid, [
-          :registered_name,
-          :initial_call,
-          :current_function,
-          :reductions,
-          :memory,
-          :message_queue_len,
-          :status,
-          :links,
-          :monitors,
-          :monitored_by
-        ])
+    info =
+      Process.info(pid, [
+        :registered_name,
+        :initial_call,
+        :current_function,
+        :reductions,
+        :memory,
+        :message_queue_len,
+        :status,
+        :links,
+        :monitors,
+        :monitored_by
+      ])
 
-      if info do
-        %{
-          pid: pid,
-          registered_name: info[:registered_name],
-          initial_call: info[:initial_call],
-          current_function: info[:current_function],
-          reductions: info[:reductions] || 0,
-          memory: info[:memory] || 0,
-          message_queue_len: info[:message_queue_len] || 0,
-          status: info[:status] || :unknown,
-          links: info[:links] || [],
-          monitors: info[:monitors] || [],
-          monitored_by: info[:monitored_by] || [],
-          stack_trace: nil
-        }
-      else
-        nil
-      end
-    rescue
-      _ -> nil
-    catch
-      _, _ -> nil
+    if info do
+      %{
+        pid: pid,
+        registered_name: info[:registered_name],
+        initial_call: info[:initial_call],
+        current_function: info[:current_function],
+        reductions: info[:reductions] || 0,
+        memory: info[:memory] || 0,
+        message_queue_len: info[:message_queue_len] || 0,
+        status: info[:status] || :unknown,
+        links: info[:links] || [],
+        monitors: info[:monitors] || [],
+        monitored_by: info[:monitored_by] || [],
+        stack_trace: nil
+      }
+    else
+      nil
     end
+  rescue
+    _ -> nil
+  catch
+    _, _ -> nil
   end
 
   defp maybe_filter_system(processes, true), do: processes
@@ -533,13 +527,15 @@ defmodule TermUI.Widgets.ProcessMonitor do
 
       new_state = %{state | selected_idx: new_idx, scroll_offset: max(0, new_scroll)}
 
-      # Call on_select callback
-      if state.on_select && new_idx != state.selected_idx do
-        process = Enum.at(state.processes, new_idx)
-        if process, do: state.on_select.(process)
-      end
-
+      maybe_notify_select(state, new_idx)
       {:ok, new_state}
+    end
+  end
+
+  defp maybe_notify_select(state, new_idx) do
+    if state.on_select && new_idx != state.selected_idx do
+      process = Enum.at(state.processes, new_idx)
+      if process, do: state.on_select.(process)
     end
   end
 
@@ -548,50 +544,44 @@ defmodule TermUI.Widgets.ProcessMonitor do
   # ----------------------------------------------------------------------------
 
   defp kill_process(state, pid) do
-    try do
-      Process.exit(pid, :kill)
+    Process.exit(pid, :kill)
 
-      if state.on_action do
-        state.on_action.({:killed, pid})
-      end
-
-      # Refresh after action
-      processes = fetch_processes(state)
-      new_idx = min(state.selected_idx, max(0, length(processes) - 1))
-      {:ok, %{state | pending_action: nil, processes: processes, selected_idx: new_idx}}
-    rescue
-      _ -> {:ok, %{state | pending_action: nil}}
+    if state.on_action do
+      state.on_action.({:killed, pid})
     end
+
+    # Refresh after action
+    processes = fetch_processes(state)
+    new_idx = min(state.selected_idx, max(0, length(processes) - 1))
+    {:ok, %{state | pending_action: nil, processes: processes, selected_idx: new_idx}}
+  rescue
+    _ -> {:ok, %{state | pending_action: nil}}
   end
 
   defp suspend_process(state, pid) do
-    try do
-      :erlang.suspend_process(pid)
+    :erlang.suspend_process(pid)
 
-      if state.on_action do
-        state.on_action.({:suspended, pid})
-      end
-
-      processes = fetch_processes(state)
-      {:ok, %{state | pending_action: nil, processes: processes}}
-    rescue
-      _ -> {:ok, %{state | pending_action: nil}}
+    if state.on_action do
+      state.on_action.({:suspended, pid})
     end
+
+    processes = fetch_processes(state)
+    {:ok, %{state | pending_action: nil, processes: processes}}
+  rescue
+    _ -> {:ok, %{state | pending_action: nil}}
   end
 
   defp resume_process(state, pid) do
-    try do
-      :erlang.resume_process(pid)
+    :erlang.resume_process(pid)
 
-      if state.on_action do
-        state.on_action.({:resumed, pid})
-      end
-
-      processes = fetch_processes(state)
-      {:ok, %{state | processes: processes}}
-    rescue
-      _ -> {:ok, state}
+    if state.on_action do
+      state.on_action.({:resumed, pid})
     end
+
+    processes = fetch_processes(state)
+    {:ok, %{state | processes: processes}}
+  rescue
+    _ -> {:ok, state}
   end
 
   # ----------------------------------------------------------------------------
@@ -666,16 +656,14 @@ defmodule TermUI.Widgets.ProcessMonitor do
   """
   @spec get_stack_trace(pid()) :: [term()] | nil
   def get_stack_trace(pid) do
-    try do
-      case Process.info(pid, :current_stacktrace) do
-        {:current_stacktrace, trace} -> trace
-        _ -> nil
-      end
-    rescue
+    case Process.info(pid, :current_stacktrace) do
+      {:current_stacktrace, trace} -> trace
       _ -> nil
-    catch
-      _, _ -> nil
     end
+  rescue
+    _ -> nil
+  catch
+    _, _ -> nil
   end
 
   # ----------------------------------------------------------------------------

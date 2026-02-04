@@ -120,24 +120,37 @@ defmodule TermUI.Color.Converter do
       46
   """
   @spec rgb_to_256({0..255, 0..255, 0..255}) :: 0..255
-  def rgb_to_256({r, g, b})
+  def rgb_to_256({r, g, b} = rgb)
       when is_integer(r) and r >= 0 and r <= 255 and
              is_integer(g) and g >= 0 and g <= 255 and
              is_integer(b) and b >= 0 and b <= 255 do
-    # Check if it's close to grayscale
-    if abs(r - g) < @grayscale_threshold and
-         abs(g - b) < @grayscale_threshold and
-         abs(r - b) < @grayscale_threshold do
-      # Use grayscale ramp (232-255)
-      gray = div(r + g + b, 3)
-      232 + div(gray * 23, 255)
+    rgb_to_256_valid(rgb)
+  end
+
+  defp rgb_to_256_valid({r, g, b}) do
+    if grayscale?(r, g, b) do
+      to_grayscale_256(r, g, b)
     else
-      # Use 6x6x6 color cube (16-231)
-      r_idx = div(r * 5, 255)
-      g_idx = div(g * 5, 255)
-      b_idx = div(b * 5, 255)
-      16 + 36 * r_idx + 6 * g_idx + b_idx
+      to_color_cube_256(r, g, b)
     end
+  end
+
+  defp grayscale?(r, g, b) do
+    abs(r - g) < @grayscale_threshold and
+      abs(g - b) < @grayscale_threshold and
+      abs(r - b) < @grayscale_threshold
+  end
+
+  defp to_grayscale_256(r, g, b) do
+    gray = div(r + g + b, 3)
+    232 + div(gray * 23, 255)
+  end
+
+  defp to_color_cube_256(r, g, b) do
+    r_idx = div(r * 5, 255)
+    g_idx = div(g * 5, 255)
+    b_idx = div(b * 5, 255)
+    16 + 36 * r_idx + 6 * g_idx + b_idx
   end
 
   @doc """
@@ -169,21 +182,29 @@ defmodule TermUI.Color.Converter do
       90  # dark gray (bright black)
   """
   @spec rgb_to_16({0..255, 0..255, 0..255}, :fg | :bg) :: 30..37 | 40..47 | 90..97 | 100..107
-  def rgb_to_16({r, g, b}, type)
+  def rgb_to_16({r, g, b}, :fg)
       when is_integer(r) and r >= 0 and r <= 255 and
              is_integer(g) and g >= 0 and g <= 255 and
-             is_integer(b) and b >= 0 and b <= 255 and
-             type in [:fg, :bg] do
+             is_integer(b) and b >= 0 and b <= 255 do
     {base_code, bright} = find_closest_16_color(r, g, b)
+    apply_16_color_code(base_code, bright, :fg)
+  end
 
-    case type do
-      :fg ->
-        if bright, do: base_code + 60, else: base_code
+  def rgb_to_16({r, g, b}, :bg)
+      when is_integer(r) and r >= 0 and r <= 255 and
+             is_integer(g) and g >= 0 and g <= 255 and
+             is_integer(b) and b >= 0 and b <= 255 do
+    {base_code, bright} = find_closest_16_color(r, g, b)
+    apply_16_color_code(base_code, bright, :bg)
+  end
 
-      :bg ->
-        bg_base = base_code + 10
-        if bright, do: bg_base + 60, else: bg_base
-    end
+  defp apply_16_color_code(base_code, bright, :fg) do
+    if bright, do: base_code + 60, else: base_code
+  end
+
+  defp apply_16_color_code(base_code, bright, :bg) do
+    bg_base = base_code + 10
+    if bright, do: bg_base + 60, else: bg_base
   end
 
   @doc """
@@ -212,13 +233,14 @@ defmodule TermUI.Color.Converter do
       false
   """
   @spec grayscale?({0..255, 0..255, 0..255}) :: boolean()
-  def grayscale?({r, g, b})
-      when is_integer(r) and r >= 0 and r <= 255 and
-             is_integer(g) and g >= 0 and g <= 255 and
-             is_integer(b) and b >= 0 and b <= 255 do
-    abs(r - g) < @grayscale_threshold and
-      abs(g - b) < @grayscale_threshold and
-      abs(r - b) < @grayscale_threshold
+  def grayscale?({r, g, b}) do
+    valid_rgb?(r, g, b) and grayscale?(r, g, b)
+  end
+
+  defp valid_rgb?(r, g, b) do
+    is_integer(r) and r >= 0 and r <= 255 and
+      is_integer(g) and g >= 0 and g <= 255 and
+      is_integer(b) and b >= 0 and b <= 255
   end
 
   @doc """
@@ -243,21 +265,10 @@ defmodule TermUI.Color.Converter do
   # Finds the closest color in the 16-color palette using weighted distance.
   @spec find_closest_16_color(0..255, 0..255, 0..255) :: {30..37 | 90..97, boolean()}
   defp find_closest_16_color(r, g, b) do
-    # Find closest color using weighted Euclidean distance
-    # Weights: R=0.299, G=0.587, B=0.114 (perceptual luminance weights)
     {best_code, _best_dist} =
-      Enum.reduce(@ansi_16_colors, {30, :infinity}, fn {code, {pr, pg, pb}}, {best, dist} ->
-        # Weighted distance calculation
-        dr = (r - pr) * 0.299
-        dg = (g - pg) * 0.587
-        db = (b - pb) * 0.114
-        new_dist = dr * dr + dg * dg + db * db
-
-        if new_dist < dist do
-          {code, new_dist}
-        else
-          {best, dist}
-        end
+      Enum.reduce(@ansi_16_colors, {30, :infinity}, fn {code, color}, {best, dist} ->
+        new_dist = weighted_color_distance(r, g, b, color)
+        if new_dist < dist, do: {code, new_dist}, else: {best, dist}
       end)
 
     # Determine if it's a bright color (90-97) or normal (30-37)
@@ -265,5 +276,12 @@ defmodule TermUI.Color.Converter do
     base = if bright, do: best_code - 60, else: best_code
 
     {base, bright}
+  end
+
+  defp weighted_color_distance(r, g, b, {pr, pg, pb}) do
+    dr = (r - pr) * 0.299
+    dg = (g - pg) * 0.587
+    db = (b - pb) * 0.114
+    dr * dr + dg * dg + db * db
   end
 end

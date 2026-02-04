@@ -1733,8 +1733,8 @@ defmodule TermUI.Backend.RawTest do
     # These tests verify that EscapeParser correctly parses SGR mouse sequences
     # which are used by poll_event/2 when mouse tracking is enabled
 
-    alias TermUI.Terminal.EscapeParser
     alias TermUI.Event
+    alias TermUI.Terminal.EscapeParser
 
     test "parses left button press" do
       # ESC [ < 0 ; 10 ; 20 M  (left button press at col 10, row 20)

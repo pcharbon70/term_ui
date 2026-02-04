@@ -10,9 +10,9 @@ defmodule TermUI.Terminal do
   use GenServer
   require Logger
 
-  alias TermUI.Terminal.State
-  alias TermUI.Terminal.SizeDetector
   alias TermUI.ANSI
+  alias TermUI.Terminal.SizeDetector
+  alias TermUI.Terminal.State
   alias TermUI.TermUtils
 
   @ets_table :term_ui_terminal_state

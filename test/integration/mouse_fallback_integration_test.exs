@@ -22,9 +22,9 @@ defmodule TermUI.Integration.MouseFallbackIntegrationTest do
 
   alias TermUI.Event
   alias TermUI.Theme
-  alias TermUI.Widgets.SplitPane
   alias TermUI.Widgets.ContextMenu
   alias TermUI.Widgets.ContextMenu.Inline
+  alias TermUI.Widgets.SplitPane
 
   # ============================================================================
   # Setup

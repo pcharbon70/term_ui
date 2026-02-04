@@ -77,6 +77,7 @@ defmodule TermUI.Widgets.AlertDialog do
   alias TermUI.CharacterSet
   alias TermUI.Event
   alias TermUI.PersistentTerms
+  alias TermUI.Renderer.Style
 
   # Icon keys mapped to CharacterSet fields (or literal strings for ?)
   @type_icon_keys %{
@@ -143,11 +144,11 @@ defmodule TermUI.Widgets.AlertDialog do
 
   # Default styles for the dialog
   defp default_background_style do
-    TermUI.Renderer.Style.new(bg: :black)
+    Style.new(bg: :black)
   end
 
   defp default_border_style do
-    TermUI.Renderer.Style.new(fg: :cyan)
+    Style.new(fg: :cyan)
   end
 
   @impl true
@@ -220,32 +221,7 @@ defmodule TermUI.Widgets.AlertDialog do
         handle_result(state, result)
 
       %TermUI.Event.Mouse{action: :press, button: :left, x: x, y: y} ->
-        # Only handle mouse events in raw mode
-        if PersistentTerms.backend_mode() == :raw do
-          {area_width, area_height} = state.terminal_area
-
-          # Calculate button bounds based on current focus (since button widths change with focus)
-          button_bounds = calculate_button_bounds_for_size(
-            state.width,
-            state.buttons,
-            state.focused_button,
-            area_width,
-            area_height
-          )
-
-          case find_button_at_position(button_bounds, x, y) do
-            nil ->
-              # Click not on any button
-              {:ok, state}
-
-            button_id ->
-              # Clicked on a button - activate it
-              handle_result(state, button_id)
-          end
-        else
-          # Ignore mouse events in TTY mode
-          {:ok, state}
-        end
+        handle_mouse_click(x, y, state)
 
       %TermUI.Event.Mouse{} ->
         # Ignore other mouse events (not clicks)
@@ -253,6 +229,27 @@ defmodule TermUI.Widgets.AlertDialog do
 
       _ ->
         {:ok, state}
+    end
+  end
+
+  defp handle_mouse_click(x, y, state) do
+    if PersistentTerms.backend_mode() == :raw do
+      {area_width, area_height} = state.terminal_area
+
+      button_bounds = calculate_button_bounds_for_size(
+        state.width,
+        state.buttons,
+        state.focused_button,
+        area_width,
+        area_height
+      )
+
+      case find_button_at_position(button_bounds, x, y) do
+        nil -> {:ok, state}
+        button_id -> handle_result(state, button_id)
+      end
+    else
+      {:ok, state}
     end
   end
 
@@ -388,19 +385,17 @@ defmodule TermUI.Widgets.AlertDialog do
 
   # Find which button was clicked based on pre-calculated bounds
   defp find_button_at_position(button_bounds, click_x, click_y) do
-    # Check if click is on the button row
     if click_y == button_bounds.button_y do
-      # Find which button contains the click x position
-      Enum.find_value(button_bounds.buttons, fn bounds ->
-        if click_x >= bounds.x and click_x < bounds.x + bounds.width do
-          bounds.id
-        else
-          nil
-        end
-      end)
+      find_button_by_x(button_bounds.buttons, click_x)
     else
       nil
     end
+  end
+
+  defp find_button_by_x(buttons, click_x) do
+    Enum.find_value(buttons, fn bounds ->
+      if click_x >= bounds.x and click_x < bounds.x + bounds.width, do: bounds.id
+    end)
   end
 
   defp render_dialog(state, width) do
@@ -445,7 +440,7 @@ defmodule TermUI.Widgets.AlertDialog do
     styles
     |> Enum.reject(&is_nil/1)
     |> Enum.reduce(fn style, acc ->
-      TermUI.Renderer.Style.merge(acc, style)
+      Style.merge(acc, style)
     end)
   end
 
