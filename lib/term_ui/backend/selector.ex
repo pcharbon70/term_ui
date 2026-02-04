@@ -194,14 +194,12 @@ defmodule TermUI.Backend.Selector do
   @doc false
   @spec try_raw_mode() :: {:raw, raw_state()} | {:tty, capabilities()}
   def try_raw_mode do
-    try do
-      attempt_raw_mode()
-    rescue
-      # Handle pre-OTP 28 systems where :shell.start_interactive/1 doesn't exist
-      UndefinedFunctionError ->
-        Logger.info("TermUI: Backend selected: :tty (OTP < 28, raw mode unavailable)")
-        {:tty, detect_capabilities()}
-    end
+    attempt_raw_mode()
+  rescue
+    # Handle pre-OTP 28 systems where :shell.start_interactive/1 doesn't exist
+    UndefinedFunctionError ->
+      Logger.info("TermUI: Backend selected: :tty (OTP < 28, raw mode unavailable)")
+      {:tty, detect_capabilities()}
   end
 
   # Attempts to start raw mode using OTP 28's shell.start_interactive/1

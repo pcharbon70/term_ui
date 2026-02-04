@@ -197,28 +197,24 @@ defmodule TermUI.Widgets.FormBuilder do
   def handle_event(%Event.Key{key: :up}, state) do
     field = get_field(state, state.focused_field)
 
-    cond do
-      field && field.type in [:radio, :select, :multi_select] ->
-        state = navigate_option(state, -1)
-        {:ok, state}
-
-      true ->
-        state = navigate_field(state, -1)
-        {:ok, state}
+    if field && field.type in [:radio, :select, :multi_select] do
+      state = navigate_option(state, -1)
+      {:ok, state}
+    else
+      state = navigate_field(state, -1)
+      {:ok, state}
     end
   end
 
   def handle_event(%Event.Key{key: :down}, state) do
     field = get_field(state, state.focused_field)
 
-    cond do
-      field && field.type in [:radio, :select, :multi_select] ->
-        state = navigate_option(state, 1)
-        {:ok, state}
-
-      true ->
-        state = navigate_field(state, 1)
-        {:ok, state}
+    if field && field.type in [:radio, :select, :multi_select] do
+      state = navigate_option(state, 1)
+      {:ok, state}
+    else
+      state = navigate_field(state, 1)
+      {:ok, state}
     end
   end
 
@@ -256,15 +252,13 @@ defmodule TermUI.Widgets.FormBuilder do
     else
       field = get_field(state, state.focused_field)
 
-      cond do
-        field && field.type in [:radio, :select] ->
-          state = select_current_option(state)
-          {:ok, state}
-
-        true ->
-          # Move to next field or submit
-          state = navigate_field(state, 1)
-          {:ok, state}
+      if field && field.type in [:radio, :select] do
+        state = select_current_option(state)
+        {:ok, state}
+      else
+        # Move to next field or submit
+        state = navigate_field(state, 1)
+        {:ok, state}
       end
     end
   end

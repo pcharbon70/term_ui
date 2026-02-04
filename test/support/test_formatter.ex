@@ -404,9 +404,10 @@ defmodule TermUI.TestFormatter do
   end
 
   defp print_failure(formatted, config) do
-    cond do
-      config.trace -> puts_line("", config.newline)
-      true -> IO.write([config.newline, config.newline])
+    if config.trace do
+      puts_line("", config.newline)
+    else
+      IO.write([config.newline, config.newline])
     end
 
     puts_line(formatted, config.newline)

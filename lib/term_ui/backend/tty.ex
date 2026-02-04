@@ -83,6 +83,9 @@ defmodule TermUI.Backend.TTY do
 
   @behaviour TermUI.Backend
 
+  alias TermUI.Backend.InputBuffer
+  alias TermUI.Color.Converter
+
   # ===========================================================================
   # ANSI Escape Sequence Constants
   # ===========================================================================
@@ -100,7 +103,7 @@ defmodule TermUI.Backend.TTY do
   # Attribute control sequences
   @reset_attrs "\e[0m"
 
-  # Input buffer management is handled by TermUI.Backend.InputBuffer module
+  # Input buffer management is handled by InputBuffer module
   # which provides rate-limited logging and consistent behavior across backends.
 
   # ===========================================================================
@@ -732,14 +735,14 @@ defmodule TermUI.Backend.TTY do
   # Uses the shared InputBuffer module for rate-limited logging.
   @spec append_to_input_buffer(t(), binary()) :: t()
   defp append_to_input_buffer(state, data) do
-    TermUI.Backend.InputBuffer.append_with_limit(state, data, :input_buffer, source: __MODULE__)
+    InputBuffer.append_with_limit(state, data, :input_buffer, source: __MODULE__)
   end
 
   # Applies buffer size limit, truncating if necessary.
   # Uses the shared InputBuffer module for rate-limited logging.
   @spec apply_buffer_limit(t()) :: t()
   defp apply_buffer_limit(%{input_buffer: buffer} = state) do
-    {limited, _overflowed} = TermUI.Backend.InputBuffer.apply_limit(buffer, source: __MODULE__)
+    {limited, _overflowed} = InputBuffer.apply_limit(buffer, source: __MODULE__)
     %{state | input_buffer: limited}
   end
 
@@ -1001,14 +1004,14 @@ defmodule TermUI.Backend.TTY do
        when is_integer(r) and r >= 0 and r <= 255 and
               is_integer(g) and g >= 0 and g <= 255 and
               is_integer(b) and b >= 0 and b <= 255 do
-    "\e[38;5;#{TermUI.Color.Converter.rgb_to_256({r, g, b})}m"
+    "\e[38;5;#{Converter.rgb_to_256({r, g, b})}m"
   end
 
   defp color_to_sgr({r, g, b}, :bg, :color_256)
        when is_integer(r) and r >= 0 and r <= 255 and
               is_integer(g) and g >= 0 and g <= 255 and
               is_integer(b) and b >= 0 and b <= 255 do
-    "\e[48;5;#{TermUI.Color.Converter.rgb_to_256({r, g, b})}m"
+    "\e[48;5;#{Converter.rgb_to_256({r, g, b})}m"
   end
 
   # 16-color mode - convert RGB to basic color (with validation)
@@ -1016,14 +1019,14 @@ defmodule TermUI.Backend.TTY do
        when is_integer(r) and r >= 0 and r <= 255 and
               is_integer(g) and g >= 0 and g <= 255 and
               is_integer(b) and b >= 0 and b <= 255 do
-    "\e[#{TermUI.Color.Converter.rgb_to_16({r, g, b}, :fg)}m"
+    "\e[#{Converter.rgb_to_16({r, g, b}, :fg)}m"
   end
 
   defp color_to_sgr({r, g, b}, :bg, :color_16)
        when is_integer(r) and r >= 0 and r <= 255 and
               is_integer(g) and g >= 0 and g <= 255 and
               is_integer(b) and b >= 0 and b <= 255 do
-    "\e[#{TermUI.Color.Converter.rgb_to_16({r, g, b}, :bg)}m"
+    "\e[#{Converter.rgb_to_16({r, g, b}, :bg)}m"
   end
 
   # Monochrome mode - skip colors entirely

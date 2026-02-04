@@ -354,92 +354,86 @@ defmodule TermUI.Widgets.ClusterDashboard do
   end
 
   defp fetch_remote_metrics(node) do
-    try do
-      case :rpc.call(node, :erlang, :memory, [], @rpc_timeout) do
-        {:badrpc, _reason} ->
-          nil
+    case :rpc.call(node, :erlang, :memory, [], @rpc_timeout) do
+      {:badrpc, _reason} ->
+        nil
 
-        memory ->
-          process_count =
-            case :rpc.call(node, Process, :list, [], @rpc_timeout) do
-              {:badrpc, _} -> 0
-              list -> length(list)
-            end
+      memory ->
+        process_count =
+          case :rpc.call(node, Process, :list, [], @rpc_timeout) do
+            {:badrpc, _} -> 0
+            list -> length(list)
+          end
 
-          scheduler_count =
-            case :rpc.call(node, :erlang, :system_info, [:schedulers_online], @rpc_timeout) do
-              {:badrpc, _} -> 0
-              count -> count
-            end
+        scheduler_count =
+          case :rpc.call(node, :erlang, :system_info, [:schedulers_online], @rpc_timeout) do
+            {:badrpc, _} -> 0
+            count -> count
+          end
 
-          %{
-            memory: memory,
-            process_count: process_count,
-            scheduler_count: scheduler_count,
-            uptime: nil,
-            otp_release: nil
-          }
-      end
-    rescue
-      _ -> nil
-    catch
-      _, _ -> nil
+        %{
+          memory: memory,
+          process_count: process_count,
+          scheduler_count: scheduler_count,
+          uptime: nil,
+          otp_release: nil
+        }
     end
+  rescue
+    _ -> nil
+  catch
+    _, _ -> nil
   end
 
   defp fetch_global_names do
-    try do
-      :global.registered_names()
-      |> Enum.map(fn name ->
-        pid = :global.whereis_name(name)
+    :global.registered_names()
+    |> Enum.map(fn name ->
+      pid = :global.whereis_name(name)
 
-        node =
-          if is_pid(pid) do
-            node(pid)
-          else
-            :unknown
-          end
+      node =
+        if is_pid(pid) do
+          node(pid)
+        else
+          :unknown
+        end
 
-        %{name: name, pid: pid, node: node}
-      end)
-      |> Enum.sort_by(& &1.name)
-    rescue
-      _ -> []
-    catch
-      _, _ -> []
-    end
+      %{name: name, pid: pid, node: node}
+    end)
+    |> Enum.sort_by(& &1.name)
+  rescue
+    _ -> []
+  catch
+    _, _ -> []
   end
 
   defp fetch_pg_groups do
-    try do
-      # Try OTP 23+ :pg module
-      groups = :pg.which_groups()
+    # Try OTP 23+ :pg module
+    groups = :pg.which_groups()
 
-      Enum.map(groups, fn group ->
-        members = :pg.get_members(group)
+    Enum.map(groups, fn group ->
+      members = :pg.get_members(group)
 
-        nodes =
-          members
-          |> Enum.map(&node/1)
-          |> Enum.uniq()
+      nodes =
+        members
+        |> Enum.map(&node/1)
+        |> Enum.uniq()
 
-        %{
-          group: group,
-          member_count: length(members),
-          nodes: nodes
-        }
-      end)
-      |> Enum.sort_by(& &1.group)
-    rescue
-      _ -> []
-    catch
-      :exit, {:noproc, _} ->
-        # :pg not started
-        []
+      %{
+        group: group,
+        member_count: length(members),
+        nodes: nodes
+      }
+    end)
+    |> Enum.sort_by(& &1.group)
+  rescue
+    _ -> []
+  catch
+    :exit, {:noproc, _} ->
+      # :pg not started
+      []
 
-      _, _ ->
-        []
-    end
+    _, _ ->
+      []
   end
 
   defp get_uptime do
@@ -452,23 +446,19 @@ defmodule TermUI.Widgets.ClusterDashboard do
   # ----------------------------------------------------------------------------
 
   defp start_node_monitoring do
-    try do
-      :net_kernel.monitor_nodes(true)
-    rescue
-      _ -> :ok
-    catch
-      _, _ -> :ok
-    end
+    :net_kernel.monitor_nodes(true)
+  rescue
+    _ -> :ok
+  catch
+    _, _ -> :ok
   end
 
   defp stop_node_monitoring do
-    try do
-      :net_kernel.monitor_nodes(false)
-    rescue
-      _ -> :ok
-    catch
-      _, _ -> :ok
-    end
+    :net_kernel.monitor_nodes(false)
+  rescue
+    _ -> :ok
+  catch
+    _, _ -> :ok
   end
 
   # ----------------------------------------------------------------------------

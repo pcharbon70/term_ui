@@ -423,10 +423,10 @@ defmodule TermUI.Widgets.TextInput.LineTest do
   end
 
   describe "focus behavior" do
-    test "is_focused? returns false by default" do
+    test "focused? returns false by default" do
       {:ok, state} = Line.init(Line.new(prompt: "> "))
 
-      refute Line.is_focused?(state)
+      refute Line.focused?(state)
     end
 
     test "set_focused/2 sets focus state to true" do
@@ -434,7 +434,7 @@ defmodule TermUI.Widgets.TextInput.LineTest do
 
       state = Line.set_focused(state, true)
 
-      assert Line.is_focused?(state)
+      assert Line.focused?(state)
     end
 
     test "set_focused/2 sets focus state to false" do
@@ -443,7 +443,7 @@ defmodule TermUI.Widgets.TextInput.LineTest do
 
       state = Line.set_focused(state, false)
 
-      refute Line.is_focused?(state)
+      refute Line.focused?(state)
     end
 
     test "blur/1 clears focus state" do
@@ -452,7 +452,7 @@ defmodule TermUI.Widgets.TextInput.LineTest do
 
       state = Line.blur(state)
 
-      refute Line.is_focused?(state)
+      refute Line.focused?(state)
     end
 
     test "blur/1 calls on_blur callback" do

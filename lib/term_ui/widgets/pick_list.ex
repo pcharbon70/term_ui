@@ -104,7 +104,7 @@ defmodule TermUI.Widgets.PickList do
   end
 
   def handle_event(%Event.Key{key: :enter}, state) do
-    if length(state.filtered_items) > 0 do
+    if state.filtered_items != [] do
       item = Enum.at(state.filtered_items, state.selected_index)
       {:ok, state, [{:send, self(), {:select, item}}]}
     else

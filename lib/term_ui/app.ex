@@ -379,22 +379,20 @@ defmodule TermUI.App do
 
   # Private helper to ensure terminal cleanup on crash
   defp ensure_terminal_cleanup do
-    try do
-      # Try to restore terminal via direct escape sequences
-      # This ensures cleanup even if Runtime GenServer is dead
-      # Disable mouse tracking
-      TermUI.TerminalOutput.write("\e[?1006l\e[?1003l\e[?1002l\e[?1000l")
-      # Show cursor
-      TermUI.TerminalOutput.write("\e[?25h")
-      # Reset colors
-      TermUI.TerminalOutput.write("\e[0m")
-      # Clear screen
-      TermUI.TerminalOutput.write("\e[2J")
-      # Move cursor to home
-      TermUI.TerminalOutput.write("\e[H")
-      :ok
-    rescue
-      _ -> :error
-    end
+    # Try to restore terminal via direct escape sequences
+    # This ensures cleanup even if Runtime GenServer is dead
+    # Disable mouse tracking
+    TermUI.TerminalOutput.write("\e[?1006l\e[?1003l\e[?1002l\e[?1000l")
+    # Show cursor
+    TermUI.TerminalOutput.write("\e[?25h")
+    # Reset colors
+    TermUI.TerminalOutput.write("\e[0m")
+    # Clear screen
+    TermUI.TerminalOutput.write("\e[2J")
+    # Move cursor to home
+    TermUI.TerminalOutput.write("\e[H")
+    :ok
+  rescue
+    _ -> :error
   end
 end

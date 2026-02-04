@@ -501,23 +501,19 @@ defmodule TermUI.Widgets.TextInput.Line do
 
   # Call on_blur callback if configured (with error protection)
   defp call_on_blur({_, _, state}) when is_function(state.on_blur, 1) do
-    try do
-      state.on_blur.(state)
-    rescue
-      e ->
-        require Logger
-        Logger.error("TextInput.Line on_blur callback error: #{inspect(e)}")
-    end
+    state.on_blur.(state)
+  rescue
+    e ->
+      require Logger
+      Logger.error("TextInput.Line on_blur callback error: #{inspect(e)}")
   end
 
   defp call_on_blur({:cancelled, state}) when is_function(state.on_blur, 1) do
-    try do
-      state.on_blur.(state)
-    rescue
-      e ->
-        require Logger
-        Logger.error("TextInput.Line on_blur callback error: #{inspect(e)}")
-    end
+    state.on_blur.(state)
+  rescue
+    e ->
+      require Logger
+      Logger.error("TextInput.Line on_blur callback error: #{inspect(e)}")
   end
 
   defp call_on_blur(_), do: :ok
@@ -527,10 +523,10 @@ defmodule TermUI.Widgets.TextInput.Line do
 
   ## Examples
 
-      TextInput.Line.is_focused?(state)  # => true or false
+      TextInput.Line.focused?(state)  # => true or false
   """
-  @spec is_focused?(t()) :: boolean()
-  def is_focused?(%__MODULE__{focused: focused}), do: focused
+  @spec focused?(t()) :: boolean()
+  def focused?(%__MODULE__{focused: focused}), do: focused
 
   @doc """
   Sets the focus state directly.

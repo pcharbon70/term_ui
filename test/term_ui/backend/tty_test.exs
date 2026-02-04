@@ -198,7 +198,7 @@ defmodule TermUI.Backend.TTYTest do
       # Verify shutdown pattern matches on the struct type
       assert_raise FunctionClauseError, fn ->
         capture_io(fn ->
-          apply(TTY, :shutdown, [%{alternate_screen: false}])
+          :erlang.apply(TTY, :shutdown, [%{alternate_screen: false}])
         end)
       end
     end

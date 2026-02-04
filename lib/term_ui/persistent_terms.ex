@@ -1,4 +1,6 @@
 defmodule TermUI.PersistentTerms do
+  alias TermUI.Backend.Selector, as: BackendSelector
+
   @moduledoc """
   Centralized management of persistent_term storage for TermUI.
 
@@ -176,7 +178,7 @@ defmodule TermUI.PersistentTerms do
 
   defp detect_capabilities do
     # Defer to Backend.Selector for capability detection
-    case TermUI.Backend.Selector.detect_capabilities() do
+    case BackendSelector.detect_capabilities() do
       caps when is_map(caps) -> caps
     end
   rescue

@@ -2,9 +2,10 @@ defmodule TermUI.Input.TTYTest do
   use TermUI.TestCase, async: true
   @moduletag :capture_log
 
-  alias TermUI.Input.TTY
-  alias TermUI.Input
   alias TermUI.Event
+  alias TermUI.Input
+  alias TermUI.Input.Raw
+  alias TermUI.Input.TTY
 
   describe "behaviour implementation" do
     test "module implements TermUI.Input behaviour" do
@@ -412,7 +413,7 @@ defmodule TermUI.Input.TTYTest do
   describe "comparison with Raw handler" do
     test "TTY and Raw have mostly the same struct fields" do
       tty_state = TTY.new()
-      raw_state = TermUI.Input.Raw.new()
+      raw_state = Raw.new()
 
       tty_fields = Map.keys(tty_state) -- [:__struct__, :io_opts_restored, :io_opts_set]
       raw_fields = Map.keys(raw_state) -- [:__struct__]
@@ -426,10 +427,10 @@ defmodule TermUI.Input.TTYTest do
       input = "a"
 
       tty_state = %TTY{buffer: input, event_queue: []}
-      raw_state = %TermUI.Input.Raw{buffer: input, event_queue: []}
+      raw_state = %Raw{buffer: input, event_queue: []}
 
       {{:ok, tty_event}, _} = TTY.poll(tty_state, 0)
-      {{:ok, raw_event}, _} = TermUI.Input.Raw.poll(raw_state, 0)
+      {{:ok, raw_event}, _} = Raw.poll(raw_state, 0)
 
       assert tty_event.key == raw_event.key
       assert tty_event.char == raw_event.char
@@ -437,10 +438,10 @@ defmodule TermUI.Input.TTYTest do
 
     test "TTY returns :tty mode, Raw returns :raw mode" do
       tty_state = TTY.new()
-      raw_state = TermUI.Input.Raw.new()
+      raw_state = Raw.new()
 
       assert TTY.mode(tty_state) == :tty
-      assert TermUI.Input.Raw.mode(raw_state) == :raw
+      assert Raw.mode(raw_state) == :raw
     end
   end
 

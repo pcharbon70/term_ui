@@ -281,15 +281,13 @@ defmodule TermUI.Widgets.ContextMenu.Inline do
 
   # Safe callback execution with error handling
   defp safe_callback(callback, args, callback_name) do
-    try do
-      apply(callback, args)
-      :ok
-    rescue
-      e ->
-        require Logger
-        Logger.error("ContextMenu.Inline #{callback_name} callback error: #{inspect(e)}")
-        {:error, e}
-    end
+    apply(callback, args)
+    :ok
+  rescue
+    e ->
+      require Logger
+      Logger.error("ContextMenu.Inline #{callback_name} callback error: #{inspect(e)}")
+      {:error, e}
   end
 
   # ----------------------------------------------------------------------------

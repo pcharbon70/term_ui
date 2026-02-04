@@ -415,7 +415,7 @@ defmodule TermUI.Widgets.TreeView do
             collapse_node(state, node)
 
           # If not expanded, move to parent
-          length(path) > 0 ->
+          path != [] ->
             parent_id = List.last(path)
             move_to_node(state, parent_id)
 

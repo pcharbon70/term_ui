@@ -714,23 +714,21 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
   end
 
   defp get_supervisor_flags(sup_pid) do
-    try do
-      # Try to get supervisor init args
-      case :sys.get_state(sup_pid, 500) do
-        %{strategy: strategy, intensity: intensity, period: period} ->
-          {strategy, intensity, period}
+    # Try to get supervisor init args
+    case :sys.get_state(sup_pid, 500) do
+      %{strategy: strategy, intensity: intensity, period: period} ->
+        {strategy, intensity, period}
 
-        # For older supervisor state format
-        state when is_tuple(state) ->
-          # Try to extract from supervisor internal state
-          {:one_for_one, nil, nil}
+      # For older supervisor state format
+      state when is_tuple(state) ->
+        # Try to extract from supervisor internal state
+        {:one_for_one, nil, nil}
 
-        _ ->
-          {:one_for_one, nil, nil}
-      end
-    catch
-      :exit, _ -> {:one_for_one, nil, nil}
+      _ ->
+        {:one_for_one, nil, nil}
     end
+  catch
+    :exit, _ -> {:one_for_one, nil, nil}
   end
 
   defp get_process_info(pid) when is_pid(pid) do
@@ -996,7 +994,7 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
     # Expand/collapse indicator
     expand_indicator =
       case {node.type, node.children} do
-        {:supervisor, children} when is_list(children) and length(children) > 0 ->
+        {:supervisor, children} when is_list(children) and children != [] ->
           if MapSet.member?(expanded, node.id),
             do: "#{chars.arrow_down} ",
             else: "#{chars.arrow_right} "

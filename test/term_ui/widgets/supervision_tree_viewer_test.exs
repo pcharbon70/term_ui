@@ -136,7 +136,7 @@ defmodule TermUI.Widgets.SupervisionTreeViewerTest do
         assert state.tree != nil
         assert state.tree.type == :supervisor
         assert is_list(state.flattened)
-        assert length(state.flattened) > 0
+        assert state.flattened != []
         assert state.selected_idx == 0
       after
         Supervisor.stop(sup)
@@ -699,7 +699,7 @@ defmodule TermUI.Widgets.SupervisionTreeViewerTest do
 
         assert result.type == :stack
         assert result.direction == :vertical
-        assert length(result.children) > 0
+        assert result.children != []
       after
         Supervisor.stop(sup)
       end

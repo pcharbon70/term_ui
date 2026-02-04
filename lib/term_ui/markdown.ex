@@ -12,6 +12,7 @@ defmodule TermUI.Markdown do
       iex> result = TermUI.Markdown.render_with_elements("```elixir\\ndef hello, do: :world\\n```", 80)
   """
 
+  alias TermUI.Component.RenderNode
   alias TermUI.Renderer.Style
 
   @type styled_segment :: {String.t(), Style.t() | nil}
@@ -169,20 +170,20 @@ defmodule TermUI.Markdown do
   @doc """
   Converts a styled line to a TermUI render node.
   """
-  @spec render_line_to_node(styled_line()) :: TermUI.Component.RenderNode.t()
-  def render_line_to_node([]), do: TermUI.Component.RenderNode.text("", nil)
+  @spec render_line_to_node(styled_line()) :: RenderNode.t()
+  def render_line_to_node([]), do: RenderNode.text("", nil)
 
   def render_line_to_node([{text, style}]) do
-    TermUI.Component.RenderNode.text(text, style)
+    RenderNode.text(text, style)
   end
 
   def render_line_to_node(segments) when is_list(segments) do
     nodes =
       Enum.map(segments, fn {text, style} ->
-        TermUI.Component.RenderNode.text(text, style)
+        RenderNode.text(text, style)
       end)
 
-    TermUI.Component.RenderNode.stack(:horizontal, nodes)
+    RenderNode.stack(:horizontal, nodes)
   end
 
   # Document Processing
@@ -430,11 +431,10 @@ defmodule TermUI.Markdown do
   defp normalize_token_text(text) when is_list(text) do
     text
     |> List.flatten()
-    |> Enum.map(fn
+    |> Enum.map_join(fn
       char when is_integer(char) -> <<char::utf8>>
       str when is_binary(str) -> str
     end)
-    |> Enum.join()
   end
 
   defp normalize_token_text(text), do: to_string(text)
@@ -523,9 +523,7 @@ defmodule TermUI.Markdown do
 
   # Text Extraction
   defp extract_text(nodes) when is_list(nodes) do
-    nodes
-    |> Enum.map(&extract_text/1)
-    |> Enum.join()
+    Enum.map_join(nodes, &extract_text/1)
   end
 
   defp extract_text(%{literal: text}) when is_binary(text), do: text

@@ -105,9 +105,8 @@ defmodule TermUI.Widgets.ContextMenu.Factory do
   @spec create(keyword()) :: {:ok, {module(), map()}} | {:error, atom()}
   def create(opts) do
     with {:ok, items} <- fetch_items(opts),
-         {:ok, mode} <- determine_mode(opts),
-         {:ok, {module, props}} <- build_props(mode, items, opts) do
-      {:ok, {module, props}}
+         {:ok, mode} <- determine_mode(opts) do
+      build_props(mode, items, opts)
     end
   end
 

@@ -1,4 +1,6 @@
 defmodule TermUI.Input.Selector do
+  alias TermUI.Backend.Selector, as: BackendSelector
+
   @moduledoc """
   Selects the appropriate input handler based on the active backend mode.
 
@@ -61,7 +63,7 @@ defmodule TermUI.Input.Selector do
   ## Example Integration
 
       # Typical usage in runtime initialization
-      case TermUI.Backend.Selector.select() do
+      case BackendSelector.select() do
         {:raw, backend_state} ->
           input_handler = TermUI.Input.Selector.select(:raw)
           input_state = input_handler.new()
@@ -121,7 +123,7 @@ defmodule TermUI.Input.Selector do
   """
   @spec select() :: handler()
   def select do
-    case TermUI.Backend.Selector.select() do
+    case BackendSelector.select() do
       {:raw, _state} -> ensure_loaded!(TermUI.Input.Raw)
       {:tty, _capabilities} -> ensure_loaded!(TermUI.Input.TTY)
     end

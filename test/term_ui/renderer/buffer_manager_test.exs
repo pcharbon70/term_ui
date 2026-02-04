@@ -244,7 +244,7 @@ defmodule TermUI.Renderer.BufferManagerTest do
   describe "dirty flag" do
     setup do
       {:ok, pid} = BufferManager.start_link(rows: 5, cols: 5, name: :test_dirty)
-      on_exit(fn -> if Process.alive?(pid), do: GenServer.stop(pid) end)
+      on_exit(fn -> stop_manager(pid) end)
       %{server: :test_dirty}
     end
 
@@ -274,7 +274,7 @@ defmodule TermUI.Renderer.BufferManagerTest do
   describe "convenience functions" do
     setup do
       {:ok, pid} = BufferManager.start_link(rows: 10, cols: 20, name: :test_convenience)
-      on_exit(fn -> if Process.alive?(pid), do: GenServer.stop(pid) end)
+      on_exit(fn -> stop_manager(pid) end)
       %{server: :test_convenience}
     end
 

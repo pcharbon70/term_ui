@@ -31,8 +31,8 @@ defmodule TermUI.Runtime do
   alias TermUI.Command.Executor, as: CommandExecutor
   alias TermUI.Config
   alias TermUI.Elm
-  alias TermUI.EventQueue
   alias TermUI.Event
+  alias TermUI.EventQueue
   alias TermUI.Input.Selector, as: InputSelector
   alias TermUI.MessageQueue
   alias TermUI.PersistentTerms
@@ -1108,7 +1108,7 @@ defmodule TermUI.Runtime do
       end
 
     # Create temporary buffer for this frame
-    case TermUI.Renderer.Buffer.new(rows, cols) do
+    case Buffer.new(rows, cols) do
       {:ok, temp_buffer} ->
         # Render tree directly to temporary buffer (bypassing BufferManager)
         NodeRenderer.render_to_buffer_direct(render_tree, temp_buffer)
@@ -1117,7 +1117,7 @@ defmodule TermUI.Runtime do
         cells = extract_all_cells(temp_buffer)
 
         # Clean up temporary buffer
-        TermUI.Renderer.Buffer.destroy(temp_buffer)
+        Buffer.destroy(temp_buffer)
 
         {cells, state.backend_state}
 
@@ -1129,16 +1129,16 @@ defmodule TermUI.Runtime do
 
   # Extracts all non-empty cells from buffer for TTY backend
   defp extract_all_cells(buffer) do
-    {rows, _cols} = TermUI.Renderer.Buffer.dimensions(buffer)
+    {rows, _cols} = Buffer.dimensions(buffer)
 
     for row <- 1..rows, reduce: [] do
       acc ->
-        buffer_row = TermUI.Renderer.Buffer.get_row(buffer, row)
+        buffer_row = Buffer.get_row(buffer, row)
 
         cells_in_row =
           buffer_row
           |> Enum.with_index(1)
-          |> Enum.filter(fn {%TermUI.Renderer.Cell{char: char}, _col} -> char != " " end)
+          |> Enum.filter(fn {%Cell{char: char}, _col} -> char != " " end)
           |> Enum.flat_map(fn {cell, col} -> cell_to_backend_tuple(cell, row, col) end)
 
         cells_in_row ++ acc
@@ -1162,10 +1162,9 @@ defmodule TermUI.Runtime do
         changed_in_row =
           current_row
           |> Enum.with_index(1)
-          |> Enum.filter(fn {%Cell{char: char}, _col} -> char != " " end)
-          |> Enum.filter(fn {cell, col} ->
-            prev_cell = Enum.at(previous_row, col - 1, Cell.empty())
-            not Cell.equal?(cell, prev_cell)
+          |> Enum.filter(fn {%Cell{char: char} = cell, col} ->
+            char != " " and
+              not Cell.equal?(cell, Enum.at(previous_row, col - 1, Cell.empty()))
           end)
           |> Enum.flat_map(fn {cell, col} ->
             cell_to_backend_tuple(cell, row, col)

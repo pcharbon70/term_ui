@@ -125,10 +125,10 @@ defmodule TermUI.Widgets.CommandPalette do
 
   @impl true
   def render(state, _area) do
-    unless state.visible do
-      empty()
-    else
+    if state.visible do
       render_dropdown(state)
+    else
+      empty()
     end
   end
 

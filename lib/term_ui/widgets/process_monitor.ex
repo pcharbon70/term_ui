@@ -256,7 +256,7 @@ defmodule TermUI.Widgets.ProcessMonitor do
   # k - kill process
   def handle_event(%Event.Key{char: "k"}, state)
       when state.filter_input == nil and state.pending_action == nil do
-    if length(state.processes) > 0 do
+    if state.processes != [] do
       {:ok, %{state | pending_action: :kill}}
     else
       {:ok, state}
@@ -266,7 +266,7 @@ defmodule TermUI.Widgets.ProcessMonitor do
   # p - pause/suspend process
   def handle_event(%Event.Key{char: "p"}, state)
       when state.filter_input == nil and state.pending_action == nil do
-    if length(state.processes) > 0 do
+    if state.processes != [] do
       process = Enum.at(state.processes, state.selected_idx)
 
       if process do
@@ -393,44 +393,42 @@ defmodule TermUI.Widgets.ProcessMonitor do
   end
 
   defp get_process_info(pid) do
-    try do
-      info =
-        Process.info(pid, [
-          :registered_name,
-          :initial_call,
-          :current_function,
-          :reductions,
-          :memory,
-          :message_queue_len,
-          :status,
-          :links,
-          :monitors,
-          :monitored_by
-        ])
+    info =
+      Process.info(pid, [
+        :registered_name,
+        :initial_call,
+        :current_function,
+        :reductions,
+        :memory,
+        :message_queue_len,
+        :status,
+        :links,
+        :monitors,
+        :monitored_by
+      ])
 
-      if info do
-        %{
-          pid: pid,
-          registered_name: info[:registered_name],
-          initial_call: info[:initial_call],
-          current_function: info[:current_function],
-          reductions: info[:reductions] || 0,
-          memory: info[:memory] || 0,
-          message_queue_len: info[:message_queue_len] || 0,
-          status: info[:status] || :unknown,
-          links: info[:links] || [],
-          monitors: info[:monitors] || [],
-          monitored_by: info[:monitored_by] || [],
-          stack_trace: nil
-        }
-      else
-        nil
-      end
-    rescue
-      _ -> nil
-    catch
-      _, _ -> nil
+    if info do
+      %{
+        pid: pid,
+        registered_name: info[:registered_name],
+        initial_call: info[:initial_call],
+        current_function: info[:current_function],
+        reductions: info[:reductions] || 0,
+        memory: info[:memory] || 0,
+        message_queue_len: info[:message_queue_len] || 0,
+        status: info[:status] || :unknown,
+        links: info[:links] || [],
+        monitors: info[:monitors] || [],
+        monitored_by: info[:monitored_by] || [],
+        stack_trace: nil
+      }
+    else
+      nil
     end
+  rescue
+    _ -> nil
+  catch
+    _, _ -> nil
   end
 
   defp maybe_filter_system(processes, true), do: processes
@@ -551,50 +549,44 @@ defmodule TermUI.Widgets.ProcessMonitor do
   # ----------------------------------------------------------------------------
 
   defp kill_process(state, pid) do
-    try do
-      Process.exit(pid, :kill)
+    Process.exit(pid, :kill)
 
-      if state.on_action do
-        state.on_action.({:killed, pid})
-      end
-
-      # Refresh after action
-      processes = fetch_processes(state)
-      new_idx = min(state.selected_idx, max(0, length(processes) - 1))
-      {:ok, %{state | pending_action: nil, processes: processes, selected_idx: new_idx}}
-    rescue
-      _ -> {:ok, %{state | pending_action: nil}}
+    if state.on_action do
+      state.on_action.({:killed, pid})
     end
+
+    # Refresh after action
+    processes = fetch_processes(state)
+    new_idx = min(state.selected_idx, max(0, length(processes) - 1))
+    {:ok, %{state | pending_action: nil, processes: processes, selected_idx: new_idx}}
+  rescue
+    _ -> {:ok, %{state | pending_action: nil}}
   end
 
   defp suspend_process(state, pid) do
-    try do
-      :erlang.suspend_process(pid)
+    :erlang.suspend_process(pid)
 
-      if state.on_action do
-        state.on_action.({:suspended, pid})
-      end
-
-      processes = fetch_processes(state)
-      {:ok, %{state | pending_action: nil, processes: processes}}
-    rescue
-      _ -> {:ok, %{state | pending_action: nil}}
+    if state.on_action do
+      state.on_action.({:suspended, pid})
     end
+
+    processes = fetch_processes(state)
+    {:ok, %{state | pending_action: nil, processes: processes}}
+  rescue
+    _ -> {:ok, %{state | pending_action: nil}}
   end
 
   defp resume_process(state, pid) do
-    try do
-      :erlang.resume_process(pid)
+    :erlang.resume_process(pid)
 
-      if state.on_action do
-        state.on_action.({:resumed, pid})
-      end
-
-      processes = fetch_processes(state)
-      {:ok, %{state | processes: processes}}
-    rescue
-      _ -> {:ok, state}
+    if state.on_action do
+      state.on_action.({:resumed, pid})
     end
+
+    processes = fetch_processes(state)
+    {:ok, %{state | processes: processes}}
+  rescue
+    _ -> {:ok, state}
   end
 
   # ----------------------------------------------------------------------------
@@ -669,16 +661,14 @@ defmodule TermUI.Widgets.ProcessMonitor do
   """
   @spec get_stack_trace(pid()) :: [term()] | nil
   def get_stack_trace(pid) do
-    try do
-      case Process.info(pid, :current_stacktrace) do
-        {:current_stacktrace, trace} -> trace
-        _ -> nil
-      end
-    rescue
+    case Process.info(pid, :current_stacktrace) do
+      {:current_stacktrace, trace} -> trace
       _ -> nil
-    catch
-      _, _ -> nil
     end
+  rescue
+    _ -> nil
+  catch
+    _, _ -> nil
   end
 
   # ----------------------------------------------------------------------------
@@ -864,7 +854,7 @@ defmodule TermUI.Widgets.ProcessMonitor do
     border = text(String.duplicate("-", 60), Style.new() |> Style.fg(Theme.get_color(:primary)))
 
     links_text =
-      if length(process.links) > 0 do
+      if process.links != [] do
         process.links
         |> Enum.take(5)
         |> Enum.map_join(", ", &inspect/1)
@@ -873,7 +863,7 @@ defmodule TermUI.Widgets.ProcessMonitor do
       end
 
     monitors_text =
-      if length(process.monitors) > 0 do
+      if process.monitors != [] do
         process.monitors
         |> Enum.take(5)
         |> Enum.map_join(", ", &inspect/1)
@@ -882,7 +872,7 @@ defmodule TermUI.Widgets.ProcessMonitor do
       end
 
     monitored_by_text =
-      if length(process.monitored_by) > 0 do
+      if process.monitored_by != [] do
         process.monitored_by
         |> Enum.take(5)
         |> Enum.map_join(", ", &inspect/1)
@@ -908,7 +898,7 @@ defmodule TermUI.Widgets.ProcessMonitor do
     trace = get_stack_trace(process.pid)
 
     trace_lines =
-      if trace && length(trace) > 0 do
+      if trace && trace != [] do
         trace
         |> Enum.take(6)
         |> Enum.map(fn {m, f, a, loc} ->
