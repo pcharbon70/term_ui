@@ -8,7 +8,7 @@ defmodule TermUI.Backend.Selector do
 
   ## Why Not Use Heuristics?
 
-  Environment-based detection (checking `$TERM`, `IO.getopts/0`, etc.) cannot
+  Environment-based detection (checking `$TERM`, `:io.getopts/0`, etc.) cannot
   reliably detect all cases where raw mode is unavailable:
 
   - **Nerves devices**: The erlinit process may have already started a shell,

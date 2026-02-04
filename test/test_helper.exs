@@ -13,7 +13,6 @@ excludes =
   else
     [:requires_terminal]
   end
-  |> Kernel.++([:manual_input])
   |> Enum.uniq()
 
 case :logger.remove_handler(:default) do

@@ -84,35 +84,38 @@ defmodule TermUI.Widgets.ProgressTest do
       props = %{value: 0.0}
       {:ok, state} = Progress.init(props)
       result = Progress.render(state, @area)
+      charset = TermUI.CharacterSet.current_charset()
 
       assert %RenderNode{type: :cells, cells: cells} = result
       assert length(cells) == 20
 
       # All should be empty char
       chars = Enum.map(cells, fn %{cell: cell} -> cell.char end)
-      assert Enum.all?(chars, fn c -> c == "░" end)
+      assert Enum.all?(chars, fn c -> c == charset.bar_empty end)
     end
 
     test "renders full bar at 100%" do
       props = %{value: 1.0}
       {:ok, state} = Progress.init(props)
       result = Progress.render(state, @area)
+      charset = TermUI.CharacterSet.current_charset()
 
       assert %RenderNode{type: :cells, cells: cells} = result
       chars = Enum.map(cells, fn %{cell: cell} -> cell.char end)
-      assert Enum.all?(chars, fn c -> c == "█" end)
+      assert Enum.all?(chars, fn c -> c == charset.bar_full end)
     end
 
     test "renders partial bar at 50%" do
       props = %{value: 0.5}
       {:ok, state} = Progress.init(props)
       result = Progress.render(state, @area)
+      charset = TermUI.CharacterSet.current_charset()
 
       assert %RenderNode{type: :cells, cells: cells} = result
       chars = Enum.map(cells, fn %{cell: cell} -> cell.char end)
 
-      filled = Enum.count(chars, fn c -> c == "█" end)
-      empty = Enum.count(chars, fn c -> c == "░" end)
+      filled = Enum.count(chars, fn c -> c == charset.bar_full end)
+      empty = Enum.count(chars, fn c -> c == charset.bar_empty end)
 
       assert filled == 10
       assert empty == 10
