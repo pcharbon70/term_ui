@@ -140,7 +140,11 @@ defmodule TermUI.Widgets.LabelTest do
 
   describe "describe/0" do
     test "returns component description" do
-      assert Label.describe() == "Label widget for displaying text"
+      assert %{
+               name: "Label",
+               description: "Label widget for displaying text",
+               version: nil
+             } = Label.describe()
     end
   end
 end

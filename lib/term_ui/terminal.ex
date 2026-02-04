@@ -585,8 +585,8 @@ defmodule TermUI.Terminal do
 
   defp io_has_terminal? do
     case :io.getopts(:standard_io) do
-      {:ok, opts} -> Keyword.get(opts, :terminal, false) == true
-      _ -> false
+      opts when is_list(opts) -> Keyword.get(opts, :terminal, false) == true
+      {:error, _reason} -> false
     end
   end
 

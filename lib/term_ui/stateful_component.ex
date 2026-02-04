@@ -70,7 +70,7 @@ defmodule TermUI.StatefulComponent do
   @type rect :: %{x: integer(), y: integer(), width: integer(), height: integer()}
 
   @typedoc "Render tree output"
-  @type render_tree :: RenderNode.t() | [render_tree()] | String.t()
+  @type render_tree :: RenderNode.render_tree()
 
   @typedoc "Event types from user input"
   @type event :: term()

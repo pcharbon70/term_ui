@@ -50,7 +50,7 @@ defmodule TermUI.PersistentTerms do
   - `backend_mode` - The backend mode (:raw, :tty, etc.)
   - `capabilities` - The detected capabilities map
   """
-  @spec store_backend_context(:raw | :tty | nil, map() | nil) :: :ok
+  @spec store_backend_context(:raw | :tty | :skip | nil, map() | nil) :: :ok
   def store_backend_context(backend_mode, capabilities) do
     :persistent_term.put(:term_ui_runtime_owner, self())
     :persistent_term.put(:term_ui_backend_mode, backend_mode)
@@ -80,7 +80,7 @@ defmodule TermUI.PersistentTerms do
 
   Returns `:raw`, `:tty`, or `nil` if not set.
   """
-  @spec backend_mode() :: :raw | :tty | nil
+  @spec backend_mode() :: :raw | :tty | :skip | nil
   def backend_mode do
     :persistent_term.get(:term_ui_backend_mode, nil)
   end
@@ -178,7 +178,6 @@ defmodule TermUI.PersistentTerms do
     # Defer to Backend.Selector for capability detection
     case TermUI.Backend.Selector.detect_capabilities() do
       caps when is_map(caps) -> caps
-      _ -> %{}
     end
   rescue
     _ -> %{}

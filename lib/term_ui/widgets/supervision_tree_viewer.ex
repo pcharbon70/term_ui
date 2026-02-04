@@ -167,7 +167,7 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
         MapSet.new()
       end
 
-    flattened = flatten_tree(tree, expanded, true)
+    flattened = flatten_tree(tree, expanded)
 
     state = %{
       root: props.root,
@@ -247,7 +247,7 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
         if node.type == :supervisor and MapSet.member?(state.expanded, node.id) do
           # Collapse this node
           expanded = MapSet.delete(state.expanded, node.id)
-          flattened = flatten_tree(state.tree, expanded, true)
+          flattened = flatten_tree(state.tree, expanded)
           {:ok, %{state | expanded: expanded, flattened: flattened}}
         else
           # Move to parent
@@ -282,7 +282,7 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
           else
             # Expand this node
             expanded = MapSet.put(state.expanded, node.id)
-            flattened = flatten_tree(state.tree, expanded, true)
+            flattened = flatten_tree(state.tree, expanded)
             {:ok, %{state | expanded: expanded, flattened: flattened}}
           end
         else
@@ -295,7 +295,7 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
   def handle_event(%Event.Key{key: :enter}, state) when state.filter_input != nil do
     # Apply filter
     filter = if state.filter_input == "", do: nil, else: state.filter_input
-    flattened = flatten_tree(state.tree, state.expanded, true)
+    flattened = flatten_tree(state.tree, state.expanded)
 
     flattened =
       if filter do
@@ -324,7 +324,7 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
               MapSet.put(state.expanded, node.id)
             end
 
-          flattened = flatten_tree(state.tree, expanded, true)
+          flattened = flatten_tree(state.tree, expanded)
           {:ok, %{state | expanded: expanded, flattened: flattened}}
         else
           # Toggle info panel for workers
@@ -420,7 +420,7 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
         {:ok, %{state | show_info: false}}
 
       state.filter != nil ->
-        flattened = flatten_tree(state.tree, state.expanded, true)
+        flattened = flatten_tree(state.tree, state.expanded)
         {:ok, %{state | filter: nil, flattened: flattened, selected_idx: 0}}
 
       true ->
@@ -456,7 +456,7 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
   def refresh(state) do
     root_pid = resolve_supervisor(state.root)
     tree = build_tree(root_pid, nil, 0, state.show_workers)
-    flattened = flatten_tree(tree, state.expanded, true)
+    flattened = flatten_tree(tree, state.expanded)
 
     # Apply filter if active
     flattened =
@@ -500,7 +500,7 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
   @spec expand_all(map()) :: {:ok, map()}
   def expand_all(state) do
     expanded = collect_supervisor_ids(state.tree)
-    flattened = flatten_tree(state.tree, expanded, true)
+    flattened = flatten_tree(state.tree, expanded)
     {:ok, %{state | expanded: expanded, flattened: flattened}}
   end
 
@@ -510,7 +510,7 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
   @spec collapse_all(map()) :: {:ok, map()}
   def collapse_all(state) do
     expanded = MapSet.new()
-    flattened = flatten_tree(state.tree, expanded, true)
+    flattened = flatten_tree(state.tree, expanded)
     {:ok, %{state | expanded: expanded, flattened: flattened}}
   end
 
@@ -755,42 +755,43 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
   # Tree Flattening
   # ----------------------------------------------------------------------------
 
-  defp flatten_tree(nil, _expanded, _visible), do: []
+  defp flatten_tree(nil, _expanded), do: []
 
-  defp flatten_tree(node, expanded, visible) do
-    if visible do
-      children_visible = MapSet.member?(expanded, node.id) and node.children != nil
+  defp flatten_tree(node, expanded) do
+    children_visible = MapSet.member?(expanded, node.id) and node.children != nil
 
-      children_nodes =
-        if children_visible and node.children do
-          Enum.flat_map(node.children, &flatten_tree(&1, expanded, true))
-        else
-          []
-        end
+    children_nodes =
+      if children_visible and node.children do
+        Enum.flat_map(node.children, &flatten_tree(&1, expanded))
+      else
+        []
+      end
 
-      [node | children_nodes]
-    else
-      []
-    end
+    [node | children_nodes]
   end
 
-  defp collect_supervisor_ids(nil), do: MapSet.new()
+  defp collect_supervisor_ids(nil), do: empty_id_set()
 
   defp collect_supervisor_ids(node) do
     if node.type == :supervisor do
       children_ids =
         if node.children do
-          Enum.reduce(node.children, MapSet.new(), fn child, acc ->
+          Enum.reduce(node.children, empty_id_set(), fn child, acc ->
             MapSet.union(acc, collect_supervisor_ids(child))
           end)
         else
-          MapSet.new()
+          empty_id_set()
         end
 
       MapSet.put(children_ids, node.id)
     else
-      MapSet.new()
+      empty_id_set()
     end
+  end
+
+  defp empty_id_set do
+    seed = make_ref()
+    MapSet.new([seed]) |> MapSet.delete(seed)
   end
 
   defp find_parent_idx(flattened, current_idx) do

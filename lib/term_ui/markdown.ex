@@ -190,8 +190,6 @@ defmodule TermUI.Markdown do
     Enum.flat_map(nodes, &process_node/1)
   end
 
-  defp process_document(_), do: [[{"", nil}]]
-
   defp process_document_with_elements(%MDEx.Document{nodes: nodes}, focused_id) do
     {lines, elements, _line_idx} =
       Enum.reduce(nodes, {[], [], 0}, fn node, {acc_lines, acc_elements, line_idx} ->
@@ -202,8 +200,6 @@ defmodule TermUI.Markdown do
 
     {lines, elements}
   end
-
-  defp process_document_with_elements(_, _focused_id), do: {[[{"", nil}]], []}
 
   defp process_node_with_elements(
          %MDEx.CodeBlock{literal: code, info: info},

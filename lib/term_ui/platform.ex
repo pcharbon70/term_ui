@@ -50,9 +50,6 @@ defmodule TermUI.Platform do
 
       version_string when is_list(version_string) ->
         parse_version_string(to_string(version_string))
-
-      _ ->
-        nil
     end
   end
 

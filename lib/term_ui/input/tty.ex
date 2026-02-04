@@ -417,7 +417,10 @@ defmodule TermUI.Input.TTY do
           binary when is_binary(binary) ->
             {:ok, binary}
 
-          :error ->
+          {:error, _binary, _rest} ->
+            {:error, :invalid_unicode}
+
+          {:incomplete, _binary, _rest} ->
             {:error, :invalid_unicode}
         end
 

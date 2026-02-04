@@ -1145,8 +1145,6 @@ defmodule TermUI.Backend.TTY do
     String.replace(char, "\e", "")
   end
 
-  defp sanitize_char(char), do: char
-
   # Builds a frame map from cells for incremental mode tracking.
   @spec build_frame_map([{TermUI.Backend.position(), TermUI.Backend.cell()}]) :: map()
   defp build_frame_map(cells) do

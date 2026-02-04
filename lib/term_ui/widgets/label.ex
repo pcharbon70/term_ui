@@ -70,7 +70,11 @@ defmodule TermUI.Widgets.Label do
   """
   @impl true
   def describe do
-    "Label widget for displaying text"
+    %{
+      name: "Label",
+      description: "Label widget for displaying text",
+      version: nil
+    }
   end
 
   # Private Functions

@@ -17,7 +17,7 @@ defmodule TermUI.Runtime.State do
   alias TermUI.EventQueue
   alias TermUI.MessageQueue
 
-  @type backend_mode :: :raw | :tty | nil
+  @type backend_mode :: :raw | :tty | :skip | nil
 
   @type capabilities :: %{
           optional(:colors) => :true_color | :color_256 | :color_16 | :monochrome,

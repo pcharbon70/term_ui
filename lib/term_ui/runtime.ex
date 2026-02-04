@@ -357,7 +357,7 @@ defmodule TermUI.Runtime do
     }
 
     # Log backend selection and execution mode
-    if backend_mode && backend_mode != :skip do
+    if backend_mode != :skip do
       require Logger
       mode_str = if TermUI.iex_mode?(), do: "IEx", else: "standalone"
       Logger.info("TermUI.Runtime started with #{backend_mode} backend (#{mode_str} mode)")

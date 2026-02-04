@@ -54,6 +54,23 @@ defmodule TermUI.TermUtils do
 
   # Known-safe command locations (will be resolved at runtime)
   @allowed_commands ~w(stty test infocmp)
+  @safe_stty_flags ~w(
+    -g
+    raw
+    -raw
+    -echo
+    echo
+    -isig
+    isig
+    -ixon
+    ixon
+    sane
+    min
+    time
+    cbreak
+    -cbreak
+    size
+  )
 
   @tty_path "/dev/tty"
 
@@ -258,28 +275,8 @@ defmodule TermUI.TermUtils do
   end
 
   defp validate_stty_args_no_prefix_list(args) do
-    # Safe stty flags (non-injectable)
-    safe_flags =
-      MapSet.new([
-        "-g",
-        "raw",
-        "-raw",
-        "-echo",
-        "echo",
-        "-isig",
-        "isig",
-        "-ixon",
-        "ixon",
-        "sane",
-        "min",
-        "time",
-        "cbreak",
-        "-cbreak",
-        "size"
-      ])
-
     if Enum.all?(args, fn arg ->
-         MapSet.member?(safe_flags, arg) or numeric_arg?(arg)
+         arg in @safe_stty_flags or numeric_arg?(arg)
        end) do
       :ok
     else

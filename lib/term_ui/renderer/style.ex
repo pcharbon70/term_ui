@@ -70,7 +70,7 @@ defmodule TermUI.Renderer.Style do
   """
   @spec new() :: t()
   def new do
-    %__MODULE__{}
+    %__MODULE__{attrs: empty_attrs()}
   end
 
   @doc """
@@ -281,7 +281,7 @@ defmodule TermUI.Renderer.Style do
   """
   @spec reset(t()) :: t()
   def reset(%__MODULE__{}) do
-    new()
+    %__MODULE__{attrs: empty_attrs()}
   end
 
   @doc """
@@ -341,5 +341,9 @@ defmodule TermUI.Renderer.Style do
   defp validate_attribute!(invalid) do
     raise ArgumentError,
           "Invalid attribute: #{inspect(invalid)}. Valid attributes: #{inspect(@valid_attributes)}"
+  end
+
+  defp empty_attrs do
+    MapSet.new([:bold]) |> MapSet.delete(:bold)
   end
 end

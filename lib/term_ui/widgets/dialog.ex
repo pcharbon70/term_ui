@@ -131,19 +131,8 @@ defmodule TermUI.Widgets.Dialog do
     {:ok, state}
   end
 
-  def handle_event(%Event.Mouse{action: :click, x: x, y: y}, state) do
-    # Check if click is on a button
-    case find_button_at_position(state, x, y) do
-      nil ->
-        {:ok, state}
-
-      button_id ->
-        if state.on_confirm do
-          state.on_confirm.(button_id)
-        end
-
-        {:ok, %{state | focused_button: button_id, visible: false}}
-    end
+  def handle_event(%Event.Mouse{action: :click}, state) do
+    {:ok, state}
   end
 
   def handle_event(_event, state) do
@@ -213,11 +202,6 @@ defmodule TermUI.Widgets.Dialog do
     end
 
     {:ok, %{state | visible: false}}
-  end
-
-  defp find_button_at_position(_state, _x, _y) do
-    # Simplified - would need actual button positions from render
-    nil
   end
 
   defp calculate_height(state) do

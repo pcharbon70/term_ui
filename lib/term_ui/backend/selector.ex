@@ -209,7 +209,7 @@ defmodule TermUI.Backend.Selector do
   @doc false
   @spec attempt_raw_mode() :: {:raw, raw_state()} | {:tty, capabilities()}
   def attempt_raw_mode do
-    case :shell.start_interactive({:noshell, :raw}) do
+    case :erlang.apply(:shell, :start_interactive, [{:noshell, :raw}]) do
       :ok ->
         # Raw mode successfully activated
         Logger.info("TermUI: Backend selected: :raw (full terminal control)")
@@ -335,10 +335,10 @@ defmodule TermUI.Backend.Selector do
   @spec detect_terminal_presence() :: boolean()
   defp detect_terminal_presence do
     case :io.getopts() do
-      {:ok, opts} ->
+      opts when is_list(opts) ->
         Keyword.get(opts, :terminal, false)
 
-      _ ->
+      {:error, _reason} ->
         false
     end
   end
