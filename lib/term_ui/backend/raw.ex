@@ -144,6 +144,7 @@ defmodule TermUI.Backend.Raw do
   @behaviour TermUI.Backend
 
   alias TermUI.ANSI
+  alias TermUI.TerminalOutput
   alias TermUI.Renderer.CursorOptimizer
   alias TermUI.Terminal.SizeDetector
   require Logger
@@ -828,8 +829,8 @@ defmodule TermUI.Backend.Raw do
   # we must reset with ESC[0m and rebuild the full style, since ANSI doesn't have
   # efficient individual attribute removal for all attributes.
   #
-  # Note: This uses ANSI module for sequence generation. For parameter-level SGR
-  # operations (e.g., combining into single sequence), see TermUI.SGR module.
+  # Note: This uses ANSI module for sequence generation. Style tracking is
+  # handled locally to minimize redundant SGR output.
   @spec style_delta_output(style_state() | nil, style_state()) :: iodata()
   defp style_delta_output(nil, new_style) do
     # No previous style - emit full style
@@ -1465,7 +1466,7 @@ defmodule TermUI.Backend.Raw do
   # Writes data to the terminal, wrapping in try/rescue for error safety.
   # Debug logging helps troubleshoot rendering issues without exposing errors to users.
   defp write_to_terminal(data) do
-    IO.write(data)
+    TerminalOutput.write(data)
   rescue
     e ->
       Logger.debug("Terminal write failed: #{Exception.message(e)}")
@@ -1474,7 +1475,7 @@ defmodule TermUI.Backend.Raw do
 
   # Error-safe write for shutdown - logs errors but continues
   defp safe_write(data) do
-    IO.write(data)
+    TerminalOutput.write(data)
   rescue
     e ->
       Logger.warning("Failed to write during shutdown: #{Exception.message(e)}")

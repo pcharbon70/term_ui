@@ -4,7 +4,7 @@ defmodule TermUI.Event do
 
   Events represent user input from the terminal: keyboard presses,
   mouse actions, and focus changes. Events are routed to components
-  by the EventRouter based on focus state and position.
+  by the Runtime based on focus state and position.
 
   ## Event Types
 

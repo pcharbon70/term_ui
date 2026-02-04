@@ -1,5 +1,5 @@
 defmodule TermUI.Widgets.ContextMenu.FactoryTest do
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: false
 
   import TermUI.Test.ContextMenuHelpers
 

@@ -18,7 +18,7 @@ defmodule TermUI.Integration.VisualDegradationIntegrationTest do
   - Selection/focus remains visible in all modes
   """
 
-  use ExUnit.Case, async: false
+  use TermUI.TestCase, async: false
 
   alias TermUI.CharacterSet
   alias TermUI.Theme

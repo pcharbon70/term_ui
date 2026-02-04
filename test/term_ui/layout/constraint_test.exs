@@ -1,5 +1,5 @@
 defmodule TermUI.Layout.ConstraintTest do
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
 
   alias TermUI.Layout.Constraint
   alias TermUI.Layout.Constraint.Fill

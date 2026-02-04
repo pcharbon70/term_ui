@@ -1,5 +1,5 @@
 defmodule TermUI.Widgets.SparklineTest do
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
 
   alias TermUI.Widgets.Sparkline
 

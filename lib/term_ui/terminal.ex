@@ -14,6 +14,7 @@ defmodule TermUI.Terminal do
   alias TermUI.Terminal.SizeDetector
   alias TermUI.ANSI
   alias TermUI.TermUtils
+  alias TermUI.TerminalOutput
 
   @ets_table :term_ui_terminal_state
 
@@ -474,12 +475,18 @@ defmodule TermUI.Terminal do
   end
 
   defp do_disable_raw_mode(original_settings) do
-    # First try to restore original settings if we have them
-    if is_binary(original_settings) and original_settings != "" do
-      restore_terminal_settings(original_settings)
-    else
-      # Fallback: use stty sane to restore reasonable defaults
-      restore_stty_sane()
+    # First try to restore original settings if we have them. If restoration
+    # fails (missing tty, invalid settings, etc.) fall back to `stty sane`
+    # so we at least restore newline handling and canonical output.
+    restore_result =
+      if is_binary(original_settings) and original_settings != "" do
+        restore_terminal_settings(original_settings)
+      else
+        {:error, :no_original_settings}
+      end
+
+    if match?({:error, _}, restore_result) do
+      _ = restore_stty_sane()
     end
 
     # Always write reset sequence as final cleanup
@@ -496,7 +503,7 @@ defmodule TermUI.Terminal do
     # We pass it as a single argument which stty accepts for restoration
     case TermUtils.safe_stty([settings]) do
       {:ok, _} -> :ok
-      {:error, _} -> :ok
+      {:error, reason} -> {:error, reason}
     end
   end
 
@@ -504,7 +511,7 @@ defmodule TermUI.Terminal do
     # Restore terminal to reasonable defaults
     case TermUtils.safe_stty(["sane"]) do
       {:ok, _} -> :ok
-      {:error, _} -> :ok
+      {:error, reason} -> {:error, reason}
     end
   end
 
@@ -556,7 +563,7 @@ defmodule TermUI.Terminal do
   end
 
   defp write_to_terminal(data) do
-    IO.write(data)
+    TerminalOutput.write(data)
   rescue
     _ -> :ok
   end

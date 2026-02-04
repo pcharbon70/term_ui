@@ -1,5 +1,5 @@
 defmodule TermUI.Test.AssertionsTest do
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
   use TermUI.Test.Assertions
 
   alias TermUI.Renderer.Cell

@@ -11,7 +11,7 @@ defmodule TermUI.Integration.CrossModeTest do
   behavioral consistency with standalone mode.
   """
 
-  use ExUnit.Case, async: false
+  use TermUI.TestCase, async: false
 
   alias TermUI.Command
   alias TermUI.Event
@@ -60,7 +60,12 @@ defmodule TermUI.Integration.CrossModeTest do
     end
 
     def update({:mouse, :press}, state) do
-      {%{state | count: state.count + 10, events: [:mouse_press | state.events], last_event: :mouse_press}, []}
+      {%{
+         state
+         | count: state.count + 10,
+           events: [:mouse_press | state.events],
+           last_event: :mouse_press
+       }, []}
     end
 
     def update({:resize, w, h}, state) do
@@ -103,9 +108,9 @@ defmodule TermUI.Integration.CrossModeTest do
 
     def update(:refresh_mode, state) do
       {%{
-         state |
-         mode: TermUI.running_mode(),
-         iex_mode: TermUI.iex_mode?()
+         state
+         | mode: TermUI.running_mode(),
+           iex_mode: TermUI.iex_mode?()
        }, []}
     end
 
@@ -324,7 +329,8 @@ defmodule TermUI.Integration.CrossModeTest do
       Runtime.sync(runtime)
 
       state = Runtime.get_state(runtime)
-      assert state.root_state.count == 0  # +1 -1 = 0
+      # +1 -1 = 0
+      assert state.root_state.count == 0
     end
   end
 
@@ -567,7 +573,8 @@ defmodule TermUI.Integration.CrossModeTest do
       for iex_mode <- [false, true] do
         Application.put_env(:term_ui, :iex_compatible, iex_mode)
 
-        {:ok, runtime} = Runtime.start_link(root: StateTracker, backend: :auto, skip_terminal: true)
+        {:ok, runtime} =
+          Runtime.start_link(root: StateTracker, backend: :auto, skip_terminal: true)
 
         # Should be functional regardless of mode
         Runtime.send_event(runtime, Event.key(:up))
@@ -584,7 +591,8 @@ defmodule TermUI.Integration.CrossModeTest do
       for iex_mode <- [false, true] do
         Application.put_env(:term_ui, :iex_compatible, iex_mode)
 
-        {:ok, runtime} = Runtime.start_link(root: StateTracker, backend: :tty, skip_terminal: true)
+        {:ok, runtime} =
+          Runtime.start_link(root: StateTracker, backend: :tty, skip_terminal: true)
 
         # Should be functional regardless of mode
         Runtime.send_event(runtime, Event.key(:up))

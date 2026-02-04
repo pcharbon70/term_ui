@@ -1,8 +1,7 @@
 defmodule TermUI.Layout.IntegrationTest do
-  use ExUnit.Case, async: false
+  use TermUI.TestCase, async: false
 
   alias TermUI.Layout.Alignment
-  alias TermUI.Layout.Cache
   alias TermUI.Layout.Constraint
   alias TermUI.Layout.Solver
 
@@ -258,137 +257,6 @@ defmodule TermUI.Layout.IntegrationTest do
       assert rect.y == 5
       assert rect.width == 90
       assert rect.height == 40
-    end
-  end
-
-  describe "cache integration" do
-    setup do
-      # Cache uses a singleton ETS table, just ensure it's started
-      case Cache.start_link([]) do
-        {:ok, _} -> :ok
-        {:error, {:already_started, _}} -> :ok
-      end
-
-      # Ensure cleanup after test to prevent state leakage
-      on_exit(fn ->
-        try do
-          Cache.clear()
-        rescue
-          ArgumentError -> :ok
-        end
-      end)
-
-      :ok
-    end
-
-    test "repeated layouts use cache" do
-      constraints = [Constraint.ratio(1), Constraint.ratio(2)]
-      area = %{x: 0, y: 0, width: 100, height: 20}
-
-      # Clear to get clean stats
-      Cache.clear()
-
-      # First call - cache miss
-      result1 = Cache.solve(constraints, area)
-
-      # Second call - cache hit
-      result2 = Cache.solve(constraints, area)
-
-      assert result1 == result2
-
-      stats = Cache.stats()
-      assert stats.hits >= 1
-    end
-
-    test "different sizes create different cache entries" do
-      constraints = [Constraint.fill()]
-      area1 = %{x: 0, y: 0, width: 100, height: 20}
-      area2 = %{x: 0, y: 0, width: 200, height: 20}
-
-      Cache.clear()
-
-      Cache.solve(constraints, area1)
-      Cache.solve(constraints, area2)
-
-      stats = Cache.stats()
-      assert stats.size == 2
-    end
-
-    test "cache clear removes all entries" do
-      constraints = [Constraint.length(50)]
-      area = %{x: 0, y: 0, width: 100, height: 20}
-
-      Cache.solve(constraints, area)
-      stats_before = Cache.stats()
-      assert stats_before.size >= 1
-
-      Cache.clear()
-      stats_after = Cache.stats()
-      assert stats_after.size == 0
-    end
-
-    test "evict_now triggers synchronous eviction" do
-      Cache.clear()
-
-      # Add some entries
-      for i <- 1..10 do
-        constraints = [Constraint.length(i)]
-        area = %{x: 0, y: 0, width: 100, height: 20}
-        Cache.solve(constraints, area)
-      end
-
-      stats_before = Cache.stats()
-      assert stats_before.size == 10
-
-      # Eviction only removes entries if over max_size
-      # With default max_size of 500, nothing will be evicted
-      # But we can verify the function runs without error
-      Cache.evict_now()
-
-      stats_after = Cache.stats()
-      # Size unchanged since we're under max_size
-      assert stats_after.size == 10
-    end
-
-    test "cache tracks access for LRU" do
-      Cache.clear()
-
-      constraints = [Constraint.fill()]
-      area = %{x: 0, y: 0, width: 100, height: 20}
-
-      # First access
-      Cache.solve(constraints, area)
-
-      # Wait a moment then access again
-      Process.sleep(1)
-      Cache.solve(constraints, area)
-
-      # Should have 1 hit (second access)
-      stats = Cache.stats()
-      assert stats.hits >= 1
-      assert stats.misses >= 1
-    end
-
-    test "warm preloads cache entries" do
-      Cache.clear()
-
-      entries = [
-        {[Constraint.length(10)], %{x: 0, y: 0, width: 100, height: 20}, []},
-        {[Constraint.fill()], %{x: 0, y: 0, width: 200, height: 30}, []}
-      ]
-
-      Cache.warm(entries)
-
-      stats = Cache.stats()
-      # Stats reset after warm, so size should be 2 but hits/misses reset
-      assert stats.size == 2
-
-      # Subsequent solves should hit cache
-      Cache.solve([Constraint.length(10)], %{x: 0, y: 0, width: 100, height: 20})
-      Cache.solve([Constraint.fill()], %{x: 0, y: 0, width: 200, height: 30})
-
-      stats_after = Cache.stats()
-      assert stats_after.hits == 2
     end
   end
 

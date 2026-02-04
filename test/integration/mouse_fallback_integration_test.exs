@@ -18,7 +18,7 @@ defmodule TermUI.Integration.MouseFallbackIntegrationTest do
   the same navigation behavior.
   """
 
-  use ExUnit.Case, async: false
+  use TermUI.TestCase, async: false
 
   alias TermUI.Event
   alias TermUI.Theme

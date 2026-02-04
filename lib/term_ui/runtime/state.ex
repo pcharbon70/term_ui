@@ -24,6 +24,13 @@ defmodule TermUI.Runtime.State do
           optional(:unicode) => boolean(),
           optional(:dimensions) => {pos_integer(), pos_integer()} | nil,
           optional(:terminal) => boolean(),
+          optional(:mouse) => boolean(),
+          optional(:bracketed_paste) => boolean(),
+          optional(:focus_events) => boolean(),
+          optional(:alternate_screen) => boolean(),
+          optional(:terminal_type) => String.t() | nil,
+          optional(:terminal_program) => String.t() | nil,
+          optional(:max_colors) => non_neg_integer(),
           optional(:raw_mode_error) => term()
         }
 
@@ -36,6 +43,7 @@ defmodule TermUI.Runtime.State do
           dirty: boolean(),
           focused_component: atom(),
           components: %{atom() => component_entry()},
+          command_executor: pid() | nil,
           pending_commands: %{reference() => command_entry()},
           shutting_down: boolean(),
           terminal_started: boolean(),
@@ -69,6 +77,7 @@ defmodule TermUI.Runtime.State do
     :dirty,
     :focused_component,
     :components,
+    :command_executor,
     :pending_commands,
     :shutting_down,
     :terminal_started,

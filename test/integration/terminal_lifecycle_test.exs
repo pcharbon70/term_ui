@@ -6,7 +6,7 @@ defmodule TermUI.Integration.TerminalLifecycleTest do
   sequences to ensure robust terminal state management.
   """
 
-  use ExUnit.Case, async: false
+  use TermUI.TestCase, async: false
 
   alias TermUI.IntegrationHelpers
   alias TermUI.Terminal

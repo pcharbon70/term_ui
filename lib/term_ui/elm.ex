@@ -97,8 +97,8 @@ defmodule TermUI.Elm do
         {%{state | count: state.count + 1}, []}
       end
 
-      def update({:fetch_data, url}, state) do
-        cmd = Command.http_get(url, {:data_loaded, :response})
+      def update({:load_file, path}, state) do
+        cmd = Command.file_read(path, :file_loaded)
         {%{state | loading: true}, [cmd]}
       end
 

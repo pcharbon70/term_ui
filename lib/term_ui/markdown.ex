@@ -218,12 +218,22 @@ defmodule TermUI.Markdown do
     header =
       if lang do
         focus_hint = if is_focused, do: " [c]", else: ""
-        [[{"┌─ " <> lang <> focus_hint <> " ", @code_block_style},
-          {String.duplicate("─", 40 - String.length(focus_hint)), border_style}]]
+
+        [
+          [
+            {"┌─ " <> lang <> focus_hint <> " ", @code_block_style},
+            {String.duplicate("─", 40 - String.length(focus_hint)), border_style}
+          ]
+        ]
       else
         focus_hint = if is_focused, do: " [c]", else: ""
-        [[{"┌" <> focus_hint, @code_block_style},
-          {String.duplicate("─", 44 - String.length(focus_hint)), border_style}]]
+
+        [
+          [
+            {"┌" <> focus_hint, @code_block_style},
+            {String.duplicate("─", 44 - String.length(focus_hint)), border_style}
+          ]
+        ]
       end
 
     code_lines = render_code_block(code, lang)
@@ -281,8 +291,12 @@ defmodule TermUI.Markdown do
 
     header =
       if lang do
-        [[{"┌─ " <> lang <> " ", @code_block_style},
-          {String.duplicate("─", 40), @code_border_style}]]
+        [
+          [
+            {"┌─ " <> lang <> " ", @code_block_style},
+            {String.duplicate("─", 40), @code_border_style}
+          ]
+        ]
       else
         [[{"┌", @code_block_style}, {String.duplicate("─", 44), @code_border_style}]]
       end
@@ -308,6 +322,7 @@ defmodule TermUI.Markdown do
       case segments do
         [{text, _style} | rest] ->
           [{"│ " <> text, @blockquote_style} | rest]
+
         [] ->
           [{"│ ", @blockquote_style}]
       end
@@ -453,6 +468,7 @@ defmodule TermUI.Markdown do
 
   defp process_inline_node(%MDEx.Link{url: url, nodes: children}) do
     text = extract_text(children)
+
     if text == url do
       [{text, @link_style}]
     else
@@ -488,14 +504,17 @@ defmodule TermUI.Markdown do
         case segments do
           [{text, style} | rest] ->
             [{prefix, @list_bullet_style}, {text, style} | rest]
+
           [] ->
             [{prefix, @list_bullet_style}]
         end
       else
         indent = String.duplicate(" ", String.length(prefix))
+
         case segments do
           [{text, style} | rest] ->
             [{indent <> text, style} | rest]
+
           [] ->
             segments
         end
@@ -526,6 +545,7 @@ defmodule TermUI.Markdown do
       case acc do
         [{prev_text, ^style} | rest] ->
           [{prev_text <> text, style} | rest]
+
         _ ->
           [{text, style} | acc]
       end
@@ -565,6 +585,7 @@ defmodule TermUI.Markdown do
       Enum.reduce(expanded_segments, {[], []}, fn
         :newline, {current, acc} ->
           {[], acc ++ [Enum.reverse(current)]}
+
         segment, {current, acc} ->
           {[segment | current], acc}
       end)

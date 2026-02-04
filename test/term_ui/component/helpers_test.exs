@@ -1,5 +1,5 @@
 defmodule TermUI.Component.HelpersTest do
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
 
   alias TermUI.Component.Helpers
   alias TermUI.Component.RenderNode

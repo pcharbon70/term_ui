@@ -1,5 +1,5 @@
 defmodule TermUI.RuntimeTest do
-  use ExUnit.Case, async: false
+  use TermUI.TestCase, async: false
   import ExUnit.CaptureLog
 
   alias TermUI.Event
@@ -527,7 +527,9 @@ defmodule TermUI.RuntimeTest do
 
     test "accepts TermUI.Backend.TTY explicit backend" do
       runtime =
-        start_supervised!({Runtime, root: Counter, backend: TermUI.Backend.TTY, skip_terminal: true})
+        start_supervised!(
+          {Runtime, root: Counter, backend: TermUI.Backend.TTY, skip_terminal: true}
+        )
 
       state = Runtime.get_state(runtime)
       assert state.backend_mode == :skip
@@ -542,7 +544,9 @@ defmodule TermUI.RuntimeTest do
 
       # Start with explicit TTY backend
       runtime =
-        start_supervised!({Runtime, root: Counter, backend: TermUI.Backend.TTY, skip_terminal: true})
+        start_supervised!(
+          {Runtime, root: Counter, backend: TermUI.Backend.TTY, skip_terminal: true}
+        )
 
       state = Runtime.get_state(runtime)
       # With skip_terminal, backend_mode is :skip
@@ -569,7 +573,8 @@ defmodule TermUI.RuntimeTest do
     end
 
     test "initializes input handler when use_input_handler is true" do
-      runtime = start_supervised!({Runtime, root: Counter, use_input_handler: true, skip_terminal: true})
+      runtime =
+        start_supervised!({Runtime, root: Counter, use_input_handler: true, skip_terminal: true})
 
       state = Runtime.get_state(runtime)
       # With skip_terminal and backend_mode :skip, no input handler is initialized
@@ -582,10 +587,7 @@ defmodule TermUI.RuntimeTest do
       runtime =
         start_supervised!({
           Runtime,
-          root: Counter,
-          backend: :raw,
-          use_input_handler: true,
-          skip_terminal: true
+          root: Counter, backend: :raw, use_input_handler: true, skip_terminal: true
         })
 
       state = Runtime.get_state(runtime)
@@ -597,10 +599,7 @@ defmodule TermUI.RuntimeTest do
       runtime =
         start_supervised!({
           Runtime,
-          root: Counter,
-          backend: :tty,
-          use_input_handler: true,
-          skip_terminal: true
+          root: Counter, backend: :tty, use_input_handler: true, skip_terminal: true
         })
 
       state = Runtime.get_state(runtime)
@@ -622,7 +621,8 @@ defmodule TermUI.RuntimeTest do
     test "logs capabilities at debug level when backend is selected" do
       log =
         capture_log([level: :debug], fn ->
-          _runtime = start_supervised!({Runtime, root: Counter, skip_terminal: true, backend: :tty})
+          _runtime =
+            start_supervised!({Runtime, root: Counter, skip_terminal: true, backend: :tty})
         end)
 
       # With skip_terminal: true, capabilities should still be logged

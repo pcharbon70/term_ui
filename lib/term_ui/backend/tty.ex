@@ -805,14 +805,14 @@ defmodule TermUI.Backend.TTY do
   defp setup_terminal(state) do
     # Enter alternate screen if configured
     if state.alternate_screen do
-      IO.write(@alt_screen_enter)
+      TermUI.TerminalOutput.write(@alt_screen_enter)
     end
 
     # Hide cursor for cleaner rendering
-    IO.write(@cursor_hide)
+    TermUI.TerminalOutput.write(@cursor_hide)
 
     # Clear screen and move cursor to home position
-    IO.write(@clear_screen <> @cursor_home)
+    TermUI.TerminalOutput.write(@clear_screen <> @cursor_home)
 
     # Update state to reflect cursor is hidden
     %{state | cursor_visible: false, cursor_position: {1, 1}}
@@ -1221,7 +1221,7 @@ defmodule TermUI.Backend.TTY do
   @spec safe_write(iodata()) :: :ok
   defp safe_write(data) do
     try do
-      IO.write(data)
+      TermUI.TerminalOutput.write(data)
     rescue
       _ -> :ok
     end

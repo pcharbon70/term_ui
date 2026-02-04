@@ -7,7 +7,7 @@ defmodule TermUI.Backend.RawIntegrationTest do
   Buffer, and Diff.
   """
 
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
 
   alias TermUI.Backend.Raw
   alias TermUI.Renderer.Cell

@@ -1,5 +1,5 @@
 defmodule TermUI.CommandTest do
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
 
   alias TermUI.Command
 
@@ -128,7 +128,7 @@ defmodule TermUI.CommandTest do
 end
 
 defmodule TermUI.Command.ExecutorTest do
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: false
 
   alias TermUI.Command
   alias TermUI.Command.Executor

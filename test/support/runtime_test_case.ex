@@ -29,7 +29,7 @@ defmodule TermUI.RuntimeTestCase do
 
   defmacro __using__(_opts) do
     quote do
-      use ExUnit.Case, async: false
+      use TermUI.TestCase, async: false
 
       alias TermUI.Command
       alias TermUI.Event

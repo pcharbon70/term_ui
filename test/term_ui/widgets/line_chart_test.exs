@@ -1,5 +1,5 @@
 defmodule TermUI.Widgets.LineChartTest do
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: false
 
   alias TermUI.Widgets.LineChart
 

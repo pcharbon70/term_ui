@@ -1,5 +1,5 @@
 defmodule TermUI.ErrorTest do
-  use ExUnit.Case
+  use TermUI.TestCase
   doctest TermUI.Error
 
   alias TermUI.Error

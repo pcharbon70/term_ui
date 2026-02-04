@@ -1,5 +1,5 @@
 defmodule TermUI.FocusTest do
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
 
   alias TermUI.Focus
 
@@ -51,7 +51,7 @@ defmodule TermUI.FocusTest do
 end
 
 defmodule TermUI.Focus.TrackerTest do
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
 
   alias TermUI.Focus.Tracker
 

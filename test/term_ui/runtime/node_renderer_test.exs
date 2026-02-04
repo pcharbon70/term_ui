@@ -1,5 +1,5 @@
 defmodule TermUI.Runtime.NodeRendererTest do
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
 
   alias TermUI.Renderer.Buffer
   alias TermUI.Renderer.BufferManager

@@ -382,11 +382,16 @@ defmodule TermUI.App do
     try do
       # Try to restore terminal via direct escape sequences
       # This ensures cleanup even if Runtime GenServer is dead
-      IO.write("\e[?1006l\e[?1003l\e[?1002l\e[?1000l")  # Disable mouse tracking
-      IO.write("\e[?25h")  # Show cursor
-      IO.write("\e[0m")  # Reset colors
-      IO.write("\e[2J")  # Clear screen
-      IO.write("\e[H")  # Move cursor to home
+      # Disable mouse tracking
+      TermUI.TerminalOutput.write("\e[?1006l\e[?1003l\e[?1002l\e[?1000l")
+      # Show cursor
+      TermUI.TerminalOutput.write("\e[?25h")
+      # Reset colors
+      TermUI.TerminalOutput.write("\e[0m")
+      # Clear screen
+      TermUI.TerminalOutput.write("\e[2J")
+      # Move cursor to home
+      TermUI.TerminalOutput.write("\e[H")
       :ok
     rescue
       _ -> :error

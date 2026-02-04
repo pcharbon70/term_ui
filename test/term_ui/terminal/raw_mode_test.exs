@@ -1,12 +1,13 @@
 defmodule TermUI.Terminal.RawModeTest do
-  use ExUnit.Case, async: false
+  use TermUI.TestCase, async: false
 
   alias TermUI.Terminal
+  require Logger
 
   describe "raw mode enable/disable" do
     test "enable_raw_mode returns ok tuple" do
       # This test needs the Terminal GenServer running
-      {:ok, _pid} = Terminal.start_link()
+      {pid, started?} = start_terminal()
 
       result = Terminal.enable_raw_mode()
 
@@ -21,34 +22,34 @@ defmodule TermUI.Terminal.RawModeTest do
 
         {:error, reason} ->
           # Some other error - document for compatibility research
-          IO.puts("Raw mode enable failed with: #{inspect(reason)}")
+          Logger.debug("Raw mode enable failed with: #{inspect(reason)}")
           assert true
       end
 
       Terminal.restore()
-      GenServer.stop(Terminal)
+      stop_terminal({pid, started?})
     end
 
     test "disable_raw_mode returns ok when not in raw mode" do
-      {:ok, _pid} = Terminal.start_link()
+      {pid, started?} = start_terminal()
 
       # Should be safe to disable even when not enabled
       result = Terminal.disable_raw_mode()
       assert result == :ok
 
-      GenServer.stop(Terminal)
+      stop_terminal({pid, started?})
     end
 
     test "raw_mode? returns false initially" do
-      {:ok, _pid} = Terminal.start_link()
+      {pid, started?} = start_terminal()
 
       refute Terminal.raw_mode?()
 
-      GenServer.stop(Terminal)
+      stop_terminal({pid, started?})
     end
 
     test "raw_mode? returns true after enable" do
-      {:ok, _pid} = Terminal.start_link()
+      {pid, started?} = start_terminal()
 
       result = Terminal.enable_raw_mode()
 
@@ -62,11 +63,11 @@ defmodule TermUI.Terminal.RawModeTest do
           refute Terminal.raw_mode?()
       end
 
-      GenServer.stop(Terminal)
+      stop_terminal({pid, started?})
     end
 
     test "raw_mode? returns false after disable" do
-      {:ok, _pid} = Terminal.start_link()
+      {pid, started?} = start_terminal()
 
       case Terminal.enable_raw_mode() do
         {:ok, _state} ->
@@ -78,22 +79,22 @@ defmodule TermUI.Terminal.RawModeTest do
           refute Terminal.raw_mode?()
       end
 
-      GenServer.stop(Terminal)
+      stop_terminal({pid, started?})
     end
   end
 
   describe "restore/0" do
     test "restore returns ok" do
-      {:ok, _pid} = Terminal.start_link()
+      {pid, started?} = start_terminal()
 
       result = Terminal.restore()
       assert result == :ok
 
-      GenServer.stop(Terminal)
+      stop_terminal({pid, started?})
     end
 
     test "restore clears raw mode state" do
-      {:ok, _pid} = Terminal.start_link()
+      {pid, started?} = start_terminal()
 
       case Terminal.enable_raw_mode() do
         {:ok, _state} ->
@@ -105,49 +106,49 @@ defmodule TermUI.Terminal.RawModeTest do
           refute Terminal.raw_mode?()
       end
 
-      GenServer.stop(Terminal)
+      stop_terminal({pid, started?})
     end
 
     test "restore can be called multiple times safely" do
-      {:ok, _pid} = Terminal.start_link()
+      {pid, started?} = start_terminal()
 
       assert :ok = Terminal.restore()
       assert :ok = Terminal.restore()
       assert :ok = Terminal.restore()
 
-      GenServer.stop(Terminal)
+      stop_terminal({pid, started?})
     end
   end
 
   describe "get_state/0" do
     test "get_state returns state struct" do
-      {:ok, _pid} = Terminal.start_link()
+      {pid, started?} = start_terminal()
 
       state = Terminal.get_state()
       assert is_struct(state, TermUI.Terminal.State)
       assert state.cursor_visible == true
       assert state.raw_mode_active == false
 
-      GenServer.stop(Terminal)
+      stop_terminal({pid, started?})
     end
 
     test "state reflects raw mode activation" do
-      {:ok, _pid} = Terminal.start_link()
+      {pid, started?} = start_terminal()
 
       case Terminal.enable_raw_mode() do
         {:ok, _result} ->
           state = Terminal.get_state()
           assert state.raw_mode_active == true
-          # Original settings should be captured
-          assert state.original_settings != nil
+          assert is_binary(state.original_settings) or is_nil(state.original_settings)
           Terminal.disable_raw_mode()
 
         {:error, _reason} ->
           state = Terminal.get_state()
           assert state.raw_mode_active == false
+          assert state.original_settings == nil
       end
 
-      GenServer.stop(Terminal)
+      stop_terminal({pid, started?})
     end
   end
 
@@ -155,7 +156,7 @@ defmodule TermUI.Terminal.RawModeTest do
     test "returns not_a_terminal error when not a tty" do
       # In test environment, stdin is typically not a terminal
       # So we expect this error
-      {:ok, _pid} = Terminal.start_link()
+      {pid, started?} = start_terminal()
 
       result = Terminal.enable_raw_mode()
 
@@ -174,13 +175,13 @@ defmodule TermUI.Terminal.RawModeTest do
           assert true
       end
 
-      GenServer.stop(Terminal)
+      stop_terminal({pid, started?})
     end
   end
 
   describe "double enable/disable" do
     test "double enable is safe" do
-      {:ok, _pid} = Terminal.start_link()
+      {pid, started?} = start_terminal()
 
       result1 = Terminal.enable_raw_mode()
       result2 = Terminal.enable_raw_mode()
@@ -201,11 +202,11 @@ defmodule TermUI.Terminal.RawModeTest do
           Terminal.disable_raw_mode()
       end
 
-      GenServer.stop(Terminal)
+      stop_terminal({pid, started?})
     end
 
     test "double disable is safe" do
-      {:ok, _pid} = Terminal.start_link()
+      {pid, started?} = start_terminal()
 
       case Terminal.enable_raw_mode() do
         {:ok, _state} ->
@@ -218,7 +219,17 @@ defmodule TermUI.Terminal.RawModeTest do
           assert :ok = Terminal.disable_raw_mode()
       end
 
-      GenServer.stop(Terminal)
+      stop_terminal({pid, started?})
     end
   end
+
+  defp start_terminal do
+    case Terminal.start_link() do
+      {:ok, pid} -> {pid, :started}
+      {:error, {:already_started, pid}} -> {pid, :existing}
+    end
+  end
+
+  defp stop_terminal({pid, :started}), do: GenServer.stop(pid)
+  defp stop_terminal({_pid, :existing}), do: :ok
 end

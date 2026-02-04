@@ -1,5 +1,5 @@
 defmodule TermUI.ThemeTest do
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
 
   alias TermUI.Renderer.Style
   alias TermUI.Theme

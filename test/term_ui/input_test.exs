@@ -1,5 +1,5 @@
 defmodule TermUI.InputTest do
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
 
   alias TermUI.Input
   alias TermUI.Event

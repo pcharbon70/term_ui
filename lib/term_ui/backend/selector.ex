@@ -90,6 +90,7 @@ defmodule TermUI.Backend.Selector do
   """
 
   require Logger
+  alias TermUI.Capabilities
 
   @typedoc """
   Result of backend selection.
@@ -112,10 +113,17 @@ defmodule TermUI.Backend.Selector do
   Detected terminal capabilities for TTY mode.
   """
   @type capabilities :: %{
-          colors: color_depth(),
-          unicode: boolean(),
-          dimensions: {pos_integer(), pos_integer()} | nil,
-          terminal: boolean()
+          required(:colors) => color_depth(),
+          required(:unicode) => boolean(),
+          required(:dimensions) => {pos_integer(), pos_integer()} | nil,
+          required(:terminal) => boolean(),
+          optional(:mouse) => boolean(),
+          optional(:bracketed_paste) => boolean(),
+          optional(:focus_events) => boolean(),
+          optional(:alternate_screen) => boolean(),
+          optional(:terminal_type) => String.t() | nil,
+          optional(:terminal_program) => String.t() | nil,
+          optional(:max_colors) => non_neg_integer()
         }
 
   @typedoc """
@@ -225,12 +233,32 @@ defmodule TermUI.Backend.Selector do
   @doc false
   @spec detect_capabilities() :: capabilities()
   def detect_capabilities do
-    %{
+    base = %{
       colors: detect_color_depth(),
       unicode: detect_unicode_support(),
       dimensions: detect_dimensions(),
       terminal: detect_terminal_presence()
     }
+
+    caps = Capabilities.detect()
+
+    max_colors =
+      case base.colors do
+        :true_color -> 16_777_216
+        :color_256 -> 256
+        :color_16 -> 16
+        :monochrome -> 2
+      end
+
+    Map.merge(base, %{
+      mouse: caps.mouse,
+      bracketed_paste: caps.bracketed_paste,
+      focus_events: caps.focus_events,
+      alternate_screen: caps.alternate_screen,
+      terminal_type: caps.terminal_type,
+      terminal_program: caps.terminal_program,
+      max_colors: max_colors
+    })
   end
 
   # Detects color depth from environment variables

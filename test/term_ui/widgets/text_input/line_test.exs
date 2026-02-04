@@ -1,5 +1,5 @@
 defmodule TermUI.Widgets.TextInput.LineTest do
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
 
   alias TermUI.Theme
 
@@ -528,6 +528,7 @@ defmodule TermUI.Widgets.TextInput.LineTest do
   end
 
   describe "EOF and cancellation" do
+    @tag :manual_input
     test "read/1 returns :eof when stream ends" do
       {:ok, state} = Line.init(Line.new(prompt: "> "))
 
@@ -537,6 +538,7 @@ defmodule TermUI.Widgets.TextInput.LineTest do
       assert {:eof, _state} = Line.read(state)
     end
 
+    @tag :manual_input
     test "read/1 with validator returns :eof when stream ends" do
       validator = fn input ->
         if String.length(input) >= 3, do: :ok, else: {:error, "too short"}
@@ -548,6 +550,7 @@ defmodule TermUI.Widgets.TextInput.LineTest do
       assert {:eof, _state} = Line.read(state)
     end
 
+    @tag :manual_input
     test "handle_focus/1 returns :cancelled on EOF" do
       {:ok, state} = Line.init(Line.new(prompt: "> "))
 
@@ -556,6 +559,7 @@ defmodule TermUI.Widgets.TextInput.LineTest do
       assert {:cancelled, _state} = Line.handle_focus(state)
     end
 
+    @tag :manual_input
     test "cancelled state has focused set to false" do
       {:ok, state} = Line.init(Line.new(prompt: "> "))
 
@@ -564,6 +568,7 @@ defmodule TermUI.Widgets.TextInput.LineTest do
       refute result_state.focused
     end
 
+    @tag :manual_input
     test "on_blur is called even when cancelled" do
       test_pid = self()
       on_blur = fn state -> send(test_pid, {:blurred, state.value}) end
@@ -574,6 +579,7 @@ defmodule TermUI.Widgets.TextInput.LineTest do
       assert_receive {:blurred, ""}
     end
 
+    @tag :manual_input
     test "handle_focus/1 with validator returns :cancelled on EOF" do
       validator = fn _input -> :ok end
 

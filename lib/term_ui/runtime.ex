@@ -27,6 +27,8 @@ defmodule TermUI.Runtime do
   require Logger
 
   alias TermUI.Backend.Selector
+  alias TermUI.Command
+  alias TermUI.Command.Executor, as: CommandExecutor
   alias TermUI.Config
   alias TermUI.Elm
   alias TermUI.EventQueue
@@ -284,7 +286,8 @@ defmodule TermUI.Runtime do
     use_input_handler = Keyword.get(opts, :use_input_handler, true)
 
     # Select backend using Backend.Selector
-    {backend_mode, backend, backend_state, capabilities, terminal_started, buffer_manager, dimensions} =
+    {backend_mode, backend, backend_state, capabilities, terminal_started, buffer_manager,
+     dimensions} =
       if skip_terminal do
         {:skip, nil, nil, nil, false, nil, nil}
       else
@@ -325,6 +328,9 @@ defmodule TermUI.Runtime do
       end
     end
 
+    # Start command executor for async effects
+    {:ok, command_executor} = CommandExecutor.start_link()
+
     state = %State{
       root_module: root_module,
       root_state: root_state,
@@ -335,6 +341,7 @@ defmodule TermUI.Runtime do
       dirty: true,
       focused_component: :root,
       components: %{root: %{module: root_module, state: root_state}},
+      command_executor: command_executor,
       pending_commands: %{},
       shutting_down: false,
       terminal_started: terminal_started,
@@ -375,12 +382,14 @@ defmodule TermUI.Runtime do
           {true, buffer_manager, dimensions} ->
             backend = TermUI.Backend.Raw
             # Initialize Raw backend with terminal setup
-            {:ok, backend_state} = backend.init(
-              alternate_screen: true,
-              hide_cursor: true,
-              mouse_tracking: :all,
-              size: dimensions
-            )
+            {:ok, backend_state} =
+              backend.init(
+                alternate_screen: true,
+                hide_cursor: true,
+                mouse_tracking: :all,
+                size: dimensions
+              )
+
             {:raw, backend, backend_state, nil, true, buffer_manager, dimensions}
 
           {false, nil, nil} ->
@@ -402,12 +411,15 @@ defmodule TermUI.Runtime do
         case setup_terminal_and_buffers() do
           {true, buffer_manager, dimensions} ->
             backend = TermUI.Backend.Raw
-            {:ok, backend_state} = backend.init(
-              alternate_screen: true,
-              hide_cursor: true,
-              mouse_tracking: :all,
-              size: dimensions
-            )
+
+            {:ok, backend_state} =
+              backend.init(
+                alternate_screen: true,
+                hide_cursor: true,
+                mouse_tracking: :all,
+                size: dimensions
+              )
+
             {:raw, backend, backend_state, nil, true, buffer_manager, dimensions}
 
           {false, nil, nil} ->
@@ -427,12 +439,14 @@ defmodule TermUI.Runtime do
           TermUI.Backend.Raw ->
             case setup_terminal_and_buffers() do
               {true, buffer_manager, dimensions} ->
-                {:ok, backend_state} = module.init(
-                  alternate_screen: true,
-                  hide_cursor: true,
-                  mouse_tracking: :all,
-                  size: dimensions
-                )
+                {:ok, backend_state} =
+                  module.init(
+                    alternate_screen: true,
+                    hide_cursor: true,
+                    mouse_tracking: :all,
+                    size: dimensions
+                  )
+
                 {:raw, module, backend_state, nil, true, buffer_manager, dimensions}
 
               {false, nil, nil} ->
@@ -489,9 +503,11 @@ defmodule TermUI.Runtime do
       state = %{state | event_queue: new_queue}
       # Log if event was dropped
       case result do
-        {:dropped, _} -> :ok  # EventQueue already logged
+        # EventQueue already logged
+        {:dropped, _} -> :ok
         :ok -> :ok
       end
+
       # Process queued events
       state = process_event_queue(state)
       {:noreply, state}
@@ -575,6 +591,7 @@ defmodule TermUI.Runtime do
         {:dropped, _} -> :ok
         :ok -> :ok
       end
+
       {:noreply, state}
     end
   end
@@ -593,6 +610,12 @@ defmodule TermUI.Runtime do
   @impl true
   def handle_info({:DOWN, _ref, :process, _pid, _reason}, state) do
     # Command task completed (handled via command_result)
+    {:noreply, state}
+  end
+
+  @impl true
+  def handle_info({:EXIT, _pid, _reason}, state) do
+    # Ignore linked process exits (command executor, terminal helpers, etc.)
     {:noreply, state}
   end
 
@@ -713,9 +736,9 @@ defmodule TermUI.Runtime do
     # This ensures cleanup even if backend shutdown is unavailable or crashed
     try do
       # Disable all mouse tracking modes
-      IO.write("\e[?1006l\e[?1003l\e[?1002l\e[?1000l")
+      TermUI.TerminalOutput.write("\e[?1006l\e[?1003l\e[?1002l\e[?1000l")
       # Show cursor
-      IO.write("\e[?25h")
+      TermUI.TerminalOutput.write("\e[?25h")
     rescue
       _ -> :ok
     end
@@ -892,29 +915,87 @@ defmodule TermUI.Runtime do
   defp execute_commands(commands, state) do
     # Check for quit command first
     # Handle both Command struct and legacy atom :quit
-    quit_cmd =
-      Enum.find(commands, fn {_component_id, cmd} ->
-        case cmd do
-          %{type: :quit} -> true
-          :quit -> true
-          _ -> false
-        end
-      end)
-
-    if quit_cmd do
+    if Enum.any?(commands, &quit_command?/1) do
       # Quit command takes precedence - initiate shutdown
       # Stop the GenServer after cleanup
       GenServer.cast(self(), :shutdown)
       %{state | shutting_down: true}
     else
-      # Track pending commands for execution
-      pending =
-        Enum.reduce(commands, state.pending_commands, fn {component_id, cmd}, acc ->
-          command_id = make_ref()
-          Map.put(acc, command_id, %{component_id: component_id, command: cmd})
-        end)
+      Enum.reduce(commands, state, fn {component_id, cmd}, acc ->
+        execute_command(component_id, cmd, acc)
+      end)
+    end
+  end
 
-      %{state | pending_commands: pending}
+  defp quit_command?({_component_id, %Command{type: :quit}}), do: true
+  defp quit_command?({_component_id, :quit}), do: true
+  defp quit_command?(_), do: false
+
+  defp execute_command(_component_id, %Command{type: :none}, state), do: state
+  defp execute_command(_component_id, :none, state), do: state
+
+  defp execute_command(component_id, %Command{} = cmd, state) do
+    if state.command_executor do
+      case CommandExecutor.execute(state.command_executor, cmd, self(), component_id) do
+        {:ok, command_id} ->
+          pending =
+            Map.put(state.pending_commands, command_id, %{
+              component_id: component_id,
+              command: cmd
+            })
+
+          %{state | pending_commands: pending}
+
+        {:error, reason} ->
+          Logger.warning("Command execution failed: #{inspect(reason)}")
+          enqueue_message(component_id, {:command_error, reason}, state)
+      end
+    else
+      Logger.warning("Command executor unavailable; dropping command: #{inspect(cmd)}")
+      state
+    end
+  end
+
+  defp execute_command(_component_id, {:send, target, message}, state) do
+    cond do
+      is_pid(target) ->
+        send(target, message)
+        state
+
+      is_atom(target) and Map.has_key?(state.components, target) ->
+        enqueue_message(target, message, state)
+
+      is_atom(target) ->
+        send(target, message)
+        state
+
+      true ->
+        Logger.warning("Invalid :send target ignored: #{inspect(target)}")
+        state
+    end
+  end
+
+  defp execute_command(_component_id, {:send_to, target, message}, state) do
+    if is_atom(target) and Map.has_key?(state.components, target) do
+      enqueue_message(target, message, state)
+    else
+      state
+    end
+  end
+
+  defp execute_command(_component_id, cmd, state) do
+    Logger.warning("Unknown command ignored: #{inspect(cmd)}")
+    state
+  end
+
+  defp handle_command_result(_component_id, command_id, {:send_to, target, message}, state) do
+    pending = Map.delete(state.pending_commands, command_id)
+    state = %{state | pending_commands: pending}
+
+    if is_atom(target) and Map.has_key?(state.components, target) do
+      enqueue_message(target, message, state)
+    else
+      state
     end
   end
 
@@ -1123,7 +1204,7 @@ defmodule TermUI.Runtime do
       end
 
       # Clear screen to avoid artifacts
-      IO.write("\e[2J")
+      TermUI.TerminalOutput.write("\e[2J")
 
       # Create resize event and broadcast to all components
       resize_event = Event.Resize.new(cols, rows)
@@ -1152,7 +1233,15 @@ defmodule TermUI.Runtime do
 
   defp do_shutdown(state) do
     # Wait for pending commands to complete (with timeout)
-    # For now, just clear them
+    # Cancel any outstanding commands and stop executor
+    if state.command_executor && Process.alive?(state.command_executor) do
+      Enum.each(Map.keys(state.pending_commands), fn command_id ->
+        _ = CommandExecutor.cancel(state.command_executor, command_id)
+      end)
+
+      GenServer.stop(state.command_executor, :normal)
+    end
+
     state = %{state | pending_commands: %{}}
 
     # Terminate components (leaf to root)

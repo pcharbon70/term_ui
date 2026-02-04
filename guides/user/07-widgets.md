@@ -346,7 +346,7 @@ Dialog.render(dialog_state, %{width: 80, height: 24})
 Modal selection dialog with type-ahead filtering.
 
 ```elixir
-alias TermUI.Widget.PickList
+alias TermUI.Widgets.PickList
 
 # Create props
 props = %{

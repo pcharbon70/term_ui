@@ -8,7 +8,7 @@ defmodule TermUI.Integration.AdvancedWidgetsTest do
   """
 
   # async: true because widgets are stateless and tests create isolated instances
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
 
   @default_area %{width: 80, height: 24}
 

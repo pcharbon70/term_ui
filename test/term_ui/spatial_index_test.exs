@@ -1,5 +1,5 @@
 defmodule TermUI.SpatialIndexTest do
-  use ExUnit.Case
+  use TermUI.TestCase
 
   alias TermUI.SpatialIndex
 

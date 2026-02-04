@@ -1,5 +1,5 @@
 defmodule TermUI.Runtime.ResizeTest do
-  use ExUnit.Case, async: false
+  use TermUI.TestCase, async: false
 
   alias TermUI.Event
   alias TermUI.Runtime

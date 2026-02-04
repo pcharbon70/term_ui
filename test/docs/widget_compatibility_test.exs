@@ -2,7 +2,7 @@ defmodule Docs.WidgetCompatibilityTest do
   @moduledoc """
   Tests that code examples in widget-compatibility.md compile and work correctly.
   """
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
 
   alias TermUI.CharacterSet
   alias TermUI.Event

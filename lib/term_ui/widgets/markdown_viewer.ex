@@ -188,6 +188,7 @@ defmodule TermUI.Widgets.MarkdownViewer do
 
     if width != state.width or height != state.height do
       state = %{state | width: width, height: height}
+
       if width != state.width do
         refresh_render_cache(state)
       else
@@ -261,16 +262,17 @@ defmodule TermUI.Widgets.MarkdownViewer do
       state = %{state | focused_element_index: index}
       element_id = element.id
 
-      state = if state.focused_element_id != element_id do
-        new_cache =
-          Markdown.render_with_elements(state.content, state.width,
-            focused_element_id: element_id
-          )
+      state =
+        if state.focused_element_id != element_id do
+          new_cache =
+            Markdown.render_with_elements(state.content, state.width,
+              focused_element_id: element_id
+            )
 
-        %{state | focused_element_id: element_id, render_cache: new_cache}
-      else
-        state
-      end
+          %{state | focused_element_id: element_id, render_cache: new_cache}
+        else
+          state
+        end
 
       target_line = element.start_line
       scroll_to_line(state, target_line)

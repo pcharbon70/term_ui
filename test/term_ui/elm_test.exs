@@ -1,5 +1,5 @@
 defmodule TermUI.ElmTest do
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
 
   alias TermUI.Elm
   alias TermUI.Event

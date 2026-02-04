@@ -1,5 +1,5 @@
 defmodule TermUI.Terminal.InputReaderTest do
-  use ExUnit.Case, async: false
+  use TermUI.TestCase, async: false
 
   alias TermUI.Terminal.InputReader
 

@@ -1,5 +1,6 @@
 defmodule TermUI.Input.TTYTest do
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
+  @moduletag :capture_log
 
   alias TermUI.Input.TTY
   alias TermUI.Input
@@ -32,7 +33,12 @@ defmodule TermUI.Input.TTYTest do
     test "state struct has buffer, event_queue, and IO opts fields" do
       state = TTY.new()
       # Verify the struct has the expected fields (including IO opts fields)
-      assert Map.keys(state) -- [:__struct__] == [:buffer, :event_queue, :io_opts_restored, :io_opts_set]
+      assert Map.keys(state) -- [:__struct__] == [
+               :buffer,
+               :event_queue,
+               :io_opts_restored,
+               :io_opts_set
+             ]
     end
   end
 
@@ -330,7 +336,9 @@ defmodule TermUI.Input.TTYTest do
 
     test "moduledoc mentions :io.get_chars" do
       {:docs_v1, _, :elixir, _, %{"en" => moduledoc}, _, _} = Code.fetch_docs(TTY)
-      assert String.contains?(moduledoc, ":io.get_chars") or String.contains?(moduledoc, "get_chars")
+
+      assert String.contains?(moduledoc, ":io.get_chars") or
+               String.contains?(moduledoc, "get_chars")
     end
 
     test "moduledoc explains arrow keys work normally" do
@@ -390,7 +398,9 @@ defmodule TermUI.Input.TTYTest do
     test "moduledoc explains IEx compatibility" do
       {:docs_v1, _, :elixir, _, %{"en" => moduledoc}, _, _} = Code.fetch_docs(TTY)
       assert String.contains?(moduledoc, "IEx")
-      assert String.contains?(moduledoc, "Compatible") or String.contains?(moduledoc, "IEx compatible")
+
+      assert String.contains?(moduledoc, "Compatible") or
+               String.contains?(moduledoc, "IEx compatible")
     end
 
     test "moduledoc mentions snake_test" do

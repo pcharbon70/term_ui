@@ -109,6 +109,7 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
 
   defp get_strategy_display do
     chars = CharacterSet.current_charset()
+
     %{
       one_for_one: "1:1",
       one_for_all: "1:*",
@@ -965,21 +966,39 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
     else
       lines =
         Enum.map(visible_nodes, fn {node, idx} ->
-          render_node_line(node, idx == state.selected_idx, state.expanded, chars, status_icons, type_icons, strategy_display)
+          render_node_line(
+            node,
+            idx == state.selected_idx,
+            state.expanded,
+            chars,
+            status_icons,
+            type_icons,
+            strategy_display
+          )
         end)
 
       stack(:vertical, lines)
     end
   end
 
-  defp render_node_line(node, selected, expanded, chars, status_icons, type_icons, strategy_display) do
+  defp render_node_line(
+         node,
+         selected,
+         expanded,
+         chars,
+         status_icons,
+         type_icons,
+         strategy_display
+       ) do
     indent = String.duplicate("  ", node.depth)
 
     # Expand/collapse indicator
     expand_indicator =
       case {node.type, node.children} do
         {:supervisor, children} when is_list(children) and length(children) > 0 ->
-          if MapSet.member?(expanded, node.id), do: "#{chars.arrow_down} ", else: "#{chars.arrow_right} "
+          if MapSet.member?(expanded, node.id),
+            do: "#{chars.arrow_down} ",
+            else: "#{chars.arrow_right} "
 
         {:supervisor, _} ->
           "#{chars.arrow_right} "
@@ -1052,7 +1071,10 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
           info_style = Style.new() |> Style.fg(Theme.get_semantic(:info))
 
           lines = [
-            text("#{String.duplicate(chars.h_line, 3)} Process Info #{String.duplicate(chars.h_line, 3)}", info_style),
+            text(
+              "#{String.duplicate(chars.h_line, 3)} Process Info #{String.duplicate(chars.h_line, 3)}",
+              info_style
+            ),
             text("  ID: #{inspect(node.id)}", nil),
             text("  PID: #{inspect(node.pid)}", nil),
             text("  Name: #{inspect(node.name)}", nil),

@@ -1,5 +1,5 @@
 defmodule TermUI.Component.RenderNodeTest do
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
 
   alias TermUI.Component.RenderNode
   alias TermUI.Renderer.Style

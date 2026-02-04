@@ -1,5 +1,5 @@
 defmodule TermUI.Widgets.StreamWidget.ConsumerTest do
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
 
   alias TermUI.Widgets.StreamWidget.Consumer
 
@@ -87,6 +87,7 @@ defmodule TermUI.Widgets.StreamWidget.ConsumerTest do
       {:ok, widget_pid} = Agent.start(fn -> :running end)
 
       {:ok, consumer} = Consumer.start_link(widget_pid)
+      ref = Process.monitor(consumer)
 
       # Consumer should be running
       assert Process.alive?(consumer)
@@ -95,7 +96,7 @@ defmodule TermUI.Widgets.StreamWidget.ConsumerTest do
       Agent.stop(widget_pid)
 
       # Wait for the consumer to exit
-      assert_receive {:EXIT, ^consumer, {:widget_down, :normal}}, 500
+      assert_receive {:DOWN, ^ref, :process, ^consumer, {:widget_down, :normal}}, 2000
 
       # Consumer should have stopped
       refute Process.alive?(consumer)

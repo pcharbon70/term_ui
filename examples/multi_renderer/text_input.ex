@@ -26,7 +26,7 @@ defmodule TextInputExample do
   """
 
   use TermUI.Elm
-  alias TermUI.Widget.TextInput
+  alias TermUI.Widgets.TextInput
 
   # State structure
   # %{
@@ -81,13 +81,15 @@ defmodule TextInputExample do
 
     box([
       # Header
-      text("TermUI Text Input Example",
+      text(
+        "TermUI Text Input Example",
         TermUI.Renderer.Style.new()
         |> TermUI.Renderer.Style.fg(:green)
         |> TermUI.Renderer.Style.bright()
       ),
       text(""),
-      text("Mode: " <> mode_label,
+      text(
+        "Mode: " <> mode_label,
         TermUI.Renderer.Style.new()
         |> TermUI.Renderer.Style.fg(:cyan)
       ),
@@ -98,28 +100,37 @@ defmodule TextInputExample do
       text(""),
 
       # Text input field
-      box([
-        text("Enter text: "),
-        text(state.input_value || "",
-          TermUI.Renderer.Style.new()
-          |> TermUI.Renderer.Style.fg(:yellow)
-        ),
-        text("_" |> String.duplicate(30),
-          TermUI.Renderer.Style.new()
-          |> TermUI.Renderer.Style.fg(:bright_black)
-        )
-      ], style: %{
-        border: :none,
-        padding: {0, 0}
-      }),
+      box(
+        [
+          text("Enter text: "),
+          text(
+            state.input_value || "",
+            TermUI.Renderer.Style.new()
+            |> TermUI.Renderer.Style.fg(:yellow)
+          ),
+          text(
+            "_" |> String.duplicate(30),
+            TermUI.Renderer.Style.new()
+            |> TermUI.Renderer.Style.fg(:bright_black)
+          )
+        ],
+        style: %{
+          border: :none,
+          padding: {0, 0}
+        }
+      ),
       text(""),
 
       # Submitted values
-      if(state.submitted_values == [], do: empty(), else: render_submitted(state.submitted_values)),
+      if(state.submitted_values == [],
+        do: empty(),
+        else: render_submitted(state.submitted_values)
+      ),
       text(""),
 
       # Footer
-      text("c=clear | h=toggle help | q=quit",
+      text(
+        "c=clear | h=toggle help | q=quit",
         TermUI.Renderer.Style.new()
         |> TermUI.Renderer.Style.fg(:bright_black)
       )
@@ -134,22 +145,28 @@ defmodule TextInputExample do
   defp render_help(false, _mode), do: empty()
 
   defp render_help(true, :raw) do
-    box([
-      text("Raw Mode Instructions:"),
-      text("  • Type to see characters appear"),
-      text("  • Press Enter to submit"),
-      text("  • Backspace deletes last character"),
-      text("  • Arrow keys move cursor")
-    ], border: :single)
+    box(
+      [
+        text("Raw Mode Instructions:"),
+        text("  • Type to see characters appear"),
+        text("  • Press Enter to submit"),
+        text("  • Backspace deletes last character"),
+        text("  • Arrow keys move cursor")
+      ],
+      border: :single
+    )
   end
 
   defp render_help(true, :tty) do
-    box([
-      text("TTY Mode Instructions:"),
-      text("  • Type your text"),
-      text("  • Press Enter to submit"),
-      text("  • Line-based input (live editing not available)")
-    ], border: :single)
+    box(
+      [
+        text("TTY Mode Instructions:"),
+        text("  • Type your text"),
+        text("  • Press Enter to submit"),
+        text("  • Line-based input (live editing not available)")
+      ],
+      border: :single
+    )
   end
 
   defp render_help(true, _) do
@@ -161,22 +178,27 @@ defmodule TextInputExample do
   end
 
   defp render_submitted(values) do
-    box([
-      text("Submitted Values:",
-        TermUI.Renderer.Style.new()
-        |> TermUI.Renderer.Style.fg(:green)
-      )
-    | Enum.concat(
-      values
-      |> Enum.reverse()
-      |> Enum.map(fn v ->
-        text("  • " <> v,
+    box(
+      [
+        text(
+          "Submitted Values:",
           TermUI.Renderer.Style.new()
-          |> TermUI.Renderer.Style.fg(:yellow)
+          |> TermUI.Renderer.Style.fg(:green)
         )
-      end)
+        | Enum.concat(
+            values
+            |> Enum.reverse()
+            |> Enum.map(fn v ->
+              text(
+                "  • " <> v,
+                TermUI.Renderer.Style.new()
+                |> TermUI.Renderer.Style.fg(:yellow)
+              )
+            end)
+          )
+      ],
+      border: :single
     )
-    ], border: :single)
   end
 
   # Run the application

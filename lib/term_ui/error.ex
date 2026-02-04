@@ -52,22 +52,22 @@ defmodule TermUI.Error do
   """
 
   @type error_reason ::
-          :invalid_argument |
-          :not_found |
-          :not_supported |
-          :timeout |
-          :terminal_setup_failed |
-          :size_detection_failed |
-          :invalid_size |
-          :out_of_bounds |
-          :backend_unavailable |
-          :command_failed |
-          :command_not_found |
-          :command_not_allowed |
-          :invalid_configuration |
-          :component_crashed |
-          :component_unavailable |
-          {atom(), term()}
+          :invalid_argument
+          | :not_found
+          | :not_supported
+          | :timeout
+          | :terminal_setup_failed
+          | :size_detection_failed
+          | :invalid_size
+          | :out_of_bounds
+          | :backend_unavailable
+          | :command_failed
+          | :command_not_found
+          | :command_not_allowed
+          | :invalid_configuration
+          | :component_crashed
+          | :component_unavailable
+          | {atom(), term()}
 
   @type result :: {:ok, term()} | {:error, error_reason()}
 

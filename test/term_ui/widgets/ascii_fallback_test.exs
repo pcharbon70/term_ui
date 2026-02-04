@@ -5,7 +5,7 @@ defmodule TermUI.Widgets.AsciiFallbackTest do
   These tests verify that when CharacterSet is configured for ASCII mode,
   widgets produce valid ASCII output without Unicode characters.
   """
-  use ExUnit.Case, async: false
+  use TermUI.TestCase, async: false
 
   alias TermUI.CharacterSet
   alias TermUI.Theme

@@ -1,5 +1,5 @@
 defmodule TermUI.Backend.TTYTest do
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
 
   import ExUnit.CaptureIO
 

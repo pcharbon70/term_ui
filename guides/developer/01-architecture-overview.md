@@ -22,11 +22,11 @@ graph TB
     subgraph "Rendering Layer"
         NR[NodeRenderer]
         BM[BufferManager<br/>ETS]
-        Diff[Diff Algorithm]
-        SB[SequenceBuffer]
+        CD[Cell Diff<br/>Runtime]
     end
 
     subgraph "Terminal Layer"
+        Backend[Backend<br/>Raw/TTY]
         Term[Terminal<br/>GenServer]
         IR[InputReader]
         EP[EscapeParser]
@@ -44,9 +44,9 @@ graph TB
     Runtime --> Cmd
     Runtime --> NR
     NR --> BM
-    BM --> Diff
-    Diff --> SB
-    SB --> Term
+    BM --> CD
+    CD --> Backend
+    Backend --> Term
     Term --> TTY
     Term --> STDOUT
     IR --> STDIN
@@ -81,8 +81,7 @@ graph TB
 |--------|----------------|
 | `NodeRenderer` | Traverses render tree, produces cells |
 | `BufferManager` | Double-buffered ETS tables |
-| `Diff` | Computes minimal update operations |
-| `SequenceBuffer` | Batches ANSI escape sequences |
+| `Runtime` | Computes cell diffs for backend |
 
 ### Terminal Layer
 
@@ -90,6 +89,7 @@ graph TB
 
 | Module | Responsibility |
 |--------|----------------|
+| `Backend` | Draws cells and flushes output |
 | `Terminal` | Raw mode, screen control, cursor |
 | `InputReader` | Reads stdin in raw mode |
 | `EscapeParser` | Converts bytes to Event structs |
@@ -135,11 +135,11 @@ Only changed cells are sent to the terminal:
 
 ```mermaid
 graph LR
-    A[Current Buffer] --> D{Diff}
+    A[Current Buffer] --> D{Cell Diff}
     B[Previous Buffer] --> D
-    D --> O[Operations]
-    O --> S[SequenceBuffer]
-    S --> T[Terminal]
+    D --> C[Changed Cells]
+    C --> Backend
+    Backend --> T[Terminal]
 ```
 
 ### 4. Message-Based Architecture
@@ -175,12 +175,11 @@ graph TD
         Cell[Cell]
         Buffer[Buffer]
         BufferMgr[BufferManager]
-        Diff[Diff]
         NodeRenderer[NodeRenderer]
-        SeqBuffer[SequenceBuffer]
     end
 
     subgraph "Terminal"
+        Backend[Backend]
         Terminal[Terminal]
         InputReader[InputReader]
         EscapeParser[EscapeParser]
@@ -190,7 +189,8 @@ graph TD
     TUI --> Runtime
     Runtime --> Elm
     Runtime --> BufferMgr
-    Runtime --> Terminal
+    Runtime --> Backend
+    Backend --> Terminal
     Runtime --> InputReader
 
     Elm --> Component
@@ -206,11 +206,7 @@ graph TD
     BufferMgr --> Buffer
     Buffer --> Cell
 
-    Diff --> Buffer
-    Diff --> Cell
-
-    SeqBuffer --> Style
-    SeqBuffer --> ANSI
+    Backend --> ANSI
 
     Terminal --> ANSI
 ```
@@ -269,8 +265,7 @@ sequenceDiagram
     participant Comp as Component
     participant NR as NodeRenderer
     participant BM as BufferManager
-    participant Diff as Diff
-    participant SB as SequenceBuffer
+    participant BE as Backend
     participant Term as Terminal
 
     RT->>Comp: view()
@@ -279,10 +274,9 @@ sequenceDiagram
     NR->>BM: Write cells
     RT->>BM: Get buffers
     BM->>RT: Current, Previous
-    RT->>Diff: diff()
-    Diff->>RT: Operations
-    RT->>SB: Build sequences
-    SB->>Term: ANSI output
+    RT->>RT: Diff buffers
+    RT->>BE: draw_cells(changed)
+    BE->>Term: ANSI output
 ```
 
 ## File Organization
@@ -306,8 +300,6 @@ lib/term_ui/
 │   ├── cell.ex             # Cell struct
 │   ├── buffer.ex           # Buffer operations
 │   ├── buffer_manager.ex   # Double buffering
-│   ├── diff.ex             # Diff algorithm
-│   ├── sequence_buffer.ex  # ANSI batching
 │   └── node_renderer.ex    # Tree → cells
 │
 ├── layout/

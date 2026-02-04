@@ -1,5 +1,5 @@
 defmodule TermUI.Backend.InputBufferTest do
-  use ExUnit.Case, async: false
+  use TermUI.TestCase, async: false
 
   alias TermUI.Backend.InputBuffer
 

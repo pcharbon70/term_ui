@@ -1,5 +1,5 @@
 defmodule TermUI.Widgets.SupervisionTreeViewerTest do
-  use ExUnit.Case, async: false
+  use TermUI.TestCase, async: false
 
   alias TermUI.Event
   alias TermUI.Theme

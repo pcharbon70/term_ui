@@ -13,10 +13,23 @@ excludes =
   else
     [:requires_terminal]
   end
+  |> Kernel.++([:manual_input])
+  |> Enum.uniq()
+
+case :logger.remove_handler(:default) do
+  :ok -> :ok
+  {:error, _} -> :ok
+end
 
 case TermUI.Theme.start_link(theme: :dark) do
   {:ok, _pid} -> :ok
   {:error, {:already_started, _pid}} -> :ok
 end
 
-ExUnit.start(exclude: excludes)
+Application.put_env(:term_ui, :suppress_terminal_output, true)
+
+ExUnit.start(
+  exclude: excludes,
+  capture_log: true,
+  formatters: [TermUI.TestFormatter]
+)

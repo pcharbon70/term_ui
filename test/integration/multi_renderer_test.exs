@@ -9,7 +9,7 @@ defmodule TermUI.Integration.MultiRendererTest do
   - Rendering consistency (widgets render consistently, colors/characters degrade)
   """
 
-  use ExUnit.Case, async: false
+  use TermUI.TestCase, async: false
 
   alias TermUI.Backend.Selector
   alias TermUI.Event
@@ -168,11 +168,12 @@ defmodule TermUI.Integration.MultiRendererTest do
   describe "6.8.1 Full Application Lifecycle" do
     test "6.8.1.1 start -> render -> input -> update -> render -> shutdown" do
       # Start runtime with skip_terminal for testing
-      {:ok, runtime} = Runtime.start_link(
-        root: Counter,
-        skip_terminal: true,
-        use_input_handler: false
-      )
+      {:ok, runtime} =
+        Runtime.start_link(
+          root: Counter,
+          skip_terminal: true,
+          use_input_handler: false
+        )
 
       # Verify runtime started
       assert Process.alive?(runtime)
@@ -228,11 +229,12 @@ defmodule TermUI.Integration.MultiRendererTest do
     test "6.8.1.3 Test in TTY mode (forced)" do
       Application.put_env(:term_ui, :backend, :tty)
 
-      {:ok, runtime} = Runtime.start_link(
-        root: Counter,
-        skip_terminal: true,
-        use_input_handler: false
-      )
+      {:ok, runtime} =
+        Runtime.start_link(
+          root: Counter,
+          skip_terminal: true,
+          use_input_handler: false
+        )
 
       # Verify TTY backend mode is set
       assert Runtime.backend_mode() in [:tty, :skip]
@@ -252,11 +254,12 @@ defmodule TermUI.Integration.MultiRendererTest do
     end
 
     test "6.8.1.4 Test cleanup on crash" do
-      {:ok, runtime} = Runtime.start_link(
-        root: Counter,
-        skip_terminal: true,
-        use_input_handler: false
-      )
+      {:ok, runtime} =
+        Runtime.start_link(
+          root: Counter,
+          skip_terminal: true,
+          use_input_handler: false
+        )
 
       # Simulate a crash by killing the process
       Process.flag(:trap_exit, true)
@@ -273,11 +276,12 @@ defmodule TermUI.Integration.MultiRendererTest do
       refute Process.alive?(runtime)
 
       # Verify we can start a new runtime (cleanup was successful)
-      {:ok, runtime2} = Runtime.start_link(
-        root: Counter,
-        skip_terminal: true,
-        use_input_handler: false
-      )
+      {:ok, runtime2} =
+        Runtime.start_link(
+          root: Counter,
+          skip_terminal: true,
+          use_input_handler: false
+        )
 
       assert Process.alive?(runtime2)
 
@@ -338,11 +342,12 @@ defmodule TermUI.Integration.MultiRendererTest do
   describe "6.8.3 Input Consistency" do
     test "6.8.3.1 Test arrow keys work in both modes" do
       # Test with skip terminal (test mode)
-      {:ok, runtime} = Runtime.start_link(
-        root: Counter,
-        skip_terminal: true,
-        use_input_handler: false
-      )
+      {:ok, runtime} =
+        Runtime.start_link(
+          root: Counter,
+          skip_terminal: true,
+          use_input_handler: false
+        )
 
       # Test up arrow
       Runtime.send_event(runtime, Event.key(:up))
@@ -360,11 +365,12 @@ defmodule TermUI.Integration.MultiRendererTest do
     end
 
     test "6.8.3.2 Test Enter/Tab/Escape work in both modes" do
-      {:ok, runtime} = Runtime.start_link(
-        root: Counter,
-        skip_terminal: true,
-        use_input_handler: false
-      )
+      {:ok, runtime} =
+        Runtime.start_link(
+          root: Counter,
+          skip_terminal: true,
+          use_input_handler: false
+        )
 
       # Test Enter
       Runtime.send_event(runtime, Event.key(:enter))
@@ -390,19 +396,21 @@ defmodule TermUI.Integration.MultiRendererTest do
 
     test "6.8.3.3 Test widgets respond identically to input" do
       # Create two runtimes with same component
-      {:ok, runtime1} = Runtime.start_link(
-        root: Counter,
-        skip_terminal: true,
-        use_input_handler: false,
-        name: :runtime1
-      )
+      {:ok, runtime1} =
+        Runtime.start_link(
+          root: Counter,
+          skip_terminal: true,
+          use_input_handler: false,
+          name: :runtime1
+        )
 
-      {:ok, runtime2} = Runtime.start_link(
-        root: Counter,
-        skip_terminal: true,
-        use_input_handler: false,
-        name: :runtime2
-      )
+      {:ok, runtime2} =
+        Runtime.start_link(
+          root: Counter,
+          skip_terminal: true,
+          use_input_handler: false,
+          name: :runtime2
+        )
 
       # Send same events to both
       Runtime.send_event(runtime1, Event.key(:up))
@@ -434,11 +442,12 @@ defmodule TermUI.Integration.MultiRendererTest do
       # The Counter component should render identically in both modes
       # since we're using skip_terminal mode
 
-      {:ok, runtime} = Runtime.start_link(
-        root: Counter,
-        skip_terminal: true,
-        use_input_handler: false
-      )
+      {:ok, runtime} =
+        Runtime.start_link(
+          root: Counter,
+          skip_terminal: true,
+          use_input_handler: false
+        )
 
       # Render initial state
       Runtime.force_render(runtime)
@@ -491,11 +500,12 @@ defmodule TermUI.Integration.MultiRendererTest do
       # Initially no backend mode
       assert Runtime.backend_mode() in [:raw, :tty, :skip, nil]
 
-      {:ok, runtime} = Runtime.start_link(
-        root: Counter,
-        skip_terminal: true,
-        use_input_handler: false
-      )
+      {:ok, runtime} =
+        Runtime.start_link(
+          root: Counter,
+          skip_terminal: true,
+          use_input_handler: false
+        )
 
       # After starting, should have a mode
       mode = Runtime.backend_mode()
@@ -508,11 +518,12 @@ defmodule TermUI.Integration.MultiRendererTest do
       # Initially no capabilities
       assert Runtime.capabilities() in [nil, %{}]
 
-      {:ok, runtime} = Runtime.start_link(
-        root: Counter,
-        skip_terminal: true,
-        use_input_handler: false
-      )
+      {:ok, runtime} =
+        Runtime.start_link(
+          root: Counter,
+          skip_terminal: true,
+          use_input_handler: false
+        )
 
       # After starting, capabilities should be available (or nil in skip mode)
       caps = Runtime.capabilities()
@@ -547,11 +558,12 @@ defmodule TermUI.Integration.MultiRendererTest do
 
   describe "Full lifecycle with quit command" do
     test "quit command triggers shutdown" do
-      {:ok, runtime} = Runtime.start_link(
-        root: Counter,
-        skip_terminal: true,
-        use_input_handler: false
-      )
+      {:ok, runtime} =
+        Runtime.start_link(
+          root: Counter,
+          skip_terminal: true,
+          use_input_handler: false
+        )
 
       # Monitor the runtime
       ref = Process.monitor(runtime)
@@ -576,11 +588,12 @@ defmodule TermUI.Integration.MultiRendererTest do
   describe "Multiple sequential runs" do
     test "runtime can be started and stopped multiple times" do
       for _i <- 1..3 do
-        {:ok, runtime} = Runtime.start_link(
-          root: Counter,
-          skip_terminal: true,
-          use_input_handler: false
-        )
+        {:ok, runtime} =
+          Runtime.start_link(
+            root: Counter,
+            skip_terminal: true,
+            use_input_handler: false
+          )
 
         # Verify it works
         Runtime.send_event(runtime, Event.key(:up))

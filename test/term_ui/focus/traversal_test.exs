@@ -1,5 +1,5 @@
 defmodule TermUI.Focus.TraversalTest do
-  use ExUnit.Case
+  use TermUI.TestCase
 
   alias TermUI.Focus.Traversal
   alias TermUI.SpatialIndex

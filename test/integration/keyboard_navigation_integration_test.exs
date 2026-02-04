@@ -27,7 +27,7 @@ defmodule TermUI.Integration.KeyboardNavigationIntegrationTest do
   works identically in both modes.
   """
 
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
 
   alias TermUI.Event
   alias TermUI.Widgets.{Menu, Tabs, TreeView}
