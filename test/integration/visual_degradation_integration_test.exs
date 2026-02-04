@@ -57,17 +57,13 @@ defmodule TermUI.Integration.VisualDegradationIntegrationTest do
         content
 
       %{type: :stack, children: children} ->
-        children
-        |> Enum.map(&extract_text/1)
-        |> Enum.join("")
+        Enum.map_join(children, "", &extract_text/1)
 
       %{type: :empty} ->
         ""
 
       %{children: children} when is_list(children) ->
-        children
-        |> Enum.map(&extract_text/1)
-        |> Enum.join("")
+        Enum.map_join(children, "", &extract_text/1)
 
       _ ->
         ""

@@ -242,13 +242,14 @@ defmodule TermUI.Input.Raw do
   @spec handle_escape_timeout(t(), non_neg_integer()) :: TermUI.Input.poll_result()
   defp handle_escape_timeout(%__MODULE__{} = state, timeout) do
     # First try to complete the escape sequence with a short timeout
-    # Using `with` for cleaner flow control
-    with {:timeout, state_after_short} <- do_read_with_timeout(state, @escape_timeout) do
-      # Escape sequence didn't complete, emit what we have
-      emit_partial_escape(state_after_short, timeout - @escape_timeout)
-    else
+    case do_read_with_timeout(state, @escape_timeout) do
+      {:timeout, state_after_short} ->
+        # Escape sequence didn't complete, emit what we have
+        emit_partial_escape(state_after_short, timeout - @escape_timeout)
+
       # Success or EOF - return as-is
-      result -> result
+      result ->
+        result
     end
   end
 

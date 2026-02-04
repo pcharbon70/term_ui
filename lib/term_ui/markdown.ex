@@ -419,11 +419,10 @@ defmodule TermUI.Markdown do
   defp normalize_token_text(text) when is_list(text) do
     text
     |> List.flatten()
-    |> Enum.map(fn
+    |> Enum.map_join(fn
       char when is_integer(char) -> <<char::utf8>>
       str when is_binary(str) -> str
     end)
-    |> Enum.join()
   end
 
   defp normalize_token_text(text), do: to_string(text)
@@ -508,9 +507,7 @@ defmodule TermUI.Markdown do
 
   # Text Extraction
   defp extract_text(nodes) when is_list(nodes) do
-    nodes
-    |> Enum.map(&extract_text/1)
-    |> Enum.join()
+    Enum.map_join(nodes, &extract_text/1)
   end
 
   defp extract_text(%{literal: text}) when is_binary(text), do: text

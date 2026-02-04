@@ -527,10 +527,10 @@ defmodule TermUI.Widgets.TextInput.Line do
 
   ## Examples
 
-      TextInput.Line.is_focused?(state)  # => true or false
+      TextInput.Line.focused?(state)  # => true or false
   """
-  @spec is_focused?(t()) :: boolean()
-  def is_focused?(%__MODULE__{focused: focused}), do: focused
+  @spec focused?(t()) :: boolean()
+  def focused?(%__MODULE__{focused: focused}), do: focused
 
   @doc """
   Sets the focus state directly.

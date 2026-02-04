@@ -563,9 +563,7 @@ defmodule TermUI.Backend.Raw do
       e in [ArgumentError, ArithmeticError, FunctionClauseError] ->
         # Fall back to absolute positioning if optimizer fails
         Logger.warning(
-          "CursorOptimizer failed (#{Exception.message(e)}), falling back to absolute positioning",
-          from: {from_row, from_col},
-          to: {to_row, to_col}
+          "CursorOptimizer failed (#{Exception.message(e)}), falling back to absolute positioning: from #{inspect({from_row, from_col})} to #{inspect({to_row, to_col})}"
         )
 
         ANSI.cursor_position(to_row, to_col)
