@@ -440,12 +440,10 @@ defmodule TermUI.TestFormatter do
   # Color styles
 
   defp colorize(key, string, %{colors: colors}) do
-    if escape = colors[:enabled] && colors[key] do
-      [escape, string, :reset]
-      |> IO.ANSI.format_fragment(true)
-      |> IO.iodata_to_binary()
-    else
-      string
+    case colors[:enabled] && colors[key] do
+      nil -> string
+      false -> string
+      escape -> [escape, string, :reset] |> IO.ANSI.format_fragment(true) |> IO.iodata_to_binary()
     end
   end
 

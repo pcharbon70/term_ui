@@ -213,19 +213,18 @@ defmodule TermUI.Widgets.PickList do
       end
 
     # Render items
-    cells =
-      cells ++
-        render_items(
-          state.filtered_items,
-          state.selected_index,
-          state.scroll_offset,
-          modal_x + 1,
-          content_start_y,
-          modal_width - 2,
-          content_height,
-          style,
-          highlight_style
-        )
+    render_ctx = %{
+      selected_index: state.selected_index,
+      scroll_offset: state.scroll_offset,
+      x: modal_x + 1,
+      y: content_start_y,
+      width: modal_width - 2,
+      height: content_height,
+      style: style,
+      highlight_style: highlight_style
+    }
+
+    cells = cells ++ render_items(state.filtered_items, render_ctx)
 
     # Render status line
     cells =
@@ -349,56 +348,57 @@ defmodule TermUI.Widgets.PickList do
     end)
   end
 
-  defp render_items(
-         items,
-         selected_index,
-         scroll_offset,
-         x,
-         y,
-         width,
-         height,
-         style,
-         highlight_style
-       ) do
+  defp render_items(items, ctx) do
     if items == [] do
-      # Empty list message
-      msg = "(No items)"
-      msg = String.pad_leading(msg, div(width + String.length(msg), 2))
-      msg = String.pad_trailing(msg, width)
-
-      msg
-      |> String.graphemes()
-      |> Enum.with_index()
-      |> Enum.map(fn {char, i} ->
-        positioned_cell(x + i, y, char, style)
-      end)
+      render_empty_message(ctx)
     else
-      items
-      |> Enum.with_index()
-      |> Enum.drop(scroll_offset)
-      |> Enum.take(height)
-      |> Enum.with_index()
-      |> Enum.flat_map(fn {{item, item_index}, display_y} ->
-        is_selected = item_index == selected_index
-        item_style = if is_selected, do: highlight_style, else: style
-
-        item_text = to_string(item)
-
-        item_text =
-          if String.length(item_text) > width do
-            String.slice(item_text, 0, width - 1) <> "…"
-          else
-            String.pad_trailing(item_text, width)
-          end
-
-        item_text
-        |> String.graphemes()
-        |> Enum.with_index()
-        |> Enum.map(fn {char, i} ->
-          positioned_cell(x + i, y + display_y, char, item_style)
-        end)
-      end)
+      render_item_list(items, ctx)
     end
+  end
+
+  defp render_empty_message(ctx) do
+    msg = "(No items)"
+    msg = String.pad_leading(msg, div(ctx.width + String.length(msg), 2))
+    msg = String.pad_trailing(msg, ctx.width)
+
+    msg
+    |> String.graphemes()
+    |> Enum.with_index()
+    |> Enum.map(fn {char, i} ->
+      positioned_cell(ctx.x + i, ctx.y, char, ctx.style)
+    end)
+  end
+
+  defp render_item_list(items, ctx) do
+    items
+    |> Enum.with_index()
+    |> Enum.drop(ctx.scroll_offset)
+    |> Enum.take(ctx.height)
+    |> Enum.with_index()
+    |> Enum.flat_map(fn {{item, item_index}, display_y} ->
+      render_single_item(item, item_index, display_y, ctx)
+    end)
+  end
+
+  defp render_single_item(item, item_index, display_y, ctx) do
+    is_selected = item_index == ctx.selected_index
+    item_style = if is_selected, do: ctx.highlight_style, else: ctx.style
+
+    item_text = to_string(item)
+
+    item_text =
+      if String.length(item_text) > ctx.width do
+        String.slice(item_text, 0, ctx.width - 1) <> "…"
+      else
+        String.pad_trailing(item_text, ctx.width)
+      end
+
+    item_text
+    |> String.graphemes()
+    |> Enum.with_index()
+    |> Enum.map(fn {char, i} ->
+      positioned_cell(ctx.x + i, ctx.y + display_y, char, item_style)
+    end)
   end
 
   defp render_status_line(state, modal_x, y, modal_width, style) do

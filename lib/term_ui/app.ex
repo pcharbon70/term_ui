@@ -308,36 +308,22 @@ defmodule TermUI.App do
   @spec supports?(supports_query()) :: boolean()
   def supports?(query) do
     capabilities = PersistentTerms.capabilities() || %{}
-
-    case query do
-      :unicode ->
-        Map.get(capabilities, :unicode, true)
-
-      :mouse ->
-        Map.get(capabilities, :mouse, false)
-
-      :colors ->
-        color_mode = Map.get(capabilities, :colors, :true_color)
-        color_mode != :monochrome
-
-      :true_color ->
-        Map.get(capabilities, :colors, :true_color) == :true_color
-
-      :color_256 ->
-        color_mode = Map.get(capabilities, :colors, :true_color)
-        color_mode in [:color_256, :true_color]
-
-      :color_16 ->
-        color_mode = Map.get(capabilities, :colors, :true_color)
-        color_mode in [:color_16, :color_256, :true_color]
-
-      :monochrome ->
-        Map.get(capabilities, :colors, :true_color) == :monochrome
-
-      _ ->
-        false
-    end
+    check_capability(query, capabilities)
   end
+
+  defp check_capability(:unicode, caps), do: Map.get(caps, :unicode, true)
+  defp check_capability(:mouse, caps), do: Map.get(caps, :mouse, false)
+  defp check_capability(:colors, caps), do: Map.get(caps, :colors, :true_color) != :monochrome
+  defp check_capability(:true_color, caps), do: Map.get(caps, :colors, :true_color) == :true_color
+
+  defp check_capability(:color_256, caps),
+    do: Map.get(caps, :colors, :true_color) in [:color_256, :true_color]
+
+  defp check_capability(:color_16, caps),
+    do: Map.get(caps, :colors, :true_color) in [:color_16, :color_256, :true_color]
+
+  defp check_capability(:monochrome, caps), do: Map.get(caps, :colors, :true_color) == :monochrome
+  defp check_capability(_, _caps), do: false
 
   @doc """
   Shuts down a running TermUI application.

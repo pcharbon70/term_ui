@@ -389,24 +389,39 @@ defmodule TermUI.TermUtils do
   def validate_stty_settings(output) when is_binary(output) do
     output = String.trim(output)
 
-    # stty -g output should contain only safe characters
-    # Allowed: alphanumeric, spaces, semicolons, colons, equals, dashes, dots
-    safe_chars? = Regex.match?(~r/^[a-zA-Z0-9\s:;=\-\.]+$/, output)
-
-    # Common GNU/BSD format: tokens separated by colons, no spaces required.
-    # Some platforms produce a semicolon-separated, human-readable format.
-    plausible_format? =
-      Regex.match?(~r/^[0-9A-Za-z]+(?::[0-9A-Za-z]+)+$/, output) or
-        (String.contains?(output, ";") and Regex.match?(~r/\d/, output) and
-           (String.contains?(output, "speed") or String.contains?(output, "baud") or
-              String.contains?(output, "rows") or String.contains?(output, "columns")))
-
-    if safe_chars? and plausible_format? and byte_size(output) > 0 and String.length(output) < 256 do
+    if valid_stty_settings?(output) do
       :ok
     else
       Logger.error("TermUtils: Invalid stty settings format")
       {:error, :invalid_stty_settings}
     end
+  end
+
+  defp valid_stty_settings?(output) do
+    stty_safe_chars?(output) and stty_plausible_format?(output) and
+      byte_size(output) > 0 and String.length(output) < 256
+  end
+
+  # stty -g output should contain only safe characters
+  # Allowed: alphanumeric, spaces, semicolons, colons, equals, dashes, dots
+  defp stty_safe_chars?(output), do: Regex.match?(~r/^[a-zA-Z0-9\s:;=\-\.]+$/, output)
+
+  # Common GNU/BSD format: tokens separated by colons, no spaces required.
+  # Some platforms produce a semicolon-separated, human-readable format.
+  defp stty_plausible_format?(output) do
+    stty_colon_format?(output) or stty_semicolon_format?(output)
+  end
+
+  defp stty_colon_format?(output), do: Regex.match?(~r/^[0-9A-Za-z]+(?::[0-9A-Za-z]+)+$/, output)
+
+  defp stty_semicolon_format?(output) do
+    String.contains?(output, ";") and Regex.match?(~r/\d/, output) and
+      stty_contains_known_keyword?(output)
+  end
+
+  defp stty_contains_known_keyword?(output) do
+    String.contains?(output, "speed") or String.contains?(output, "baud") or
+      String.contains?(output, "rows") or String.contains?(output, "columns")
   end
 
   defp maybe_prefix_stty_tty(args) do

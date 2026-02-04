@@ -266,26 +266,24 @@ defmodule TermUI.Backend.Selector do
     colorterm = System.get_env("COLORTERM") || ""
     term = System.get_env("TERM") || ""
 
+    detect_color_depth_from_colorterm(colorterm) ||
+      detect_color_depth_from_term(term) ||
+      :monochrome
+  end
+
+  defp detect_color_depth_from_colorterm("truecolor"), do: :true_color
+  defp detect_color_depth_from_colorterm("24bit"), do: :true_color
+  defp detect_color_depth_from_colorterm(_), do: nil
+
+  defp detect_color_depth_from_term(""), do: nil
+
+  defp detect_color_depth_from_term(term) do
     cond do
-      # COLORTERM is the most reliable indicator for true color
-      colorterm in ["truecolor", "24bit"] ->
-        :true_color
-
-      # TERM patterns for true color
-      String.contains?(term, "-direct") ->
-        :true_color
-
-      # 256 color support
-      String.contains?(term, "-256color") or String.contains?(term, "256color") ->
-        :color_256
-
-      # Standard terminals with 16 color support
-      term != "" and basic_terminal?(term) ->
-        :color_16
-
-      # Unknown or no terminal
-      true ->
-        :monochrome
+      String.contains?(term, "-direct") -> :true_color
+      String.contains?(term, "-256color") -> :color_256
+      String.contains?(term, "256color") -> :color_256
+      basic_terminal?(term) -> :color_16
+      true -> nil
     end
   end
 

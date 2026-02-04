@@ -161,24 +161,31 @@ defmodule TermUI.Widgets.SplitPane do
   # Returns defaults if values are invalid.
   @spec validate_resize_config(term(), term(), term()) :: {float(), float(), float()}
   defp validate_resize_config(step, min_r, max_r) do
-    # Ensure step is in valid range (0.001 to 1.0)
-    step =
-      if is_number(step) and step > 0 and step <= 1.0, do: step, else: @default_ctrl_resize_step
+    step = normalize_step(step)
+    min_r = normalize_min_ratio(min_r)
+    max_r = normalize_max_ratio(max_r)
 
-    # Ensure ratios are in valid range (0.0 to 1.0)
-    min_r =
-      if is_number(min_r) and min_r >= 0.0 and min_r < 1.0, do: min_r, else: @default_min_ratio
-
-    max_r =
-      if is_number(max_r) and max_r > 0.0 and max_r <= 1.0, do: max_r, else: @default_max_ratio
-
-    # Ensure min < max, otherwise reset to defaults
-    if min_r >= max_r do
-      {@default_ctrl_resize_step, @default_min_ratio, @default_max_ratio}
-    else
-      {step, min_r, max_r}
-    end
+    ensure_valid_ratio_range(step, min_r, max_r)
   end
+
+  defp normalize_step(step) when is_number(step) and step > 0 and step <= 1.0, do: step
+  defp normalize_step(_step), do: @default_ctrl_resize_step
+
+  defp normalize_min_ratio(min_r) when is_number(min_r) and min_r >= 0.0 and min_r < 1.0,
+    do: min_r
+
+  defp normalize_min_ratio(_min_r), do: @default_min_ratio
+
+  defp normalize_max_ratio(max_r) when is_number(max_r) and max_r > 0.0 and max_r <= 1.0,
+    do: max_r
+
+  defp normalize_max_ratio(_max_r), do: @default_max_ratio
+
+  defp ensure_valid_ratio_range(_step, min_r, max_r) when min_r >= max_r do
+    {@default_ctrl_resize_step, @default_min_ratio, @default_max_ratio}
+  end
+
+  defp ensure_valid_ratio_range(step, min_r, max_r), do: {step, min_r, max_r}
 
   # ----------------------------------------------------------------------------
   # StatefulComponent Callbacks
@@ -476,17 +483,19 @@ defmodule TermUI.Widgets.SplitPane do
     panes =
       state.panes
       |> Enum.with_index()
-      |> Enum.map(fn {pane, idx} ->
-        if idx in collapsed_indices do
-          %{pane | computed_size: 0}
-        else
-          visible_idx = Enum.find_index(visible_panes, fn {_, i} -> i == idx end)
-          size = Enum.at(computed_sizes, visible_idx, 0)
-          %{pane | computed_size: size}
-        end
-      end)
+      |> Enum.map(&assign_computed_size(&1, collapsed_indices, visible_panes, computed_sizes))
 
     %{state | panes: panes, total_size: total_size, last_area: area}
+  end
+
+  defp assign_computed_size({pane, idx}, collapsed_indices, visible_panes, computed_sizes) do
+    if idx in collapsed_indices do
+      %{pane | computed_size: 0}
+    else
+      visible_idx = Enum.find_index(visible_panes, fn {_, i} -> i == idx end)
+      size = Enum.at(computed_sizes, visible_idx, 0)
+      %{pane | computed_size: size}
+    end
   end
 
   defp distribute_space([], _available), do: []
@@ -556,20 +565,27 @@ defmodule TermUI.Widgets.SplitPane do
     if flexible_indices == [] do
       sizes
     else
-      flexible_count = length(flexible_indices)
-      per_pane = div(remaining, flexible_count)
-      leftover = rem(remaining, flexible_count)
+      apply_flexible_redistribution(sizes, flexible_indices, remaining)
+    end
+  end
 
-      sizes
-      |> Enum.with_index()
-      |> Enum.map(fn {size, idx} ->
-        if idx in flexible_indices do
-          extra = if idx == hd(flexible_indices), do: per_pane + leftover, else: per_pane
-          max(0, size + extra)
-        else
-          size
-        end
-      end)
+  defp apply_flexible_redistribution(sizes, flexible_indices, remaining) do
+    flexible_count = length(flexible_indices)
+    per_pane = div(remaining, flexible_count)
+    leftover = rem(remaining, flexible_count)
+    first_flexible = hd(flexible_indices)
+
+    sizes
+    |> Enum.with_index()
+    |> Enum.map(&adjust_size_for_index(&1, flexible_indices, first_flexible, per_pane, leftover))
+  end
+
+  defp adjust_size_for_index({size, idx}, flexible_indices, first_flexible, per_pane, leftover) do
+    if idx in flexible_indices do
+      extra = if idx == first_flexible, do: per_pane + leftover, else: per_pane
+      max(0, size + extra)
+    else
+      size
     end
   end
 
@@ -722,54 +738,71 @@ defmodule TermUI.Widgets.SplitPane do
   end
 
   defp move_divider(state, divider_idx, delta) do
-    # Get panes on either side of the divider
     pane_before = Enum.at(state.panes, divider_idx)
     pane_after = Enum.at(state.panes, divider_idx + 1)
 
-    if pane_before && pane_after && not pane_before.collapsed && not pane_after.collapsed do
-      # If computed_size is 0, use proportional sizes based on total_size or a default
-      {size_before, size_after} =
-        if pane_before.computed_size == 0 and pane_after.computed_size == 0 do
-          # Use the size ratios to compute approximate sizes
-          # Default to 100 units if no area has been rendered yet
-          total = if state.total_size > 0, do: state.total_size, else: 100
-          {round(pane_before.size * total), round(pane_after.size * total)}
-        else
-          {pane_before.computed_size, pane_after.computed_size}
-        end
-
-      # Calculate new sizes
-      new_size_before = size_before + delta
-      new_size_after = size_after - delta
-
-      # Apply constraints
-      {final_before, final_after} =
-        apply_resize_constraints(pane_before, pane_after, new_size_before, new_size_after)
-
-      # Only update if we could actually move
-      if final_before != size_before do
-        # Update pane sizes as ratios
-        total = final_before + final_after
-
-        panes =
-          state.panes
-          |> Enum.with_index()
-          |> Enum.map(fn {pane, idx} ->
-            cond do
-              idx == divider_idx -> %{pane | size: final_before / max(total, 1)}
-              idx == divider_idx + 1 -> %{pane | size: final_after / max(total, 1)}
-              true -> pane
-            end
-          end)
-
-        state = %{state | panes: panes}
-        maybe_call_resize_callback(state)
-      else
-        {:ok, state}
-      end
+    if can_move_divider?(pane_before, pane_after) do
+      do_move_divider(state, divider_idx, pane_before, pane_after, delta)
     else
       {:ok, state}
     end
+  end
+
+  defp can_move_divider?(nil, _pane_after), do: false
+  defp can_move_divider?(_pane_before, nil), do: false
+  defp can_move_divider?(%{collapsed: true}, _pane_after), do: false
+  defp can_move_divider?(_pane_before, %{collapsed: true}), do: false
+  defp can_move_divider?(_pane_before, _pane_after), do: true
+
+  defp do_move_divider(state, divider_idx, pane_before, pane_after, delta) do
+    {size_before, size_after} = get_pane_sizes(state, pane_before, pane_after)
+
+    new_size_before = size_before + delta
+    new_size_after = size_after - delta
+
+    {final_before, final_after} =
+      apply_resize_constraints(pane_before, pane_after, new_size_before, new_size_after)
+
+    apply_divider_move(state, divider_idx, size_before, final_before, final_after)
+  end
+
+  defp get_pane_sizes(state, pane_before, pane_after) do
+    if pane_before.computed_size == 0 and pane_after.computed_size == 0 do
+      total = if state.total_size > 0, do: state.total_size, else: 100
+      {round(pane_before.size * total), round(pane_after.size * total)}
+    else
+      {pane_before.computed_size, pane_after.computed_size}
+    end
+  end
+
+  defp apply_divider_move(state, _divider_idx, size_before, final_before, _final_after)
+       when final_before == size_before do
+    {:ok, state}
+  end
+
+  defp apply_divider_move(state, divider_idx, _size_before, final_before, final_after) do
+    total = final_before + final_after
+
+    panes =
+      state.panes
+      |> Enum.with_index()
+      |> Enum.map(&update_pane_size(&1, divider_idx, final_before, final_after, total))
+
+    maybe_call_resize_callback(%{state | panes: panes})
+  end
+
+  defp update_pane_size({pane, idx}, divider_idx, final_before, _final_after, total)
+       when idx == divider_idx do
+    %{pane | size: final_before / max(total, 1)}
+  end
+
+  defp update_pane_size({pane, idx}, divider_idx, _final_before, final_after, total)
+       when idx == divider_idx + 1 do
+    %{pane | size: final_after / max(total, 1)}
+  end
+
+  defp update_pane_size({pane, _idx}, _divider_idx, _final_before, _final_after, _total) do
+    pane
   end
 
   defp apply_resize_constraints(pane_before, pane_after, size_before, size_after) do

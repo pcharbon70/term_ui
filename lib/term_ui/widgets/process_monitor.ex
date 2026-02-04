@@ -264,23 +264,14 @@ defmodule TermUI.Widgets.ProcessMonitor do
   end
 
   # p - pause/suspend process
+  def handle_event(%Event.Key{char: "p"}, %{processes: []} = state)
+      when state.filter_input == nil and state.pending_action == nil do
+    {:ok, state}
+  end
+
   def handle_event(%Event.Key{char: "p"}, state)
       when state.filter_input == nil and state.pending_action == nil do
-    if state.processes != [] do
-      process = Enum.at(state.processes, state.selected_idx)
-
-      if process do
-        if process.status == :suspended do
-          resume_process(state, process.pid)
-        else
-          {:ok, %{state | pending_action: :suspend}}
-        end
-      else
-        {:ok, state}
-      end
-    else
-      {:ok, state}
-    end
+    handle_pause_suspend(state, Enum.at(state.processes, state.selected_idx))
   end
 
   # l - show links
@@ -363,6 +354,13 @@ defmodule TermUI.Widgets.ProcessMonitor do
   def handle_event(_event, state) do
     {:ok, state}
   end
+
+  defp handle_pause_suspend(state, nil), do: {:ok, state}
+
+  defp handle_pause_suspend(state, %{status: :suspended, pid: pid}),
+    do: resume_process(state, pid)
+
+  defp handle_pause_suspend(state, _process), do: {:ok, %{state | pending_action: :suspend}}
 
   # ----------------------------------------------------------------------------
   # Message Handling
@@ -511,36 +509,36 @@ defmodule TermUI.Widgets.ProcessMonitor do
   # Navigation
   # ----------------------------------------------------------------------------
 
+  defp move_selection(%{processes: []} = state, _delta), do: {:ok, state}
+
   defp move_selection(state, delta) do
     count = length(state.processes)
+    new_idx = state.selected_idx + delta
+    new_idx = max(0, min(new_idx, count - 1))
 
-    if count == 0 do
-      {:ok, state}
-    else
-      new_idx = state.selected_idx + delta
-      new_idx = max(0, min(new_idx, count - 1))
+    new_scroll = calculate_scroll(new_idx, state.scroll_offset, state.viewport_height)
+    new_state = %{state | selected_idx: new_idx, scroll_offset: max(0, new_scroll)}
 
-      new_scroll =
-        cond do
-          new_idx < state.scroll_offset ->
-            new_idx
+    maybe_call_on_select(state, new_idx)
 
-          new_idx >= state.scroll_offset + state.viewport_height ->
-            new_idx - state.viewport_height + 1
+    {:ok, new_state}
+  end
 
-          true ->
-            state.scroll_offset
-        end
+  defp calculate_scroll(new_idx, scroll_offset, viewport_height) do
+    cond do
+      new_idx < scroll_offset -> new_idx
+      new_idx >= scroll_offset + viewport_height -> new_idx - viewport_height + 1
+      true -> scroll_offset
+    end
+  end
 
-      new_state = %{state | selected_idx: new_idx, scroll_offset: max(0, new_scroll)}
+  defp maybe_call_on_select(%{on_select: nil}, _new_idx), do: :ok
+  defp maybe_call_on_select(state, new_idx) when new_idx == state.selected_idx, do: :ok
 
-      # Call on_select callback
-      if state.on_select && new_idx != state.selected_idx do
-        process = Enum.at(state.processes, new_idx)
-        if process, do: state.on_select.(process)
-      end
-
-      {:ok, new_state}
+  defp maybe_call_on_select(state, new_idx) do
+    case Enum.at(state.processes, new_idx) do
+      nil -> :ok
+      process -> state.on_select.(process)
     end
   end
 

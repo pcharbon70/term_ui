@@ -780,23 +780,30 @@ defmodule TermUI.Widgets.LogViewer do
   end
 
   defp matches_filter?(line, idx, filter, bookmarks) do
-    level_match =
-      filter.levels == nil or line.level in filter.levels
-
-    source_match =
-      filter.source == nil or
-        (line.source != nil and String.contains?(line.source, filter.source))
-
-    pattern_match =
-      filter.pattern == nil or
-        (is_struct(filter.pattern, Regex) and Regex.match?(filter.pattern, line.raw)) or
-        (is_binary(filter.pattern) and String.contains?(line.raw, filter.pattern))
-
-    bookmark_match =
-      not filter.bookmarks_only or MapSet.member?(bookmarks, idx)
+    level_match = filter.levels == nil or line.level in filter.levels
+    source_match = matches_source?(line, filter)
+    pattern_match = matches_pattern?(line, filter)
+    bookmark_match = not filter.bookmarks_only or MapSet.member?(bookmarks, idx)
 
     level_match and source_match and pattern_match and bookmark_match
   end
+
+  defp matches_source?(line, filter) do
+    filter.source == nil or
+      (line.source != nil and String.contains?(line.source, filter.source))
+  end
+
+  defp matches_pattern?(_line, %{pattern: nil}), do: true
+
+  defp matches_pattern?(line, %{pattern: pattern}) when is_struct(pattern, Regex) do
+    Regex.match?(pattern, line.raw)
+  end
+
+  defp matches_pattern?(line, %{pattern: pattern}) when is_binary(pattern) do
+    String.contains?(line.raw, pattern)
+  end
+
+  defp matches_pattern?(_line, _filter), do: false
 
   # ----------------------------------------------------------------------------
   # Private: Bookmarks
@@ -925,19 +932,15 @@ defmodule TermUI.Widgets.LogViewer do
     stack(:horizontal, parts)
   end
 
-  defp level_color(level) do
-    case level do
-      :debug -> Theme.get_semantic(:info)
-      :info -> Theme.get_semantic(:success)
-      :notice -> Theme.get_color(:primary)
-      :warning -> Theme.get_semantic(:warning)
-      :error -> Theme.get_semantic(:error)
-      :critical -> Theme.get_color(:accent)
-      :alert -> Theme.get_semantic(:error)
-      :emergency -> Theme.get_semantic(:error)
-      _ -> Theme.get_color(:foreground)
-    end
-  end
+  defp level_color(:debug), do: Theme.get_semantic(:info)
+  defp level_color(:info), do: Theme.get_semantic(:success)
+  defp level_color(:notice), do: Theme.get_color(:primary)
+  defp level_color(:warning), do: Theme.get_semantic(:warning)
+  defp level_color(:error), do: Theme.get_semantic(:error)
+  defp level_color(:critical), do: Theme.get_color(:accent)
+  defp level_color(:alert), do: Theme.get_semantic(:error)
+  defp level_color(:emergency), do: Theme.get_semantic(:error)
+  defp level_color(_), do: Theme.get_color(:foreground)
 
   defp level_abbrev(:debug), do: "DEBUG"
   defp level_abbrev(:info), do: "INFO"

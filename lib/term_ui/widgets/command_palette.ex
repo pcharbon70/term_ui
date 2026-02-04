@@ -176,31 +176,26 @@ defmodule TermUI.Widgets.CommandPalette do
     if visible_commands == [] do
       text("  (no matches)                    ", Style.new(fg: :bright_black))
     else
-      # Calculate max label width for consistent padding
-      # Add extra padding to ensure we overwrite any previous content
-      max_label_width =
-        state.filtered
-        |> Enum.map(fn cmd -> String.length(cmd.label) end)
-        |> Enum.max(fn -> 0 end)
-
-      # Pad to at least 30 chars to clear any previous content on the line
-      min_width = max(max_label_width, 30)
-
-      rows =
-        Enum.map(visible_commands, fn {cmd, idx} ->
-          is_selected = idx == state.selected
-          # Pad label to consistent width
-          padded_label = String.pad_trailing(cmd.label, min_width)
-
-          if is_selected do
-            text("  " <> padded_label, Theme.get_component_style(:item, :selected))
-          else
-            text("  " <> padded_label, nil)
-          end
-        end)
-
+      min_width = calculate_min_width(state.filtered)
+      rows = Enum.map(visible_commands, &render_command_row(&1, state.selected, min_width))
       stack(:vertical, rows)
     end
+  end
+
+  defp calculate_min_width(filtered) do
+    max_label_width =
+      filtered
+      |> Enum.map(fn cmd -> String.length(cmd.label) end)
+      |> Enum.max(fn -> 0 end)
+
+    # Pad to at least 30 chars to clear any previous content on the line
+    max(max_label_width, 30)
+  end
+
+  defp render_command_row({cmd, idx}, selected_idx, min_width) do
+    padded_label = String.pad_trailing(cmd.label, min_width)
+    style = if idx == selected_idx, do: Theme.get_component_style(:item, :selected), else: nil
+    text("  " <> padded_label, style)
   end
 
   # Public API

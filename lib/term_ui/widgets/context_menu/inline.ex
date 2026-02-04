@@ -258,24 +258,18 @@ defmodule TermUI.Widgets.ContextMenu.Inline do
 
   @spec select_by_number(map(), pos_integer()) :: map()
   defp select_by_number(state, number) do
-    case Map.get(state.number_map, number) do
-      nil ->
-        # Number not mapped to any item
-        state
+    with item_id when not is_nil(item_id) <- Map.get(state.number_map, number),
+         %{type: :action} = item <- Map.get(state.item_map, item_id) do
+      maybe_invoke_on_select(state, item)
+      Behavior.close_menu(state)
+    else
+      _ -> state
+    end
+  end
 
-      item_id ->
-        # Use O(1) map lookup instead of O(n) Enum.find
-        case Map.get(state.item_map, item_id) do
-          %{type: :action} = item ->
-            if state.on_select && not Map.get(item, :disabled, false) do
-              safe_callback(state.on_select, [item.id], "on_select")
-            end
-
-            Behavior.close_menu(state)
-
-          _ ->
-            state
-        end
+  defp maybe_invoke_on_select(state, item) do
+    if state.on_select && not Map.get(item, :disabled, false) do
+      safe_callback(state.on_select, [item.id], "on_select")
     end
   end
 

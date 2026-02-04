@@ -327,50 +327,41 @@ defmodule TermUI.Terminal.EscapeParser do
   end
 
   defp decode_mouse_event(cb, cx, cy, terminator) do
-    # Extract button from lower bits (0-2)
-    button_code = cb &&& 0b11
+    {action, button} = decode_mouse_action(cb, terminator)
+    modifiers = decode_mouse_modifiers(cb)
 
-    # Check for scroll (bit 6) and motion (bit 5)
+    # Convert 1-indexed terminal coords to 0-indexed
+    Event.mouse(action, button, cx - 1, cy - 1, modifiers: modifiers)
+  end
+
+  defp decode_mouse_action(cb, terminator) do
+    button_code = cb &&& 0b11
     is_scroll = (cb &&& 64) != 0
     is_motion = (cb &&& 32) != 0
 
-    # Determine action and button
-    {action, button} =
-      cond do
-        is_scroll and button_code == 0 ->
-          {:scroll_up, nil}
-
-        is_scroll and button_code == 1 ->
-          {:scroll_down, nil}
-
-        is_motion and terminator == :press ->
-          # Motion with button held = drag
-          button = decode_button(button_code)
-          {:drag, button}
-
-        terminator == :release ->
-          # On release, button_code is usually 3 (meaning "released")
-          # We use :left as default since we don't track which was pressed
-          {:release, :left}
-
-        true ->
-          # Normal press
-          button = decode_button(button_code)
-          {:press, button}
-      end
-
-    # Extract modifiers from bits 2-4
-    modifiers = []
-    modifiers = if (cb &&& 4) != 0, do: [:shift | modifiers], else: modifiers
-    modifiers = if (cb &&& 8) != 0, do: [:alt | modifiers], else: modifiers
-    modifiers = if (cb &&& 16) != 0, do: [:ctrl | modifiers], else: modifiers
-
-    # Convert 1-indexed terminal coords to 0-indexed
-    x = cx - 1
-    y = cy - 1
-
-    Event.mouse(action, button, x, y, modifiers: modifiers)
+    decode_mouse_action(button_code, is_scroll, is_motion, terminator)
   end
+
+  defp decode_mouse_action(0, true, _is_motion, _terminator), do: {:scroll_up, nil}
+  defp decode_mouse_action(1, true, _is_motion, _terminator), do: {:scroll_down, nil}
+
+  defp decode_mouse_action(button_code, _is_scroll, true, :press),
+    do: {:drag, decode_button(button_code)}
+
+  defp decode_mouse_action(_button_code, _is_scroll, _is_motion, :release), do: {:release, :left}
+
+  defp decode_mouse_action(button_code, _is_scroll, _is_motion, _terminator),
+    do: {:press, decode_button(button_code)}
+
+  defp decode_mouse_modifiers(cb) do
+    []
+    |> maybe_add_modifier(cb &&& 4, :shift)
+    |> maybe_add_modifier(cb &&& 8, :alt)
+    |> maybe_add_modifier(cb &&& 16, :ctrl)
+  end
+
+  defp maybe_add_modifier(modifiers, 0, _mod), do: modifiers
+  defp maybe_add_modifier(modifiers, _nonzero, mod), do: [mod | modifiers]
 
   defp decode_button(0), do: :left
   defp decode_button(1), do: :middle

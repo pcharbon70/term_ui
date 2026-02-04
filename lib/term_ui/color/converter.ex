@@ -120,23 +120,11 @@ defmodule TermUI.Color.Converter do
       46
   """
   @spec rgb_to_256({0..255, 0..255, 0..255}) :: 0..255
-  def rgb_to_256({r, g, b})
-      when is_integer(r) and r >= 0 and r <= 255 and
-             is_integer(g) and g >= 0 and g <= 255 and
-             is_integer(b) and b >= 0 and b <= 255 do
-    # Check if it's close to grayscale
-    if abs(r - g) < @grayscale_threshold and
-         abs(g - b) < @grayscale_threshold and
-         abs(r - b) < @grayscale_threshold do
-      # Use grayscale ramp (232-255)
-      gray = div(r + g + b, 3)
-      232 + div(gray * 23, 255)
+  def rgb_to_256({r, g, b}) when r in 0..255 and g in 0..255 and b in 0..255 do
+    if near_grayscale?(r, g, b) do
+      rgb_to_grayscale_index(r, g, b)
     else
-      # Use 6x6x6 color cube (16-231)
-      r_idx = div(r * 5, 255)
-      g_idx = div(g * 5, 255)
-      b_idx = div(b * 5, 255)
-      16 + 36 * r_idx + 6 * g_idx + b_idx
+      rgb_to_color_cube_index(r, g, b)
     end
   end
 
@@ -169,21 +157,9 @@ defmodule TermUI.Color.Converter do
       90  # dark gray (bright black)
   """
   @spec rgb_to_16({0..255, 0..255, 0..255}, :fg | :bg) :: 30..37 | 40..47 | 90..97 | 100..107
-  def rgb_to_16({r, g, b}, type)
-      when is_integer(r) and r >= 0 and r <= 255 and
-             is_integer(g) and g >= 0 and g <= 255 and
-             is_integer(b) and b >= 0 and b <= 255 and
-             type in [:fg, :bg] do
+  def rgb_to_16({r, g, b}, type) when r in 0..255 and g in 0..255 and b in 0..255 do
     {base_code, bright} = find_closest_16_color(r, g, b)
-
-    case type do
-      :fg ->
-        if bright, do: base_code + 60, else: base_code
-
-      :bg ->
-        bg_base = base_code + 10
-        if bright, do: bg_base + 60, else: bg_base
-    end
+    apply_color_type(base_code, bright, type)
   end
 
   @doc """
@@ -212,13 +188,8 @@ defmodule TermUI.Color.Converter do
       false
   """
   @spec grayscale?({0..255, 0..255, 0..255}) :: boolean()
-  def grayscale?({r, g, b})
-      when is_integer(r) and r >= 0 and r <= 255 and
-             is_integer(g) and g >= 0 and g <= 255 and
-             is_integer(b) and b >= 0 and b <= 255 do
-    abs(r - g) < @grayscale_threshold and
-      abs(g - b) < @grayscale_threshold and
-      abs(r - b) < @grayscale_threshold
+  def grayscale?({r, g, b}) when r in 0..255 and g in 0..255 and b in 0..255 do
+    near_grayscale?(r, g, b)
   end
 
   @doc """
@@ -265,5 +236,36 @@ defmodule TermUI.Color.Converter do
     base = if bright, do: best_code - 60, else: best_code
 
     {base, bright}
+  end
+
+  # Checks if RGB values are close to grayscale (within threshold).
+  defp near_grayscale?(r, g, b) do
+    abs(r - g) < @grayscale_threshold and
+      abs(g - b) < @grayscale_threshold and
+      abs(r - b) < @grayscale_threshold
+  end
+
+  # Converts RGB to grayscale ramp index (232-255).
+  defp rgb_to_grayscale_index(r, g, b) do
+    gray = div(r + g + b, 3)
+    232 + div(gray * 23, 255)
+  end
+
+  # Converts RGB to 6x6x6 color cube index (16-231).
+  defp rgb_to_color_cube_index(r, g, b) do
+    r_idx = div(r * 5, 255)
+    g_idx = div(g * 5, 255)
+    b_idx = div(b * 5, 255)
+    16 + 36 * r_idx + 6 * g_idx + b_idx
+  end
+
+  # Applies foreground/background offset to base color code.
+  defp apply_color_type(base_code, bright, :fg) do
+    if bright, do: base_code + 60, else: base_code
+  end
+
+  defp apply_color_type(base_code, bright, :bg) do
+    bg_base = base_code + 10
+    if bright, do: bg_base + 60, else: bg_base
   end
 end

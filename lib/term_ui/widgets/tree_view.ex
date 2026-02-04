@@ -448,21 +448,21 @@ defmodule TermUI.Widgets.TreeView do
 
   defp handle_select_or_toggle(state) do
     case get_current_node(state) do
-      nil ->
-        state
+      nil -> state
+      {node, _depth, _path} -> toggle_or_select_node(state, node)
+    end
+  end
 
-      {node, _depth, _path} ->
-        if has_children?(node) do
-          # Toggle expand/collapse
-          if MapSet.member?(state.expanded, node.id) do
-            collapse_node(state, node)
-          else
-            expand_node(state, node)
-          end
-        else
-          # Select leaf node
-          select_node(state, node)
-        end
+  defp toggle_or_select_node(state, node) do
+    cond do
+      !has_children?(node) ->
+        select_node(state, node)
+
+      MapSet.member?(state.expanded, node.id) ->
+        collapse_node(state, node)
+
+      true ->
+        expand_node(state, node)
     end
   end
 
@@ -625,30 +625,67 @@ defmodule TermUI.Widgets.TreeView do
 
   defp find_filter_matches(nodes, filter, path, matches, ancestors) do
     Enum.reduce(nodes, {matches, ancestors}, fn node, {matches_acc, ancestors_acc} ->
-      label_lower = String.downcase(node.label)
-      is_match = String.contains?(label_lower, filter)
-
-      # Recurse into children
-      {child_matches, child_ancestors} =
-        case node.children do
-          children when is_list(children) ->
-            find_filter_matches(children, filter, path ++ [node.id], matches_acc, ancestors_acc)
-
-          _ ->
-            {matches_acc, ancestors_acc}
-        end
-
-      # If this node or any descendant matches, add this node's ancestors
-      has_descendant_match = MapSet.size(child_matches) > MapSet.size(matches_acc)
-
-      if is_match || has_descendant_match do
-        new_matches = if is_match, do: MapSet.put(child_matches, node.id), else: child_matches
-        new_ancestors = Enum.reduce(path, child_ancestors, &MapSet.put(&2, &1))
-        {new_matches, new_ancestors}
-      else
-        {child_matches, child_ancestors}
-      end
+      process_filter_node(node, filter, path, matches_acc, ancestors_acc)
     end)
+  end
+
+  defp process_filter_node(node, filter, path, matches_acc, ancestors_acc) do
+    label_lower = String.downcase(node.label)
+    is_match = String.contains?(label_lower, filter)
+
+    {child_matches, child_ancestors} =
+      recurse_filter_children(
+        node.children,
+        filter,
+        path ++ [node.id],
+        matches_acc,
+        ancestors_acc
+      )
+
+    has_descendant_match = MapSet.size(child_matches) > MapSet.size(matches_acc)
+
+    accumulate_filter_results(
+      is_match,
+      has_descendant_match,
+      path,
+      node.id,
+      child_matches,
+      child_ancestors
+    )
+  end
+
+  defp recurse_filter_children(children, filter, child_path, matches_acc, ancestors_acc)
+       when is_list(children) do
+    find_filter_matches(children, filter, child_path, matches_acc, ancestors_acc)
+  end
+
+  defp recurse_filter_children(_children, _filter, _child_path, matches_acc, ancestors_acc) do
+    {matches_acc, ancestors_acc}
+  end
+
+  defp accumulate_filter_results(
+         is_match,
+         has_descendant_match,
+         path,
+         node_id,
+         child_matches,
+         child_ancestors
+       )
+       when is_match or has_descendant_match do
+    new_matches = if is_match, do: MapSet.put(child_matches, node_id), else: child_matches
+    new_ancestors = Enum.reduce(path, child_ancestors, &MapSet.put(&2, &1))
+    {new_matches, new_ancestors}
+  end
+
+  defp accumulate_filter_results(
+         _is_match,
+         _has_descendant_match,
+         _path,
+         _node_id,
+         child_matches,
+         child_ancestors
+       ) do
+    {child_matches, child_ancestors}
   end
 
   # ----------------------------------------------------------------------------
@@ -693,79 +730,77 @@ defmodule TermUI.Widgets.TreeView do
   # ----------------------------------------------------------------------------
 
   defp render_node(node, depth, index, state) do
-    is_cursor = index == state.cursor
-    is_selected = MapSet.member?(state.selected, node.id)
-    is_loading = MapSet.member?(state.loading, node.id)
-    is_match = state.filter != nil && MapSet.member?(state.filter_matches, node.id)
-
-    # Build indentation
-    indent = String.duplicate(" ", depth * state.indent_size)
-
-    # Build expand/collapse indicator
-    indicator =
-      cond do
-        is_loading ->
-          state.icons.loading
-
-        has_children?(node) && MapSet.member?(state.expanded, node.id) ->
-          state.icons.expanded
-
-        has_children?(node) ->
-          state.icons.collapsed
-
-        true ->
-          state.icons.leaf
-      end
-
-    # Build icon
-    icon =
-      if node.icon do
-        "#{node.icon} "
-      else
-        ""
-      end
-
-    # Build selection indicator
-    chars = CharacterSet.current_charset()
-
-    selection_prefix =
-      cond do
-        is_cursor && is_selected -> chars.bullet
-        is_cursor -> chars.pointer
-        is_selected -> chars.bullet_empty
-        true -> " "
-      end
-
-    # Build the line
-    label = node.label
-    line = "#{selection_prefix}#{indent}#{indicator} #{icon}#{label}"
-
-    # Apply styling
-    cond do
-      node.disabled ->
-        styled(text(line), Style.new() |> Style.fg(Theme.get_semantic(:muted)))
-
-      is_cursor && is_match ->
-        cursor_match_style =
-          Style.new()
-          |> Style.fg(Theme.get_color(:background))
-          |> Style.bg(Theme.get_semantic(:warning))
-
-        styled(text(line), cursor_match_style)
-
-      is_cursor ->
-        styled(text(line), Theme.get_component_style(:item, :focused))
-
-      is_match ->
-        styled(text(line), Style.new() |> Style.fg(Theme.get_semantic(:warning)))
-
-      is_selected ->
-        styled(text(line), Style.new() |> Style.fg(Theme.get_color(:primary)))
-
-      true ->
-        text(line)
-    end
+    node_state = build_node_state(node, index, state)
+    line = build_node_line(node, depth, node_state, state)
+    apply_node_style(line, node, node_state)
   end
+
+  defp build_node_state(node, index, state) do
+    %{
+      is_cursor: index == state.cursor,
+      is_selected: MapSet.member?(state.selected, node.id),
+      is_loading: MapSet.member?(state.loading, node.id),
+      is_match: state.filter != nil && MapSet.member?(state.filter_matches, node.id),
+      is_expanded: MapSet.member?(state.expanded, node.id)
+    }
+  end
+
+  defp build_node_line(node, depth, node_state, state) do
+    indent = String.duplicate(" ", depth * state.indent_size)
+    indicator = build_node_indicator(node, node_state, state.icons)
+    icon = if node.icon, do: "#{node.icon} ", else: ""
+    selection_prefix = build_selection_prefix(node_state)
+
+    "#{selection_prefix}#{indent}#{indicator} #{icon}#{node.label}"
+  end
+
+  defp build_node_indicator(_node, %{is_loading: true}, icons), do: icons.loading
+
+  defp build_node_indicator(node, %{is_expanded: true}, icons) do
+    if has_children?(node), do: icons.expanded, else: icons.leaf
+  end
+
+  defp build_node_indicator(node, _node_state, icons) do
+    if has_children?(node), do: icons.collapsed, else: icons.leaf
+  end
+
+  defp build_selection_prefix(%{is_cursor: true, is_selected: true}) do
+    CharacterSet.current_charset().bullet
+  end
+
+  defp build_selection_prefix(%{is_cursor: true}), do: CharacterSet.current_charset().pointer
+
+  defp build_selection_prefix(%{is_selected: true}),
+    do: CharacterSet.current_charset().bullet_empty
+
+  defp build_selection_prefix(_node_state), do: " "
+
+  defp apply_node_style(line, %{disabled: true}, _node_state) do
+    styled(text(line), Style.new() |> Style.fg(Theme.get_semantic(:muted)))
+  end
+
+  defp apply_node_style(line, _node, %{is_cursor: true, is_match: true}) do
+    style =
+      Style.new()
+      |> Style.fg(Theme.get_color(:background))
+      |> Style.bg(Theme.get_semantic(:warning))
+
+    styled(text(line), style)
+  end
+
+  defp apply_node_style(line, _node, %{is_cursor: true}) do
+    styled(text(line), Theme.get_component_style(:item, :focused))
+  end
+
+  defp apply_node_style(line, _node, %{is_match: true}) do
+    styled(text(line), Style.new() |> Style.fg(Theme.get_semantic(:warning)))
+  end
+
+  defp apply_node_style(line, _node, %{is_selected: true}) do
+    styled(text(line), Style.new() |> Style.fg(Theme.get_color(:primary)))
+  end
+
+  defp apply_node_style(line, _node, _node_state), do: text(line)
 
   defp render_filter_bar(state) do
     filter_text = "Filter: #{state.filter}_"

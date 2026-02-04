@@ -184,49 +184,60 @@ defmodule TermUI.Widgets.Block do
         positioned_cell(area.width - 1, 0, chars.tr, style)
       ]
     else
-      title_text = String.slice(title, 0, inner_width)
-      title_len = String.length(title_text)
-      remaining = inner_width - title_len
+      render_top_with_title(chars, title, title_align, area, style, inner_width)
+    end
+  end
 
-      {left_pad, right_pad} =
-        case title_align do
-          :left -> {0, remaining}
-          :right -> {remaining, 0}
-          :center -> {div(remaining, 2), remaining - div(remaining, 2)}
-        end
+  defp render_top_with_title(chars, title, title_align, area, style, inner_width) do
+    title_text = String.slice(title, 0, inner_width)
+    title_len = String.length(title_text)
+    remaining = inner_width - title_len
 
-      top_cells = [positioned_cell(0, 0, chars.tl, style)]
+    {left_pad, right_pad} =
+      case title_align do
+        :left -> {0, remaining}
+        :right -> {remaining, 0}
+        :center -> {div(remaining, 2), remaining - div(remaining, 2)}
+      end
 
-      # Left padding
-      top_cells =
-        if left_pad > 0 do
-          top_cells ++ for(x <- 1..left_pad, do: positioned_cell(x, 0, chars.h, style))
-        else
-          top_cells
-        end
+    top_cells = [positioned_cell(0, 0, chars.tl, style)]
 
-      # Title
-      top_cells =
-        top_cells ++
-          (title_text
-           |> String.graphemes()
-           |> Enum.with_index()
-           |> Enum.map(fn {char, i} ->
-             positioned_cell(1 + left_pad + i, 0, char, style)
-           end))
+    # Left padding
+    left_cells = render_left_padding(left_pad, chars, style)
 
-      # Right padding
-      top_cells =
-        if right_pad > 0 do
-          top_cells ++
-            for i <- 0..(right_pad - 1) do
-              positioned_cell(1 + left_pad + title_len + i, 0, chars.h, style)
-            end
-        else
-          top_cells
-        end
+    # Title
+    title_cells = render_title_cells(title_text, left_pad, style)
 
-      top_cells ++ [positioned_cell(area.width - 1, 0, chars.tr, style)]
+    # Right padding
+    right_cells = render_right_padding(right_pad, left_pad, title_len, chars, style)
+
+    top_cells ++
+      left_cells ++
+      title_cells ++
+      right_cells ++
+      [positioned_cell(area.width - 1, 0, chars.tr, style)]
+  end
+
+  defp render_left_padding(0, _chars, _style), do: []
+
+  defp render_left_padding(left_pad, chars, style) do
+    for x <- 1..left_pad, do: positioned_cell(x, 0, chars.h, style)
+  end
+
+  defp render_title_cells(title_text, left_pad, style) do
+    title_text
+    |> String.graphemes()
+    |> Enum.with_index()
+    |> Enum.map(fn {char, i} ->
+      positioned_cell(1 + left_pad + i, 0, char, style)
+    end)
+  end
+
+  defp render_right_padding(0, _left_pad, _title_len, _chars, _style), do: []
+
+  defp render_right_padding(right_pad, left_pad, title_len, chars, style) do
+    for i <- 0..(right_pad - 1) do
+      positioned_cell(1 + left_pad + title_len + i, 0, chars.h, style)
     end
   end
 

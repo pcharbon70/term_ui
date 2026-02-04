@@ -272,193 +272,208 @@ defmodule TermUI.Runtime do
 
   @impl true
   def init(opts) do
-    # Trap exits to ensure terminate/2 is called even on crashes
     Process.flag(:trap_exit, true)
 
-    # Merge runtime options with application configuration
-    # Runtime options take precedence over config
     opts = Config.merge_options(opts)
+    init_config = parse_init_options(opts)
+    backend_result = init_backend(init_config)
 
-    root_module = Keyword.fetch!(opts, :root)
-    render_interval = Keyword.get(opts, :render_interval, @default_render_interval)
-    skip_terminal = Keyword.get(opts, :skip_terminal, false)
-    backend_opt = Keyword.get(opts, :backend, :auto)
-    use_input_handler = Keyword.get(opts, :use_input_handler, true)
+    PersistentTerms.store_backend_context(
+      backend_result.backend_mode,
+      backend_result.capabilities
+    )
 
-    # Select backend using Backend.Selector
-    {backend_mode, backend, backend_state, capabilities, terminal_started, buffer_manager,
-     dimensions} =
-      if skip_terminal do
-        {:skip, nil, nil, nil, false, nil, nil}
-      else
-        select_backend(backend_opt)
-      end
+    root_state = init_config.root_module.init(opts)
+    {input_handler, input_state} = init_input_handler(init_config, backend_result.backend_mode)
+    input_reader = init_legacy_input_reader(init_config, backend_result.terminal_started)
 
-    # Store backend info in persistent_term for global access
-    PersistentTerms.store_backend_context(backend_mode, capabilities)
+    maybe_register_resize_callback(init_config, backend_result.backend_mode)
 
-    # Initialize root component state
-    root_state = root_module.init(opts)
-
-    # Select and initialize input handler (if enabled)
-    {input_handler, input_state} =
-      if use_input_handler and backend_mode in [:raw, :tty] do
-        handler = InputSelector.select(backend_mode)
-        {handler, handler.new()}
-      else
-        {nil, nil}
-      end
-
-    # Start input reader and register for resize callbacks if using legacy InputReader
-    input_reader =
-      if not use_input_handler and terminal_started do
-        {:ok, reader_pid} = InputReader.start_link(target: self())
-        Terminal.register_resize_callback(self())
-        reader_pid
-      else
-        nil
-      end
-
-    # Register for resize callbacks if using new input handler
-    # TTY backend also needs resize events even though terminal_started=false
-    if use_input_handler and backend_mode in [:raw, :tty] do
-      # Only register if Terminal GenServer is running
-      if Process.whereis(Terminal) do
-        Terminal.register_resize_callback(self())
-      end
-    end
-
-    # Start command executor for async effects
     {:ok, command_executor} = CommandExecutor.start_link()
 
-    state = %State{
-      root_module: root_module,
-      root_state: root_state,
-      message_queue: MessageQueue.new(),
-      event_queue: EventQueue.new(),
-      render_interval: render_interval,
-      # Initial render needed
-      dirty: true,
-      focused_component: :root,
-      components: %{root: %{module: root_module, state: root_state}},
-      command_executor: command_executor,
-      pending_commands: %{},
-      shutting_down: false,
-      terminal_started: terminal_started,
-      buffer_manager: buffer_manager,
-      dimensions: dimensions,
-      input_reader: input_reader,
-      backend_mode: backend_mode,
-      backend: backend,
-      backend_state: backend_state,
-      capabilities: capabilities,
-      input_handler: input_handler,
-      input_state: input_state
-    }
+    state =
+      build_init_state(
+        init_config,
+        backend_result,
+        root_state,
+        input_handler,
+        input_state,
+        input_reader,
+        command_executor
+      )
 
-    # Log backend selection and execution mode
-    if backend_mode != :skip do
-      require Logger
-      mode_str = if TermUI.iex_mode?(), do: "IEx", else: "standalone"
-      Logger.info("TermUI.Runtime started with #{backend_mode} backend (#{mode_str} mode)")
-    end
-
-    # Schedule first render
-    schedule_render(render_interval)
-
-    # Schedule first input poll (if using new input handler)
-    if input_handler do
-      schedule_input_poll()
-    end
+    log_backend_selection(backend_result.backend_mode)
+    schedule_render(init_config.render_interval)
+    maybe_schedule_input_poll(input_handler)
 
     {:ok, state}
   end
 
+  defp parse_init_options(opts) do
+    %{
+      root_module: Keyword.fetch!(opts, :root),
+      render_interval: Keyword.get(opts, :render_interval, @default_render_interval),
+      skip_terminal: Keyword.get(opts, :skip_terminal, false),
+      backend_opt: Keyword.get(opts, :backend, :auto),
+      use_input_handler: Keyword.get(opts, :use_input_handler, true)
+    }
+  end
+
+  defp init_backend(%{skip_terminal: true}) do
+    %{
+      backend_mode: :skip,
+      backend: nil,
+      backend_state: nil,
+      capabilities: nil,
+      terminal_started: false,
+      buffer_manager: nil,
+      dimensions: nil
+    }
+  end
+
+  defp init_backend(%{backend_opt: backend_opt}) do
+    {backend_mode, backend, backend_state, capabilities, terminal_started, buffer_manager,
+     dimensions} = select_backend(backend_opt)
+
+    %{
+      backend_mode: backend_mode,
+      backend: backend,
+      backend_state: backend_state,
+      capabilities: capabilities,
+      terminal_started: terminal_started,
+      buffer_manager: buffer_manager,
+      dimensions: dimensions
+    }
+  end
+
+  defp init_input_handler(%{use_input_handler: true}, backend_mode)
+       when backend_mode in [:raw, :tty] do
+    handler = InputSelector.select(backend_mode)
+    {handler, handler.new()}
+  end
+
+  defp init_input_handler(_config, _backend_mode), do: {nil, nil}
+
+  defp init_legacy_input_reader(%{use_input_handler: false}, true = _terminal_started) do
+    {:ok, reader_pid} = InputReader.start_link(target: self())
+    Terminal.register_resize_callback(self())
+    reader_pid
+  end
+
+  defp init_legacy_input_reader(_config, _terminal_started), do: nil
+
+  defp maybe_register_resize_callback(%{use_input_handler: true}, backend_mode)
+       when backend_mode in [:raw, :tty] do
+    if Process.whereis(Terminal), do: Terminal.register_resize_callback(self())
+  end
+
+  defp maybe_register_resize_callback(_config, _backend_mode), do: :ok
+
+  defp build_init_state(
+         init_config,
+         backend_result,
+         root_state,
+         input_handler,
+         input_state,
+         input_reader,
+         command_executor
+       ) do
+    %State{
+      root_module: init_config.root_module,
+      root_state: root_state,
+      message_queue: MessageQueue.new(),
+      event_queue: EventQueue.new(),
+      render_interval: init_config.render_interval,
+      dirty: true,
+      focused_component: :root,
+      components: %{root: %{module: init_config.root_module, state: root_state}},
+      command_executor: command_executor,
+      pending_commands: %{},
+      shutting_down: false,
+      terminal_started: backend_result.terminal_started,
+      buffer_manager: backend_result.buffer_manager,
+      dimensions: backend_result.dimensions,
+      input_reader: input_reader,
+      backend_mode: backend_result.backend_mode,
+      backend: backend_result.backend,
+      backend_state: backend_result.backend_state,
+      capabilities: backend_result.capabilities,
+      input_handler: input_handler,
+      input_state: input_state
+    }
+  end
+
+  defp log_backend_selection(:skip), do: :ok
+
+  defp log_backend_selection(backend_mode) do
+    require Logger
+    mode_str = if TermUI.iex_mode?(), do: "IEx", else: "standalone"
+    Logger.info("TermUI.Runtime started with #{backend_mode} backend (#{mode_str} mode)")
+  end
+
+  defp maybe_schedule_input_poll(nil), do: :ok
+  defp maybe_schedule_input_poll(_handler), do: schedule_input_poll()
+
   defp select_backend(backend_opt) do
     case Selector.select(backend_opt) do
       {:raw, _raw_state} ->
-        # Raw mode succeeded - set up terminal and buffers
-        case setup_terminal_and_buffers() do
-          {true, buffer_manager, dimensions} ->
-            backend = TermUI.Backend.Raw
-            # Initialize Raw backend with terminal setup
-            {:ok, backend_state} =
-              backend.init(
-                alternate_screen: true,
-                hide_cursor: true,
-                mouse_tracking: :all,
-                size: dimensions
-              )
-
-            {:raw, backend, backend_state, nil, true, buffer_manager, dimensions}
-
-          {false, nil, nil} ->
-            # Terminal setup failed, fall back to TTY
-            capabilities = Selector.detect_capabilities()
-            backend = TermUI.Backend.TTY
-            {:ok, backend_state} = backend.init(capabilities: capabilities)
-            {:tty, backend, backend_state, capabilities, false, nil, nil}
-        end
+        select_raw_backend_with_fallback()
 
       {:tty, capabilities} ->
-        # TTY mode - no terminal setup, no buffer manager
-        backend = TermUI.Backend.TTY
-        {:ok, backend_state} = backend.init(capabilities: capabilities)
-        {:tty, backend, backend_state, capabilities, false, nil, nil}
+        init_tty_backend(capabilities)
 
       {:explicit, :raw, _opts} ->
-        # Explicit raw backend selection - atom form
-        case setup_terminal_and_buffers() do
-          {true, buffer_manager, dimensions} ->
-            backend = TermUI.Backend.Raw
-
-            {:ok, backend_state} =
-              backend.init(
-                alternate_screen: true,
-                hide_cursor: true,
-                mouse_tracking: :all,
-                size: dimensions
-              )
-
-            {:raw, backend, backend_state, nil, true, buffer_manager, dimensions}
-
-          {false, nil, nil} ->
-            raise "Raw backend requested but unavailable"
-        end
+        select_explicit_raw_backend()
 
       {:explicit, :tty, _opts} ->
-        # Explicit TTY backend selection - atom form
-        capabilities = Selector.detect_capabilities()
-        backend = TermUI.Backend.TTY
-        {:ok, backend_state} = backend.init(capabilities: capabilities)
-        {:tty, backend, backend_state, capabilities, false, nil, nil}
+        init_tty_backend(Selector.detect_capabilities())
 
-      {:explicit, module, _opts} ->
-        # Explicit backend selection - module form (TermUI.Backend.Raw or TermUI.Backend.TTY)
-        case module do
-          TermUI.Backend.Raw ->
-            case setup_terminal_and_buffers() do
-              {true, buffer_manager, dimensions} ->
-                {:ok, backend_state} =
-                  module.init(
-                    alternate_screen: true,
-                    hide_cursor: true,
-                    mouse_tracking: :all,
-                    size: dimensions
-                  )
+      {:explicit, TermUI.Backend.Raw, _opts} ->
+        select_explicit_raw_backend()
 
-                {:raw, module, backend_state, nil, true, buffer_manager, dimensions}
-
-              {false, nil, nil} ->
-                raise "Raw backend requested but unavailable"
-            end
-
-          TermUI.Backend.TTY ->
-            capabilities = Selector.detect_capabilities()
-            {:ok, backend_state} = module.init(capabilities: capabilities)
-            {:tty, module, backend_state, capabilities, false, nil, nil}
-        end
+      {:explicit, TermUI.Backend.TTY, _opts} ->
+        init_tty_backend(Selector.detect_capabilities())
     end
+  end
+
+  defp select_raw_backend_with_fallback do
+    case setup_terminal_and_buffers() do
+      {true, buffer_manager, dimensions} ->
+        init_raw_backend(buffer_manager, dimensions)
+
+      {false, nil, nil} ->
+        init_tty_backend(Selector.detect_capabilities())
+    end
+  end
+
+  defp select_explicit_raw_backend do
+    case setup_terminal_and_buffers() do
+      {true, buffer_manager, dimensions} ->
+        init_raw_backend(buffer_manager, dimensions)
+
+      {false, nil, nil} ->
+        raise "Raw backend requested but unavailable"
+    end
+  end
+
+  defp init_raw_backend(buffer_manager, dimensions) do
+    backend = TermUI.Backend.Raw
+
+    {:ok, backend_state} =
+      backend.init(
+        alternate_screen: true,
+        hide_cursor: true,
+        mouse_tracking: :all,
+        size: dimensions
+      )
+
+    {:raw, backend, backend_state, nil, true, buffer_manager, dimensions}
+  end
+
+  defp init_tty_backend(capabilities) do
+    backend = TermUI.Backend.TTY
+    {:ok, backend_state} = backend.init(capabilities: capabilities)
+    {:tty, backend, backend_state, capabilities, false, nil, nil}
   end
 
   defp setup_terminal_and_buffers do
@@ -628,35 +643,38 @@ defmodule TermUI.Runtime do
   # Catch-all for unknown messages - forward to root module's handle_info if it exists
   @impl true
   def handle_info(msg, state) do
-    if function_exported?(state.root_module, :handle_info, 2) do
-      case state.root_module.handle_info(msg, state.root_state) do
-        {new_root_state, commands} ->
-          # Update both root_state and components[:root].state
-          components =
-            Map.update!(state.components, :root, fn comp ->
-              %{comp | state: new_root_state}
-            end)
-
-          state = %{state | root_state: new_root_state, components: components, dirty: true}
-          # Tag commands with root component_id
-          tagged_commands = Enum.map(commands, fn cmd -> {:root, cmd} end)
-          state = execute_commands(tagged_commands, state)
-          {:noreply, state}
-
-        new_root_state ->
-          # Support simple return without commands
-          # Update both root_state and components[:root].state
-          components =
-            Map.update!(state.components, :root, fn comp ->
-              %{comp | state: new_root_state}
-            end)
-
-          {:noreply, %{state | root_state: new_root_state, components: components, dirty: true}}
-      end
-    else
-      # Ignore unknown messages if root module doesn't handle them
-      {:noreply, state}
+    case maybe_forward_to_root(msg, state) do
+      {:forwarded, new_state} -> {:noreply, new_state}
+      :not_handled -> {:noreply, state}
     end
+  end
+
+  defp maybe_forward_to_root(msg, state) do
+    if function_exported?(state.root_module, :handle_info, 2) do
+      result = state.root_module.handle_info(msg, state.root_state)
+      {:forwarded, apply_root_handle_info_result(result, state)}
+    else
+      :not_handled
+    end
+  end
+
+  defp apply_root_handle_info_result({new_root_state, commands}, state) do
+    state = update_root_component_state(state, new_root_state)
+    tagged_commands = Enum.map(commands, fn cmd -> {:root, cmd} end)
+    execute_commands(tagged_commands, state)
+  end
+
+  defp apply_root_handle_info_result(new_root_state, state) do
+    update_root_component_state(state, new_root_state)
+  end
+
+  defp update_root_component_state(state, new_root_state) do
+    components =
+      Map.update!(state.components, :root, fn comp ->
+        %{comp | state: new_root_state}
+      end)
+
+    %{state | root_state: new_root_state, components: components, dirty: true}
   end
 
   @impl true
@@ -673,87 +691,55 @@ defmodule TermUI.Runtime do
 
   @impl true
   def terminate(_reason, state) do
-    # Wrap all cleanup in try/rescue to ensure we attempt all cleanup steps
-    # even if some fail
-
-    # Stop input reader first to stop receiving events
-    try do
-      if state.input_reader do
-        InputReader.stop(state.input_reader)
-      end
-    rescue
-      _ -> :ok
-    end
-
-    # Stop input handler to restore IO options (TTY mode)
-    try do
-      if state.input_handler and state.input_state do
-        state.input_handler.stop(state.input_state)
-      end
-    rescue
-      _ -> :ok
-    end
-
-    # Unregister from resize callbacks
-    try do
-      if state.terminal_started do
-        Terminal.unregister_resize_callback(self())
-      end
-    rescue
-      _ -> :ok
-    end
-
-    # Shutdown backend - this handles terminal restoration
-    try do
-      if state.backend and state.backend_state do
-        state.backend.shutdown(state.backend_state)
-      end
-    rescue
-      _ -> :ok
-    end
-
-    # Ensure clean shutdown
-    try do
-      if not state.shutting_down do
-        do_shutdown(state)
-      end
-    rescue
-      _ -> :ok
-    end
-
-    # Restore terminal via Terminal module - this is the legacy path
-    # and provides defense-in-depth if backend shutdown didn't fully restore
-    try do
-      if state.terminal_started and state.backend == nil do
-        # Only do this if backend.shutdown wasn't called (defense in depth)
-        Terminal.restore()
-      end
-    rescue
-      _ -> :ok
-    end
-
-    # Defensive cleanup: directly write mouse disable sequences to terminal
-    # This ensures cleanup even if backend shutdown is unavailable or crashed
-    try do
-      # Disable all mouse tracking modes
-      TermUI.TerminalOutput.write("\e[?1006l\e[?1003l\e[?1002l\e[?1000l")
-      # Show cursor
-      TermUI.TerminalOutput.write("\e[?25h")
-    rescue
-      _ -> :ok
-    end
-
-    # Clean up persistent_term storage to prevent memory leaks
-    # Only clean up if this runtime owns the current terms
-    try do
-      if PersistentTerms.owns_terms?(self()) do
-        PersistentTerms.cleanup()
-      end
-    rescue
-      _ -> :ok
-    end
-
+    # Each cleanup step is wrapped in safe_cleanup to ensure all steps run
+    safe_cleanup(fn -> terminate_input_reader(state) end)
+    safe_cleanup(fn -> terminate_input_handler(state) end)
+    safe_cleanup(fn -> terminate_resize_callback(state) end)
+    safe_cleanup(fn -> terminate_backend(state) end)
+    safe_cleanup(fn -> terminate_shutdown(state) end)
+    safe_cleanup(fn -> terminate_legacy_restore(state) end)
+    safe_cleanup(fn -> terminate_defensive_cleanup() end)
+    safe_cleanup(fn -> terminate_persistent_terms() end)
     :ok
+  end
+
+  defp safe_cleanup(fun) do
+    fun.()
+  rescue
+    _ -> :ok
+  end
+
+  defp terminate_input_reader(%{input_reader: nil}), do: :ok
+  defp terminate_input_reader(%{input_reader: reader}), do: InputReader.stop(reader)
+
+  defp terminate_input_handler(%{input_handler: nil}), do: :ok
+  defp terminate_input_handler(%{input_state: nil}), do: :ok
+
+  defp terminate_input_handler(%{input_handler: handler, input_state: input_state}),
+    do: handler.stop(input_state)
+
+  defp terminate_resize_callback(%{terminal_started: false}), do: :ok
+  defp terminate_resize_callback(_state), do: Terminal.unregister_resize_callback(self())
+
+  defp terminate_backend(%{backend: nil}), do: :ok
+  defp terminate_backend(%{backend_state: nil}), do: :ok
+
+  defp terminate_backend(%{backend: backend, backend_state: backend_state}),
+    do: backend.shutdown(backend_state)
+
+  defp terminate_shutdown(%{shutting_down: true}), do: :ok
+  defp terminate_shutdown(state), do: do_shutdown(state)
+
+  defp terminate_legacy_restore(%{terminal_started: true, backend: nil}), do: Terminal.restore()
+  defp terminate_legacy_restore(_state), do: :ok
+
+  defp terminate_defensive_cleanup do
+    TermUI.TerminalOutput.write("\e[?1006l\e[?1003l\e[?1002l\e[?1000l")
+    TermUI.TerminalOutput.write("\e[?25h")
+  end
+
+  defp terminate_persistent_terms do
+    if PersistentTerms.owns_terms?(self()), do: PersistentTerms.cleanup()
   end
 
   # --- Event Dispatch ---

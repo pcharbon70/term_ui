@@ -753,17 +753,19 @@ defmodule TermUI.Backend.TTY do
   # Determines color mode from capabilities map.
   @spec determine_color_mode(map()) :: color_mode()
   defp determine_color_mode(capabilities) do
-    case Map.get(capabilities, :colors) do
-      :true_color -> :true_color
-      :color_256 -> :color_256
-      :color_16 -> :color_16
-      :monochrome -> :monochrome
-      n when is_integer(n) and n >= 16_777_216 -> :true_color
-      n when is_integer(n) and n >= 256 -> :color_256
-      n when is_integer(n) and n >= 16 -> :color_16
-      _ -> :true_color
-    end
+    capabilities
+    |> Map.get(:colors)
+    |> color_value_to_mode()
   end
+
+  defp color_value_to_mode(:true_color), do: :true_color
+  defp color_value_to_mode(:color_256), do: :color_256
+  defp color_value_to_mode(:color_16), do: :color_16
+  defp color_value_to_mode(:monochrome), do: :monochrome
+  defp color_value_to_mode(n) when is_integer(n) and n >= 16_777_216, do: :true_color
+  defp color_value_to_mode(n) when is_integer(n) and n >= 256, do: :color_256
+  defp color_value_to_mode(n) when is_integer(n) and n >= 16, do: :color_16
+  defp color_value_to_mode(_), do: :true_color
 
   # Determines character set from capabilities map.
   @spec determine_character_set(map()) :: character_set()
@@ -778,21 +780,22 @@ defmodule TermUI.Backend.TTY do
   # Determines terminal size from options, capabilities, or defaults.
   @spec determine_size(keyword(), map()) :: {pos_integer(), pos_integer()}
   defp determine_size(opts, capabilities) do
-    case Keyword.get(opts, :size) do
+    size_from_opts(Keyword.get(opts, :size)) || size_from_capabilities(capabilities) || {24, 80}
+  end
+
+  defp size_from_opts({rows, cols})
+       when is_integer(rows) and is_integer(cols) and rows > 0 and cols > 0,
+       do: {rows, cols}
+
+  defp size_from_opts(_), do: nil
+
+  defp size_from_capabilities(capabilities) do
+    case Map.get(capabilities, :dimensions) do
       {rows, cols} when is_integer(rows) and is_integer(cols) and rows > 0 and cols > 0 ->
         {rows, cols}
 
-      nil ->
-        case Map.get(capabilities, :dimensions) do
-          {rows, cols} when is_integer(rows) and is_integer(cols) and rows > 0 and cols > 0 ->
-            {rows, cols}
-
-          _ ->
-            {24, 80}
-        end
-
       _ ->
-        {24, 80}
+        nil
     end
   end
 
