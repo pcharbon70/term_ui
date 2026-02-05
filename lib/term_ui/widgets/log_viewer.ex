@@ -44,7 +44,15 @@ defmodule TermUI.Widgets.LogViewer do
   use TermUI.StatefulComponent
 
   alias TermUI.Event
+  alias TermUI.Renderer.Style
   alias TermUI.Theme
+
+  # Dialyzer: Suppress opaque type warnings for Style helpers
+  @dialyzer {:nowarn_function,
+             fg_semantic: 1,
+             fg_color: 1,
+             fg_dim_semantic: 1,
+             fg_bg_semantic: 2}
 
   @type log_level ::
           :debug | :info | :notice | :warning | :error | :critical | :alert | :emergency
@@ -87,6 +95,26 @@ defmodule TermUI.Widgets.LogViewer do
   @source_pattern ~r/\[([^\]]+)\]/
 
   @page_size 20
+
+  # ----------------------------------------------------------------------------
+  # Style Helper Functions
+  # ----------------------------------------------------------------------------
+
+  @spec fg_semantic(atom()) :: Style.t()
+  defp fg_semantic(color) when is_atom(color),
+    do: Style.new() |> Style.fg(color)
+
+  @spec fg_color(atom()) :: Style.t()
+  defp fg_color(color) when is_atom(color),
+    do: Style.new() |> Style.fg(color)
+
+  @spec fg_dim_semantic(atom()) :: Style.t()
+  defp fg_dim_semantic(color) when is_atom(color),
+    do: Style.new() |> Style.fg(color) |> Style.dim()
+
+  @spec fg_bg_semantic(atom(), atom()) :: Style.t()
+  defp fg_bg_semantic(fg, bg) when is_atom(fg) and is_atom(bg),
+    do: Style.new() |> Style.fg(fg) |> Style.bg(bg)
 
   # ----------------------------------------------------------------------------
   # Props
@@ -898,7 +926,7 @@ defmodule TermUI.Widgets.LogViewer do
     parts =
       if state.show_line_numbers do
         num_str = String.pad_leading("#{actual_idx + 1}", 5)
-        num_style = Style.new() |> Style.fg(Theme.get_semantic(:muted)) |> Style.dim()
+        num_style = fg_dim_semantic(Theme.get_semantic(:muted))
         parts ++ [text(num_str <> " ", num_style)]
       else
         parts
@@ -907,7 +935,7 @@ defmodule TermUI.Widgets.LogViewer do
     # Bookmark indicator
     parts =
       if is_bookmarked do
-        bookmark_style = Style.new() |> Style.fg(Theme.get_semantic(:warning))
+        bookmark_style = fg_semantic(Theme.get_semantic(:warning))
         parts ++ [text("*", bookmark_style)]
       else
         parts ++ [text(" ", nil)]
@@ -917,7 +945,7 @@ defmodule TermUI.Widgets.LogViewer do
     parts =
       if state.show_levels && line.level do
         level_str = String.pad_trailing(level_abbrev(line.level), 5)
-        level_style = Style.new() |> Style.fg(level_color(line.level))
+        level_style = fg_color(level_color(line.level))
         parts ++ [text(level_str <> " ", level_style)]
       else
         parts
@@ -981,10 +1009,10 @@ defmodule TermUI.Widgets.LogViewer do
         Theme.get_component_style(:item, :selected)
 
       is_search_match ->
-        Style.new() |> Style.fg(base_color) |> Style.bg(Theme.get_semantic(:warning))
+        fg_bg_semantic(base_color, Theme.get_semantic(:warning))
 
       true ->
-        Style.new() |> Style.fg(base_color)
+        fg_color(base_color)
     end
   end
 
@@ -1044,18 +1072,18 @@ defmodule TermUI.Widgets.LogViewer do
       end
 
     status = Enum.join(parts, "")
-    status_style = Style.new() |> Style.fg(Theme.get_semantic(:info)) |> Style.dim()
+    status_style = fg_dim_semantic(Theme.get_semantic(:info))
     text(status, status_style)
   end
 
   defp render_input_bar(state) do
     cond do
       state.search_input != nil ->
-        search_style = Style.new() |> Style.fg(Theme.get_semantic(:warning))
+        search_style = fg_semantic(Theme.get_semantic(:warning))
         [text("Search: " <> state.search_input <> "_", search_style)]
 
       state.filter_input != nil ->
-        filter_style = Style.new() |> Style.fg(Theme.get_semantic(:success))
+        filter_style = fg_semantic(Theme.get_semantic(:success))
         [text("Filter: " <> state.filter_input <> "_", filter_style)]
 
       true ->

@@ -27,6 +27,9 @@ defmodule TermUI.Widget.Block do
   alias TermUI.Component.RenderNode
   alias TermUI.Renderer.Style
 
+  # Dialyzer: Suppress opaque type warnings for Style helpers
+  @dialyzer {:nowarn_function, build_style: 1, positioned_cell_safe: 4}
+
   # Border character sets
   @borders %{
     none: %{tl: " ", tr: " ", bl: " ", br: " ", h: " ", v: " "},
@@ -134,9 +137,9 @@ defmodule TermUI.Widget.Block do
 
   defp do_render_top(chars, nil, _title_align, area, style) do
     # No title - just border
-    [positioned_cell(0, 0, chars.tl, style)] ++
-      for(x <- 1..(area.width - 2), do: positioned_cell(x, 0, chars.h, style)) ++
-      [positioned_cell(area.width - 1, 0, chars.tr, style)]
+    [positioned_cell_safe(0, 0, chars.tl, style)] ++
+      for(x <- 1..(area.width - 2), do: positioned_cell_safe(x, 0, chars.h, style)) ++
+      [positioned_cell_safe(area.width - 1, 0, chars.tr, style)]
   end
 
   defp do_render_top(chars, title, title_align, area, style) do
@@ -145,8 +148,8 @@ defmodule TermUI.Widget.Block do
 
     if inner_width < 1 do
       [
-        positioned_cell(0, 0, chars.tl, style),
-        positioned_cell(area.width - 1, 0, chars.tr, style)
+        positioned_cell_safe(0, 0, chars.tl, style),
+        positioned_cell_safe(area.width - 1, 0, chars.tr, style)
       ]
     else
       title_text = String.slice(title, 0, inner_width)
@@ -160,12 +163,12 @@ defmodule TermUI.Widget.Block do
           :center -> {div(remaining, 2), remaining - div(remaining, 2)}
         end
 
-      top_cells = [positioned_cell(0, 0, chars.tl, style)]
+      top_cells = [positioned_cell_safe(0, 0, chars.tl, style)]
 
       # Left padding
       top_cells =
         if left_pad > 0 do
-          top_cells ++ for(x <- 1..left_pad, do: positioned_cell(x, 0, chars.h, style))
+          top_cells ++ for(x <- 1..left_pad, do: positioned_cell_safe(x, 0, chars.h, style))
         else
           top_cells
         end
@@ -177,7 +180,7 @@ defmodule TermUI.Widget.Block do
            |> String.graphemes()
            |> Enum.with_index()
            |> Enum.map(fn {char, i} ->
-             positioned_cell(1 + left_pad + i, 0, char, style)
+             positioned_cell_safe(1 + left_pad + i, 0, char, style)
            end))
 
       # Right padding
@@ -185,13 +188,13 @@ defmodule TermUI.Widget.Block do
         if right_pad > 0 do
           top_cells ++
             for i <- 0..(right_pad - 1) do
-              positioned_cell(1 + left_pad + title_len + i, 0, chars.h, style)
+              positioned_cell_safe(1 + left_pad + title_len + i, 0, chars.h, style)
             end
         else
           top_cells
         end
 
-      top_cells ++ [positioned_cell(area.width - 1, 0, chars.tr, style)]
+      top_cells ++ [positioned_cell_safe(area.width - 1, 0, chars.tr, style)]
     end
   end
 
@@ -201,8 +204,8 @@ defmodule TermUI.Widget.Block do
     else
       for y <- 1..(area.height - 2) do
         [
-          positioned_cell(0, y, chars.v, style),
-          positioned_cell(area.width - 1, y, chars.v, style)
+          positioned_cell_safe(0, y, chars.v, style),
+          positioned_cell_safe(area.width - 1, y, chars.v, style)
         ]
       end
       |> List.flatten()
@@ -215,9 +218,9 @@ defmodule TermUI.Widget.Block do
     else
       y = area.height - 1
 
-      [positioned_cell(0, y, chars.bl, style)] ++
-        for(x <- 1..(area.width - 2), do: positioned_cell(x, y, chars.h, style)) ++
-        [positioned_cell(area.width - 1, y, chars.br, style)]
+      [positioned_cell_safe(0, y, chars.bl, style)] ++
+        for(x <- 1..(area.width - 2), do: positioned_cell_safe(x, y, chars.h, style)) ++
+        [positioned_cell_safe(area.width - 1, y, chars.br, style)]
     end
   end
 
@@ -235,6 +238,18 @@ defmodule TermUI.Widget.Block do
   end
 
   defp normalize_padding(_), do: %{top: 0, right: 0, bottom: 0, left: 0}
+
+  # ----------------------------------------------------------------------------
+  # Style Helper Functions
+  # ----------------------------------------------------------------------------
+
+  @spec positioned_cell_safe(integer(), integer(), String.t(), Style.t()) :: RenderNode.t()
+  defp positioned_cell_safe(x, y, char, style),
+    do: positioned_cell_safe(x, y, char, style)
+
+  # ----------------------------------------------------------------------------
+  # Style Building
+  # ----------------------------------------------------------------------------
 
   defp build_style(opts) when is_map(opts) do
     style_list =

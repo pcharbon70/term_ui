@@ -47,6 +47,13 @@ defmodule TermUI.Widgets.ProcessMonitor do
   alias TermUI.Renderer.Style
   alias TermUI.Theme
 
+  # Dialyzer: Suppress opaque type warnings for Style helpers
+  @dialyzer {:nowarn_function,
+             fg_semantic: 1,
+             fg_color: 1,
+             fg_bold_semantic: 1,
+             fg_bold_help: 0}
+
   @type sort_field :: :pid | :name | :reductions | :memory | :queue | :status
   @type sort_direction :: :asc | :desc
 
@@ -94,6 +101,26 @@ defmodule TermUI.Widgets.ProcessMonitor do
     ~r/^:logger/,
     ~r/^:erl_prim_loader$/
   ]
+
+  # ----------------------------------------------------------------------------
+  # Style Helper Functions
+  # ----------------------------------------------------------------------------
+
+  @spec fg_semantic(atom()) :: Style.t()
+  defp fg_semantic(color) when is_atom(color),
+    do: Style.new() |> Style.fg(color)
+
+  @spec fg_color(atom()) :: Style.t()
+  defp fg_color(color) when is_atom(color),
+    do: Style.new() |> Style.fg(color)
+
+  @spec fg_bold_semantic(atom()) :: Style.t()
+  defp fg_bold_semantic(color) when is_atom(color),
+    do: Style.new() |> Style.fg(color) |> Style.bold()
+
+  @spec fg_bold_help() :: Style.t()
+  defp fg_bold_help(),
+    do: Style.new() |> Style.fg(Theme.get_semantic(:help)) |> Style.dim()
 
   # ----------------------------------------------------------------------------
   # Props
@@ -267,15 +294,6 @@ defmodule TermUI.Widgets.ProcessMonitor do
     handle_suspend_action(state, process)
   end
 
-  defp handle_suspend_action(state, nil), do: {:ok, state}
-  defp handle_suspend_action(state, process) do
-    if process.status == :suspended do
-      resume_process(state, process.pid)
-    else
-      {:ok, %{state | pending_action: :suspend}}
-    end
-  end
-
   # l - show links
   def handle_event(%Event.Key{char: "l"}, state) when state.filter_input == nil do
     {:ok, %{state | show_details: true, detail_mode: :links}}
@@ -355,6 +373,20 @@ defmodule TermUI.Widgets.ProcessMonitor do
 
   def handle_event(_event, state) do
     {:ok, state}
+  end
+
+  # ----------------------------------------------------------------------------
+  # Private Helpers for Event Handling
+  # ----------------------------------------------------------------------------
+
+  defp handle_suspend_action(state, nil), do: {:ok, state}
+
+  defp handle_suspend_action(state, process) do
+    if process.status == :suspended do
+      resume_process(state, process.pid)
+    else
+      {:ok, %{state | pending_action: :suspend}}
+    end
   end
 
   # ----------------------------------------------------------------------------
@@ -710,7 +742,7 @@ defmodule TermUI.Widgets.ProcessMonitor do
 
     header_text = "Processes: #{length(state.processes)} | Sort: #{sort_label}#{filter_label}"
 
-    header_style = Style.new() |> Style.fg(Theme.get_semantic(:info)) |> Style.bold()
+    header_style = fg_bold_semantic(Theme.get_semantic(:info))
     text(header_text, header_style)
   end
 
@@ -789,19 +821,19 @@ defmodule TermUI.Widgets.ProcessMonitor do
           Theme.get_component_style(:item, :selected)
 
         process.message_queue_len >= state.thresholds.queue_critical ->
-          Style.new() |> Style.fg(Theme.get_semantic(:error)) |> Style.bold()
+          fg_bold_semantic(Theme.get_semantic(:error))
 
         process.message_queue_len >= state.thresholds.queue_warning ->
-          Style.new() |> Style.fg(Theme.get_semantic(:warning))
+          fg_semantic(Theme.get_semantic(:warning))
 
         process.memory >= state.thresholds.memory_critical ->
-          Style.new() |> Style.fg(Theme.get_semantic(:error)) |> Style.bold()
+          fg_bold_semantic(Theme.get_semantic(:error))
 
         process.memory >= state.thresholds.memory_warning ->
-          Style.new() |> Style.fg(Theme.get_semantic(:warning))
+          fg_semantic(Theme.get_semantic(:warning))
 
         process.status == :suspended ->
-          Style.new() |> Style.fg(Theme.get_color(:accent))
+          fg_color(Theme.get_color(:accent))
 
         true ->
           nil
@@ -820,13 +852,13 @@ defmodule TermUI.Widgets.ProcessMonitor do
         :trace -> render_trace_details(process)
       end
     else
-      empty_style = Style.new() |> Style.fg(Theme.get_semantic(:muted))
+      empty_style = fg_semantic(Theme.get_semantic(:muted))
       [text("No process selected", empty_style)]
     end
   end
 
   defp render_info_details(process, _state) do
-    border = text(String.duplicate("-", 60), Style.new() |> Style.fg(Theme.get_color(:primary)))
+    border = text(String.duplicate("-", 60), fg_color(Theme.get_color(:primary)))
 
     lines = [
       border,
@@ -846,7 +878,7 @@ defmodule TermUI.Widgets.ProcessMonitor do
   end
 
   defp render_links_details(process) do
-    border = text(String.duplicate("-", 60), Style.new() |> Style.fg(Theme.get_color(:primary)))
+    border = text(String.duplicate("-", 60), fg_color(Theme.get_color(:primary)))
 
     links_text =
       if length(process.links) > 0 do
@@ -888,7 +920,7 @@ defmodule TermUI.Widgets.ProcessMonitor do
   end
 
   defp render_trace_details(process) do
-    border = text(String.duplicate("-", 60), Style.new() |> Style.fg(Theme.get_color(:primary)))
+    border = text(String.duplicate("-", 60), fg_color(Theme.get_color(:primary)))
 
     trace = get_stack_trace(process.pid)
 
@@ -902,7 +934,7 @@ defmodule TermUI.Widgets.ProcessMonitor do
           text("  #{m}.#{f}/#{a} (#{file}:#{line})", nil)
         end)
       else
-        empty_style = Style.new() |> Style.fg(Theme.get_semantic(:muted))
+        empty_style = fg_semantic(Theme.get_semantic(:muted))
         [text("  (no stack trace available)", empty_style)]
       end
 
@@ -912,7 +944,7 @@ defmodule TermUI.Widgets.ProcessMonitor do
   defp render_footer(state, chars) do
     input_line =
       if state.filter_input != nil do
-        filter_style = Style.new() |> Style.fg(Theme.get_semantic(:warning))
+        filter_style = fg_semantic(Theme.get_semantic(:warning))
         [text("Filter: #{state.filter_input}_", filter_style)]
       else
         []
@@ -921,7 +953,7 @@ defmodule TermUI.Widgets.ProcessMonitor do
     help_text =
       "[#{chars.arrow_up}#{chars.arrow_down}] Select [Enter] Details [s/S] Sort [/] Filter [k] Kill [p] Pause [l] Links [t] Trace [r] Refresh"
 
-    help_style = Style.new() |> Style.fg(Theme.get_semantic(:help)) |> Style.dim()
+    help_style = fg_bold_help()
     input_line ++ [text(help_text, help_style)]
   end
 
@@ -937,7 +969,7 @@ defmodule TermUI.Widgets.ProcessMonitor do
         end
 
       if process do
-        confirm_style = Style.new() |> Style.fg(Theme.get_semantic(:error)) |> Style.bold()
+        confirm_style = fg_bold_semantic(Theme.get_semantic(:error))
 
         [
           text("", nil),

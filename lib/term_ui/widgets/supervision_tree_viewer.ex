@@ -56,7 +56,17 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
 
   alias TermUI.CharacterSet
   alias TermUI.Event
+  alias TermUI.Renderer.Style
   alias TermUI.Theme
+
+  # Dialyzer: Suppress opaque type warnings for Style helpers
+  @dialyzer {:nowarn_function,
+             fg_semantic: 1,
+             fg_bold_semantic: 1,
+             fg_dim_semantic: 1,
+             fg_bold_help: 0,
+             collect_supervisor_ids: 1,
+             collect_children_supervisor_ids: 1}
 
   @type node_type :: :supervisor | :worker
   @type node_status :: :running | :restarting | :terminated | :undefined
@@ -99,6 +109,30 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
     terminated: "[T]",
     undefined: "[U]"
   }
+
+  # ----------------------------------------------------------------------------
+  # Style Helper Functions
+  # ----------------------------------------------------------------------------
+
+  @spec fg_semantic(atom()) :: Style.t()
+  defp fg_semantic(color) when is_atom(color),
+    do: Style.new() |> Style.fg(color)
+
+  @spec fg_bold_semantic(atom()) :: Style.t()
+  defp fg_bold_semantic(color) when is_atom(color),
+    do: Style.new() |> Style.fg(color) |> Style.bold()
+
+  @spec fg_dim_semantic(atom()) :: Style.t()
+  defp fg_dim_semantic(color) when is_atom(color),
+    do: Style.new() |> Style.fg(color) |> Style.dim()
+
+  @spec fg_bold_help() :: Style.t()
+  defp fg_bold_help(),
+    do: Style.new() |> Style.fg(Theme.get_semantic(:help)) |> Style.dim()
+
+  # ----------------------------------------------------------------------------
+  # Icon Functions
+  # ----------------------------------------------------------------------------
 
   defp get_type_icons do
     %{
@@ -244,64 +278,12 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
     end
   end
 
-  defp handle_left_key(%{type: :supervisor, id: id}, state) do
-    if MapSet.member?(state.expanded, id) do
-      collapse_node(id, state)
-    else
-      move_to_parent(state)
-    end
-  end
-
-  defp handle_left_key(_node, state), do: move_to_parent(state)
-
-  defp collapse_node(node_id, state) do
-    expanded = MapSet.delete(state.expanded, node_id)
-    flattened = flatten_tree(state.tree, expanded, true)
-    {:ok, %{state | expanded: expanded, flattened: flattened}}
-  end
-
-  defp move_to_parent(state) do
-    parent_idx = find_parent_idx(state.flattened, state.selected_idx)
-
-    if parent_idx do
-      {:ok, %{state | selected_idx: parent_idx}}
-    else
-      {:ok, state}
-    end
-  end
-
   # Right - expand or move to first child
   def handle_event(%Event.Key{key: :right}, state) do
     case get_selected(state) do
       nil -> {:ok, state}
       node -> handle_right_key(node, state)
     end
-  end
-
-  defp handle_right_key(%{type: :supervisor, id: id}, state) do
-    if MapSet.member?(state.expanded, id) do
-      move_to_first_child(state)
-    else
-      expand_node(id, state)
-    end
-  end
-
-  defp handle_right_key(_node, state), do: {:ok, state}
-
-  defp move_to_first_child(state) do
-    child_idx = state.selected_idx + 1
-
-    if child_idx < length(state.flattened) do
-      {:ok, %{state | selected_idx: child_idx}}
-    else
-      {:ok, state}
-    end
-  end
-
-  defp expand_node(node_id, state) do
-    expanded = MapSet.put(state.expanded, node_id)
-    flattened = flatten_tree(state.tree, expanded, true)
-    {:ok, %{state | expanded: expanded, flattened: flattened}}
   end
 
   # Enter - toggle expand/collapse
@@ -443,6 +425,62 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
 
   def handle_event(_event, state) do
     {:ok, state}
+  end
+
+  # ----------------------------------------------------------------------------
+  # Private Helpers for Event Handling
+  # ----------------------------------------------------------------------------
+
+  defp handle_left_key(%{type: :supervisor, id: id}, state) do
+    if MapSet.member?(state.expanded, id) do
+      collapse_node(id, state)
+    else
+      move_to_parent(state)
+    end
+  end
+
+  defp handle_left_key(_node, state), do: move_to_parent(state)
+
+  defp collapse_node(node_id, state) do
+    expanded = MapSet.delete(state.expanded, node_id)
+    flattened = flatten_tree(state.tree, expanded, true)
+    {:ok, %{state | expanded: expanded, flattened: flattened}}
+  end
+
+  defp move_to_parent(state) do
+    parent_idx = find_parent_idx(state.flattened, state.selected_idx)
+
+    if parent_idx do
+      {:ok, %{state | selected_idx: parent_idx}}
+    else
+      {:ok, state}
+    end
+  end
+
+  defp handle_right_key(%{type: :supervisor, id: id}, state) do
+    if MapSet.member?(state.expanded, id) do
+      move_to_first_child(state)
+    else
+      expand_node(id, state)
+    end
+  end
+
+  defp handle_right_key(_node, state), do: {:ok, state}
+
+  defp move_to_first_child(state) do
+    child_idx = state.selected_idx + 1
+
+    if child_idx < length(state.flattened) do
+      {:ok, %{state | selected_idx: child_idx}}
+    else
+      {:ok, state}
+    end
+  end
+
+  defp expand_node(node_id, state) do
+    expanded = MapSet.put(state.expanded, node_id)
+    flattened = flatten_tree(state.tree, expanded, true)
+    {:ok, %{state | expanded: expanded, flattened: flattened}}
   end
 
   # ----------------------------------------------------------------------------
@@ -774,8 +812,10 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
     end
   end
 
+  @spec collect_supervisor_ids(term() | nil) :: MapSet.t()
   defp collect_supervisor_ids(nil), do: MapSet.new()
 
+  @spec collect_supervisor_ids(term()) :: MapSet.t()
   defp collect_supervisor_ids(node) do
     if node.type == :supervisor do
       children_ids = collect_children_supervisor_ids(node.children)
@@ -929,7 +969,7 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
 
     count = length(state.flattened)
 
-    style = Style.new() |> Style.fg(Theme.get_semantic(:info)) |> Style.bold()
+    style = fg_bold_semantic(Theme.get_semantic(:info))
 
     text(
       "Supervision Tree: #{root_name} | Nodes: #{count}",
@@ -961,7 +1001,7 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
 
     if Enum.empty?(visible_nodes) do
       muted_color = Theme.get_semantic(:muted)
-      style = Style.new() |> Style.fg(muted_color) |> Style.dim()
+      style = fg_dim_semantic(muted_color)
       text("  No processes found", style)
     else
       lines =
@@ -1025,11 +1065,11 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
   defp render_filter_line(state) do
     cond do
       state.filter_input != nil ->
-        style = Style.new() |> Style.fg(Theme.get_semantic(:warning))
+        style = fg_semantic(Theme.get_semantic(:warning))
         text("Filter: #{state.filter_input}_", style)
 
       state.filter != nil ->
-        style = Style.new() |> Style.fg(Theme.get_semantic(:warning)) |> Style.dim()
+        style = fg_dim_semantic(Theme.get_semantic(:warning))
         text("Filter: #{state.filter} (Esc to clear)", style)
 
       true ->
@@ -1044,7 +1084,7 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
           nil
 
         node ->
-          info_style = Style.new() |> Style.fg(Theme.get_semantic(:info))
+          info_style = fg_semantic(Theme.get_semantic(:info))
 
           lines = [
             text("#{String.duplicate(chars.h_line, 3)} Process Info #{String.duplicate(chars.h_line, 3)}", info_style),
@@ -1098,19 +1138,19 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
       :restart ->
         node = get_selected(state)
         name = if node, do: node_display_name(node), else: "?"
-        style = Style.new() |> Style.fg(Theme.get_semantic(:warning)) |> Style.bold()
+        style = fg_bold_semantic(Theme.get_semantic(:warning))
         text("Restart #{name}? [y/n]", style)
 
       :terminate ->
         node = get_selected(state)
         name = if node, do: node_display_name(node), else: "?"
-        style = Style.new() |> Style.fg(Theme.get_semantic(:error)) |> Style.bold()
+        style = fg_bold_semantic(Theme.get_semantic(:error))
         text("Terminate #{name}? [y/n]", style)
     end
   end
 
   defp render_footer(_state, chars) do
-    style = Style.new() |> Style.fg(Theme.get_semantic(:help)) |> Style.dim()
+    style = fg_bold_help()
 
     text(
       "[#{chars.arrow_up}#{chars.arrow_down}] Navigate [#{chars.arrow_left}#{chars.arrow_right}] Expand/Collapse [i] Info [r] Restart [k] Kill [R] Refresh [/] Filter",

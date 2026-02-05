@@ -127,6 +127,9 @@ defmodule TermUI.Widgets.TextInput.Line do
   alias TermUI.Renderer.Style
   alias TermUI.Theme
 
+  # Dialyzer: Suppress opaque type warnings for Style helpers
+  @dialyzer {:nowarn_function, fg_semantic: 1, fg_color: 1}
+
   @typedoc """
   TextInput.Line state structure.
 
@@ -655,7 +658,7 @@ defmodule TermUI.Widgets.TextInput.Line do
     display_text =
       if state.value == "" and state.placeholder != "" do
         # Show placeholder with muted style
-        placeholder_style = Style.new(fg: :bright_black)
+        placeholder_style = fg_color(:bright_black)
 
         stack(:horizontal, [
           text(state.prompt),
@@ -669,9 +672,25 @@ defmodule TermUI.Widgets.TextInput.Line do
     display_text
   end
 
+  # ----------------------------------------------------------------------------
+  # Style Helper Functions
+  # ----------------------------------------------------------------------------
+
+  @spec fg_semantic(atom()) :: Style.t()
+  defp fg_semantic(color) when is_atom(color),
+    do: Style.new() |> Style.fg(color)
+
+  @spec fg_color(atom()) :: Style.t()
+  defp fg_color(color) when is_atom(color),
+    do: Style.new(fg: color)
+
+  # ----------------------------------------------------------------------------
+  # Error Rendering
+  # ----------------------------------------------------------------------------
+
   # Renders the error message
   defp render_error(error) do
-    error_style = Style.new() |> Style.fg(Theme.get_semantic(:error))
+    error_style = fg_semantic(Theme.get_semantic(:error))
     text(error, error_style)
   end
 end

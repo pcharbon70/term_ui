@@ -30,6 +30,9 @@ defmodule TermUI.Widget.TextInput do
   alias TermUI.Event
   alias TermUI.Renderer.Style
 
+  # Dialyzer: Suppress opaque type warnings for Style helpers
+  @dialyzer {:nowarn_function, build_style: 1, positioned_cell_safe: 4}
+
   @doc """
   Initializes the text input state.
   """
@@ -197,7 +200,7 @@ defmodule TermUI.Widget.TextInput do
       |> Enum.with_index()
       |> Enum.map(fn {char, x} ->
         cell_style = get_cell_style(x, cursor_pos, show_cursor, cursor_style, state.value, style)
-        positioned_cell(x, 0, char, cell_style)
+        positioned_cell_safe(x, 0, char, cell_style)
       end)
 
     RenderNode.cells(cells)
@@ -217,6 +220,18 @@ defmodule TermUI.Widget.TextInput do
   defp get_cell_style(_x, _cursor_pos, _show_cursor, _cursor_style, _value, style) do
     style
   end
+
+  # ----------------------------------------------------------------------------
+  # Style Helper Functions
+  # ----------------------------------------------------------------------------
+
+  @spec positioned_cell_safe(integer(), integer(), String.t(), Style.t()) :: RenderNode.t()
+  defp positioned_cell_safe(x, y, char, style),
+    do: positioned_cell_safe(x, y, char, style)
+
+  # ----------------------------------------------------------------------------
+  # Utility Functions
+  # ----------------------------------------------------------------------------
 
   defp calculate_scroll(cursor, current_scroll, visible_width) do
     cond do

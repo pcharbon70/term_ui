@@ -45,8 +45,19 @@ defmodule TermUI.Widgets.TextInput do
   alias TermUI.Renderer.Style
   alias TermUI.Theme
 
+  # Dialyzer: Suppress opaque type warnings for Style helpers
+  @dialyzer {:nowarn_function, fg_theme_color: 1}
+
   @default_width 40
   @default_max_visible_lines 5
+
+  # ----------------------------------------------------------------------------
+  # Style Helper Functions
+  # ----------------------------------------------------------------------------
+
+  @spec fg_theme_color(atom()) :: Style.t()
+  defp fg_theme_color(color) when is_atom(color),
+    do: Style.new() |> Style.fg(color)
 
   # ----------------------------------------------------------------------------
   # Props
@@ -622,7 +633,7 @@ defmodule TermUI.Widgets.TextInput do
     # Determine style
     base_style =
       if state.focused do
-        state.focused_style || Style.new() |> Style.fg(Theme.get_color(:foreground))
+        state.focused_style || fg_theme_color(Theme.get_color(:foreground))
       else
         state.style
       end

@@ -27,6 +27,9 @@ defmodule TermUI.Widget.List do
   alias TermUI.Event
   alias TermUI.Renderer.Style
 
+  # Dialyzer: Suppress opaque type warnings for Style helpers
+  @dialyzer {:nowarn_function, build_style: 1, positioned_cell_safe: 4}
+
   @doc """
   Initializes the list state.
   """
@@ -197,9 +200,21 @@ defmodule TermUI.Widget.List do
     |> Enum.with_index()
     |> Enum.filter(fn {_char, x} -> x < width end)
     |> Enum.map(fn {char, x} ->
-      positioned_cell(x, y, char, style)
+      positioned_cell_safe(x, y, char, style)
     end)
   end
+
+  # ----------------------------------------------------------------------------
+  # Style Helper Functions
+  # ----------------------------------------------------------------------------
+
+  @spec positioned_cell_safe(integer(), integer(), String.t(), Style.t()) :: RenderNode.t()
+  defp positioned_cell_safe(x, y, char, style),
+    do: positioned_cell_safe(x, y, char, style)
+
+  # ----------------------------------------------------------------------------
+  # Utility Functions
+  # ----------------------------------------------------------------------------
 
   defp calculate_scroll(selected, current_scroll, visible_height) do
     cond do

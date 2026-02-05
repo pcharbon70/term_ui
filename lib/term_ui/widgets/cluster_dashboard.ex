@@ -42,7 +42,16 @@ defmodule TermUI.Widgets.ClusterDashboard do
 
   alias TermUI.CharacterSet
   alias TermUI.Event
+  alias TermUI.Renderer.Style
   alias TermUI.Theme
+
+  # Dialyzer: Suppress opaque type warnings for Style helpers
+  @dialyzer {:nowarn_function,
+             fg_semantic: 1,
+             fg_color: 1,
+             fg_bold_semantic: 1,
+             fg_bg_bold_semantic: 2,
+             fg_bold_help: 0}
 
   @type view_mode :: :nodes | :globals | :pg_groups | :events
   @type node_status :: :connected | :disconnected | :local
@@ -64,6 +73,30 @@ defmodule TermUI.Widgets.ClusterDashboard do
   @page_size 10
   @max_events 50
   @rpc_timeout 5000
+
+  # ----------------------------------------------------------------------------
+  # Style Helper Functions
+  # ----------------------------------------------------------------------------
+
+  @spec fg_semantic(atom()) :: Style.t()
+  defp fg_semantic(color) when is_atom(color),
+    do: Style.new() |> Style.fg(color)
+
+  @spec fg_color(atom()) :: Style.t()
+  defp fg_color(color) when is_atom(color),
+    do: Style.new() |> Style.fg(color)
+
+  @spec fg_bold_semantic(atom()) :: Style.t()
+  defp fg_bold_semantic(color) when is_atom(color),
+    do: Style.new() |> Style.fg(color) |> Style.bold()
+
+  @spec fg_bg_bold_semantic(atom(), atom()) :: Style.t()
+  defp fg_bg_bold_semantic(fg, bg) when is_atom(fg) and is_atom(bg),
+    do: Style.new() |> Style.fg(fg) |> Style.bg(bg) |> Style.bold()
+
+  @spec fg_bold_help() :: Style.t()
+  defp fg_bold_help(),
+    do: Style.new() |> Style.fg(Theme.get_semantic(:help)) |> Style.dim()
 
   # ----------------------------------------------------------------------------
   # Props
@@ -629,10 +662,7 @@ defmodule TermUI.Widgets.ClusterDashboard do
   defp render_alert(state) do
     if state.partition_alert do
       alert_style =
-        Style.new()
-        |> Style.bg(Theme.get_semantic(:error))
-        |> Style.fg(Theme.get_color(:background))
-        |> Style.bold()
+        fg_bg_bold_semantic(Theme.get_color(:background), Theme.get_semantic(:error))
 
       [text(state.partition_alert, alert_style)]
     else
@@ -657,7 +687,7 @@ defmodule TermUI.Widgets.ClusterDashboard do
     header_text =
       "Cluster: #{local}#{dist_status} | Connected: #{connected_count} | View: #{mode_label}"
 
-    header_style = Style.new() |> Style.fg(Theme.get_semantic(:info)) |> Style.bold()
+    header_style = fg_bold_semantic(Theme.get_semantic(:info))
     text(header_text, header_style)
   end
 
@@ -742,11 +772,11 @@ defmodule TermUI.Widgets.ClusterDashboard do
   end
 
   defp node_row_style(:local, false) do
-    Style.new() |> Style.fg(Theme.get_semantic(:success))
+    fg_semantic(Theme.get_semantic(:success))
   end
 
   defp node_row_style(:disconnected, _is_selected) do
-    Style.new() |> Style.fg(Theme.get_semantic(:error))
+    fg_semantic(Theme.get_semantic(:error))
   end
 
   defp node_row_style(_status, true) do
@@ -764,7 +794,7 @@ defmodule TermUI.Widgets.ClusterDashboard do
     header = text(header_line, Style.new(attrs: [:bold, :underline]))
 
     if Enum.empty?(state.global_names) do
-      empty_style = Style.new() |> Style.fg(Theme.get_semantic(:muted))
+      empty_style = fg_semantic(Theme.get_semantic(:muted))
       [header, text("  (no global names registered)", empty_style)]
     else
       visible =
@@ -808,7 +838,7 @@ defmodule TermUI.Widgets.ClusterDashboard do
     header = text(header_line, Style.new(attrs: [:bold, :underline]))
 
     if Enum.empty?(state.pg_groups) do
-      empty_style = Style.new() |> Style.fg(Theme.get_semantic(:muted))
+      empty_style = fg_semantic(Theme.get_semantic(:muted))
       [header, text("  (no :pg groups - is :pg started?)", empty_style)]
     else
       visible =
@@ -850,7 +880,7 @@ defmodule TermUI.Widgets.ClusterDashboard do
     header = text(header_line, Style.new(attrs: [:bold, :underline]))
 
     if Enum.empty?(state.events) do
-      empty_style = Style.new() |> Style.fg(Theme.get_semantic(:muted))
+      empty_style = fg_semantic(Theme.get_semantic(:muted))
       [header, text("  (no events yet)", empty_style)]
     else
       visible =
@@ -890,12 +920,12 @@ defmodule TermUI.Widgets.ClusterDashboard do
   end
 
   defp event_row_style(true, _event_type), do: Theme.get_component_style(:item, :selected)
-  defp event_row_style(false, :nodedown), do: Style.new() |> Style.fg(Theme.get_semantic(:error))
-  defp event_row_style(false, :nodeup), do: Style.new() |> Style.fg(Theme.get_semantic(:success))
+  defp event_row_style(false, :nodedown), do: fg_semantic(Theme.get_semantic(:error))
+  defp event_row_style(false, :nodeup), do: fg_semantic(Theme.get_semantic(:success))
   defp event_row_style(_, _), do: nil
 
   defp render_details(state) do
-    border_style = Style.new() |> Style.fg(Theme.get_color(:primary))
+    border_style = fg_color(Theme.get_color(:primary))
     border = text(String.duplicate("-", 60), border_style)
 
     case state.view_mode do
@@ -933,7 +963,7 @@ defmodule TermUI.Widgets.ClusterDashboard do
         border
       ]
     else
-      empty_style = Style.new() |> Style.fg(Theme.get_semantic(:muted))
+      empty_style = fg_semantic(Theme.get_semantic(:muted))
 
       [
         border,
@@ -1012,7 +1042,7 @@ defmodule TermUI.Widgets.ClusterDashboard do
   end
 
   defp render_empty_details(border) do
-    empty_style = Style.new() |> Style.fg(Theme.get_semantic(:muted))
+    empty_style = fg_semantic(Theme.get_semantic(:muted))
 
     [
       border,
@@ -1031,7 +1061,7 @@ defmodule TermUI.Widgets.ClusterDashboard do
     help_text =
       "[#{chars.arrow_up}#{chars.arrow_down}] Select [Enter] Details [n] Nodes [g] Globals [p] PG [e] Events [r] Refresh"
 
-    help_style = Style.new() |> Style.fg(Theme.get_semantic(:help)) |> Style.dim()
+    help_style = fg_bold_help()
     [text(help_text, help_style)]
   end
 

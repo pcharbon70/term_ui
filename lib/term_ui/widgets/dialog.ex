@@ -50,6 +50,9 @@ defmodule TermUI.Widgets.Dialog do
   alias TermUI.Renderer.Style
   alias TermUI.Theme
 
+  # Dialyzer: Suppress opaque type warnings for Style helpers
+  @dialyzer {:nowarn_function, bg_theme: 1}
+
   @doc """
   Creates new Dialog widget props.
 
@@ -83,6 +86,18 @@ defmodule TermUI.Widgets.Dialog do
       focused_button_style: Keyword.get(opts, :focused_button_style)
     }
   end
+
+  # ----------------------------------------------------------------------------
+  # Style Helper Functions
+  # ----------------------------------------------------------------------------
+
+  @spec bg_theme(atom()) :: Style.t()
+  defp bg_theme(color) when is_atom(color),
+    do: Style.new() |> Style.bg(color)
+
+  # ----------------------------------------------------------------------------
+  # StatefulComponent Callbacks
+  # ----------------------------------------------------------------------------
 
   @impl true
   def init(props) do
@@ -150,6 +165,14 @@ defmodule TermUI.Widgets.Dialog do
     end
   end
 
+  def handle_event(_event, state) do
+    {:ok, state}
+  end
+
+  # ----------------------------------------------------------------------------
+  # Private Helpers for Event Handling
+  # ----------------------------------------------------------------------------
+
   defp handle_button_click(state, x, y) do
     case find_button_at_position(state, x, y) do
       nil ->
@@ -166,10 +189,6 @@ defmodule TermUI.Widgets.Dialog do
     end
 
     {:ok, %{state | focused_button: button_id, visible: false}}
-  end
-
-  def handle_event(_event, state) do
-    {:ok, state}
   end
 
   @impl true
@@ -196,7 +215,7 @@ defmodule TermUI.Widgets.Dialog do
       # Provide dimensions and background for opaque fill
       width: dialog_width,
       height: dialog_height,
-      bg: Style.new() |> Style.bg(Theme.get_color(:background))
+      bg: bg_theme(Theme.get_color(:background))
     }
   end
 
@@ -248,9 +267,9 @@ defmodule TermUI.Widgets.Dialog do
   end
 
   defp calculate_button_row_y(state) do
-    area_width = 80
+    _area_width = 80
     area_height = 24
-    dialog_width = state.width
+    _dialog_width = state.width
     dialog_height = calculate_height(state)
 
     dialog_y = max(0, div(area_height - dialog_height, 2))

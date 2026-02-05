@@ -62,6 +62,9 @@ defmodule TermUI.Widgets.TreeView do
   alias TermUI.Renderer.Style
   alias TermUI.Theme
 
+  # Dialyzer: Suppress opaque type warnings for Style helpers
+  @dialyzer {:nowarn_function, fg_semantic: 1, fg_color: 1, fg_bold_semantic: 1, fg_bg_semantic: 2}
+
   @type node_id :: term()
 
   @type tree_node :: %{
@@ -134,6 +137,26 @@ defmodule TermUI.Widgets.TreeView do
   def lazy(id, label, opts \\ []) do
     node(id, label, Keyword.put(opts, :children, :lazy))
   end
+
+  # ----------------------------------------------------------------------------
+  # Style Helper Functions
+  # ----------------------------------------------------------------------------
+
+  @spec fg_semantic(atom()) :: Style.t()
+  defp fg_semantic(color) when is_atom(color),
+    do: Style.new() |> Style.fg(color)
+
+  @spec fg_color(atom()) :: Style.t()
+  defp fg_color(color) when is_atom(color),
+    do: Style.new() |> Style.fg(color)
+
+  @spec fg_bold_semantic(atom()) :: Style.t()
+  defp fg_bold_semantic(color) when is_atom(color),
+    do: Style.new() |> Style.fg(color) |> Style.bold()
+
+  @spec fg_bg_semantic(atom(), atom()) :: Style.t()
+  defp fg_bg_semantic(fg, bg) when is_atom(fg) and is_atom(bg),
+    do: Style.new() |> Style.fg(fg) |> Style.bg(bg)
 
   # ----------------------------------------------------------------------------
   # Props
@@ -765,13 +788,10 @@ defmodule TermUI.Widgets.TreeView do
   defp apply_node_style(line, node, is_cursor, is_selected, is_match) do
     cond do
       node.disabled ->
-        styled(text(line), Style.new() |> Style.fg(Theme.get_semantic(:muted)))
+        styled(text(line), fg_semantic(Theme.get_semantic(:muted)))
 
       is_cursor && is_match ->
-        cursor_match_style =
-          Style.new()
-          |> Style.fg(Theme.get_color(:background))
-          |> Style.bg(Theme.get_semantic(:warning))
+        cursor_match_style = fg_bg_semantic(Theme.get_color(:background), Theme.get_semantic(:warning))
 
         styled(text(line), cursor_match_style)
 
@@ -779,10 +799,10 @@ defmodule TermUI.Widgets.TreeView do
         styled(text(line), Theme.get_component_style(:item, :focused))
 
       is_match ->
-        styled(text(line), Style.new() |> Style.fg(Theme.get_semantic(:warning)))
+        styled(text(line), fg_semantic(Theme.get_semantic(:warning)))
 
       is_selected ->
-        styled(text(line), Style.new() |> Style.fg(Theme.get_color(:primary)))
+        styled(text(line), fg_color(Theme.get_color(:primary)))
 
       true ->
         text(line)
@@ -794,7 +814,7 @@ defmodule TermUI.Widgets.TreeView do
     match_count = MapSet.size(state.filter_matches)
     count_text = if match_count > 0, do: " (#{match_count} matches)", else: " (no matches)"
 
-    filter_style = Style.new() |> Style.fg(Theme.get_semantic(:warning)) |> Style.bold()
+    filter_style = fg_bold_semantic(Theme.get_semantic(:warning))
     styled(text(filter_text <> count_text), filter_style)
   end
 

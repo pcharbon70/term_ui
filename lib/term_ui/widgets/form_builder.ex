@@ -45,6 +45,9 @@ defmodule TermUI.Widgets.FormBuilder do
   alias TermUI.Theme
   alias TermUI.Widgets.WidgetHelpers, as: Helpers
 
+  # Dialyzer: Suppress opaque type warnings for Style helpers
+  @dialyzer {:nowarn_function, fg_semantic: 1}
+
   @type field_type :: :text | :password | :checkbox | :radio | :select | :multi_select
 
   @type field_def :: %{
@@ -65,6 +68,18 @@ defmodule TermUI.Widgets.FormBuilder do
           label: String.t(),
           collapsible: boolean()
         }
+
+  # ----------------------------------------------------------------------------
+  # Style Helper Functions
+  # ----------------------------------------------------------------------------
+
+  @spec fg_semantic(atom()) :: Style.t()
+  defp fg_semantic(color) when is_atom(color),
+    do: Style.new() |> Style.fg(color)
+
+  # ----------------------------------------------------------------------------
+  # Public API
+  # ----------------------------------------------------------------------------
 
   @doc """
   Creates new FormBuilder widget props.
@@ -222,30 +237,6 @@ defmodule TermUI.Widgets.FormBuilder do
     handle_space_key(state)
   end
 
-  defp handle_space_key(%{submit_focused: true} = state), do: submit_form(state)
-
-  defp handle_space_key(state) do
-    field = get_field(state, state.focused_field)
-    handle_space_on_field(field, state)
-  end
-
-  defp handle_space_on_field(%{type: :checkbox} = field, state) do
-    state = toggle_checkbox(state, field.id)
-    {:ok, state}
-  end
-
-  defp handle_space_on_field(%{type: type} = field, state) when type in [:radio, :select] do
-    state = select_current_option(state)
-    {:ok, state}
-  end
-
-  defp handle_space_on_field(%{type: type} = field, state) when type in [:text, :password] do
-    state = append_char(state, " ")
-    {:ok, state}
-  end
-
-  defp handle_space_on_field(_field, state), do: {:ok, state}
-
   def handle_event(%Event.Key{key: :enter}, state) do
     if state.submit_focused do
       submit_form(state)
@@ -293,6 +284,34 @@ defmodule TermUI.Widgets.FormBuilder do
   def handle_event(_event, state) do
     {:ok, state}
   end
+
+  # ----------------------------------------------------------------------------
+  # Private Helpers for Event Handling
+  # ----------------------------------------------------------------------------
+
+  defp handle_space_key(%{submit_focused: true} = state), do: submit_form(state)
+
+  defp handle_space_key(state) do
+    field = get_field(state, state.focused_field)
+    handle_space_on_field(field, state)
+  end
+
+  defp handle_space_on_field(%{type: :checkbox} = field, state) do
+    state = toggle_checkbox(state, field.id)
+    {:ok, state}
+  end
+
+  defp handle_space_on_field(%{type: type}, state) when type in [:radio, :select] do
+    state = select_current_option(state)
+    {:ok, state}
+  end
+
+  defp handle_space_on_field(%{type: type}, state) when type in [:text, :password] do
+    state = append_char(state, " ")
+    {:ok, state}
+  end
+
+  defp handle_space_on_field(_field, state), do: {:ok, state}
 
   @impl true
   def render(state, area) do
@@ -386,26 +405,6 @@ defmodule TermUI.Widgets.FormBuilder do
     if field && field.options do
       {value, _label} = Enum.at(field.options, state.focused_option, {"", ""})
       update_value(state, field.id, value)
-    else
-      state
-    end
-  end
-
-  defp toggle_multi_select_option(state) do
-    field = get_field(state, state.focused_field)
-
-    if field && field.options do
-      {value, _label} = Enum.at(field.options, state.focused_option, {"", ""})
-      current = Map.get(state.values, field.id, [])
-
-      new_value =
-        if value in current do
-          List.delete(current, value)
-        else
-          [value | current]
-        end
-
-      update_value(state, field.id, new_value)
     else
       state
     end
@@ -611,7 +610,7 @@ defmodule TermUI.Widgets.FormBuilder do
 
     # Add error messages
     if errors != [] do
-      error_style = Style.new() |> Style.fg(Theme.get_semantic(:error))
+      error_style = fg_semantic(Theme.get_semantic(:error))
 
       error_rows =
         Enum.map(errors, fn err ->

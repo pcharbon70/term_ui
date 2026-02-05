@@ -31,6 +31,9 @@ defmodule TermUI.Widgets.Gauge do
   alias TermUI.Theme
   alias TermUI.Widgets.VisualizationHelper, as: VizHelper
 
+  # Dialyzer: Suppress opaque type warnings for Style helpers
+  @dialyzer {:nowarn_function, fg_semantic: 1}
+
   @doc """
   Renders a gauge.
 
@@ -60,6 +63,18 @@ defmodule TermUI.Widgets.Gauge do
         empty()
     end
   end
+
+  # ----------------------------------------------------------------------------
+  # Style Helper Functions
+  # ----------------------------------------------------------------------------
+
+  @spec fg_semantic(atom()) :: Style.t()
+  defp fg_semantic(color) when is_atom(color),
+    do: Style.new() |> Style.fg(color)
+
+  # ----------------------------------------------------------------------------
+  # Rendering
+  # ----------------------------------------------------------------------------
 
   defp do_render(value, opts) do
     chars = CharacterSet.current_charset()
@@ -301,9 +316,9 @@ defmodule TermUI.Widgets.Gauge do
 
     # Create theme-based default zones
     default_zones = [
-      {0, Style.new() |> Style.fg(Theme.get_semantic(:success))},
-      {warning, Style.new() |> Style.fg(Theme.get_semantic(:warning))},
-      {danger, Style.new() |> Style.fg(Theme.get_semantic(:error))}
+      {0, fg_semantic(Theme.get_semantic(:success))},
+      {warning, fg_semantic(Theme.get_semantic(:warning))},
+      {danger, fg_semantic(Theme.get_semantic(:error))}
     ]
 
     zones = Keyword.get(opts, :zones, default_zones)

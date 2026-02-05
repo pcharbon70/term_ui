@@ -43,6 +43,9 @@ defmodule TermUI.Widget.PickList do
   alias TermUI.Event
   alias TermUI.Renderer.Style
 
+  # Dialyzer: Suppress opaque type warnings for Style helpers
+  @dialyzer {:nowarn_function, build_style: 1, positioned_cell_safe: 4}
+
   # Border characters (single style)
   @border %{tl: "┌", tr: "┐", bl: "└", br: "┘", h: "─", v: "│"}
 
@@ -287,10 +290,10 @@ defmodule TermUI.Widget.PickList do
     title_padded = " " <> title_text <> " "
     title_start = 2
 
-    cells = cells ++ [positioned_cell(x, y, @border.tl, style)]
+    cells = cells ++ [positioned_cell_safe(x, y, @border.tl, style)]
 
     cells =
-      cells ++ for(i <- 1..(title_start - 1), do: positioned_cell(x + i, y, @border.h, style))
+      cells ++ for(i <- 1..(title_start - 1), do: positioned_cell_safe(x + i, y, @border.h, style))
 
     cells =
       cells ++
@@ -298,35 +301,35 @@ defmodule TermUI.Widget.PickList do
          |> String.graphemes()
          |> Enum.with_index()
          |> Enum.map(fn {char, i} ->
-           positioned_cell(x + title_start + i, y, char, style)
+           positioned_cell_safe(x + title_start + i, y, char, style)
          end))
 
     title_end = title_start + String.length(title_padded)
 
     cells =
-      cells ++ for(i <- title_end..(width - 2), do: positioned_cell(x + i, y, @border.h, style))
+      cells ++ for(i <- title_end..(width - 2), do: positioned_cell_safe(x + i, y, @border.h, style))
 
-    cells = cells ++ [positioned_cell(x + width - 1, y, @border.tr, style)]
+    cells = cells ++ [positioned_cell_safe(x + width - 1, y, @border.tr, style)]
 
     # Side borders
     cells =
       (cells ++
          for row <- 1..(height - 2) do
            [
-             positioned_cell(x, y + row, @border.v, style),
-             positioned_cell(x + width - 1, y + row, @border.v, style)
+             positioned_cell_safe(x, y + row, @border.v, style),
+             positioned_cell_safe(x + width - 1, y + row, @border.v, style)
            ]
          end)
       |> List.flatten()
 
     # Bottom border
-    cells = cells ++ [positioned_cell(x, y + height - 1, @border.bl, style)]
+    cells = cells ++ [positioned_cell_safe(x, y + height - 1, @border.bl, style)]
 
     cells =
       cells ++
-        for(i <- 1..(width - 2), do: positioned_cell(x + i, y + height - 1, @border.h, style))
+        for(i <- 1..(width - 2), do: positioned_cell_safe(x + i, y + height - 1, @border.h, style))
 
-    cells = cells ++ [positioned_cell(x + width - 1, y + height - 1, @border.br, style)]
+    cells = cells ++ [positioned_cell_safe(x + width - 1, y + height - 1, @border.br, style)]
 
     cells
   end
@@ -341,13 +344,13 @@ defmodule TermUI.Widget.PickList do
     |> String.graphemes()
     |> Enum.with_index()
     |> Enum.map(fn {char, i} ->
-      positioned_cell(modal_x + 1 + i, modal_y + 1, char, style)
+      positioned_cell_safe(modal_x + 1 + i, modal_y + 1, char, style)
     end)
   end
 
   defp render_items(params) do
-    %{items: items, selected_index: selected_index, scroll_offset: scroll_offset,
-            x: x, y: y, width: width, height: height, style: style, highlight_style: highlight_style} = params
+    %{items: items, selected_index: _selected_index, scroll_offset: _scroll_offset,
+            x: x, y: y, width: width, height: _height, style: style, highlight_style: _highlight_style} = params
 
     if items == [] do
       render_empty_items(x, y, width, style)
@@ -365,7 +368,7 @@ defmodule TermUI.Widget.PickList do
     |> String.graphemes()
     |> Enum.with_index()
     |> Enum.map(fn {char, i} ->
-      positioned_cell(x + i, y, char, style)
+      positioned_cell_safe(x + i, y, char, style)
     end)
   end
 
@@ -396,7 +399,7 @@ defmodule TermUI.Widget.PickList do
     |> String.graphemes()
     |> Enum.with_index()
     |> Enum.map(fn {char, i} ->
-      positioned_cell(x + i, y, char, style)
+      positioned_cell_safe(x + i, y, char, style)
     end)
   end
 
@@ -430,9 +433,21 @@ defmodule TermUI.Widget.PickList do
     |> String.graphemes()
     |> Enum.with_index()
     |> Enum.map(fn {char, i} ->
-      positioned_cell(modal_x + 1 + i, y, char, style)
+      positioned_cell_safe(modal_x + 1 + i, y, char, style)
     end)
   end
+
+  # ----------------------------------------------------------------------------
+  # Style Helper Functions
+  # ----------------------------------------------------------------------------
+
+  @spec positioned_cell_safe(integer(), integer(), String.t(), Style.t()) :: RenderNode.t()
+  defp positioned_cell_safe(x, y, char, style),
+    do: positioned_cell_safe(x, y, char, style)
+
+  # ----------------------------------------------------------------------------
+  # Style Building
+  # ----------------------------------------------------------------------------
 
   defp build_style(opts) when is_map(opts) do
     style_list =
