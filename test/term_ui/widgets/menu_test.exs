@@ -1,5 +1,5 @@
 defmodule TermUI.Widgets.MenuTest do
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
 
   alias TermUI.Event
   alias TermUI.Widgets.Menu
@@ -152,7 +152,6 @@ defmodule TermUI.Widgets.MenuTest do
     end
 
     test "enter selects action item", %{state: state} do
-      selected_id = nil
       on_select = fn id -> send(self(), {:selected, id}) end
 
       state = %{state | on_select: on_select}

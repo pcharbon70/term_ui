@@ -259,16 +259,14 @@ defmodule TermUI.Widgets.ContextMenu.Behavior do
   @doc false
   @spec safe_callback(function(), list(), String.t()) :: :ok | {:error, term()}
   defp safe_callback(callback, args, callback_name) do
-    try do
-      apply(callback, args)
-      :ok
-    rescue
-      e ->
-        require Logger
+    apply(callback, args)
+    :ok
+  rescue
+    e ->
+      require Logger
 
-        Logger.error("ContextMenu #{callback_name} callback error: #{inspect(e)}")
+      Logger.error("ContextMenu #{callback_name} callback error: #{inspect(e)}")
 
-        {:error, e}
-    end
+      {:error, e}
   end
 end

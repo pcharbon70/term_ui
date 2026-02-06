@@ -1,5 +1,5 @@
 defmodule TermUI.Widgets.TextInput.LineTest do
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
 
   alias TermUI.Theme
 
@@ -423,10 +423,10 @@ defmodule TermUI.Widgets.TextInput.LineTest do
   end
 
   describe "focus behavior" do
-    test "is_focused? returns false by default" do
+    test "focused? returns false by default" do
       {:ok, state} = Line.init(Line.new(prompt: "> "))
 
-      refute Line.is_focused?(state)
+      refute Line.focused?(state)
     end
 
     test "set_focused/2 sets focus state to true" do
@@ -434,7 +434,7 @@ defmodule TermUI.Widgets.TextInput.LineTest do
 
       state = Line.set_focused(state, true)
 
-      assert Line.is_focused?(state)
+      assert Line.focused?(state)
     end
 
     test "set_focused/2 sets focus state to false" do
@@ -443,7 +443,7 @@ defmodule TermUI.Widgets.TextInput.LineTest do
 
       state = Line.set_focused(state, false)
 
-      refute Line.is_focused?(state)
+      refute Line.focused?(state)
     end
 
     test "blur/1 clears focus state" do
@@ -452,7 +452,7 @@ defmodule TermUI.Widgets.TextInput.LineTest do
 
       state = Line.blur(state)
 
-      refute Line.is_focused?(state)
+      refute Line.focused?(state)
     end
 
     test "blur/1 calls on_blur callback" do
@@ -531,10 +531,12 @@ defmodule TermUI.Widgets.TextInput.LineTest do
     test "read/1 returns :eof when stream ends" do
       {:ok, state} = Line.init(Line.new(prompt: "> "))
 
-      # CaptureIO doesn't directly support EOF simulation, so we verify
-      # the behavior through LineReader which returns :eof
-      # We test this by verifying the return type specification
-      assert {:eof, _state} = Line.read(state)
+      capture_io([input: "", capture_prompt: false], fn ->
+        result = Line.read(state)
+        send(self(), {:result, result})
+      end)
+
+      assert_receive {:result, {:eof, _state}}
     end
 
     test "read/1 with validator returns :eof when stream ends" do
@@ -544,22 +546,34 @@ defmodule TermUI.Widgets.TextInput.LineTest do
 
       {:ok, state} = Line.init(Line.new(validator: validator))
 
-      # Verify EOF return type with validator
-      assert {:eof, _state} = Line.read(state)
+      capture_io([input: "", capture_prompt: false], fn ->
+        result = Line.read(state)
+        send(self(), {:result, result})
+      end)
+
+      assert_receive {:result, {:eof, _state}}
     end
 
     test "handle_focus/1 returns :cancelled on EOF" do
       {:ok, state} = Line.init(Line.new(prompt: "> "))
 
-      # When EOF occurs during handle_focus, it returns :cancelled
-      # (distinct from :eof in direct read/1 calls)
-      assert {:cancelled, _state} = Line.handle_focus(state)
+      capture_io([input: "", capture_prompt: false], fn ->
+        result = Line.handle_focus(state)
+        send(self(), {:result, result})
+      end)
+
+      assert_receive {:result, {:cancelled, _state}}
     end
 
     test "cancelled state has focused set to false" do
       {:ok, state} = Line.init(Line.new(prompt: "> "))
 
-      {:cancelled, result_state} = Line.handle_focus(state)
+      capture_io([input: "", capture_prompt: false], fn ->
+        result = Line.handle_focus(state)
+        send(self(), {:result, result})
+      end)
+
+      assert_receive {:result, {:cancelled, result_state}}
 
       refute result_state.focused
     end
@@ -569,7 +583,12 @@ defmodule TermUI.Widgets.TextInput.LineTest do
       on_blur = fn state -> send(test_pid, {:blurred, state.value}) end
       {:ok, state} = Line.init(Line.new(prompt: "> ", on_blur: on_blur))
 
-      {:cancelled, _result_state} = Line.handle_focus(state)
+      capture_io([input: "", capture_prompt: false], fn ->
+        result = Line.handle_focus(state)
+        send(self(), {:result, result})
+      end)
+
+      assert_receive {:result, {:cancelled, _result_state}}
 
       assert_receive {:blurred, ""}
     end
@@ -579,7 +598,12 @@ defmodule TermUI.Widgets.TextInput.LineTest do
 
       {:ok, state} = Line.init(Line.new(validator: validator))
 
-      assert {:cancelled, _state} = Line.handle_focus(state)
+      capture_io([input: "", capture_prompt: false], fn ->
+        result = Line.handle_focus(state)
+        send(self(), {:result, result})
+      end)
+
+      assert_receive {:result, {:cancelled, _state}}
     end
   end
 

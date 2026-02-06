@@ -1,5 +1,5 @@
 defmodule TermUI.Runtime.NodeRendererTest do
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
 
   alias TermUI.Renderer.Buffer
   alias TermUI.Renderer.BufferManager
@@ -11,7 +11,16 @@ defmodule TermUI.Runtime.NodeRendererTest do
     {:ok, pid} = BufferManager.start_link(rows: 30, cols: 50, name: name)
 
     on_exit(fn ->
-      if Process.alive?(pid), do: GenServer.stop(pid)
+      ref = Process.monitor(pid)
+
+      _ =
+        try do
+          GenServer.stop(pid, :normal)
+        catch
+          :exit, _ -> :ok
+        end
+
+      assert_receive {:DOWN, ^ref, :process, ^pid, _}, 1_000
     end)
 
     {:ok, bm: pid}

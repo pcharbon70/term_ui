@@ -1,5 +1,5 @@
 defmodule TermUI.Focus.IndicatorTest do
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
 
   alias TermUI.Focus.Indicator
   alias TermUI.Renderer.Style

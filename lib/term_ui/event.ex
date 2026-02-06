@@ -4,7 +4,7 @@ defmodule TermUI.Event do
 
   Events represent user input from the terminal: keyboard presses,
   mouse actions, and focus changes. Events are routed to components
-  by the EventRouter based on focus state and position.
+  by the Runtime based on focus state and position.
 
   ## Event Types
 
@@ -29,6 +29,8 @@ defmodule TermUI.Event do
       event = Event.focus(:lost)
   """
 
+  alias __MODULE__.{Custom, Focus, Key, Mouse, Paste, Resize, Tick}
+
   @typedoc "Union type for all event types"
   @type t ::
           Key.t() | Mouse.t() | Focus.t() | Custom.t() | Resize.t() | Paste.t() | Tick.t()
@@ -43,7 +45,7 @@ defmodule TermUI.Event do
     """
 
     @type t :: %__MODULE__{
-            key: atom(),
+            key: atom() | binary(),
             char: String.t() | nil,
             modifiers: [atom()],
             timestamp: integer()
@@ -277,7 +279,7 @@ defmodule TermUI.Event do
       Event.key(:a, char: "a")
       Event.key(:c, modifiers: [:ctrl])
   """
-  @spec key(atom(), keyword()) :: Key.t()
+  @spec key(atom() | binary(), keyword()) :: Key.t()
   def key(key, opts \\ []) do
     Key.new(key, opts)
   end

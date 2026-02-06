@@ -9,15 +9,15 @@ defmodule TermUI.Focus do
   ## Usage
 
       # Enable focus reporting
-      IO.write(Focus.enable())
+      TermUI.TerminalOutput.write(Focus.enable())
 
       # Check if focus reporting is supported
       if Focus.supported?() do
-        IO.write(Focus.enable())
+        TermUI.TerminalOutput.write(Focus.enable())
       end
 
       # Disable focus reporting
-      IO.write(Focus.disable())
+      TermUI.TerminalOutput.write(Focus.disable())
   """
 
   # Focus reporting mode

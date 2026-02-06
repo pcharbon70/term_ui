@@ -1,4 +1,6 @@
 defmodule TermUI.PersistentTerms do
+  alias TermUI.Backend.Selector, as: BackendSelector
+
   @moduledoc """
   Centralized management of persistent_term storage for TermUI.
 
@@ -13,6 +15,7 @@ defmodule TermUI.PersistentTerms do
   - `:term_ui_backend_mode` - Current backend mode (:raw, :tty, or nil)
   - `:term_ui_capabilities` - Detected terminal capabilities map
   - `term_ui_character_set` - Character set (:unicode or :ascii)
+  - `:term_ui_runtime_owner` - PID of the runtime that last stored context
 
   BufferManager also uses persistent terms with its own name prefix:
   - `{TermUI.Renderer.BufferManager, name, :current}` - Current buffer reference
@@ -49,8 +52,9 @@ defmodule TermUI.PersistentTerms do
   - `backend_mode` - The backend mode (:raw, :tty, etc.)
   - `capabilities` - The detected capabilities map
   """
-  @spec store_backend_context(:raw | :tty | nil, map() | nil) :: :ok
+  @spec store_backend_context(:raw | :tty | :skip | nil, map() | nil) :: :ok
   def store_backend_context(backend_mode, capabilities) do
+    :persistent_term.put(:term_ui_runtime_owner, self())
     :persistent_term.put(:term_ui_backend_mode, backend_mode)
 
     caps_to_store =
@@ -78,7 +82,7 @@ defmodule TermUI.PersistentTerms do
 
   Returns `:raw`, `:tty`, or `nil` if not set.
   """
-  @spec backend_mode() :: :raw | :tty | nil
+  @spec backend_mode() :: :raw | :tty | :skip | nil
   def backend_mode do
     :persistent_term.get(:term_ui_backend_mode, nil)
   end
@@ -127,6 +131,7 @@ defmodule TermUI.PersistentTerms do
     :persistent_term.erase(:term_ui_backend_mode)
     :persistent_term.erase(:term_ui_capabilities)
     :persistent_term.erase(:term_ui_character_set)
+    :persistent_term.erase(:term_ui_runtime_owner)
 
     :ok
   end
@@ -145,16 +150,36 @@ defmodule TermUI.PersistentTerms do
   def any_terms? do
     :persistent_term.get(:term_ui_backend_mode, :not_set) != :not_set or
       :persistent_term.get(:term_ui_capabilities, :not_set) != :not_set or
-      :persistent_term.get(:term_ui_character_set, :not_set) != :not_set
+      :persistent_term.get(:term_ui_character_set, :not_set) != :not_set or
+      :persistent_term.get(:term_ui_runtime_owner, :not_set) != :not_set
+  end
+
+  @doc """
+  Returns the PID that last stored backend context, if any.
+  """
+  @spec owner_pid() :: pid() | nil
+  def owner_pid do
+    :persistent_term.get(:term_ui_runtime_owner, nil)
+  end
+
+  @doc """
+  Returns true when the given PID owns the current persistent terms.
+  """
+  @spec owns_terms?(pid()) :: boolean()
+  def owns_terms?(pid) when is_pid(pid) do
+    case owner_pid() do
+      nil -> true
+      ^pid -> true
+      _ -> false
+    end
   end
 
   # Private Functions
 
   defp detect_capabilities do
     # Defer to Backend.Selector for capability detection
-    case TermUI.Backend.Selector.detect_capabilities() do
+    case BackendSelector.detect_capabilities() do
       caps when is_map(caps) -> caps
-      _ -> %{}
     end
   rescue
     _ -> %{}

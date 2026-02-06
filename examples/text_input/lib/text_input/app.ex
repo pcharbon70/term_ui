@@ -255,7 +255,7 @@ defmodule TextInput.App do
   # Private Helpers
   # ----------------------------------------------------------------------------
 
-  # Border character sets (matching TermUI.Widget.Block)
+  # Border character sets (matching TermUI.Widgets.Block)
   @border_rounded %{tl: "╭", tr: "╮", bl: "╰", br: "╯", h: "─", v: "│"}
   @border_single %{tl: "┌", tr: "┐", bl: "└", br: "┘", h: "─", v: "│"}
 
@@ -267,19 +267,48 @@ defmodule TextInput.App do
     left_pad = 2
     right_pad = inner_width - left_pad - String.length(label)
 
-    top = b.tl <> String.duplicate(b.h, left_pad) <> label <> String.duplicate(b.h, right_pad) <> b.tr
+    top =
+      b.tl <> String.duplicate(b.h, left_pad) <> label <> String.duplicate(b.h, right_pad) <> b.tr
+
     bot = b.bl <> String.duplicate(b.h, inner_width) <> b.br
 
     stack(:vertical, [
       text(top, Style.new(fg: :yellow)),
       text(b.v <> String.pad_trailing("  Arrow keys       Move cursor", inner_width) <> b.v, nil),
-      text(b.v <> String.pad_trailing("  Home/End         Move to start/end of line", inner_width) <> b.v, nil),
-      text(b.v <> String.pad_trailing("  Ctrl+Home/End    Move to start/end of text", inner_width) <> b.v, nil),
-      text(b.v <> String.pad_trailing("  Backspace/Del    Delete characters", inner_width) <> b.v, nil),
-      text(b.v <> String.pad_trailing("  Ctrl+Enter       Insert newline (multiline)", inner_width) <> b.v, nil),
-      text(b.v <> String.pad_trailing("  Enter            Submit (single/chat) or newline", inner_width) <> b.v, nil),
-      text(b.v <> String.pad_trailing("  Tab              Switch between inputs", inner_width) <> b.v, nil),
-      text(b.v <> String.pad_trailing("  Q                Quit (when input is empty)", inner_width) <> b.v, nil),
+      text(
+        b.v <>
+          String.pad_trailing("  Home/End         Move to start/end of line", inner_width) <> b.v,
+        nil
+      ),
+      text(
+        b.v <>
+          String.pad_trailing("  Ctrl+Home/End    Move to start/end of text", inner_width) <> b.v,
+        nil
+      ),
+      text(
+        b.v <> String.pad_trailing("  Backspace/Del    Delete characters", inner_width) <> b.v,
+        nil
+      ),
+      text(
+        b.v <>
+          String.pad_trailing("  Ctrl+Enter       Insert newline (multiline)", inner_width) <> b.v,
+        nil
+      ),
+      text(
+        b.v <>
+          String.pad_trailing("  Enter            Submit (single/chat) or newline", inner_width) <>
+          b.v,
+        nil
+      ),
+      text(
+        b.v <> String.pad_trailing("  Tab              Switch between inputs", inner_width) <> b.v,
+        nil
+      ),
+      text(
+        b.v <>
+          String.pad_trailing("  Q                Quit (when input is empty)", inner_width) <> b.v,
+        nil
+      ),
       text(bot, Style.new(fg: :yellow))
     ])
   end
@@ -296,7 +325,9 @@ defmodule TextInput.App do
     left_pad = 2
     right_pad = inner_width - left_pad - String.length(label)
 
-    top = b.tl <> String.duplicate(b.h, left_pad) <> label <> String.duplicate(b.h, right_pad) <> b.tr
+    top =
+      b.tl <> String.duplicate(b.h, left_pad) <> label <> String.duplicate(b.h, right_pad) <> b.tr
+
     bot = b.bl <> String.duplicate(b.h, inner_width) <> b.br
 
     stack(:vertical, [
@@ -306,7 +337,12 @@ defmodule TextInput.App do
         TI.render(state.single_input, %{width: 50, height: 1}),
         text(" " <> b.v, border_style)
       ]),
-      text(b.v <> String.pad_trailing("  Value: \"#{String.slice(current_value, 0, 40)}\"", inner_width) <> b.v, Style.new(fg: :bright_black)),
+      text(
+        b.v <>
+          String.pad_trailing("  Value: \"#{String.slice(current_value, 0, 40)}\"", inner_width) <>
+          b.v,
+        Style.new(fg: :bright_black)
+      ),
       text(bot, border_style)
     ])
   end
@@ -325,7 +361,9 @@ defmodule TextInput.App do
     left_pad = 2
     right_pad = inner_width - left_pad - String.length(label)
 
-    top = b.tl <> String.duplicate(b.h, left_pad) <> label <> String.duplicate(b.h, right_pad) <> b.tr
+    top =
+      b.tl <> String.duplicate(b.h, left_pad) <> label <> String.duplicate(b.h, right_pad) <> b.tr
+
     bot = b.bl <> String.duplicate(b.h, inner_width) <> b.br
 
     input_view = TI.render(state.multi_input, %{width: 60, height: 5})
@@ -337,7 +375,14 @@ defmodule TextInput.App do
         input_view,
         text(" " <> b.v, border_style)
       ]),
-      text(b.v <> String.pad_trailing("  Lines: #{line_count}, Cursor: row #{cursor_row + 1}, col #{cursor_col + 1}", inner_width) <> b.v, Style.new(fg: :bright_black)),
+      text(
+        b.v <>
+          String.pad_trailing(
+            "  Lines: #{line_count}, Cursor: row #{cursor_row + 1}, col #{cursor_col + 1}",
+            inner_width
+          ) <> b.v,
+        Style.new(fg: :bright_black)
+      ),
       text(bot, border_style)
     ])
   end
@@ -353,7 +398,9 @@ defmodule TextInput.App do
     left_pad = 2
     right_pad = inner_width - left_pad - String.length(label)
 
-    top = b.tl <> String.duplicate(b.h, left_pad) <> label <> String.duplicate(b.h, right_pad) <> b.tr
+    top =
+      b.tl <> String.duplicate(b.h, left_pad) <> label <> String.duplicate(b.h, right_pad) <> b.tr
+
     bot = b.bl <> String.duplicate(b.h, inner_width) <> b.br
 
     input_view = TI.render(state.chat_input, %{width: 60, height: 3})

@@ -1,5 +1,5 @@
 defmodule TermUI.Input.LineReaderTest do
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
 
   alias TermUI.Input.LineReader
 
@@ -20,6 +20,7 @@ defmodule TermUI.Input.LineReaderTest do
 
   describe "read_line/1" do
     test "function exists with arity 0 and 1" do
+      assert Code.ensure_loaded?(LineReader)
       assert function_exported?(LineReader, :read_line, 0)
       assert function_exported?(LineReader, :read_line, 1)
     end
@@ -57,6 +58,7 @@ defmodule TermUI.Input.LineReaderTest do
 
   describe "read_line/2 with validation" do
     test "function exists with arity 2" do
+      assert Code.ensure_loaded?(LineReader)
       assert function_exported?(LineReader, :read_line, 2)
     end
 

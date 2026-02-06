@@ -1,5 +1,5 @@
 defmodule TermUI.Layout.AlignmentTest do
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
 
   alias TermUI.Layout.Alignment
 

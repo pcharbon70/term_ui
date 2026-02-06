@@ -83,6 +83,9 @@ defmodule TermUI.Backend.TTY do
 
   @behaviour TermUI.Backend
 
+  alias TermUI.Backend.InputBuffer
+  alias TermUI.Color.Converter
+
   # ===========================================================================
   # ANSI Escape Sequence Constants
   # ===========================================================================
@@ -100,7 +103,7 @@ defmodule TermUI.Backend.TTY do
   # Attribute control sequences
   @reset_attrs "\e[0m"
 
-  # Input buffer management is handled by TermUI.Backend.InputBuffer module
+  # Input buffer management is handled by InputBuffer module
   # which provides rate-limited logging and consistent behavior across backends.
 
   # ===========================================================================
@@ -732,14 +735,14 @@ defmodule TermUI.Backend.TTY do
   # Uses the shared InputBuffer module for rate-limited logging.
   @spec append_to_input_buffer(t(), binary()) :: t()
   defp append_to_input_buffer(state, data) do
-    TermUI.Backend.InputBuffer.append_with_limit(state, data, :input_buffer, source: __MODULE__)
+    InputBuffer.append_with_limit(state, data, :input_buffer, source: __MODULE__)
   end
 
   # Applies buffer size limit, truncating if necessary.
   # Uses the shared InputBuffer module for rate-limited logging.
   @spec apply_buffer_limit(t()) :: t()
   defp apply_buffer_limit(%{input_buffer: buffer} = state) do
-    {limited, _overflowed} = TermUI.Backend.InputBuffer.apply_limit(buffer, source: __MODULE__)
+    {limited, _overflowed} = InputBuffer.apply_limit(buffer, source: __MODULE__)
     %{state | input_buffer: limited}
   end
 
@@ -750,17 +753,19 @@ defmodule TermUI.Backend.TTY do
   # Determines color mode from capabilities map.
   @spec determine_color_mode(map()) :: color_mode()
   defp determine_color_mode(capabilities) do
-    case Map.get(capabilities, :colors) do
-      :true_color -> :true_color
-      :color_256 -> :color_256
-      :color_16 -> :color_16
-      :monochrome -> :monochrome
-      n when is_integer(n) and n >= 16_777_216 -> :true_color
-      n when is_integer(n) and n >= 256 -> :color_256
-      n when is_integer(n) and n >= 16 -> :color_16
-      _ -> :true_color
-    end
+    capabilities
+    |> Map.get(:colors)
+    |> color_value_to_mode()
   end
+
+  defp color_value_to_mode(:true_color), do: :true_color
+  defp color_value_to_mode(:color_256), do: :color_256
+  defp color_value_to_mode(:color_16), do: :color_16
+  defp color_value_to_mode(:monochrome), do: :monochrome
+  defp color_value_to_mode(n) when is_integer(n) and n >= 16_777_216, do: :true_color
+  defp color_value_to_mode(n) when is_integer(n) and n >= 256, do: :color_256
+  defp color_value_to_mode(n) when is_integer(n) and n >= 16, do: :color_16
+  defp color_value_to_mode(_), do: :true_color
 
   # Determines character set from capabilities map.
   @spec determine_character_set(map()) :: character_set()
@@ -775,21 +780,22 @@ defmodule TermUI.Backend.TTY do
   # Determines terminal size from options, capabilities, or defaults.
   @spec determine_size(keyword(), map()) :: {pos_integer(), pos_integer()}
   defp determine_size(opts, capabilities) do
-    case Keyword.get(opts, :size) do
+    size_from_opts(Keyword.get(opts, :size)) || size_from_capabilities(capabilities) || {24, 80}
+  end
+
+  defp size_from_opts({rows, cols})
+       when is_integer(rows) and is_integer(cols) and rows > 0 and cols > 0,
+       do: {rows, cols}
+
+  defp size_from_opts(_), do: nil
+
+  defp size_from_capabilities(capabilities) do
+    case Map.get(capabilities, :dimensions) do
       {rows, cols} when is_integer(rows) and is_integer(cols) and rows > 0 and cols > 0 ->
         {rows, cols}
 
-      nil ->
-        case Map.get(capabilities, :dimensions) do
-          {rows, cols} when is_integer(rows) and is_integer(cols) and rows > 0 and cols > 0 ->
-            {rows, cols}
-
-          _ ->
-            {24, 80}
-        end
-
       _ ->
-        {24, 80}
+        nil
     end
   end
 
@@ -805,14 +811,14 @@ defmodule TermUI.Backend.TTY do
   defp setup_terminal(state) do
     # Enter alternate screen if configured
     if state.alternate_screen do
-      IO.write(@alt_screen_enter)
+      TermUI.TerminalOutput.write(@alt_screen_enter)
     end
 
     # Hide cursor for cleaner rendering
-    IO.write(@cursor_hide)
+    TermUI.TerminalOutput.write(@cursor_hide)
 
     # Clear screen and move cursor to home position
-    IO.write(@clear_screen <> @cursor_home)
+    TermUI.TerminalOutput.write(@clear_screen <> @cursor_home)
 
     # Update state to reflect cursor is hidden
     %{state | cursor_visible: false, cursor_position: {1, 1}}
@@ -1001,14 +1007,14 @@ defmodule TermUI.Backend.TTY do
        when is_integer(r) and r >= 0 and r <= 255 and
               is_integer(g) and g >= 0 and g <= 255 and
               is_integer(b) and b >= 0 and b <= 255 do
-    "\e[38;5;#{TermUI.Color.Converter.rgb_to_256({r, g, b})}m"
+    "\e[38;5;#{Converter.rgb_to_256({r, g, b})}m"
   end
 
   defp color_to_sgr({r, g, b}, :bg, :color_256)
        when is_integer(r) and r >= 0 and r <= 255 and
               is_integer(g) and g >= 0 and g <= 255 and
               is_integer(b) and b >= 0 and b <= 255 do
-    "\e[48;5;#{TermUI.Color.Converter.rgb_to_256({r, g, b})}m"
+    "\e[48;5;#{Converter.rgb_to_256({r, g, b})}m"
   end
 
   # 16-color mode - convert RGB to basic color (with validation)
@@ -1016,14 +1022,14 @@ defmodule TermUI.Backend.TTY do
        when is_integer(r) and r >= 0 and r <= 255 and
               is_integer(g) and g >= 0 and g <= 255 and
               is_integer(b) and b >= 0 and b <= 255 do
-    "\e[#{TermUI.Color.Converter.rgb_to_16({r, g, b}, :fg)}m"
+    "\e[#{Converter.rgb_to_16({r, g, b}, :fg)}m"
   end
 
   defp color_to_sgr({r, g, b}, :bg, :color_16)
        when is_integer(r) and r >= 0 and r <= 255 and
               is_integer(g) and g >= 0 and g <= 255 and
               is_integer(b) and b >= 0 and b <= 255 do
-    "\e[#{TermUI.Color.Converter.rgb_to_16({r, g, b}, :bg)}m"
+    "\e[#{Converter.rgb_to_16({r, g, b}, :bg)}m"
   end
 
   # Monochrome mode - skip colors entirely
@@ -1145,8 +1151,6 @@ defmodule TermUI.Backend.TTY do
     String.replace(char, "\e", "")
   end
 
-  defp sanitize_char(char), do: char
-
   # Builds a frame map from cells for incremental mode tracking.
   @spec build_frame_map([{TermUI.Backend.position(), TermUI.Backend.cell()}]) :: map()
   defp build_frame_map(cells) do
@@ -1221,7 +1225,7 @@ defmodule TermUI.Backend.TTY do
   @spec safe_write(iodata()) :: :ok
   defp safe_write(data) do
     try do
-      IO.write(data)
+      TermUI.TerminalOutput.write(data)
     rescue
       _ -> :ok
     end

@@ -216,7 +216,7 @@ defmodule TermUI.Widgets.Canvas do
   @doc """
   Draws a horizontal line.
   """
-  @spec draw_hline(map(), integer(), integer(), integer(), String.t()) :: map()
+  @spec draw_hline(map(), integer(), integer(), integer(), String.t() | nil) :: map()
   def draw_hline(state, x, y, length, char \\ nil) do
     char = char || CharacterSet.current_charset().h_line
 
@@ -228,7 +228,7 @@ defmodule TermUI.Widgets.Canvas do
   @doc """
   Draws a vertical line.
   """
-  @spec draw_vline(map(), integer(), integer(), integer(), String.t()) :: map()
+  @spec draw_vline(map(), integer(), integer(), integer(), String.t() | nil) :: map()
   def draw_vline(state, x, y, length, char \\ nil) do
     char = char || CharacterSet.current_charset().v_line
 
@@ -240,7 +240,7 @@ defmodule TermUI.Widgets.Canvas do
   @doc """
   Draws a line between two points using Bresenham's algorithm.
   """
-  @spec draw_line(map(), integer(), integer(), integer(), integer(), String.t()) :: map()
+  @spec draw_line(map(), integer(), integer(), integer(), integer(), String.t() | nil) :: map()
   def draw_line(state, x1, y1, x2, y2, char \\ nil) do
     char = char || CharacterSet.current_charset().dot
     dx = abs(x2 - x1)

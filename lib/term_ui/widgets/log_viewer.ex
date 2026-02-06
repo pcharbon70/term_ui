@@ -72,19 +72,27 @@ defmodule TermUI.Widgets.LogViewer do
           highlight: boolean()
         }
 
-  @level_patterns [
-    {:emergency, ~r/\b(EMERGENCY|EMERG)\b/i},
-    {:alert, ~r/\b(ALERT)\b/i},
-    {:critical, ~r/\b(CRITICAL|CRIT|FATAL)\b/i},
-    {:error, ~r/\b(ERROR|ERR)\b/i},
-    {:warning, ~r/\b(WARNING|WARN)\b/i},
-    {:notice, ~r/\b(NOTICE)\b/i},
-    {:info, ~r/\b(INFO)\b/i},
-    {:debug, ~r/\b(DEBUG|DBG)\b/i}
-  ]
+  # Regex patterns defined as functions to avoid Elixir 1.18+ Regex escape issues
+  defp level_patterns do
+    [
+      {:emergency, ~r/\b(EMERGENCY|EMERG)\b/i},
+      {:alert, ~r/\b(ALERT)\b/i},
+      {:critical, ~r/\b(CRITICAL|CRIT|FATAL)\b/i},
+      {:error, ~r/\b(ERROR|ERR)\b/i},
+      {:warning, ~r/\b(WARNING|WARN)\b/i},
+      {:notice, ~r/\b(NOTICE)\b/i},
+      {:info, ~r/\b(INFO)\b/i},
+      {:debug, ~r/\b(DEBUG|DBG)\b/i}
+    ]
+  end
 
-  @timestamp_pattern ~r/\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?/
-  @source_pattern ~r/\[([^\]]+)\]/
+  defp timestamp_pattern do
+    ~r/\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?/
+  end
+
+  defp source_pattern do
+    ~r/\[([^\]]+)\]/
+  end
 
   @page_size 20
 
@@ -169,7 +177,7 @@ defmodule TermUI.Widgets.LogViewer do
 
     # Start at bottom if tail mode
     state =
-      if props.tail_mode and length(lines) > 0 do
+      if props.tail_mode and lines != [] do
         %{
           state
           | cursor: length(lines) - 1,
@@ -689,7 +697,7 @@ defmodule TermUI.Widgets.LogViewer do
 
     # Jump to first match if any
     state =
-      if length(matches) > 0 do
+      if matches != [] do
         first_match = hd(matches)
         visible_lines = get_visible_line_indices(state)
         visible_idx = Enum.find_index(visible_lines, &(&1 == first_match)) || 0
@@ -707,7 +715,7 @@ defmodule TermUI.Widgets.LogViewer do
   end
 
   defp next_search_match(state, direction) do
-    if state.search && length(state.search.matches) > 0 do
+    if state.search && state.search.matches != [] do
       matches = state.search.matches
       current = state.search.current_match
       next_idx = rem(current + direction + length(matches), length(matches))
@@ -772,23 +780,30 @@ defmodule TermUI.Widgets.LogViewer do
   end
 
   defp matches_filter?(line, idx, filter, bookmarks) do
-    level_match =
-      filter.levels == nil or line.level in filter.levels
-
-    source_match =
-      filter.source == nil or
-        (line.source != nil and String.contains?(line.source, filter.source))
-
-    pattern_match =
-      filter.pattern == nil or
-        (is_struct(filter.pattern, Regex) and Regex.match?(filter.pattern, line.raw)) or
-        (is_binary(filter.pattern) and String.contains?(line.raw, filter.pattern))
-
-    bookmark_match =
-      not filter.bookmarks_only or MapSet.member?(bookmarks, idx)
+    level_match = filter.levels == nil or line.level in filter.levels
+    source_match = matches_source?(line, filter)
+    pattern_match = matches_pattern?(line, filter)
+    bookmark_match = not filter.bookmarks_only or MapSet.member?(bookmarks, idx)
 
     level_match and source_match and pattern_match and bookmark_match
   end
+
+  defp matches_source?(line, filter) do
+    filter.source == nil or
+      (line.source != nil and String.contains?(line.source, filter.source))
+  end
+
+  defp matches_pattern?(_line, %{pattern: nil}), do: true
+
+  defp matches_pattern?(line, %{pattern: pattern}) when is_struct(pattern, Regex) do
+    Regex.match?(pattern, line.raw)
+  end
+
+  defp matches_pattern?(line, %{pattern: pattern}) when is_binary(pattern) do
+    String.contains?(line.raw, pattern)
+  end
+
+  defp matches_pattern?(_line, _filter), do: false
 
   # ----------------------------------------------------------------------------
   # Private: Bookmarks
@@ -842,7 +857,7 @@ defmodule TermUI.Widgets.LogViewer do
   end
 
   defp extract_timestamp(line) do
-    case Regex.run(@timestamp_pattern, line) do
+    case Regex.run(timestamp_pattern(), line) do
       [match | _] ->
         case DateTime.from_iso8601(match) do
           {:ok, dt, _} -> dt
@@ -855,13 +870,13 @@ defmodule TermUI.Widgets.LogViewer do
   end
 
   defp extract_level(line) do
-    Enum.find_value(@level_patterns, fn {level, pattern} ->
+    Enum.find_value(level_patterns(), fn {level, pattern} ->
       if Regex.match?(pattern, line), do: level, else: nil
     end)
   end
 
   defp extract_source(line) do
-    case Regex.run(@source_pattern, line) do
+    case Regex.run(source_pattern(), line) do
       [_, source | _] -> source
       nil -> nil
     end
@@ -917,19 +932,15 @@ defmodule TermUI.Widgets.LogViewer do
     stack(:horizontal, parts)
   end
 
-  defp level_color(level) do
-    case level do
-      :debug -> Theme.get_semantic(:info)
-      :info -> Theme.get_semantic(:success)
-      :notice -> Theme.get_color(:primary)
-      :warning -> Theme.get_semantic(:warning)
-      :error -> Theme.get_semantic(:error)
-      :critical -> Theme.get_color(:accent)
-      :alert -> Theme.get_semantic(:error)
-      :emergency -> Theme.get_semantic(:error)
-      _ -> Theme.get_color(:foreground)
-    end
-  end
+  defp level_color(:debug), do: Theme.get_semantic(:info)
+  defp level_color(:info), do: Theme.get_semantic(:success)
+  defp level_color(:notice), do: Theme.get_color(:primary)
+  defp level_color(:warning), do: Theme.get_semantic(:warning)
+  defp level_color(:error), do: Theme.get_semantic(:error)
+  defp level_color(:critical), do: Theme.get_color(:accent)
+  defp level_color(:alert), do: Theme.get_semantic(:error)
+  defp level_color(:emergency), do: Theme.get_semantic(:error)
+  defp level_color(_), do: Theme.get_color(:foreground)
 
   defp level_abbrev(:debug), do: "DEBUG"
   defp level_abbrev(:info), do: "INFO"

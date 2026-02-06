@@ -1,5 +1,6 @@
 defmodule TermUI.TermUtilsTest do
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
+  @moduletag :capture_log
 
   alias TermUI.TermUtils
 
@@ -15,6 +16,30 @@ defmodule TermUI.TermUtilsTest do
       # Either succeeds (has TTY) or fails with :stty_failed (no TTY)
       # But should NOT fail with :invalid_arguments
       refute match?({:error, :invalid_arguments}, result)
+    end
+
+    @tag :external
+    test "accepts stty size command" do
+      # Should pass argument validation even if command fails (no tty)
+      result = TermUtils.safe_stty(["size"])
+      refute match?({:error, :invalid_arguments}, result)
+    end
+
+    @tag :external
+    test "accepts stty -g settings string as argument" do
+      # This is the format that stty -g outputs on common platforms
+      settings = "9600:5:cbf3a3b:bf:8a3b:3d"
+      assert :ok = TermUtils.validate_stty_settings(settings)
+
+      # Should pass argument validation even if command fails (no tty)
+      result = TermUtils.safe_stty([settings])
+      refute match?({:error, :invalid_arguments}, result)
+    end
+
+    @tag :external
+    test "rejects stty file flags for non-tty paths" do
+      assert {:error, :invalid_arguments} = TermUtils.safe_stty(["-F", "/dev/null", "-g"])
+      assert {:error, :invalid_arguments} = TermUtils.safe_stty(["-f", "/dev/null", "-g"])
     end
 
     @tag :external
@@ -137,7 +162,8 @@ defmodule TermUI.TermUtilsTest do
 
     test "test argument validation blocks dangerous inputs" do
       bad_inputs = [
-        ["-t", "1000"],  # FD too large
+        # FD too large
+        ["-t", "1000"],
         ["-t", "$(whoami)"],
         [";rm"],
         ["$(echo", "pwn)"]

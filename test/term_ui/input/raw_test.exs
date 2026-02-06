@@ -1,9 +1,10 @@
 defmodule TermUI.Input.RawTest do
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
+  @moduletag :capture_log
 
-  alias TermUI.Input.Raw
-  alias TermUI.Input
   alias TermUI.Event
+  alias TermUI.Input
+  alias TermUI.Input.Raw
 
   describe "behaviour implementation" do
     test "module implements TermUI.Input behaviour" do

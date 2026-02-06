@@ -1,6 +1,6 @@
 defmodule TermUI.Integration.TestingFrameworkTest do
   # async: true because test utilities are stateless and create isolated resources
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
   use TermUI.Test.Assertions
 
   alias TermUI.Event
@@ -75,7 +75,7 @@ defmodule TermUI.Integration.TestingFrameworkTest do
 
       # Get diffs
       diffs = TestRenderer.diff_snapshot(renderer, snapshot)
-      assert length(diffs) > 0
+      assert diffs != []
 
       TestRenderer.destroy(renderer)
     end

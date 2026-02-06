@@ -88,6 +88,16 @@ defmodule TermUI.CharacterSet do
           tr: String.t(),
           bl: String.t(),
           br: String.t(),
+          # Box corners (double)
+          tl_double: String.t(),
+          tr_double: String.t(),
+          bl_double: String.t(),
+          br_double: String.t(),
+          # Box corners (heavy)
+          tl_heavy: String.t(),
+          tr_heavy: String.t(),
+          bl_heavy: String.t(),
+          br_heavy: String.t(),
           # Rounded box corners
           tl_round: String.t(),
           tr_round: String.t(),
@@ -96,6 +106,9 @@ defmodule TermUI.CharacterSet do
           # Lines (light)
           h_line: String.t(),
           v_line: String.t(),
+          # Lines (double)
+          h_line_double: String.t(),
+          v_line_double: String.t(),
           # Lines (heavy)
           h_line_heavy: String.t(),
           v_line_heavy: String.t(),
@@ -146,6 +159,16 @@ defmodule TermUI.CharacterSet do
     tr: "┐",
     bl: "└",
     br: "┘",
+    # Box corners (double)
+    tl_double: "╔",
+    tr_double: "╗",
+    bl_double: "╚",
+    br_double: "╝",
+    # Box corners (heavy)
+    tl_heavy: "┏",
+    tr_heavy: "┓",
+    bl_heavy: "┗",
+    br_heavy: "┛",
     # Rounded box corners
     tl_round: "╭",
     tr_round: "╮",
@@ -154,6 +177,9 @@ defmodule TermUI.CharacterSet do
     # Lines (light)
     h_line: "─",
     v_line: "│",
+    # Lines (double)
+    h_line_double: "═",
+    v_line_double: "║",
     # Lines (heavy)
     h_line_heavy: "━",
     v_line_heavy: "┃",
@@ -204,6 +230,16 @@ defmodule TermUI.CharacterSet do
     tr: "+",
     bl: "+",
     br: "+",
+    # Box corners (double - same as regular in ASCII)
+    tl_double: "+",
+    tr_double: "+",
+    bl_double: "+",
+    br_double: "+",
+    # Box corners (heavy - same as regular in ASCII)
+    tl_heavy: "+",
+    tr_heavy: "+",
+    bl_heavy: "+",
+    br_heavy: "+",
     # Rounded box corners (same as regular in ASCII)
     tl_round: "+",
     tr_round: "+",
@@ -212,6 +248,9 @@ defmodule TermUI.CharacterSet do
     # Lines (ASCII)
     h_line: "-",
     v_line: "|",
+    # Lines (double - approximate in ASCII)
+    h_line_double: "=",
+    v_line_double: "|",
     # Lines (heavy - same as regular in ASCII)
     h_line_heavy: "=",
     v_line_heavy: "|",

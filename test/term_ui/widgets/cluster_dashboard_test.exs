@@ -1,5 +1,5 @@
 defmodule TermUI.Widgets.ClusterDashboardTest do
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
 
   alias TermUI.Event
   alias TermUI.Theme
@@ -7,7 +7,11 @@ defmodule TermUI.Widgets.ClusterDashboardTest do
 
   setup do
     # Start Theme server for color support
-    {:ok, _theme_pid} = Theme.start_link(theme: :dark)
+    case Theme.start_link(theme: :dark) do
+      {:ok, _pid} -> :ok
+      {:error, {:already_started, _pid}} -> :ok
+    end
+
     :ok
   end
 
@@ -63,7 +67,7 @@ defmodule TermUI.Widgets.ClusterDashboardTest do
       {:ok, state} = ClusterDashboard.init(props)
 
       # Should have at least the local node
-      assert length(state.nodes) >= 1
+      assert [_ | _] = state.nodes
 
       local = Enum.find(state.nodes, &(&1.status == :local))
       assert local != nil
@@ -270,7 +274,7 @@ defmodule TermUI.Widgets.ClusterDashboardTest do
 
       assert result.type == :stack
       assert result.direction == :vertical
-      assert length(result.children) > 0
+      assert result.children != []
     end
 
     test "renders globals view" do
@@ -419,7 +423,7 @@ defmodule TermUI.Widgets.ClusterDashboardTest do
       {:ok, state} = ClusterDashboard.init(props)
 
       # Should have local node
-      assert length(state.nodes) >= 1
+      assert [_ | _] = state.nodes
 
       # Rendering should work
       area = %{x: 0, y: 0, width: 80, height: 25}

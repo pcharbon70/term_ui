@@ -114,7 +114,14 @@ defmodule TermUI.Runtime.NodeRenderer do
          col,
          style
        ) do
-    render_viewport(content, buffer, row, col, style, scroll_x, scroll_y, width, height)
+    viewport_params = %{
+      scroll_x: scroll_x,
+      scroll_y: scroll_y,
+      width: width,
+      height: height
+    }
+
+    render_viewport(content, buffer, row, col, style, viewport_params)
   end
 
   # Handle overlay nodes (from AlertDialog, Dialog, ContextMenu, Toast widgets)
@@ -259,17 +266,10 @@ defmodule TermUI.Runtime.NodeRenderer do
 
   # Viewport rendering - clips content to a region with scroll offsets
   # Creates a temporary buffer to render content, then copies visible portion
-  defp render_viewport(
-         content,
-         buffer,
-         dest_row,
-         dest_col,
-         style,
-         scroll_x,
-         scroll_y,
-         vp_width,
-         vp_height
-       ) do
+  defp render_viewport(content, buffer, dest_row, dest_col, style, viewport_params) do
+    %{scroll_x: scroll_x, scroll_y: scroll_y, width: vp_width, height: vp_height} =
+      viewport_params
+
     # Estimate content size - we need a buffer large enough to hold the content
     # Use a reasonable maximum to avoid excessive memory usage
     content_width = scroll_x + vp_width + 100

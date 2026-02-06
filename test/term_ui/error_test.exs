@@ -1,5 +1,5 @@
 defmodule TermUI.ErrorTest do
-  use ExUnit.Case
+  use TermUI.TestCase
   doctest TermUI.Error
 
   alias TermUI.Error
@@ -35,36 +35,36 @@ defmodule TermUI.ErrorTest do
     end
   end
 
-  describe "is_error_reason/1" do
+  describe "error_reason?/1" do
     test "returns true for valid error atoms" do
-      assert Error.is_error_reason(:not_found)
-      assert Error.is_error_reason(:timeout)
-      assert Error.is_error_reason(:invalid_size)
-      assert Error.is_error_reason(:component_crashed)
+      assert Error.error_reason?(:not_found)
+      assert Error.error_reason?(:timeout)
+      assert Error.error_reason?(:invalid_size)
+      assert Error.error_reason?(:component_crashed)
     end
 
     test "returns true for valid error tuples" do
-      assert Error.is_error_reason({:not_found, "resource"})
-      assert Error.is_error_reason({:invalid_size, {24, 80}})
-      assert Error.is_error_reason({:command_failed, {:exit_code, 1}})
+      assert Error.error_reason?({:not_found, "resource"})
+      assert Error.error_reason?({:invalid_size, {24, 80}})
+      assert Error.error_reason?({:command_failed, {:exit_code, 1}})
     end
 
     test "returns false for non-error atoms" do
-      refute Error.is_error_reason(:ok)
-      refute Error.is_error_reason(:error)
-      refute Error.is_error_reason(:some_atom)
+      refute Error.error_reason?(:ok)
+      refute Error.error_reason?(:error)
+      refute Error.error_reason?(:some_atom)
     end
 
     test "returns false for non-error tuples" do
-      refute Error.is_error_reason({:ok, "result"})
-      refute Error.is_error_reason({:error, "message"})
-      refute Error.is_error_reason({1, 2, 3})
+      refute Error.error_reason?({:ok, "result"})
+      refute Error.error_reason?({:error, "message"})
+      refute Error.error_reason?({1, 2, 3})
     end
 
     test "returns false for other types" do
-      refute Error.is_error_reason("string")
-      refute Error.is_error_reason(123)
-      refute Error.is_error_reason(%{})
+      refute Error.error_reason?("string")
+      refute Error.error_reason?(123)
+      refute Error.error_reason?(%{})
     end
   end
 
@@ -105,7 +105,7 @@ defmodule TermUI.ErrorTest do
 
       # Verify these are all valid error reasons
       Enum.each(error_atoms, fn atom ->
-        assert Error.is_error_reason(atom), "#{atom} should be a valid error reason"
+        assert Error.error_reason?(atom), "#{atom} should be a valid error reason"
       end)
     end
   end

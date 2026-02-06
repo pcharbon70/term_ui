@@ -1,5 +1,5 @@
 defmodule TermUI.ThemeIntegrationTest do
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
 
   alias TermUI.Renderer.Style
   alias TermUI.Theme
@@ -143,7 +143,7 @@ defmodule TermUI.ThemeIntegrationTest do
       }
 
       {:error, errors} = Theme.validate(incomplete_theme)
-      assert length(errors) > 0
+      assert errors != []
     end
   end
 

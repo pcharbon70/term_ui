@@ -1,5 +1,5 @@
 defmodule TermUI.Widgets.SupervisionTreeViewerTest do
-  use ExUnit.Case, async: false
+  use TermUI.TestCase, async: false
 
   alias TermUI.Event
   alias TermUI.Theme
@@ -79,7 +79,10 @@ defmodule TermUI.Widgets.SupervisionTreeViewerTest do
 
   setup do
     # Start Theme server for color support
-    {:ok, _theme_pid} = Theme.start_link(theme: :dark)
+    case Theme.start_link(theme: :dark) do
+      {:ok, _pid} -> :ok
+      {:error, {:already_started, _pid}} -> :ok
+    end
 
     on_exit(fn ->
       # Theme server will be automatically stopped when test process exits
@@ -133,7 +136,7 @@ defmodule TermUI.Widgets.SupervisionTreeViewerTest do
         assert state.tree != nil
         assert state.tree.type == :supervisor
         assert is_list(state.flattened)
-        assert length(state.flattened) > 0
+        assert state.flattened != []
         assert state.selected_idx == 0
       after
         Supervisor.stop(sup)
@@ -696,7 +699,7 @@ defmodule TermUI.Widgets.SupervisionTreeViewerTest do
 
         assert result.type == :stack
         assert result.direction == :vertical
-        assert length(result.children) > 0
+        assert result.children != []
       after
         Supervisor.stop(sup)
       end

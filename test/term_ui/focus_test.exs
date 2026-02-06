@@ -1,5 +1,5 @@
 defmodule TermUI.FocusTest do
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
 
   alias TermUI.Focus
 
@@ -51,7 +51,7 @@ defmodule TermUI.FocusTest do
 end
 
 defmodule TermUI.Focus.TrackerTest do
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
 
   alias TermUI.Focus.Tracker
 
@@ -286,7 +286,6 @@ defmodule TermUI.Focus.TrackerTest do
       {:ok, tracker} = Tracker.start_link(initial_focus: true)
 
       test_pid = self()
-      state = %{saved: false, refreshed: false}
 
       # Register autosave on focus lost
       Tracker.on_focus_lost(tracker, fn ->

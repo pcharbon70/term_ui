@@ -124,7 +124,7 @@ defmodule TermUI.Style do
   """
   @spec new() :: t()
   def new do
-    %__MODULE__{}
+    %__MODULE__{attrs: empty_attrs()}
   end
 
   @doc """
@@ -218,8 +218,8 @@ defmodule TermUI.Style do
   Clears all attributes.
   """
   @spec clear_attrs(t()) :: t()
-  def clear_attrs(style) do
-    %{style | attrs: MapSet.new()}
+  def clear_attrs(%__MODULE__{} = style) do
+    %{style | attrs: empty_attrs()}
   end
 
   @doc """
@@ -265,7 +265,7 @@ defmodule TermUI.Style do
   Resets style to defaults, breaking inheritance.
   """
   @spec reset(t()) :: t()
-  def reset(_style) do
+  def reset(%__MODULE__{}) do
     new()
   end
 
@@ -407,6 +407,10 @@ defmodule TermUI.Style do
 
   defp add_attr(style, attr) do
     %{style | attrs: MapSet.put(style.attrs, attr)}
+  end
+
+  defp empty_attrs do
+    MapSet.new([:bold]) |> MapSet.delete(:bold)
   end
 
   defp color_cube_index(value) do

@@ -1,12 +1,12 @@
 defmodule TermUI.Widgets.ContextMenu.FactoryTest do
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: false
 
   import TermUI.Test.ContextMenuHelpers
 
+  alias TermUI.Capabilities
   alias TermUI.Widgets.ContextMenu
   alias TermUI.Widgets.ContextMenu.Factory
   alias TermUI.Widgets.ContextMenu.Inline
-  alias TermUI.Capabilities
 
   # Test helpers
 

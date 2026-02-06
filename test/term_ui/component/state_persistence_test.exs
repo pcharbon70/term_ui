@@ -1,5 +1,5 @@
 defmodule TermUI.Component.StatePersistenceTest do
-  use ExUnit.Case, async: false
+  use TermUI.TestCase, async: false
 
   alias TermUI.Component.StatePersistence
 

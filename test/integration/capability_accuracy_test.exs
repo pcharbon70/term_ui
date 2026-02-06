@@ -6,10 +6,9 @@ defmodule TermUI.Integration.CapabilityAccuracyTest do
   for various terminal emulators and configurations.
   """
 
-  use ExUnit.Case, async: false
+  use TermUI.TestCase, async: false
 
   alias TermUI.Capabilities
-  alias TermUI.Capabilities.Fallbacks
   alias TermUI.IntegrationHelpers
 
   # These tests validate capability detection
@@ -168,25 +167,6 @@ defmodule TermUI.Integration.CapabilityAccuracyTest do
           else: System.delete_env("LANG")
       end
     end
-
-    test "Unicode fallbacks work correctly" do
-      # Test box drawing fallbacks
-      assert Fallbacks.unicode_to_ascii("┌") == "+"
-      assert Fallbacks.unicode_to_ascii("─") == "-"
-      assert Fallbacks.unicode_to_ascii("│") == "|"
-      assert Fallbacks.unicode_to_ascii("┘") == "+"
-
-      # Test arrows
-      assert Fallbacks.unicode_to_ascii("→") == ">"
-      assert Fallbacks.unicode_to_ascii("←") == "<"
-      assert Fallbacks.unicode_to_ascii("↑") == "^"
-      assert Fallbacks.unicode_to_ascii("↓") == "v"
-    end
-
-    test "Unicode to ASCII preserves ASCII" do
-      ascii_string = "Hello, World!"
-      assert Fallbacks.unicode_to_ascii(ascii_string) == ascii_string
-    end
   end
 
   describe "1.6.3.4 capability query timeouts" do
@@ -226,64 +206,6 @@ defmodule TermUI.Integration.CapabilityAccuracyTest do
         assert is_struct(caps1, Capabilities)
         assert is_struct(caps2, Capabilities)
       end)
-    end
-  end
-
-  describe "color approximation accuracy" do
-    test "RGB to 256 color approximation" do
-      # Pure red should map to color 196 (bright red in cube)
-      index = Fallbacks.rgb_to_256(255, 0, 0)
-      assert index in [196, 9], "Expected red to map to 196 or 9, got #{index}"
-
-      # Pure green
-      index = Fallbacks.rgb_to_256(0, 255, 0)
-      assert index in [46, 10], "Expected green to map to 46 or 10, got #{index}"
-
-      # Pure blue
-      index = Fallbacks.rgb_to_256(0, 0, 255)
-      assert index in [21, 12], "Expected blue to map to 21 or 12, got #{index}"
-
-      # White - grayscale 255 (232 + 23)
-      index = Fallbacks.rgb_to_256(255, 255, 255)
-      assert index in [231, 255, 15], "Expected white to map to grayscale, got #{index}"
-
-      # Black - grayscale 232 (232 + 0)
-      index = Fallbacks.rgb_to_256(0, 0, 0)
-      assert index in [16, 232, 0], "Expected black to map to 16 or grayscale, got #{index}"
-    end
-
-    test "RGB to 16 color approximation" do
-      # Red
-      index = Fallbacks.rgb_to_16(255, 0, 0)
-      assert index in [1, 9], "Expected red, got #{index}"
-
-      # Green
-      index = Fallbacks.rgb_to_16(0, 255, 0)
-      assert index in [2, 10], "Expected green, got #{index}"
-
-      # Blue
-      index = Fallbacks.rgb_to_16(0, 0, 255)
-      assert index in [4, 12], "Expected blue, got #{index}"
-
-      # White
-      index = Fallbacks.rgb_to_16(255, 255, 255)
-      assert index in [7, 15], "Expected white, got #{index}"
-
-      # Black
-      index = Fallbacks.rgb_to_16(0, 0, 0)
-      assert index == 0, "Expected black (0), got #{index}"
-    end
-
-    test "256 to 16 color degradation" do
-      # Standard colors should map to themselves
-      for i <- 0..15 do
-        result = Fallbacks.color_256_to_16(i)
-        assert result == i, "Standard color #{i} should map to itself, got #{result}"
-      end
-
-      # Cube colors should map to nearest 16
-      result = Fallbacks.color_256_to_16(196)
-      assert result in 0..15, "Color 196 should map to 0-15, got #{result}"
     end
   end
 

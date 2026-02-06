@@ -13,8 +13,6 @@ TermUI has two types of widgets:
 
 ### Gauge
 
-> **Example:** See [`examples/gauge/`](../../examples/gauge/) for a complete demonstration.
-
 Displays a value as a progress bar with optional color zones.
 
 ```elixir
@@ -61,8 +59,6 @@ Gauge.render(
 ```
 
 ### Sparkline
-
-> **Example:** See [`examples/sparkline/`](../../examples/sparkline/) for a complete demonstration.
 
 Compact inline graph showing trends.
 
@@ -116,8 +112,6 @@ node = Widget.render(widget_state, %{width: 80, height: 24})
 ```
 
 ### Table
-
-> **Example:** See [`examples/table/`](../../examples/table/) for a complete demonstration.
 
 Scrollable data table with selection and sorting.
 
@@ -177,8 +171,6 @@ end
 
 ### Menu
 
-> **Example:** See [`examples/menu/`](../../examples/menu/) for a complete demonstration.
-
 Hierarchical menu with submenus and keyboard navigation.
 
 ```elixir
@@ -226,8 +218,6 @@ Menu.render(menu_state, %{width: 30, height: 20})
 - Escape: Close menu
 
 ### TextInput
-
-> **Example:** See [`examples/text_input/`](../../examples/text_input/) for a complete demonstration.
 
 Single-line and multi-line text input with cursor movement.
 
@@ -297,8 +287,6 @@ state = TextInput.clear(state)
 
 ### Dialog
 
-> **Example:** See [`examples/dialog/`](../../examples/dialog/) for a complete demonstration.
-
 Modal dialog with buttons.
 
 ```elixir
@@ -341,12 +329,10 @@ Dialog.render(dialog_state, %{width: 80, height: 24})
 
 ### PickList
 
-> **Example:** See [`examples/pick_list/`](../../examples/pick_list/) for a complete demonstration.
-
 Modal selection dialog with type-ahead filtering.
 
 ```elixir
-alias TermUI.Widget.PickList
+alias TermUI.Widgets.PickList
 
 # Create props
 props = %{

@@ -22,7 +22,17 @@ defmodule TermUI.MixProject do
       docs: docs(),
 
       # Test coverage
-      test_coverage: [tool: ExCoveralls]
+      test_coverage: [tool: ExCoveralls],
+
+      # Dialyzer
+      dialyzer: dialyzer()
+    ]
+  end
+
+  defp dialyzer do
+    [
+      plt_file: {:no_warn, "priv/plts/dialyzer.plt"},
+      plt_add_apps: [:mix, :ex_unit]
     ]
   end
 
@@ -48,10 +58,11 @@ defmodule TermUI.MixProject do
   defp deps do
     [
       # Documentation
-      {:ex_doc, "~> 0.31", only: :dev, runtime: false},
+      {:ex_doc, "~> 0.40", only: :dev, runtime: false},
 
       # Code quality
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
 
       # Testing
       {:excoveralls, "~> 0.18", only: :test},
@@ -61,7 +72,7 @@ defmodule TermUI.MixProject do
       {:gen_stage, "~> 1.2"},
 
       # Markdown processing
-      {:mdex, "~> 0.10"},
+      {:mdex, "~> 0.11"},
 
       # Syntax highlighting for code blocks
       {:makeup, "~> 1.1"},

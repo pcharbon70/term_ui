@@ -43,11 +43,36 @@ defmodule TermUI.Component.RenderNode do
   @type positioned_cell :: %{x: non_neg_integer(), y: non_neg_integer(), cell: Cell.t()}
   @type direction :: :vertical | :horizontal
 
+  @typedoc "Viewport node map (clips content with scroll offsets)"
+  @type viewport_node :: %{
+          required(:type) => :viewport,
+          required(:content) => render_tree(),
+          required(:scroll_x) => non_neg_integer(),
+          required(:scroll_y) => non_neg_integer(),
+          required(:width) => non_neg_integer(),
+          required(:height) => non_neg_integer()
+        }
+
+  @typedoc "Overlay node map (absolute positioning with optional background fill)"
+  @type overlay_node :: %{
+          required(:type) => :overlay,
+          required(:content) => render_tree(),
+          required(:x) => non_neg_integer(),
+          required(:y) => non_neg_integer(),
+          optional(:width) => non_neg_integer(),
+          optional(:height) => non_neg_integer(),
+          optional(:bg) => Style.t(),
+          optional(:z) => integer()
+        }
+
+  @typedoc "Render tree output"
+  @type render_tree :: t() | viewport_node() | overlay_node() | [render_tree()] | String.t()
+
   @type t :: %__MODULE__{
           type: node_type(),
           content: String.t() | nil,
           style: Style.t() | nil,
-          children: [t()],
+          children: [render_tree()],
           direction: direction() | nil,
           width: non_neg_integer() | :auto | nil,
           height: non_neg_integer() | :auto | nil,
@@ -115,7 +140,7 @@ defmodule TermUI.Component.RenderNode do
       iex> RenderNode.box([RenderNode.text("Styled")], style: Style.new() |> Style.bg(:blue))
       %RenderNode{type: :box, style: %Style{bg: :blue}}
   """
-  @spec box([t()], keyword()) :: t()
+  @spec box([render_tree()], keyword()) :: t()
   def box(children, opts \\ []) when is_list(children) do
     %__MODULE__{
       type: :box,
@@ -137,7 +162,7 @@ defmodule TermUI.Component.RenderNode do
       iex> RenderNode.stack(:horizontal, [RenderNode.text("Left"), RenderNode.text("Right")])
       %RenderNode{type: :stack, direction: :horizontal, children: [...]}
   """
-  @spec stack(direction(), [t()], keyword()) :: t()
+  @spec stack(direction(), [render_tree()], keyword()) :: t()
   def stack(direction, children, opts \\ [])
       when direction in [:vertical, :horizontal] and is_list(children) do
     %__MODULE__{

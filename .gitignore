@@ -21,3 +21,6 @@ term_ui-*.tar
 
 # Temporary files, for example, from tests.
 /tmp/
+
+# Dialyzer PLT files
+/priv/plts/

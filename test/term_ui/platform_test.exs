@@ -1,5 +1,5 @@
 defmodule TermUI.PlatformTest do
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
 
   alias TermUI.Platform
 
@@ -181,7 +181,7 @@ defmodule TermUI.PlatformTest do
 end
 
 defmodule TermUI.Platform.UnixTest do
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
 
   alias TermUI.Platform
   alias TermUI.Platform.Unix
@@ -243,7 +243,7 @@ defmodule TermUI.Platform.UnixTest do
       paths = Unix.terminfo_paths()
 
       assert is_list(paths)
-      assert length(paths) > 0
+      assert paths != []
 
       for path <- paths do
         assert is_binary(path)
@@ -310,7 +310,7 @@ defmodule TermUI.Platform.UnixTest do
 end
 
 defmodule TermUI.Platform.WindowsTest do
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
 
   alias TermUI.Platform.Windows
 

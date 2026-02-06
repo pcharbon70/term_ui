@@ -1,13 +1,13 @@
 defmodule TermUI.Widgets.ContextMenu.InlineTest do
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
 
   import TermUI.Test.ContextMenuHelpers
 
   alias TermUI.CharacterSet
-  alias TermUI.Widgets.ContextMenu
-  alias TermUI.Widgets.ContextMenu.Inline
   alias TermUI.Event
   alias TermUI.Renderer.Style
+  alias TermUI.Widgets.ContextMenu
+  alias TermUI.Widgets.ContextMenu.Inline
 
   # Test helpers
 

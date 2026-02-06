@@ -5,9 +5,10 @@ defmodule TermUI.Widgets.AsciiFallbackTest do
   These tests verify that when CharacterSet is configured for ASCII mode,
   widgets produce valid ASCII output without Unicode characters.
   """
-  use ExUnit.Case, async: false
+  use TermUI.TestCase, async: false
 
   alias TermUI.CharacterSet
+  alias TermUI.Layout.Constraint
   alias TermUI.Theme
   alias TermUI.Widgets.Dialog
   alias TermUI.Widgets.Gauge
@@ -17,7 +18,6 @@ defmodule TermUI.Widgets.AsciiFallbackTest do
   alias TermUI.Widgets.Table.Column
   alias TermUI.Widgets.Toast
   alias TermUI.Widgets.TreeView
-  alias TermUI.Layout.Constraint
 
   # Helper to extract all text content from a render tree
   defp extract_text(node), do: extract_text(node, []) |> Enum.reverse() |> Enum.join("")

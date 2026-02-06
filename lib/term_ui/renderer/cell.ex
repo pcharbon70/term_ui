@@ -37,7 +37,7 @@ defmodule TermUI.Renderer.Cell do
           fg: color(),
           bg: color(),
           attrs: MapSet.t(attribute()),
-          width: 1 | 2,
+          width: 0 | 1 | 2,
           wide_placeholder: boolean()
         }
 
@@ -157,7 +157,7 @@ defmodule TermUI.Renderer.Cell do
   """
   @spec empty() :: t()
   def empty do
-    %__MODULE__{}
+    new(" ")
   end
 
   @doc """

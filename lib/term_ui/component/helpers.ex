@@ -46,7 +46,7 @@ defmodule TermUI.Component.Helpers do
       box([text("Content")])
       box([text("Styled")], style: Style.new() |> Style.bg(:blue))
   """
-  @spec box([RenderNode.t()], keyword()) :: RenderNode.t()
+  @spec box([RenderNode.render_tree()], keyword()) :: RenderNode.t()
   defdelegate box(children, opts \\ []), to: RenderNode
 
   @doc """
@@ -57,7 +57,7 @@ defmodule TermUI.Component.Helpers do
       stack(:vertical, [text("Top"), text("Bottom")])
       stack(:horizontal, [text("Left"), text("Right")])
   """
-  @spec stack(RenderNode.direction(), [RenderNode.t()], keyword()) :: RenderNode.t()
+  @spec stack(RenderNode.direction(), [RenderNode.render_tree()], keyword()) :: RenderNode.t()
   defdelegate stack(direction, children, opts \\ []), to: RenderNode
 
   @doc """

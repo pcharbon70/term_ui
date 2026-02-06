@@ -1,5 +1,5 @@
 defmodule TermUI.Widgets.VisualizationHelperTest do
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
 
   alias TermUI.Widgets.VisualizationHelper, as: VizHelper
 

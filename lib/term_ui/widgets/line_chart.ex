@@ -77,25 +77,23 @@ defmodule TermUI.Widgets.LineChart do
     show_axis = Keyword.get(opts, :show_axis, false)
     style = Keyword.get(opts, :style)
 
-    cond do
-      Enum.empty?(series) ->
-        empty()
+    render_series(series, width, height, show_axis, style, opts)
+  end
 
-      true ->
-        # Validate series data BEFORE accessing s.data to avoid crashes
-        case VizHelper.validate_series_data(series) do
-          :ok ->
-            # Now safe to check if all data is empty
-            if Enum.all?(series, fn s -> Enum.empty?(s.data) end) do
-              empty()
-            else
-              do_render(series, width, height, show_axis, style, opts)
-            end
+  defp render_series([], _width, _height, _show_axis, _style, _opts), do: empty()
 
-          {:error, _msg} ->
-            # Return empty for invalid data rather than crashing
-            empty()
-        end
+  defp render_series(series, width, height, show_axis, style, opts) do
+    case VizHelper.validate_series_data(series) do
+      :ok -> render_validated_series(series, width, height, show_axis, style, opts)
+      {:error, _msg} -> empty()
+    end
+  end
+
+  defp render_validated_series(series, width, height, show_axis, style, opts) do
+    if Enum.all?(series, fn s -> Enum.empty?(s.data) end) do
+      empty()
+    else
+      do_render(series, width, height, show_axis, style, opts)
     end
   end
 
@@ -117,9 +115,6 @@ defmodule TermUI.Widgets.LineChart do
   end
 
   defp do_render(series, width, height, show_axis, style, opts) do
-    # Get character set for axis characters
-    chars = CharacterSet.current_charset()
-
     # Get all values for scaling
     all_values = series |> Enum.flat_map(& &1.data)
     {min, max} = VizHelper.calculate_range(all_values, opts)

@@ -54,6 +54,25 @@ defmodule TermUI.TermUtils do
 
   # Known-safe command locations (will be resolved at runtime)
   @allowed_commands ~w(stty test infocmp)
+  @safe_stty_flags ~w(
+    -g
+    raw
+    -raw
+    -echo
+    echo
+    -isig
+    isig
+    -ixon
+    ixon
+    sane
+    min
+    time
+    cbreak
+    -cbreak
+    size
+  )
+
+  @tty_path "/dev/tty"
 
   # ===========================================================================
   # Public API
@@ -84,6 +103,8 @@ defmodule TermUI.TermUtils do
   """
   @spec safe_stty([binary()], options()) :: result()
   def safe_stty(args, opts \\ []) do
+    args = maybe_prefix_stty_tty(args)
+
     case validate_stty_args(args) do
       :ok ->
         safe_command("stty", args, opts)
@@ -231,37 +252,40 @@ defmodule TermUI.TermUtils do
   defp validate_stty_args([]), do: {:error, :invalid_arguments}
 
   defp validate_stty_args(args) do
-    # Safe stty flags (non-injectable)
-    safe_flags = [
-      "-g",
-      "raw",
-      "-raw",
-      "-echo",
-      "echo",
-      "-isig",
-      "isig",
-      "-ixon",
-      "ixon",
-      "sane",
-      "min",
-      "time",
-      "cbreak",
-      "-cbreak"
-    ]
-
-    # Check all arguments are safe
-    Enum.all?(args, fn arg ->
-      # Either it's a known safe flag
-      arg in safe_flags or
-        # Or it's a numeric argument (for min/time)
-        match?(<<_::utf8>>, arg) and String.length(arg) < 32
-    end)
-    |> if do
+    with {:ok, args} <- strip_stty_tty_prefix(args),
+         :ok <- validate_stty_args_no_prefix(args) do
       :ok
     else
-      Logger.error("TermUtils: Invalid stty arguments: #{inspect(args)}")
+      {:error, :invalid_arguments} = error ->
+        Logger.error("TermUtils: Invalid stty arguments: #{inspect(args)}")
+        error
+    end
+  end
+
+  defp validate_stty_args_no_prefix([settings]) do
+    # Allow stty settings blobs previously captured via `stty -g`.
+    case validate_stty_settings(settings) do
+      :ok -> :ok
+      {:error, _} -> validate_stty_args_no_prefix_list([settings])
+    end
+  end
+
+  defp validate_stty_args_no_prefix(args) when is_list(args) do
+    validate_stty_args_no_prefix_list(args)
+  end
+
+  defp validate_stty_args_no_prefix_list(args) do
+    if Enum.all?(args, fn arg ->
+         arg in @safe_stty_flags or numeric_arg?(arg)
+       end) do
+      :ok
+    else
       {:error, :invalid_arguments}
     end
+  end
+
+  defp numeric_arg?(arg) when is_binary(arg) do
+    byte_size(arg) <= 8 and Regex.match?(~r/^\d+$/, arg)
   end
 
   # Validates test command arguments.
@@ -316,7 +340,7 @@ defmodule TermUI.TermUtils do
     term_name_regex = ~r/^[a-zA-Z0-9_-]+$/
 
     Enum.all?(args, fn arg ->
-      arg in safe_flags or Regex.match?(term_name_regex, arg) and String.length(arg) < 64
+      arg in safe_flags or (Regex.match?(term_name_regex, arg) and String.length(arg) < 64)
     end)
     |> if do
       :ok
@@ -363,15 +387,66 @@ defmodule TermUI.TermUtils do
   """
   @spec validate_stty_settings(binary()) :: :ok | {:error, term()}
   def validate_stty_settings(output) when is_binary(output) do
-    # stty -g output should contain only safe characters
-    # Allowed: alphanumeric, spaces, semicolons, colons, dashes, dots
-    safe_stty_regex = ~r/^[a-zA-Z0-9\s:;=\-\.]+$/
+    output = String.trim(output)
 
-    if Regex.match?(safe_stty_regex, output) and String.length(output) < 256 do
+    if valid_stty_settings?(output) do
       :ok
     else
       Logger.error("TermUtils: Invalid stty settings format")
       {:error, :invalid_stty_settings}
+    end
+  end
+
+  defp valid_stty_settings?(output) do
+    stty_safe_chars?(output) and stty_plausible_format?(output) and
+      byte_size(output) > 0 and String.length(output) < 256
+  end
+
+  # stty -g output should contain only safe characters
+  # Allowed: alphanumeric, spaces, semicolons, colons, equals, dashes, dots
+  defp stty_safe_chars?(output), do: Regex.match?(~r/^[a-zA-Z0-9\s:;=\-\.]+$/, output)
+
+  # Common GNU/BSD format: tokens separated by colons, no spaces required.
+  # Some platforms produce a semicolon-separated, human-readable format.
+  defp stty_plausible_format?(output) do
+    stty_colon_format?(output) or stty_semicolon_format?(output)
+  end
+
+  defp stty_colon_format?(output), do: Regex.match?(~r/^[0-9A-Za-z]+(?::[0-9A-Za-z]+)+$/, output)
+
+  defp stty_semicolon_format?(output) do
+    String.contains?(output, ";") and Regex.match?(~r/\d/, output) and
+      stty_contains_known_keyword?(output)
+  end
+
+  defp stty_contains_known_keyword?(output) do
+    String.contains?(output, "speed") or String.contains?(output, "baud") or
+      String.contains?(output, "rows") or String.contains?(output, "columns")
+  end
+
+  defp maybe_prefix_stty_tty(args) do
+    cond do
+      Enum.any?(args, &(&1 in ["-F", "-f"])) ->
+        args
+
+      File.exists?(@tty_path) ->
+        [stty_file_flag(), @tty_path | args]
+
+      true ->
+        args
+    end
+  end
+
+  defp strip_stty_tty_prefix(["-F", @tty_path | rest]), do: {:ok, rest}
+  defp strip_stty_tty_prefix(["-f", @tty_path | rest]), do: {:ok, rest}
+  defp strip_stty_tty_prefix(["-F", _other | _rest]), do: {:error, :invalid_arguments}
+  defp strip_stty_tty_prefix(["-f", _other | _rest]), do: {:error, :invalid_arguments}
+  defp strip_stty_tty_prefix(args), do: {:ok, args}
+
+  defp stty_file_flag do
+    case :os.type() do
+      {:unix, os} when os in [:darwin, :freebsd, :openbsd, :netbsd, :dragonfly] -> "-f"
+      _ -> "-F"
     end
   end
 

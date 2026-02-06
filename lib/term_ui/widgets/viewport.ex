@@ -206,9 +206,8 @@ defmodule TermUI.Widgets.Viewport do
         stack(:vertical, [content, h_bar])
 
       :both ->
-        chars = CharacterSet.current_charset()
-        v_bar = render_vertical_bar(state, vp_height)
-        h_bar = render_horizontal_bar(state, vp_width)
+        v_bar = render_vertical_bar(state, vp_height, chars)
+        h_bar = render_horizontal_bar(state, vp_width, chars)
 
         # Content + vertical bar on top, horizontal bar on bottom
         top_row = stack(:horizontal, [content, v_bar])
@@ -297,7 +296,7 @@ defmodule TermUI.Widgets.Viewport do
 
     thumb_pos = round((height - thumb_size) * scroll_fraction)
 
-    charset = CharacterSet.current_charset()
+    charset = chars
 
     # Build the bar
     lines =
@@ -315,8 +314,8 @@ defmodule TermUI.Widgets.Viewport do
     stack(:vertical, lines)
   end
 
-  defp render_horizontal_bar(state, width) do
-    charset = CharacterSet.current_charset()
+  defp render_horizontal_bar(state, width, chars) do
+    charset = chars
     vp_width = viewport_width(state)
 
     # Calculate thumb position and size

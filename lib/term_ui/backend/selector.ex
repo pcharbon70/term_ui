@@ -8,7 +8,7 @@ defmodule TermUI.Backend.Selector do
 
   ## Why Not Use Heuristics?
 
-  Environment-based detection (checking `$TERM`, `IO.getopts/0`, etc.) cannot
+  Environment-based detection (checking `$TERM`, `:io.getopts/0`, etc.) cannot
   reliably detect all cases where raw mode is unavailable:
 
   - **Nerves devices**: The erlinit process may have already started a shell,
@@ -90,6 +90,7 @@ defmodule TermUI.Backend.Selector do
   """
 
   require Logger
+  alias TermUI.Capabilities
 
   @typedoc """
   Result of backend selection.
@@ -112,10 +113,17 @@ defmodule TermUI.Backend.Selector do
   Detected terminal capabilities for TTY mode.
   """
   @type capabilities :: %{
-          colors: color_depth(),
-          unicode: boolean(),
-          dimensions: {pos_integer(), pos_integer()} | nil,
-          terminal: boolean()
+          required(:colors) => color_depth(),
+          required(:unicode) => boolean(),
+          required(:dimensions) => {pos_integer(), pos_integer()} | nil,
+          required(:terminal) => boolean(),
+          optional(:mouse) => boolean(),
+          optional(:bracketed_paste) => boolean(),
+          optional(:focus_events) => boolean(),
+          optional(:alternate_screen) => boolean(),
+          optional(:terminal_type) => String.t() | nil,
+          optional(:terminal_program) => String.t() | nil,
+          optional(:max_colors) => non_neg_integer()
         }
 
   @typedoc """
@@ -186,14 +194,12 @@ defmodule TermUI.Backend.Selector do
   @doc false
   @spec try_raw_mode() :: {:raw, raw_state()} | {:tty, capabilities()}
   def try_raw_mode do
-    try do
-      attempt_raw_mode()
-    rescue
-      # Handle pre-OTP 28 systems where :shell.start_interactive/1 doesn't exist
-      UndefinedFunctionError ->
-        Logger.info("TermUI: Backend selected: :tty (OTP < 28, raw mode unavailable)")
-        {:tty, detect_capabilities()}
-    end
+    attempt_raw_mode()
+  rescue
+    # Handle pre-OTP 28 systems where :shell.start_interactive/1 doesn't exist
+    UndefinedFunctionError ->
+      Logger.info("TermUI: Backend selected: :tty (OTP < 28, raw mode unavailable)")
+      {:tty, detect_capabilities()}
   end
 
   # Attempts to start raw mode using OTP 28's shell.start_interactive/1
@@ -201,7 +207,7 @@ defmodule TermUI.Backend.Selector do
   @doc false
   @spec attempt_raw_mode() :: {:raw, raw_state()} | {:tty, capabilities()}
   def attempt_raw_mode do
-    case :shell.start_interactive({:noshell, :raw}) do
+    case :erlang.apply(:shell, :start_interactive, [{:noshell, :raw}]) do
       :ok ->
         # Raw mode successfully activated
         Logger.info("TermUI: Backend selected: :raw (full terminal control)")
@@ -225,12 +231,32 @@ defmodule TermUI.Backend.Selector do
   @doc false
   @spec detect_capabilities() :: capabilities()
   def detect_capabilities do
-    %{
+    base = %{
       colors: detect_color_depth(),
       unicode: detect_unicode_support(),
       dimensions: detect_dimensions(),
       terminal: detect_terminal_presence()
     }
+
+    caps = Capabilities.detect()
+
+    max_colors =
+      case base.colors do
+        :true_color -> 16_777_216
+        :color_256 -> 256
+        :color_16 -> 16
+        :monochrome -> 2
+      end
+
+    Map.merge(base, %{
+      mouse: caps.mouse,
+      bracketed_paste: caps.bracketed_paste,
+      focus_events: caps.focus_events,
+      alternate_screen: caps.alternate_screen,
+      terminal_type: caps.terminal_type,
+      terminal_program: caps.terminal_program,
+      max_colors: max_colors
+    })
   end
 
   # Detects color depth from environment variables
@@ -240,26 +266,24 @@ defmodule TermUI.Backend.Selector do
     colorterm = System.get_env("COLORTERM") || ""
     term = System.get_env("TERM") || ""
 
+    detect_color_depth_from_colorterm(colorterm) ||
+      detect_color_depth_from_term(term) ||
+      :monochrome
+  end
+
+  defp detect_color_depth_from_colorterm("truecolor"), do: :true_color
+  defp detect_color_depth_from_colorterm("24bit"), do: :true_color
+  defp detect_color_depth_from_colorterm(_), do: nil
+
+  defp detect_color_depth_from_term(""), do: nil
+
+  defp detect_color_depth_from_term(term) do
     cond do
-      # COLORTERM is the most reliable indicator for true color
-      colorterm in ["truecolor", "24bit"] ->
-        :true_color
-
-      # TERM patterns for true color
-      String.contains?(term, "-direct") ->
-        :true_color
-
-      # 256 color support
-      String.contains?(term, "-256color") or String.contains?(term, "256color") ->
-        :color_256
-
-      # Standard terminals with 16 color support
-      term != "" and basic_terminal?(term) ->
-        :color_16
-
-      # Unknown or no terminal
-      true ->
-        :monochrome
+      String.contains?(term, "-direct") -> :true_color
+      String.contains?(term, "-256color") -> :color_256
+      String.contains?(term, "256color") -> :color_256
+      basic_terminal?(term) -> :color_16
+      true -> nil
     end
   end
 
@@ -307,10 +331,10 @@ defmodule TermUI.Backend.Selector do
   @spec detect_terminal_presence() :: boolean()
   defp detect_terminal_presence do
     case :io.getopts() do
-      {:ok, opts} ->
+      opts when is_list(opts) ->
         Keyword.get(opts, :terminal, false)
 
-      _ ->
+      {:error, _reason} ->
         false
     end
   end

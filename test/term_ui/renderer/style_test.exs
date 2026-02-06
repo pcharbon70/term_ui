@@ -1,5 +1,5 @@
 defmodule TermUI.Renderer.StyleTest do
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
 
   alias TermUI.Renderer.{Cell, Style}
 

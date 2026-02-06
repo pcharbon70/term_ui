@@ -52,7 +52,7 @@ defmodule TermUI.Component do
   # Type definitions
 
   @typedoc "Render tree output - can be a node, list of nodes, or string"
-  @type render_tree :: RenderNode.t() | [render_tree()] | String.t()
+  @type render_tree :: RenderNode.render_tree()
 
   @typedoc "Component props passed to render"
   @type props :: map()

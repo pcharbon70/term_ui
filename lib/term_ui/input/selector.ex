@@ -1,4 +1,6 @@
 defmodule TermUI.Input.Selector do
+  alias TermUI.Backend.Selector, as: BackendSelector
+
   @moduledoc """
   Selects the appropriate input handler based on the active backend mode.
 
@@ -61,7 +63,7 @@ defmodule TermUI.Input.Selector do
   ## Example Integration
 
       # Typical usage in runtime initialization
-      case TermUI.Backend.Selector.select() do
+      case BackendSelector.select() do
         {:raw, backend_state} ->
           input_handler = TermUI.Input.Selector.select(:raw)
           input_state = input_handler.new()
@@ -121,9 +123,9 @@ defmodule TermUI.Input.Selector do
   """
   @spec select() :: handler()
   def select do
-    case TermUI.Backend.Selector.select() do
-      {:raw, _state} -> TermUI.Input.Raw
-      {:tty, _capabilities} -> TermUI.Input.TTY
+    case BackendSelector.select() do
+      {:raw, _state} -> ensure_loaded!(TermUI.Input.Raw)
+      {:tty, _capabilities} -> ensure_loaded!(TermUI.Input.TTY)
     end
   end
 
@@ -165,10 +167,15 @@ defmodule TermUI.Input.Selector do
       # ** (ArgumentError) invalid input mode: :invalid, expected :raw or :tty
   """
   @spec select(mode()) :: handler()
-  def select(:raw), do: TermUI.Input.Raw
-  def select(:tty), do: TermUI.Input.TTY
+  def select(:raw), do: ensure_loaded!(TermUI.Input.Raw)
+  def select(:tty), do: ensure_loaded!(TermUI.Input.TTY)
 
   def select(mode) do
     raise ArgumentError, "invalid input mode: #{inspect(mode)}, expected :raw or :tty"
+  end
+
+  defp ensure_loaded!(module) do
+    _ = Code.ensure_loaded?(module)
+    module
   end
 end

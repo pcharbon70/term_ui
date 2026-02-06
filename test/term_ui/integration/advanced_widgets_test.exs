@@ -8,7 +8,7 @@ defmodule TermUI.Integration.AdvancedWidgetsTest do
   """
 
   # async: true because widgets are stateless and tests create isolated instances
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
 
   @default_area %{width: 80, height: 24}
 
@@ -38,7 +38,7 @@ defmodule TermUI.Integration.AdvancedWidgetsTest do
       assert state.scroll_offset == 0
 
       output = Table.render(state, @default_area)
-      assert output != nil
+      refute is_nil(output)
     end
 
     test "handles large dataset efficiently" do
@@ -51,7 +51,7 @@ defmodule TermUI.Integration.AdvancedWidgetsTest do
       assert length(state.data) == 1000
 
       output = Table.render(state, @default_area)
-      assert output != nil
+      refute is_nil(output)
     end
 
     test "handles keyboard navigation" do
@@ -84,7 +84,7 @@ defmodule TermUI.Integration.AdvancedWidgetsTest do
       assert state.cursor == 0
 
       output = Table.render(state, @default_area)
-      assert output != nil
+      refute is_nil(output)
     end
   end
 
@@ -99,7 +99,7 @@ defmodule TermUI.Integration.AdvancedWidgetsTest do
       assert state.selected == :tab1
 
       output = Tabs.render(state, @default_area)
-      assert output != nil
+      refute is_nil(output)
     end
 
     test "handles tab navigation events" do
@@ -118,7 +118,7 @@ defmodule TermUI.Integration.AdvancedWidgetsTest do
 
       # Render after events
       output = Tabs.render(new_state, @default_area)
-      assert output != nil
+      refute is_nil(output)
     end
 
     test "handles single tab" do
@@ -129,7 +129,7 @@ defmodule TermUI.Integration.AdvancedWidgetsTest do
       assert state.selected == :only
 
       output = Tabs.render(state, @default_area)
-      assert output != nil
+      refute is_nil(output)
     end
   end
 
@@ -149,7 +149,7 @@ defmodule TermUI.Integration.AdvancedWidgetsTest do
       assert length(state.buttons) == 2
 
       output = Dialog.render(state, @default_area)
-      assert output != nil
+      refute is_nil(output)
     end
 
     test "handles visibility toggle" do
@@ -166,12 +166,12 @@ defmodule TermUI.Integration.AdvancedWidgetsTest do
       # Hide dialog
       state = %{state | visible: false}
       output = Dialog.render(state, @default_area)
-      assert output != nil
+      refute is_nil(output)
 
       # Show dialog
       state = %{state | visible: true}
       output = Dialog.render(state, @default_area)
-      assert output != nil
+      refute is_nil(output)
     end
 
     test "handles keyboard navigation events" do
@@ -194,7 +194,7 @@ defmodule TermUI.Integration.AdvancedWidgetsTest do
 
       # Render after events
       output = Dialog.render(new_state, @default_area)
-      assert output != nil
+      refute is_nil(output)
     end
 
     test "handles single button" do
@@ -209,7 +209,7 @@ defmodule TermUI.Integration.AdvancedWidgetsTest do
       assert length(state.buttons) == 1
 
       output = Dialog.render(state, @default_area)
-      assert output != nil
+      refute is_nil(output)
     end
   end
 
@@ -218,34 +218,34 @@ defmodule TermUI.Integration.AdvancedWidgetsTest do
       data = Factories.sample_chart_data()
 
       output = BarChart.render(data: data, width: 40, height: 10)
-      assert output != nil
+      refute is_nil(output)
     end
 
     test "bar chart handles empty data" do
       output = BarChart.render(data: [], width: 40, height: 10)
-      assert output != nil
+      refute is_nil(output)
     end
 
     test "bar chart handles single value" do
       output = BarChart.render(data: [%{label: "X", value: 100}], width: 40, height: 10)
-      assert output != nil
+      refute is_nil(output)
     end
 
     test "sparkline renders values" do
       values = Factories.sample_sparkline_values()
 
       output = Sparkline.render(values: values)
-      assert output != nil
+      refute is_nil(output)
     end
 
     test "sparkline handles empty values" do
       output = Sparkline.render(values: [])
-      assert output != nil
+      refute is_nil(output)
     end
 
     test "sparkline handles single value" do
       output = Sparkline.render(values: [42])
-      assert output != nil
+      refute is_nil(output)
     end
 
     test "gauge renders value" do
@@ -257,21 +257,21 @@ defmodule TermUI.Integration.AdvancedWidgetsTest do
           width: 30
         )
 
-      assert output != nil
+      refute is_nil(output)
     end
 
     test "gauge handles boundary values" do
       # Minimum value
       output = Gauge.render(value: 0, min: 0, max: 100, width: 30)
-      assert output != nil
+      refute is_nil(output)
 
       # Maximum value
       output = Gauge.render(value: 100, min: 0, max: 100, width: 30)
-      assert output != nil
+      refute is_nil(output)
 
       # Value at 50%
       output = Gauge.render(value: 50, min: 0, max: 100, width: 30)
-      assert output != nil
+      refute is_nil(output)
     end
 
     test "gauge handles custom range" do
@@ -283,7 +283,7 @@ defmodule TermUI.Integration.AdvancedWidgetsTest do
           width: 30
         )
 
-      assert output != nil
+      refute is_nil(output)
     end
   end
 
@@ -304,7 +304,7 @@ defmodule TermUI.Integration.AdvancedWidgetsTest do
       assert state.scroll_y == 0
 
       output = Viewport.render(state, @default_area)
-      assert output != nil
+      refute is_nil(output)
     end
 
     test "viewport handles scrolling" do
@@ -332,7 +332,7 @@ defmodule TermUI.Integration.AdvancedWidgetsTest do
       {:ok, state} = Viewport.handle_event(Event.key(:left), state)
 
       output = Viewport.render(state, @default_area)
-      assert output != nil
+      refute is_nil(output)
     end
 
     test "viewport handles content smaller than view" do
@@ -348,7 +348,7 @@ defmodule TermUI.Integration.AdvancedWidgetsTest do
       {:ok, state} = Viewport.init(props)
 
       output = Viewport.render(state, @default_area)
-      assert output != nil
+      refute is_nil(output)
     end
 
     test "canvas drawing operations" do
@@ -361,7 +361,7 @@ defmodule TermUI.Integration.AdvancedWidgetsTest do
       state = Canvas.draw_line(state, 0, 0, 10, 10)
 
       output = Canvas.render(state, %{width: 40, height: 20})
-      assert output != nil
+      refute is_nil(output)
     end
 
     test "canvas handles multiple drawing operations" do
@@ -376,7 +376,7 @@ defmodule TermUI.Integration.AdvancedWidgetsTest do
       state = Canvas.draw_line(state, 0, 10, 39, 10)
 
       output = Canvas.render(state, %{width: 40, height: 20})
-      assert output != nil
+      refute is_nil(output)
     end
 
     test "canvas handles empty canvas" do
@@ -385,7 +385,7 @@ defmodule TermUI.Integration.AdvancedWidgetsTest do
 
       # Render without any drawing
       output = Canvas.render(state, %{width: 40, height: 20})
-      assert output != nil
+      refute is_nil(output)
     end
   end
 end

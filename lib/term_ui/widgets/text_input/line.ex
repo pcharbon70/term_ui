@@ -284,38 +284,41 @@ defmodule TermUI.Widgets.TextInput.Line do
       end
   """
   @spec read(t()) :: read_result()
-  def read(%__MODULE__{} = state) do
-    case state.validator do
-      nil ->
-        # No validator, use simple read
-        case LineReader.read_line(state.prompt) do
-          {:ok, line} ->
-            new_state = %{state | value: line, error: nil}
-            {:ok, line, new_state}
+  def read(%__MODULE__{validator: nil} = state) do
+    read_without_validator(state)
+  end
 
-          :eof ->
-            {:eof, state}
-        end
+  def read(%__MODULE__{validator: validator} = state) when is_function(validator, 1) do
+    read_with_validator(state)
+  end
 
-      validator when is_function(validator, 1) ->
-        # Has validator, use read_line/2
-        case LineReader.read_line(state.prompt, validator) do
-          {:ok, value} ->
-            # Value may be transformed by validator
-            string_value = if is_binary(value), do: value, else: inspect(value)
-            new_state = %{state | value: string_value, error: nil}
-            {:ok, value, new_state}
-
-          {:error, reason} ->
-            error_msg = if is_binary(reason), do: reason, else: inspect(reason)
-            new_state = %{state | error: error_msg}
-            {:error, reason, new_state}
-
-          :eof ->
-            {:eof, state}
-        end
+  defp read_without_validator(state) do
+    case LineReader.read_line(state.prompt) do
+      {:ok, line} -> {:ok, line, %{state | value: line, error: nil}}
+      :eof -> {:eof, state}
     end
   end
+
+  defp read_with_validator(state) do
+    state.prompt
+    |> LineReader.read_line(state.validator)
+    |> handle_validated_read_result(state)
+  end
+
+  defp handle_validated_read_result({:ok, value}, state) do
+    string_value = to_string_value(value)
+    {:ok, value, %{state | value: string_value, error: nil}}
+  end
+
+  defp handle_validated_read_result({:error, reason}, state) do
+    error_msg = to_string_value(reason)
+    {:error, reason, %{state | error: error_msg}}
+  end
+
+  defp handle_validated_read_result(:eof, state), do: {:eof, state}
+
+  defp to_string_value(value) when is_binary(value), do: value
+  defp to_string_value(value), do: inspect(value)
 
   @doc """
   Gets the current value.
@@ -463,36 +466,32 @@ defmodule TermUI.Widgets.TextInput.Line do
     result
   end
 
-  # Performs the read while focused
-  defp do_focused_read(state) do
-    case state.validator do
-      nil ->
-        case LineReader.read_line(state.prompt) do
-          {:ok, line} ->
-            new_state = %{state | value: line, error: nil}
-            {:ok, line, new_state}
-
-          :eof ->
-            {:cancelled, state}
-        end
-
-      validator when is_function(validator, 1) ->
-        case LineReader.read_line(state.prompt, validator) do
-          {:ok, value} ->
-            string_value = if is_binary(value), do: value, else: inspect(value)
-            new_state = %{state | value: string_value, error: nil}
-            {:ok, value, new_state}
-
-          {:error, reason} ->
-            error_msg = if is_binary(reason), do: reason, else: inspect(reason)
-            new_state = %{state | error: error_msg}
-            {:error, reason, new_state}
-
-          :eof ->
-            {:cancelled, state}
-        end
+  # Performs the read while focused (no validator)
+  defp do_focused_read(%{validator: nil} = state) do
+    case LineReader.read_line(state.prompt) do
+      {:ok, line} -> {:ok, line, %{state | value: line, error: nil}}
+      :eof -> {:cancelled, state}
     end
   end
+
+  # Performs the read while focused (with validator)
+  defp do_focused_read(%{validator: validator} = state) when is_function(validator, 1) do
+    state.prompt
+    |> LineReader.read_line(validator)
+    |> handle_focused_read_result(state)
+  end
+
+  defp handle_focused_read_result({:ok, value}, state) do
+    string_value = to_string_value(value)
+    {:ok, value, %{state | value: string_value, error: nil}}
+  end
+
+  defp handle_focused_read_result({:error, reason}, state) do
+    error_msg = to_string_value(reason)
+    {:error, reason, %{state | error: error_msg}}
+  end
+
+  defp handle_focused_read_result(:eof, state), do: {:cancelled, state}
 
   # Clear focused state in result
   defp unfocus_result({:ok, value, state}), do: {:ok, value, %{state | focused: false}}
@@ -501,23 +500,19 @@ defmodule TermUI.Widgets.TextInput.Line do
 
   # Call on_blur callback if configured (with error protection)
   defp call_on_blur({_, _, state}) when is_function(state.on_blur, 1) do
-    try do
-      state.on_blur.(state)
-    rescue
-      e ->
-        require Logger
-        Logger.error("TextInput.Line on_blur callback error: #{inspect(e)}")
-    end
+    state.on_blur.(state)
+  rescue
+    e ->
+      require Logger
+      Logger.error("TextInput.Line on_blur callback error: #{inspect(e)}")
   end
 
   defp call_on_blur({:cancelled, state}) when is_function(state.on_blur, 1) do
-    try do
-      state.on_blur.(state)
-    rescue
-      e ->
-        require Logger
-        Logger.error("TextInput.Line on_blur callback error: #{inspect(e)}")
-    end
+    state.on_blur.(state)
+  rescue
+    e ->
+      require Logger
+      Logger.error("TextInput.Line on_blur callback error: #{inspect(e)}")
   end
 
   defp call_on_blur(_), do: :ok
@@ -527,10 +522,10 @@ defmodule TermUI.Widgets.TextInput.Line do
 
   ## Examples
 
-      TextInput.Line.is_focused?(state)  # => true or false
+      TextInput.Line.focused?(state)  # => true or false
   """
-  @spec is_focused?(t()) :: boolean()
-  def is_focused?(%__MODULE__{focused: focused}), do: focused
+  @spec focused?(t()) :: boolean()
+  def focused?(%__MODULE__{focused: focused}), do: focused
 
   @doc """
   Sets the focus state directly.

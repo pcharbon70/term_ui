@@ -1,11 +1,16 @@
 defmodule TermUI.Backend.SelectorTest do
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
   import ExUnit.CaptureLog
 
   alias TermUI.Backend.Selector
   import TermUI.Backend.SelectorTestHelpers
 
   describe "module structure" do
+    setup do
+      assert Code.ensure_loaded?(Selector)
+      :ok
+    end
+
     test "module compiles successfully" do
       assert Code.ensure_loaded?(Selector)
     end
@@ -158,13 +163,17 @@ defmodule TermUI.Backend.SelectorTest do
     end
 
     test "tty capabilities has expected keys" do
-      # Current placeholder always returns TTY
-      {:tty, capabilities} = Selector.select()
+      case Selector.select() do
+        {:tty, capabilities} ->
+          assert Map.has_key?(capabilities, :colors)
+          assert Map.has_key?(capabilities, :unicode)
+          assert Map.has_key?(capabilities, :dimensions)
+          assert Map.has_key?(capabilities, :terminal)
 
-      assert Map.has_key?(capabilities, :colors)
-      assert Map.has_key?(capabilities, :unicode)
-      assert Map.has_key?(capabilities, :dimensions)
-      assert Map.has_key?(capabilities, :terminal)
+        {:raw, _state} ->
+          # Raw backend selected in environments that support it
+          assert true
+      end
     end
   end
 
@@ -619,26 +628,29 @@ defmodule TermUI.Backend.SelectorTest do
 
   describe "logging" do
     test "logs backend selection at info level" do
-      log = capture_log(fn ->
-        Selector.select()
-      end)
+      log =
+        capture_log(fn ->
+          Selector.select()
+        end)
 
       assert log =~ "TermUI: Backend selected"
     end
 
     test "logs forced backend selection" do
-      log = capture_log(fn ->
-        Selector.select(TermUI.Backend.TTY)
-      end)
+      log =
+        capture_log(fn ->
+          Selector.select(TermUI.Backend.TTY)
+        end)
 
       assert log =~ "TermUI: Using forced backend"
       assert log =~ "TermUI.Backend.TTY"
     end
 
     test "logs forced backend with options" do
-      log = capture_log(fn ->
-        Selector.select({TermUI.Backend.TTY, [line_mode: :full_redraw]})
-      end)
+      log =
+        capture_log(fn ->
+          Selector.select({TermUI.Backend.TTY, [line_mode: :full_redraw]})
+        end)
 
       assert log =~ "TermUI: Using forced backend"
       assert log =~ "TermUI.Backend.TTY"

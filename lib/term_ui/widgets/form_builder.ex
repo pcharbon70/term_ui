@@ -197,57 +197,30 @@ defmodule TermUI.Widgets.FormBuilder do
   def handle_event(%Event.Key{key: :up}, state) do
     field = get_field(state, state.focused_field)
 
-    cond do
-      field && field.type in [:radio, :select, :multi_select] ->
-        state = navigate_option(state, -1)
-        {:ok, state}
-
-      true ->
-        state = navigate_field(state, -1)
-        {:ok, state}
+    if field && field.type in [:radio, :select, :multi_select] do
+      state = navigate_option(state, -1)
+      {:ok, state}
+    else
+      state = navigate_field(state, -1)
+      {:ok, state}
     end
   end
 
   def handle_event(%Event.Key{key: :down}, state) do
     field = get_field(state, state.focused_field)
 
-    cond do
-      field && field.type in [:radio, :select, :multi_select] ->
-        state = navigate_option(state, 1)
-        {:ok, state}
-
-      true ->
-        state = navigate_field(state, 1)
-        {:ok, state}
+    if field && field.type in [:radio, :select, :multi_select] do
+      state = navigate_option(state, 1)
+      {:ok, state}
+    else
+      state = navigate_field(state, 1)
+      {:ok, state}
     end
   end
 
   def handle_event(%Event.Key{key: " "}, state) do
     field = get_field(state, state.focused_field)
-
-    cond do
-      state.submit_focused ->
-        submit_form(state)
-
-      field && field.type == :checkbox ->
-        state = toggle_checkbox(state, field.id)
-        {:ok, state}
-
-      field && field.type in [:radio, :select] ->
-        state = select_current_option(state)
-        {:ok, state}
-
-      field && field.type == :multi_select ->
-        state = toggle_multi_select_option(state)
-        {:ok, state}
-
-      field && field.type in [:text, :password] ->
-        state = append_char(state, " ")
-        {:ok, state}
-
-      true ->
-        {:ok, state}
-    end
+    handle_space_key(state, field)
   end
 
   def handle_event(%Event.Key{key: :enter}, state) do
@@ -256,15 +229,13 @@ defmodule TermUI.Widgets.FormBuilder do
     else
       field = get_field(state, state.focused_field)
 
-      cond do
-        field && field.type in [:radio, :select] ->
-          state = select_current_option(state)
-          {:ok, state}
-
-        true ->
-          # Move to next field or submit
-          state = navigate_field(state, 1)
-          {:ok, state}
+      if field && field.type in [:radio, :select] do
+        state = select_current_option(state)
+        {:ok, state}
+      else
+        # Move to next field or submit
+        state = navigate_field(state, 1)
+        {:ok, state}
       end
     end
   end
@@ -297,6 +268,31 @@ defmodule TermUI.Widgets.FormBuilder do
   end
 
   def handle_event(_event, state) do
+    {:ok, state}
+  end
+
+  # Space key handlers - split by field type to reduce complexity
+  defp handle_space_key(state, _field) when state.submit_focused do
+    submit_form(state)
+  end
+
+  defp handle_space_key(state, %{type: :checkbox, id: id}) do
+    {:ok, toggle_checkbox(state, id)}
+  end
+
+  defp handle_space_key(state, %{type: type}) when type in [:radio, :select] do
+    {:ok, select_current_option(state)}
+  end
+
+  defp handle_space_key(state, %{type: :multi_select}) do
+    {:ok, toggle_multi_select_option(state)}
+  end
+
+  defp handle_space_key(state, %{type: type}) when type in [:text, :password] do
+    {:ok, append_char(state, " ")}
+  end
+
+  defp handle_space_key(state, _field) do
     {:ok, state}
   end
 
@@ -584,8 +580,7 @@ defmodule TermUI.Widgets.FormBuilder do
     end
   end
 
-  defp render_group_header(group, collapsed) do
-    chars = CharacterSet.current_charset()
+  defp render_group_header(group, collapsed, chars) do
     indicator = if collapsed, do: chars.triangle_right, else: chars.triangle_down
     text("#{indicator} #{group.label}")
   end
@@ -710,24 +705,31 @@ defmodule TermUI.Widgets.FormBuilder do
       end
 
     if focused do
-      # Show expanded options
-      options =
-        field.options
-        |> Enum.with_index()
-        |> Enum.map(fn {{value, label}, idx} ->
-          option_focused = idx == focused_option
-          selected = value == selected_value
-
-          prefix = if selected, do: "* ", else: "  "
-          content = "#{prefix}#{label}"
-
-          Helpers.text_focused(content, option_focused)
-        end)
-
-      stack(:vertical, options)
+      render_select_expanded(field.options, selected_value, focused_option)
     else
       text("[#{selected_label} v]")
     end
+  end
+
+  defp render_select_expanded(options, selected_value, focused_option) do
+    option_elements =
+      options
+      |> Enum.with_index()
+      |> Enum.map(fn {{value, label}, idx} ->
+        render_select_option(value, label, idx, selected_value, focused_option)
+      end)
+
+    stack(:vertical, option_elements)
+  end
+
+  defp render_select_option(value, label, idx, selected_value, focused_option) do
+    option_focused = idx == focused_option
+    selected = value == selected_value
+
+    prefix = if selected, do: "* ", else: "  "
+    content = "#{prefix}#{label}"
+
+    Helpers.text_focused(content, option_focused)
   end
 
   defp render_multi_select_field(field, selected_values, focused_option, focused) do

@@ -29,7 +29,7 @@ defmodule TermUI.RuntimeTestCase do
 
   defmacro __using__(_opts) do
     quote do
-      use ExUnit.Case, async: false
+      use TermUI.TestCase, async: false
 
       alias TermUI.Command
       alias TermUI.Event
@@ -46,14 +46,13 @@ defmodule TermUI.RuntimeTestCase do
           runtime = start_test_runtime(MyComponent)
           # runtime will be cleaned up automatically
       """
-      defp start_test_runtime(component) do
-        {:ok, runtime} = Runtime.start_link(root: component, skip_terminal: true)
-
-        on_exit(fn ->
-          if Process.alive?(runtime), do: Runtime.shutdown(runtime)
-        end)
-
-        runtime
+      def start_test_runtime(component) do
+        start_supervised!(
+          Supervisor.child_spec(
+            {Runtime, root: component, skip_terminal: true},
+            id: make_ref()
+          )
+        )
       end
     end
   end

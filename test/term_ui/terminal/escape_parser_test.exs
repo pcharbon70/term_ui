@@ -1,5 +1,5 @@
 defmodule TermUI.Terminal.EscapeParserTest do
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
 
   alias TermUI.Event
   alias TermUI.Terminal.EscapeParser

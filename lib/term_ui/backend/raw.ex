@@ -144,8 +144,11 @@ defmodule TermUI.Backend.Raw do
   @behaviour TermUI.Backend
 
   alias TermUI.ANSI
+  alias TermUI.Backend.InputBuffer
   alias TermUI.Renderer.CursorOptimizer
+  alias TermUI.Terminal.EscapeParser
   alias TermUI.Terminal.SizeDetector
+  alias TermUI.TerminalOutput
   require Logger
 
   # Comprehensive mouse disable sequence - disables ALL mouse modes defensively
@@ -297,32 +300,13 @@ defmodule TermUI.Backend.Raw do
     size_opt = Keyword.get(opts, :size, nil)
     optimize_cursor = Keyword.get(opts, :optimize_cursor, true)
 
-    # Validate and get terminal size
     with {:ok, size} <- get_terminal_size(size_opt) do
-      # Perform terminal setup sequence
-      # Order: alternate screen -> hide cursor -> mouse tracking -> clear
-      if alternate_screen do
-        write_to_terminal(ANSI.enter_alternate_screen())
-      end
-
-      if hide_cursor do
-        write_to_terminal(ANSI.cursor_hide())
-      end
-
-      if mouse_tracking != :none do
-        ansi_mode = mouse_mode_to_ansi(mouse_tracking)
-
-        if ansi_mode do
-          write_to_terminal(ANSI.enable_mouse_tracking(ansi_mode))
-          write_to_terminal(ANSI.enable_sgr_mouse())
-        end
-      end
-
-      # Clear screen and home cursor
+      setup_alternate_screen(alternate_screen)
+      setup_cursor_visibility(hide_cursor)
+      setup_mouse_tracking(mouse_tracking)
       write_to_terminal(ANSI.clear_screen())
       write_to_terminal(ANSI.cursor_position(1, 1))
 
-      # Build initial state
       state = %__MODULE__{
         size: size,
         cursor_visible: not hide_cursor,
@@ -335,6 +319,20 @@ defmodule TermUI.Backend.Raw do
 
       {:ok, state}
     end
+  end
+
+  defp setup_alternate_screen(true), do: write_to_terminal(ANSI.enter_alternate_screen())
+  defp setup_alternate_screen(false), do: :ok
+
+  defp setup_cursor_visibility(true), do: write_to_terminal(ANSI.cursor_hide())
+  defp setup_cursor_visibility(false), do: :ok
+
+  defp setup_mouse_tracking(:none), do: :ok
+
+  defp setup_mouse_tracking(mode) do
+    ansi_mode = mouse_mode_to_ansi(mode)
+    write_to_terminal(ANSI.enable_mouse_tracking(ansi_mode))
+    write_to_terminal(ANSI.enable_sgr_mouse())
   end
 
   @impl true
@@ -554,20 +552,17 @@ defmodule TermUI.Backend.Raw do
        ) do
     # Use optimizer to find cheapest movement, with error recovery
     # Only catch expected exceptions, not system-level errors
-    try do
-      {sequence, _cost} = CursorOptimizer.optimal_move(from_row, from_col, to_row, to_col)
-      sequence
-    rescue
-      e in [ArgumentError, ArithmeticError, FunctionClauseError] ->
-        # Fall back to absolute positioning if optimizer fails
-        Logger.warning(
-          "CursorOptimizer failed (#{Exception.message(e)}), falling back to absolute positioning",
-          from: {from_row, from_col},
-          to: {to_row, to_col}
-        )
+    {sequence, _cost} = CursorOptimizer.optimal_move(from_row, from_col, to_row, to_col)
+    sequence
+  rescue
+    e in [ArgumentError, ArithmeticError, FunctionClauseError] ->
+      # Fall back to absolute positioning if optimizer fails
+      Logger.warning(
+        "CursorOptimizer failed (#{Exception.message(e)}), falling back to absolute positioning " <>
+          "from=#{inspect({from_row, from_col})} to=#{inspect({to_row, to_col})}"
+      )
 
-        ANSI.cursor_position(to_row, to_col)
-    end
+      ANSI.cursor_position(to_row, to_col)
   end
 
   @impl true
@@ -796,10 +791,6 @@ defmodule TermUI.Backend.Raw do
   # Note on cursor advancement: After writing a character, the cursor automatically
   # advances one column. This function assumes single-width characters. Multi-width
   # characters (CJK, emoji) would require grapheme width tracking - a future enhancement.
-  #
-  # TODO: Consider using CursorOptimizer here for ~40% byte savings on cursor
-  # movement. Current absolute positioning is simple and correct but not optimal.
-  # See move_cursor/2 for example of CursorOptimizer integration.
   @spec cursor_move_output({pos_integer(), pos_integer()} | nil, {pos_integer(), pos_integer()}) ::
           iodata()
   defp cursor_move_output(nil, {row, col}) do
@@ -828,8 +819,8 @@ defmodule TermUI.Backend.Raw do
   # we must reset with ESC[0m and rebuild the full style, since ANSI doesn't have
   # efficient individual attribute removal for all attributes.
   #
-  # Note: This uses ANSI module for sequence generation. For parameter-level SGR
-  # operations (e.g., combining into single sequence), see TermUI.SGR module.
+  # Note: This uses ANSI module for sequence generation. Style tracking is
+  # handled locally to minimize redundant SGR output.
   @spec style_delta_output(style_state() | nil, style_state()) :: iodata()
   defp style_delta_output(nil, new_style) do
     # No previous style - emit full style
@@ -1178,8 +1169,6 @@ defmodule TermUI.Backend.Raw do
   end
 
   defp try_parse_buffer(%{input_buffer: buffer, event_queue: []} = state) do
-    alias TermUI.Terminal.EscapeParser
-
     case EscapeParser.parse(buffer) do
       {[event], remaining} ->
         # Single event - simple case
@@ -1209,9 +1198,6 @@ defmodule TermUI.Backend.Raw do
   @spec read_input_with_timeout(t(), non_neg_integer()) ::
           {:ok, TermUI.Backend.event(), t()} | {:timeout, t()} | {:error, term(), t()}
   defp read_input_with_timeout(state, timeout) do
-    alias TermUI.Terminal.EscapeParser
-    alias TermUI.Event
-
     # For zero timeout, just check if there's input ready
     # Unfortunately, IO.getn blocks, so we use a Task with timeout
     task = Task.async(fn -> read_one_byte() end)
@@ -1239,9 +1225,6 @@ defmodule TermUI.Backend.Raw do
   @spec try_parse_or_continue(t(), non_neg_integer()) ::
           {:ok, TermUI.Backend.event(), t()} | {:timeout, t()} | {:error, term(), t()}
   defp try_parse_or_continue(state, _timeout) do
-    alias TermUI.Terminal.EscapeParser
-    alias TermUI.Event
-
     buffer = state.input_buffer
 
     case EscapeParser.parse(buffer) do
@@ -1268,39 +1251,40 @@ defmodule TermUI.Backend.Raw do
   @spec wait_for_escape_completion(t(), binary()) ::
           {:ok, TermUI.Backend.event(), t()} | {:timeout, t()} | {:error, term(), t()}
   defp wait_for_escape_completion(state, buffer) do
-    alias TermUI.Terminal.EscapeParser
-    alias TermUI.Event
-
     task = Task.async(fn -> read_one_byte() end)
+    result = Task.yield(task, @escape_timeout) || Task.shutdown(task)
+    handle_escape_read_result(result, state, buffer)
+  end
 
-    case Task.yield(task, @escape_timeout) || Task.shutdown(task) do
-      {:ok, {:ok, data}} ->
-        # Got more data - try to parse again
-        new_buffer = buffer <> data
+  defp handle_escape_read_result({:ok, {:ok, data}}, state, buffer) do
+    new_buffer = buffer <> data
+    parse_escape_buffer(state, new_buffer)
+  end
 
-        case EscapeParser.parse(new_buffer) do
-          {[event | _], remaining} ->
-            {:ok, event, %{state | input_buffer: remaining}}
+  defp handle_escape_read_result({:ok, :eof}, state, buffer),
+    do: emit_partial_escape(state, buffer)
 
-          {[], remaining} ->
-            if EscapeParser.partial_sequence?(remaining) do
-              # Still partial - recurse with remaining timeout
-              wait_for_escape_completion(state, remaining)
-            else
-              {:timeout, %{state | input_buffer: remaining}}
-            end
-        end
+  defp handle_escape_read_result({:ok, {:error, _reason}}, state, buffer),
+    do: emit_partial_escape(state, buffer)
 
-      {:ok, :eof} ->
-        # EOF during escape sequence - emit what we have
-        emit_partial_escape(state, buffer)
+  defp handle_escape_read_result(nil, state, buffer),
+    do: emit_partial_escape(state, buffer)
 
-      {:ok, {:error, _reason}} ->
-        emit_partial_escape(state, buffer)
+  defp parse_escape_buffer(state, buffer) do
+    case EscapeParser.parse(buffer) do
+      {[event | _], remaining} ->
+        {:ok, event, %{state | input_buffer: remaining}}
 
-      nil ->
-        # Timeout - emit partial escape sequence
-        emit_partial_escape(state, buffer)
+      {[], remaining} ->
+        handle_incomplete_escape(state, remaining)
+    end
+  end
+
+  defp handle_incomplete_escape(state, remaining) do
+    if EscapeParser.partial_sequence?(remaining) do
+      wait_for_escape_completion(state, remaining)
+    else
+      {:timeout, %{state | input_buffer: remaining}}
     end
   end
 
@@ -1311,8 +1295,6 @@ defmodule TermUI.Backend.Raw do
   end
 
   defp handle_timeout(%{input_buffer: buffer} = state) do
-    alias TermUI.Terminal.EscapeParser
-
     if EscapeParser.partial_sequence?(buffer) do
       emit_partial_escape(state, buffer)
     else
@@ -1323,7 +1305,6 @@ defmodule TermUI.Backend.Raw do
   # Emits events from a partial escape sequence (timeout disambiguation).
   @spec emit_partial_escape(t(), binary()) :: {:ok, TermUI.Backend.event(), t()}
   defp emit_partial_escape(state, buffer) do
-    alias TermUI.Terminal.EscapeParser
     alias TermUI.Event
 
     # Handle known partial sequences
@@ -1430,7 +1411,7 @@ defmodule TermUI.Backend.Raw do
   # Uses the shared InputBuffer module for rate-limited logging.
   @spec append_to_input_buffer(t(), binary()) :: t()
   defp append_to_input_buffer(state, data) do
-    TermUI.Backend.InputBuffer.append_with_limit(state, data, :input_buffer, source: __MODULE__)
+    InputBuffer.append_with_limit(state, data, :input_buffer, source: __MODULE__)
   end
 
   # Queues events with size limit protection.
@@ -1465,7 +1446,7 @@ defmodule TermUI.Backend.Raw do
   # Writes data to the terminal, wrapping in try/rescue for error safety.
   # Debug logging helps troubleshoot rendering issues without exposing errors to users.
   defp write_to_terminal(data) do
-    IO.write(data)
+    TerminalOutput.write(data)
   rescue
     e ->
       Logger.debug("Terminal write failed: #{Exception.message(e)}")
@@ -1474,7 +1455,7 @@ defmodule TermUI.Backend.Raw do
 
   # Error-safe write for shutdown - logs errors but continues
   defp safe_write(data) do
-    IO.write(data)
+    TerminalOutput.write(data)
   rescue
     e ->
       Logger.warning("Failed to write during shutdown: #{Exception.message(e)}")

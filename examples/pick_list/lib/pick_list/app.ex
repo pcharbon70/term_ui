@@ -2,7 +2,7 @@ defmodule PickList.App do
   @moduledoc """
   PickList Widget Example
 
-  This example demonstrates how to use the TermUI.Widget.PickList widget
+  This example demonstrates how to use the TermUI.Widgets.PickList widget
   for modal selection dialogs with filtering support.
 
   Features demonstrated:
@@ -28,25 +28,96 @@ defmodule PickList.App do
 
   alias TermUI.Event
   alias TermUI.Renderer.Style
-  alias TermUI.Widget.PickList
+  alias TermUI.Widgets.PickList
 
   # Sample data for different pick lists
-  @fruits ["Apple", "Apricot", "Avocado", "Banana", "Blackberry", "Blueberry",
-           "Cherry", "Coconut", "Cranberry", "Date", "Dragon Fruit", "Fig",
-           "Grape", "Grapefruit", "Guava", "Honeydew", "Kiwi", "Lemon",
-           "Lime", "Lychee", "Mango", "Melon", "Nectarine", "Orange",
-           "Papaya", "Passion Fruit", "Peach", "Pear", "Pineapple", "Plum",
-           "Pomegranate", "Raspberry", "Strawberry", "Tangerine", "Watermelon"]
+  @fruits [
+    "Apple",
+    "Apricot",
+    "Avocado",
+    "Banana",
+    "Blackberry",
+    "Blueberry",
+    "Cherry",
+    "Coconut",
+    "Cranberry",
+    "Date",
+    "Dragon Fruit",
+    "Fig",
+    "Grape",
+    "Grapefruit",
+    "Guava",
+    "Honeydew",
+    "Kiwi",
+    "Lemon",
+    "Lime",
+    "Lychee",
+    "Mango",
+    "Melon",
+    "Nectarine",
+    "Orange",
+    "Papaya",
+    "Passion Fruit",
+    "Peach",
+    "Pear",
+    "Pineapple",
+    "Plum",
+    "Pomegranate",
+    "Raspberry",
+    "Strawberry",
+    "Tangerine",
+    "Watermelon"
+  ]
 
-  @colors ["Red", "Orange", "Yellow", "Green", "Blue", "Indigo", "Violet",
-           "Pink", "Cyan", "Magenta", "Brown", "Black", "White", "Gray",
-           "Teal", "Navy", "Maroon", "Olive", "Coral", "Salmon"]
+  @colors [
+    "Red",
+    "Orange",
+    "Yellow",
+    "Green",
+    "Blue",
+    "Indigo",
+    "Violet",
+    "Pink",
+    "Cyan",
+    "Magenta",
+    "Brown",
+    "Black",
+    "White",
+    "Gray",
+    "Teal",
+    "Navy",
+    "Maroon",
+    "Olive",
+    "Coral",
+    "Salmon"
+  ]
 
-  @countries ["Argentina", "Australia", "Brazil", "Canada", "China", "Egypt",
-              "France", "Germany", "India", "Italy", "Japan", "Kenya",
-              "Mexico", "Netherlands", "Norway", "Portugal", "Russia",
-              "Spain", "Sweden", "Thailand", "United Kingdom", "United States",
-              "Vietnam", "Zimbabwe"]
+  @countries [
+    "Argentina",
+    "Australia",
+    "Brazil",
+    "Canada",
+    "China",
+    "Egypt",
+    "France",
+    "Germany",
+    "India",
+    "Italy",
+    "Japan",
+    "Kenya",
+    "Mexico",
+    "Netherlands",
+    "Norway",
+    "Portugal",
+    "Russia",
+    "Spain",
+    "Sweden",
+    "Thailand",
+    "United Kingdom",
+    "United States",
+    "Vietnam",
+    "Zimbabwe"
+  ]
 
   # ----------------------------------------------------------------------------
   # Component Callbacks
@@ -115,11 +186,12 @@ defmodule PickList.App do
 
     {:ok, picker_state} = PickList.init(props)
 
-    {%{state |
-      picker: :fruit,
-      picker_state: picker_state,
-      last_action: "Fruit picker opened - type to filter"
-    }, []}
+    {%{
+       state
+       | picker: :fruit,
+         picker_state: picker_state,
+         last_action: "Fruit picker opened - type to filter"
+     }, []}
   end
 
   def update(:open_color_picker, state) do
@@ -132,11 +204,12 @@ defmodule PickList.App do
 
     {:ok, picker_state} = PickList.init(props)
 
-    {%{state |
-      picker: :color,
-      picker_state: picker_state,
-      last_action: "Color picker opened - type to filter"
-    }, []}
+    {%{
+       state
+       | picker: :color,
+         picker_state: picker_state,
+         last_action: "Color picker opened - type to filter"
+     }, []}
   end
 
   def update(:open_country_picker, state) do
@@ -149,11 +222,12 @@ defmodule PickList.App do
 
     {:ok, picker_state} = PickList.init(props)
 
-    {%{state |
-      picker: :country,
-      picker_state: picker_state,
-      last_action: "Country picker opened - type to filter"
-    }, []}
+    {%{
+       state
+       | picker: :country,
+         picker_state: picker_state,
+         last_action: "Country picker opened - type to filter"
+     }, []}
   end
 
   def update({:picker_event, event}, state) do
@@ -183,19 +257,11 @@ defmodule PickList.App do
               :country -> %{s | selected_country: item}
             end
 
-          {%{new_state |
-            picker: nil,
-            picker_state: nil,
-            last_action: "Selected: #{item}"
-          }, cmds}
+          {%{new_state | picker: nil, picker_state: nil, last_action: "Selected: #{item}"}, cmds}
 
         {:send, _pid, :cancel} ->
           # Handle cancel - just close picker
-          {%{s |
-            picker: nil,
-            picker_state: nil,
-            last_action: "Selection cancelled"
-          }, cmds}
+          {%{s | picker: nil, picker_state: nil, last_action: "Selection cancelled"}, cmds}
 
         _ ->
           {s, cmds}

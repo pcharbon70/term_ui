@@ -1,5 +1,5 @@
 defmodule TermUI.Widgets.LogViewerTest do
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
 
   alias TermUI.Event
   alias TermUI.Theme
@@ -7,7 +7,11 @@ defmodule TermUI.Widgets.LogViewerTest do
 
   setup do
     # Start Theme server for color support
-    {:ok, _theme_pid} = Theme.start_link(theme: :dark)
+    case Theme.start_link(theme: :dark) do
+      {:ok, _pid} -> :ok
+      {:error, {:already_started, _pid}} -> :ok
+    end
+
     :ok
   end
 
@@ -252,7 +256,7 @@ defmodule TermUI.Widgets.LogViewerTest do
       assert state.search != nil
       assert state.search_input == nil
       # Should find ERROR line
-      assert length(state.search.matches) > 0
+      assert state.search.matches != []
     end
 
     test "n goes to next match", %{state: state} do
@@ -279,7 +283,7 @@ defmodule TermUI.Widgets.LogViewerTest do
     test "search finds regex patterns", %{state: state} do
       state = LogViewer.search(state, "\\d{3}ms")
       # Should find "500ms"
-      assert length(state.search.matches) > 0
+      assert state.search.matches != []
     end
 
     test "escape clears search", %{state: state} do

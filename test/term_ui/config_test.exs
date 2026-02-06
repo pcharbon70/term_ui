@@ -1,5 +1,5 @@
 defmodule TermUI.ConfigTest do
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: false
 
   alias TermUI.Config
 
@@ -183,9 +183,12 @@ defmodule TermUI.ConfigTest do
 
       merged = Config.merge_options(backend: :raw, render_interval: 33)
 
-      assert merged[:backend] == :raw  # Runtime override
-      assert merged[:render_interval] == 33  # Runtime option
-      assert merged[:color_mode] == :auto  # Default
+      # Runtime override
+      assert merged[:backend] == :raw
+      # Runtime option
+      assert merged[:render_interval] == 33
+      # Default
+      assert merged[:color_mode] == :auto
     end
 
     test "arbitrary options are passed through" do
@@ -200,8 +203,10 @@ defmodule TermUI.ConfigTest do
 
       merged = Config.merge_options(original_opts)
 
-      assert merged[:backend] == :raw  # Should use runtime option
-      assert original_opts[:backend] == :raw  # Original unchanged
+      # Should use runtime option
+      assert merged[:backend] == :raw
+      # Original unchanged
+      assert original_opts[:backend] == :raw
     end
 
     test "handles nil values in config" do

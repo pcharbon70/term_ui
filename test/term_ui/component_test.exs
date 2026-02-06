@@ -1,5 +1,5 @@
 defmodule TermUI.ComponentTest do
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
 
   alias TermUI.Component.RenderNode
   alias TermUI.Renderer.Style
@@ -52,7 +52,7 @@ defmodule TermUI.ComponentTest do
     use TermUI.Component
 
     @impl true
-    def render(props, area) do
+    def render(_props, area) do
       box([
         text("Header"),
         stack(:vertical, [

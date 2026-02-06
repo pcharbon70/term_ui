@@ -199,82 +199,15 @@ defp attr_off_sgr(:underline), do: "24"
 # ... etc
 ```
 
-### Sequence Buffer
+### Backend Output Buffering
 
-Batches sequences for efficient output:
-
-```elixir
-defmodule TermUI.Renderer.SequenceBuffer do
-  defstruct [
-    buffer: [],          # Accumulated iodata
-    size: 0,             # Current size
-    threshold: 4096,     # Auto-flush threshold
-    last_style: nil      # For delta encoding
-  ]
-
-  def append(buffer, data) do
-    new_size = buffer.size + IO.iodata_length(data)
-    new_buffer = %{buffer | buffer: [data | buffer.buffer], size: new_size}
-
-    if new_size >= buffer.threshold do
-      {flushed, reset} = flush(new_buffer)
-      {:flush, flushed, reset}
-    else
-      {:ok, new_buffer}
-    end
-  end
-
-  def flush(buffer) do
-    data = buffer.buffer |> Enum.reverse()
-    {data, %{buffer | buffer: [], size: 0}}
-  end
-end
-```
+Backends accumulate ANSI iodata during `draw_cells/2` and flush it via
+`flush/1`, keeping IO writes batched without a dedicated sequence buffer.
 
 ### Style Delta Encoding
 
-Only emit changed attributes:
-
-```elixir
-def append_style(buffer, style) do
-  params = style_to_sgr_params(style, buffer.last_style)
-
-  if params == [] do
-    buffer
-  else
-    sequence = build_sgr_sequence(params)
-    buffer = append!(buffer, sequence)
-    %{buffer | last_style: style}
-  end
-end
-
-defp style_to_sgr_params(style, nil) do
-  # No previous - emit all
-  build_full_sgr_params(style)
-end
-
-defp style_to_sgr_params(style, last) do
-  params = []
-
-  # Only emit if changed
-  params = if style.fg != last.fg do
-    fg = style.fg || :default
-    [color_to_sgr(:fg, fg) | params]
-  else
-    params
-  end
-
-  params = if style.bg != last.bg do
-    bg = style.bg || :default
-    [color_to_sgr(:bg, bg) | params]
-  else
-    params
-  end
-
-  # Handle attribute changes...
-  params
-end
-```
+Backends track the last emitted style and only output SGR parameters when
+attributes change, reducing redundant escape sequences.
 
 ## Mouse Tracking
 

@@ -1,5 +1,5 @@
 defmodule TermUI.Widgets.GaugeTest do
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
 
   alias TermUI.Theme
   alias TermUI.Widgets.Gauge

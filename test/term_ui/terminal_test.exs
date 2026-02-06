@@ -1,5 +1,5 @@
 defmodule TermUI.TerminalTest do
-  use ExUnit.Case
+  use TermUI.TestCase
 
   alias TermUI.Terminal
   alias TermUI.Terminal.State

@@ -1,8 +1,8 @@
 defmodule TermUI.InputTest do
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
 
-  alias TermUI.Input
   alias TermUI.Event
+  alias TermUI.Input
 
   describe "behaviour definition" do
     test "module compiles and defines behaviour" do

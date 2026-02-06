@@ -1,5 +1,5 @@
 defmodule TermUI.Renderer.BufferTest do
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
 
   alias TermUI.Renderer.{Buffer, Cell, Style}
 

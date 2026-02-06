@@ -1,5 +1,5 @@
 defmodule TermUI.Widgets.CommandPaletteTest do
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
 
   alias TermUI.Theme
 
@@ -221,7 +221,7 @@ defmodule TermUI.Widgets.CommandPaletteTest do
       {:ok, state} = CommandPalette.handle_event(%Event.Key{key: "i"}, state)
       {:ok, state} = CommandPalette.handle_event(%Event.Key{key: "t"}, state)
 
-      assert length(state.filtered) >= 1
+      assert state.filtered != []
       assert Enum.any?(state.filtered, &(&1.id == :quit))
     end
 

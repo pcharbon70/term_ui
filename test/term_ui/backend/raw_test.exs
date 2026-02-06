@@ -6,9 +6,10 @@ defmodule TermUI.Backend.RawTest do
   Callback implementation tests will be added as each section is implemented.
   """
 
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
 
   alias TermUI.Backend.Raw
+  alias TermUI.Terminal.SizeDetector
 
   describe "module structure" do
     test "module compiles successfully" do
@@ -796,16 +797,20 @@ defmodule TermUI.Backend.RawTest do
         {:ok, state} = Raw.init(size: {24, 80})
         assert state.size == {24, 80}
 
+        expected =
+          case SizeDetector.detect() do
+            {:ok, size} -> size
+            {:error, _} -> :error
+          end
+
         case Raw.refresh_size(state) do
           {:ok, new_size, updated_state} ->
-            assert new_size == {50, 120}
-            assert updated_state.size == {50, 120}
+            assert expected != :error
             assert updated_state.size == new_size
+            assert new_size == expected
 
           {:error, :size_detection_failed} ->
-            # If :io.rows/0 and :io.columns/0 succeed but with different values,
-            # the env fallback won't be used
-            :ok
+            assert expected == :error
         end
       end)
     end
@@ -1733,8 +1738,8 @@ defmodule TermUI.Backend.RawTest do
     # These tests verify that EscapeParser correctly parses SGR mouse sequences
     # which are used by poll_event/2 when mouse tracking is enabled
 
-    alias TermUI.Terminal.EscapeParser
     alias TermUI.Event
+    alias TermUI.Terminal.EscapeParser
 
     test "parses left button press" do
       # ESC [ < 0 ; 10 ; 20 M  (left button press at col 10, row 20)

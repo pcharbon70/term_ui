@@ -1,5 +1,5 @@
 defmodule TermUI.Test.TestRendererTest do
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
 
   alias TermUI.Renderer.Cell
   alias TermUI.Test.TestRenderer
@@ -200,7 +200,7 @@ defmodule TermUI.Test.TestRendererTest do
       diffs = TestRenderer.diff_snapshot(renderer, snapshot)
 
       # First character changed from T to B
-      assert length(diffs) > 0
+      assert diffs != []
       TestRenderer.destroy(renderer)
     end
   end

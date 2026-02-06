@@ -17,18 +17,18 @@ graph LR
     end
 
     subgraph "3. Diff"
-        CB --> D{Diff}
+        CB --> D{Cell Diff}
         PB[Previous Buffer] --> D
-        D --> OPS[Operations]
+        D --> CC[Changed Cells]
     end
 
-    subgraph "4. Serialize"
-        OPS --> SB[SequenceBuffer]
-        SB --> ANSI[ANSI Sequences]
+    subgraph "4. Backend"
+        CC --> BE[Backend.draw_cells]
+        BE --> FL[Backend.flush]
     end
 
     subgraph "5. Output"
-        ANSI --> IO[IO.write]
+        FL --> IO[IO.write]
         IO --> T[Terminal]
     end
 ```
@@ -163,170 +163,57 @@ This approach:
 
 ## Stage 3: Diff
 
-The diff algorithm compares current and previous buffers:
+The runtime compares current and previous buffers and produces a flat list of
+changed cells to send to the backend.
 
 ```mermaid
 graph TB
-    subgraph "Diff Algorithm"
-        CB[Current Buffer] --> GR[Get Rows]
-        PB[Previous Buffer] --> GR
-        GR --> CR[Compare Rows]
-        CR --> FS[Find Spans]
-        FS --> MS[Merge Spans]
-        MS --> GO[Generate Ops]
-    end
-
-    GO --> OPS[Operations List]
+    CB[Current Buffer] --> D{Cell Diff}
+    PB[Previous Buffer] --> D
+    D --> CC[Changed Cells]
 ```
 
-### Diff Process
+### Diff Process (simplified)
 
 ```elixir
-def diff(current, previous) do
+defp get_changed_cells(current, previous) do
   {rows, cols} = Buffer.dimensions(current)
 
-  1..rows
-  |> Enum.flat_map(fn row ->
-    diff_row(current, previous, row, cols)
-  end)
-  |> optimize_operations()
-end
-```
+  for row <- 1..rows, reduce: [] do
+    acc ->
+      current_row = Buffer.get_row(current, row)
+      previous_row = Buffer.get_row(previous, row)
 
-### Finding Changed Spans
+      Enum.reduce(1..cols, acc, fn col, acc2 ->
+        curr = Enum.at(current_row, col - 1)
+        prev = Enum.at(previous_row, col - 1)
 
-```elixir
-def find_changed_spans(current_cells, previous_cells, row) do
-  current_cells
-  |> Enum.zip(previous_cells)
-  |> Enum.reduce({[], nil}, fn {{col, curr}, {_, prev}}, acc ->
-    if Cell.equal?(curr, prev) do
-      close_span(acc)
-    else
-      extend_span(acc, col, curr, row)
-    end
-  end)
-  |> finalize()
-end
-```
-
-### Span Merging
-
-Small gaps between spans are merged to reduce cursor movements:
-
-```
-Before:  [CHANGED]...[CHANGED]  (3 char gap)
-After:   [CHANGED...CHANGED]    (merged)
-```
-
-```elixir
-@merge_gap_threshold 3
-
-defp merge_spans(spans) do
-  Enum.reduce(spans, [], fn span, acc ->
-    case acc do
-      [prev | rest] when span.start_col - prev.end_col <= @merge_gap_threshold ->
-        [merge(prev, span) | rest]
-      _ ->
-        [span | acc]
-    end
-  end)
-end
-```
-
-### Operation Types
-
-```elixir
-@type operation ::
-  {:move, row, col}     # Move cursor
-  | {:style, Style.t()} # Set SGR attributes
-  | {:text, String.t()} # Output text
-  | :reset              # Reset all attributes
-```
-
-## Stage 4: Serialize
-
-`SequenceBuffer` converts operations to ANSI escape sequences:
-
-```mermaid
-graph LR
-    subgraph "SequenceBuffer"
-        OPS[Operations] --> P[Process]
-        P --> M[Move: ESC row;col H]
-        P --> S[Style: ESC params m]
-        P --> T[Text: raw chars]
-        M --> B[Buffer]
-        S --> B
-        T --> B
-        B --> F[Flush]
-    end
-
-    F --> IO[iodata]
-```
-
-### Style Delta Encoding
-
-Only changed style attributes are emitted:
-
-```elixir
-defp style_to_sgr_params(style, last_style) do
-  params = []
-
-  # Only emit fg if changed
-  params = if style.fg != last_style.fg do
-    [color_to_sgr(:fg, style.fg) | params]
-  else
-    params
+        if Cell.equal?(curr, prev) do
+          acc2
+        else
+          [%{row: row, col: col, cell: curr} | acc2]
+        end
+      end)
   end
-
-  # Only emit bg if changed
-  params = if style.bg != last_style.bg do
-    [color_to_sgr(:bg, style.bg) | params]
-  else
-    params
-  end
-
-  # Handle attribute changes
-  # ...
-
-  params
 end
 ```
 
-### SGR Sequence Building
+## Stage 4: Backend Encode
+
+Backends accept changed cells and emit ANSI sequences. Raw mode uses
+double-buffer diffing; TTY mode renders a full frame and still delegates
+cell encoding to the backend.
 
 ```elixir
-defp build_sgr_sequence(params) do
-  # ESC[param1;param2;...m
-  ["\e[", Enum.intersperse(params, ";"), "m"]
-end
-
-# Examples:
-# Red foreground: \e[31m
-# Bold + blue: \e[1;34m
-# Reset: \e[0m
+{:ok, backend_state} = backend.draw_cells(backend_state, cells)
+{:ok, backend_state} = backend.flush(backend_state)
 ```
+
+Backends handle cursor movement optimization and style encoding.
 
 ## Stage 5: Output
 
-The final iodata is written to the terminal:
-
-```elixir
-defp render_operations(operations) do
-  seq_buffer = SequenceBuffer.new()
-
-  seq_buffer =
-    Enum.reduce(operations, seq_buffer, fn op, buf ->
-      apply_operation(op, buf)
-    end)
-
-  # Reset at end to avoid style bleeding
-  seq_buffer = SequenceBuffer.append!(seq_buffer, "\e[0m")
-
-  {output, _} = SequenceBuffer.flush(seq_buffer)
-  IO.write(output)
-end
-```
+`Backend.flush/1` writes accumulated output via `IO.write/1` to the terminal.
 
 ## Optimization Techniques
 
@@ -387,7 +274,7 @@ For 60 FPS, each frame has ~16ms:
 | View | 0.1-1ms |
 | Rasterize | 0.5-2ms |
 | Diff | 0.2-1ms |
-| Serialize | 0.1-0.5ms |
+| Backend Encode | 0.1-0.5ms |
 | Output | 0.5-2ms |
 | **Total** | **1.4-6.5ms** |
 
@@ -412,12 +299,12 @@ def view(state) do
 end
 ```
 
-### Inspect Operations
+### Inspect Changed Cells
 
 ```elixir
 # In Runtime.do_render/1
-operations = Diff.diff(current, previous)
-IO.inspect(operations, label: "Diff Operations")
+cells = get_changed_cells(current, previous)
+IO.inspect(cells, label: "Changed Cells")
 ```
 
 ### Buffer Contents

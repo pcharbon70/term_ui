@@ -1,5 +1,5 @@
 defmodule TermUI.Widgets.Table.ColumnTest do
-  use ExUnit.Case, async: true
+  use TermUI.TestCase, async: true
 
   alias TermUI.Layout.Constraint
   alias TermUI.Widgets.Table.Column
