@@ -37,6 +37,9 @@ defmodule TermUI.Widgets.Viewport do
   alias TermUI.CharacterSet
   alias TermUI.Event
 
+  # Dialyzer: Functions return specific map types
+  @dialyzer {:nowarn_function, new: 1, set_content: 2, render: 2}
+
   @doc """
   Creates new Viewport widget props.
 

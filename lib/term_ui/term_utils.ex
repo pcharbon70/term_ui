@@ -55,6 +55,10 @@ defmodule TermUI.TermUtils do
   # Known-safe command locations (will be resolved at runtime)
   @allowed_commands ~w(stty test infocmp)
 
+  # Dialyzer: Functions return specific types
+  @dialyzer {:nowarn_function,
+             default_validate: 1, validate_stty_settings: 1, validate_stty_size: 1}
+
   # ===========================================================================
   # Public API
   # ===========================================================================
@@ -252,9 +256,9 @@ defmodule TermUI.TermUtils do
     # Check all arguments are safe
     Enum.all?(args, fn arg ->
       # Either it's a known safe flag
+      # Or it's a numeric argument (for min/time)
       arg in safe_flags or
-        # Or it's a numeric argument (for min/time)
-        match?(<<_::utf8>>, arg) and String.length(arg) < 32
+        (match?(<<_::utf8>>, arg) and String.length(arg) < 32)
     end)
     |> if do
       :ok
@@ -316,7 +320,7 @@ defmodule TermUI.TermUtils do
     term_name_regex = ~r/^[a-zA-Z0-9_-]+$/
 
     Enum.all?(args, fn arg ->
-      arg in safe_flags or Regex.match?(term_name_regex, arg) and String.length(arg) < 64
+      arg in safe_flags or (Regex.match?(term_name_regex, arg) and String.length(arg) < 64)
     end)
     |> if do
       :ok

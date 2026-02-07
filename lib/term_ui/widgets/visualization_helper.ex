@@ -32,6 +32,9 @@ defmodule TermUI.Widgets.VisualizationHelper do
   @max_width 1000
   @max_height 500
 
+  # Dialyzer: Functions return specific types or constants
+  @dialyzer {:nowarn_function, max_width: 0, max_height: 0, maybe_style: 2}
+
   @doc """
   Returns the maximum allowed width for visualization widgets.
   """

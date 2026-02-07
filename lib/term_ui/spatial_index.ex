@@ -27,6 +27,9 @@ defmodule TermUI.SpatialIndex do
 
   @table_name :term_ui_spatial_index
 
+  # Dialyzer: Functions with unmatched return values
+  @dialyzer {:nowarn_function, init: 1}
+
   # Client API
 
   @doc """

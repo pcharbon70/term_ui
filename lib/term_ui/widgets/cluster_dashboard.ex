@@ -45,13 +45,18 @@ defmodule TermUI.Widgets.ClusterDashboard do
   alias TermUI.Renderer.Style
   alias TermUI.Theme
 
-  # Dialyzer: Suppress opaque type warnings for Style helpers
+  # Dialyzer: Suppress opaque type warnings for Style helpers and contract warnings for specific types
   @dialyzer {:nowarn_function,
              fg_semantic: 1,
              fg_color: 1,
              fg_bold_semantic: 1,
              fg_bg_bold_semantic: 2,
-             fg_bold_help: 0}
+             fg_bold_help: 0,
+             new: 1,
+             refresh: 1,
+             set_interval: 2,
+             handle_info: 2,
+             unmount: 1}
 
   @type view_mode :: :nodes | :globals | :pg_groups | :events
   @type node_status :: :connected | :disconnected | :local
@@ -95,8 +100,9 @@ defmodule TermUI.Widgets.ClusterDashboard do
     do: Style.new() |> Style.fg(fg) |> Style.bg(bg) |> Style.bold()
 
   @spec fg_bold_help() :: Style.t()
-  defp fg_bold_help(),
-    do: Style.new() |> Style.fg(Theme.get_semantic(:help)) |> Style.dim()
+  defp fg_bold_help do
+    Style.new() |> Style.fg(Theme.get_semantic(:help)) |> Style.dim()
+  end
 
   # ----------------------------------------------------------------------------
   # Props

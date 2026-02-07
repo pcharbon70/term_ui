@@ -36,6 +36,9 @@ defmodule TermUI.Layout.Cache do
   @default_max_size 500
   @default_eviction_count 50
 
+  # Dialyzer: Functions with unmatched return values
+  @dialyzer {:nowarn_function, init: 1, increment_hits: 0, increment_misses: 0, solve: 3}
+
   # Client API
 
   @doc """

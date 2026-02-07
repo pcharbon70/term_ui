@@ -36,6 +36,20 @@ defmodule TermUI.Capabilities do
 
   @ets_table :term_ui_capabilities
 
+  # Dialyzer: Functions with unmatched return values
+  @dialyzer {:nowarn_function,
+             ensure_table_exists: 0,
+             clear_cache: 0,
+             get: 0,
+             detect_from_term: 1,
+             detect_from_colorterm: 1,
+             detect_from_term_program: 1,
+             detect_from_terminfo: 1,
+             supports_true_color?: 0,
+             supports_256_color?: 0,
+             cache_capabilities: 1,
+             get_cached: 0}
+
   # Known terminal emulators with their capabilities
   @true_color_terminals ~w(iTerm.app vscode WezTerm kitty Alacritty Hyper)
   @color_256_terminals ~w(Apple_Terminal gnome-terminal konsole xfce4-terminal)

@@ -137,7 +137,8 @@ defmodule TermUI.TermUtilsTest do
 
     test "test argument validation blocks dangerous inputs" do
       bad_inputs = [
-        ["-t", "1000"],  # FD too large
+        # FD too large
+        ["-t", "1000"],
         ["-t", "$(whoami)"],
         [";rm"],
         ["$(echo", "pwn)"]

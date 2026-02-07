@@ -41,6 +41,9 @@ defmodule TermUI.ComponentSupervisor do
   alias TermUI.Component.StatePersistence
   alias TermUI.ComponentRegistry
 
+  # Dialyzer: Functions return specific types
+  @dialyzer {:nowarn_function, get_component_info: 1}
+
   @default_shutdown_timeout 5_000
 
   @doc """

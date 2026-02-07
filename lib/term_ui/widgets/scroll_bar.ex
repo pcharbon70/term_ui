@@ -36,6 +36,9 @@ defmodule TermUI.Widgets.ScrollBar do
   alias TermUI.CharacterSet
   alias TermUI.Event
 
+  # Dialyzer: Functions return specific map types
+  @dialyzer {:nowarn_function, new: 1, vertical: 1, horizontal: 1}
+
   @doc """
   Creates new ScrollBar widget props.
 

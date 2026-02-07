@@ -22,6 +22,9 @@ defmodule TermUI.Command.Executor do
 
   alias TermUI.Command
 
+  # Dialyzer: Functions with unmatched return values in side-effect calls
+  @dialyzer {:nowarn_function, execute_command: 4, handle_call: 3, handle_info: 2}
+
   @type t :: pid()
 
   # Default max concurrent commands

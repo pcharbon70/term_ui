@@ -63,6 +63,9 @@ defmodule TermUI.Component.RenderNode do
             height: nil,
             cells: nil
 
+  # Dialyzer: Functions return specific struct types
+  @dialyzer {:nowarn_function, empty: 0}
+
   @doc """
   Creates an empty render node.
 

@@ -30,7 +30,7 @@ defmodule TermUI.Widget.Label do
   alias TermUI.Renderer.Style
 
   # Dialyzer: Suppress opaque type warnings for Style helpers
-  @dialyzer {:nowarn_function, build_style: 1, positioned_cell_safe: 4}
+  @dialyzer {:nowarn_function, build_style: 1, positioned_cell_safe: 4, describe: 0}
 
   @doc """
   Renders the label text within the given area.

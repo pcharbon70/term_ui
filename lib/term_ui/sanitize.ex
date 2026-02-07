@@ -39,6 +39,9 @@ defmodule TermUI.Sanitize do
                          \x00-\x08|\x0b-\x0c|\x0e-\x1f
                        )/x
 
+  # Dialyzer: Functions return specific atom types
+  @dialyzer {:nowarn_function, validate: 1}
+
   @doc """
   Sanitizes a string by processing terminal escape sequences.
 

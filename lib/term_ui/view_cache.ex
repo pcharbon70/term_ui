@@ -29,6 +29,9 @@ defmodule TermUI.ViewCache do
   For most UI state this is acceptable—the worst case is a redundant render.
   """
 
+  # Dialyzer: Functions return specific struct types
+  @dialyzer {:nowarn_function, new: 0}
+
   @type state :: term()
   @type render_tree :: term()
   @type state_hash :: integer()

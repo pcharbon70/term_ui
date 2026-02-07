@@ -63,7 +63,21 @@ defmodule TermUI.Widgets.TreeView do
   alias TermUI.Theme
 
   # Dialyzer: Suppress opaque type warnings for Style helpers
-  @dialyzer {:nowarn_function, fg_semantic: 1, fg_color: 1, fg_bold_semantic: 1, fg_bg_semantic: 2}
+  # Also suppress contract_supertype for functions returning specific struct types
+  @dialyzer {:nowarn_function,
+             fg_semantic: 1,
+             fg_color: 1,
+             fg_bold_semantic: 1,
+             fg_bg_semantic: 2,
+             new: 1,
+             expand: 2,
+             collapse: 2,
+             expand_all: 1,
+             collapse_all: 1,
+             clear_selection: 1,
+             set_filter: 2,
+             clear_filter: 1,
+             finish_loading: 2}
 
   @type node_id :: term()
 
@@ -659,7 +673,8 @@ defmodule TermUI.Widgets.TreeView do
     label_lower = String.downcase(node.label)
     is_match = String.contains?(label_lower, filter)
 
-    {child_matches, child_ancestors} = find_child_filter_matches(node, filter, path, matches_acc, ancestors_acc)
+    {child_matches, child_ancestors} =
+      find_child_filter_matches(node, filter, path, matches_acc, ancestors_acc)
 
     if should_include_in_filter?(is_match, child_matches, matches_acc) do
       new_matches = update_filter_matches(child_matches, is_match, node.id)
@@ -791,7 +806,8 @@ defmodule TermUI.Widgets.TreeView do
         styled(text(line), fg_semantic(Theme.get_semantic(:muted)))
 
       is_cursor && is_match ->
-        cursor_match_style = fg_bg_semantic(Theme.get_color(:background), Theme.get_semantic(:warning))
+        cursor_match_style =
+          fg_bg_semantic(Theme.get_color(:background), Theme.get_semantic(:warning))
 
         styled(text(line), cursor_match_style)
 

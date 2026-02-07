@@ -58,6 +58,20 @@ defmodule TermUI.SGR do
       "\\e[1m"
   """
 
+  # Dialyzer: Functions in this module are pure data constructors that return
+  # specific iolist or String.t() structures. The public specs are correct
+  # for the API, but Dialyzer's success typing infers more specific types.
+  @dialyzer {:nowarn_function,
+             color_param: 2,
+             attr_param: 1,
+             attr_off_param: 1,
+             build_sequence: 1,
+             color_sequence: 2,
+             attr_sequence: 1,
+             reset: 0,
+             named_colors: 0,
+             supported_attrs: 0}
+
   @csi "\e["
 
   # ===========================================================================
@@ -206,7 +220,7 @@ defmodule TermUI.SGR do
       iex> SGR.build_sequence([])
       []
   """
-  @spec build_sequence([String.t()]) :: iodata()
+  @spec build_sequence([String.t()]) :: iolist()
   def build_sequence([]), do: []
 
   def build_sequence(params) when is_list(params) do
@@ -236,7 +250,7 @@ defmodule TermUI.SGR do
       iex> SGR.color_sequence(:fg, :default) |> IO.iodata_to_binary()
       "\\e[39m"
   """
-  @spec color_sequence(:fg | :bg, color :: term()) :: iodata()
+  @spec color_sequence(:fg | :bg, color :: term()) :: iolist()
   def color_sequence(type, color) do
     case color_param(type, color) do
       nil -> []
@@ -254,7 +268,7 @@ defmodule TermUI.SGR do
       iex> SGR.attr_sequence(:bold) |> IO.iodata_to_binary()
       "\\e[1m"
   """
-  @spec attr_sequence(atom()) :: iodata()
+  @spec attr_sequence(atom()) :: iolist()
   def attr_sequence(attr) do
     case attr_param(attr) do
       nil -> []
@@ -267,7 +281,7 @@ defmodule TermUI.SGR do
 
   Resets all attributes and colors to terminal defaults.
   """
-  @spec reset() :: iodata()
+  @spec reset() :: iolist()
   def reset, do: [@csi, "0m"]
 
   # ===========================================================================

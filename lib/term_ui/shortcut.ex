@@ -31,6 +31,9 @@ defmodule TermUI.Shortcut do
 
   alias TermUI.Event
 
+  # Dialyzer: Functions with unmatched return values in side-effect calls
+  @dialyzer {:nowarn_function, match: 3, handle_cast: 2, handle_call: 3, check_sequence_match: 2}
+
   @type scope :: :global | {:mode, atom()} | {:component, atom()}
 
   @type action ::

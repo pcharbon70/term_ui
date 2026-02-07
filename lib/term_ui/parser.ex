@@ -10,6 +10,9 @@ defmodule TermUI.Parser do
 
   alias TermUI.Parser.Events.{FocusEvent, KeyEvent, MouseEvent, PasteEvent}
 
+  # Dialyzer: Functions return specific map types
+  @dialyzer {:nowarn_function, new: 0}
+
   @type event :: KeyEvent.t() | MouseEvent.t() | PasteEvent.t() | FocusEvent.t()
 
   # Map control characters to key events

@@ -62,6 +62,9 @@ defmodule TermUI.Widgets.ContextMenu.Factory do
 
   @type mode :: :auto | :positioned | :inline
 
+  # Dialyzer: Functions return specific types
+  @dialyzer {:nowarn_function, create: 1, create!: 1, determine_mode: 1, build_props: 3}
+
   @type option ::
           {:items, [map()]}
           | {:position, {non_neg_integer(), non_neg_integer()}}
@@ -115,6 +118,7 @@ defmodule TermUI.Widgets.ContextMenu.Factory do
   end
 
   defp fetch_and_validate_mode({:error, _} = error, _opts), do: error
+
   defp fetch_and_validate_mode({:ok, items}, opts) do
     case determine_mode(opts) do
       {:ok, mode} -> {:ok, items, mode}
@@ -123,6 +127,7 @@ defmodule TermUI.Widgets.ContextMenu.Factory do
   end
 
   defp build_menu_props({:error, _} = error, _opts), do: error
+
   defp build_menu_props({:ok, items, mode}, opts) do
     build_props(mode, items, opts)
   end

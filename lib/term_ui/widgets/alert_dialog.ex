@@ -79,6 +79,9 @@ defmodule TermUI.Widgets.AlertDialog do
   alias TermUI.PersistentTerms
   alias TermUI.Renderer.Style
 
+  # Dialyzer: Functions return specific map types
+  @dialyzer {:nowarn_function, new: 1, show: 1, hide: 1}
+
   # Icon keys mapped to CharacterSet fields (or literal strings for ?)
   @type_icon_keys %{
     info: :info,
@@ -236,13 +239,14 @@ defmodule TermUI.Widgets.AlertDialog do
     if PersistentTerms.backend_mode() == :raw do
       {area_width, area_height} = state.terminal_area
 
-      button_bounds = calculate_button_bounds_for_size(
-        state.width,
-        state.buttons,
-        state.focused_button,
-        area_width,
-        area_height
-      )
+      button_bounds =
+        calculate_button_bounds_for_size(
+          state.width,
+          state.buttons,
+          state.focused_button,
+          area_width,
+          area_height
+        )
 
       case find_button_at_position(button_bounds, x, y) do
         nil -> {:ok, state}
@@ -327,8 +331,15 @@ defmodule TermUI.Widgets.AlertDialog do
 
   # Calculate button bounds for a given terminal size and focus state
   # Returns a map with button positions for click detection
-  defp calculate_button_bounds_for_size(dialog_width, buttons, focused_button, area_width, area_height) do
-    dialog_height = 7  # Base height for single-line message
+  defp calculate_button_bounds_for_size(
+         dialog_width,
+         buttons,
+         focused_button,
+         area_width,
+         area_height
+       ) do
+    # Base height for single-line message
+    dialog_height = 7
 
     # Dialog position on screen (centered)
     dialog_x = max(0, div(area_width - dialog_width, 2))
@@ -339,12 +350,14 @@ defmodule TermUI.Widgets.AlertDialog do
     button_y = dialog_y + button_row_in_dialog
 
     # Calculate button positions within the button line
-    inner_width = dialog_width - 4  # width inside borders
+    # width inside borders
+    inner_width = dialog_width - 4
 
     # Build button texts - focused button gets brackets
     button_texts =
       Enum.map(buttons, fn button ->
         label = button.label
+
         if button.id == focused_button do
           "[ " <> label <> " ]"
         else
@@ -362,20 +375,22 @@ defmodule TermUI.Widgets.AlertDialog do
     buttons_start_x = dialog_x + 2 + left_pad
 
     # Build bounds map for each button
-    {bounds_list, _} = Enum.map_reduce(buttons, {button_texts, buttons_start_x}, fn button, {texts, current_x} ->
-      [button_text | remaining_texts] = texts
-      button_width = String.length(button_text)
+    {bounds_list, _} =
+      Enum.map_reduce(buttons, {button_texts, buttons_start_x}, fn button, {texts, current_x} ->
+        [button_text | remaining_texts] = texts
+        button_width = String.length(button_text)
 
-      bounds = %{
-        id: button.id,
-        x: current_x,
-        y: button_y,
-        width: button_width,
-        height: 1
-      }
+        bounds = %{
+          id: button.id,
+          x: current_x,
+          y: button_y,
+          width: button_width,
+          height: 1
+        }
 
-      {bounds, {remaining_texts, current_x + button_width + 1}}  # +1 for space between buttons
-    end)
+        # +1 for space between buttons
+        {bounds, {remaining_texts, current_x + button_width + 1}}
+      end)
 
     %{
       button_y: button_y,

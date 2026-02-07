@@ -35,6 +35,9 @@ defmodule TermUI.EventRouter do
   alias TermUI.Event
   alias TermUI.SpatialIndex
 
+  # Dialyzer: Functions with unmatched return values in side-effect calls
+  @dialyzer {:nowarn_function, handle_call: 3, send_focus_event: 2}
+
   @type route_result :: :handled | :unhandled | {:error, term()}
 
   # Client API

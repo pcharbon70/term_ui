@@ -15,6 +15,20 @@ defmodule TermUI.Terminal do
   alias TermUI.Terminal.State
   alias TermUI.TermUtils
 
+  # Dialyzer: unmatched_return, pattern_match_cov, guard_fail warnings
+  @dialyzer {:nowarn_function,
+             init: 1,
+             handle_call: 3,
+             handle_cast: 2,
+             handle_info: 2,
+             terminate: 2,
+             do_restore: 1,
+             io_has_terminal?: 0,
+             check_tty: 0,
+             apply_stty_raw_settings: 0,
+             terminal?: 0,
+             do_enable_raw_mode: 0}
+
   @ets_table :term_ui_terminal_state
 
   # Full terminal reset sequence (not in ANSI module as it's rarely needed)

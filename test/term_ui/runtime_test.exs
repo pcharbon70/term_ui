@@ -559,7 +559,12 @@ defmodule TermUI.RuntimeTest do
       # We can't test actual raw mode without a terminal, but we can verify
       # the logic path by checking the state structure
       {:ok, runtime} =
-        Runtime.start_link(root: Counter, backend: :raw, use_input_handler: true, skip_terminal: true)
+        Runtime.start_link(
+          root: Counter,
+          backend: :raw,
+          use_input_handler: true,
+          skip_terminal: true
+        )
 
       state = Runtime.get_state(runtime)
       # Backend mode :skip means no handler selected
@@ -568,7 +573,12 @@ defmodule TermUI.RuntimeTest do
 
     test "initializes input handler for TTY backend mode" do
       {:ok, runtime} =
-        Runtime.start_link(root: Counter, backend: :tty, use_input_handler: true, skip_terminal: true)
+        Runtime.start_link(
+          root: Counter,
+          backend: :tty,
+          use_input_handler: true,
+          skip_terminal: true
+        )
 
       state = Runtime.get_state(runtime)
       # Backend mode :skip means no handler selected

@@ -45,8 +45,8 @@ defmodule TermUI.Widgets.TextInput do
   alias TermUI.Renderer.Style
   alias TermUI.Theme
 
-  # Dialyzer: Suppress opaque type warnings for Style helpers
-  @dialyzer {:nowarn_function, fg_theme_color: 1}
+  # Dialyzer: Suppress opaque type warnings for Style helpers and contract warnings for specific map types
+  @dialyzer {:nowarn_function, fg_theme_color: 1, new: 1, set_value: 2, clear: 1}
 
   @default_width 40
   @default_max_visible_lines 5

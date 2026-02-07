@@ -24,6 +24,14 @@ defmodule TermUI.Component.Introspection do
   alias TermUI.ComponentRegistry
   alias TermUI.ComponentServer
 
+  # Dialyzer: Functions return specific map types
+  @dialyzer {:nowarn_function,
+             get_component_info: 1,
+             get_metrics: 1,
+             aggregate_stats: 0,
+             print_tree: 1,
+             format_tree: 0}
+
   @doc """
   Returns the component tree structure.
 

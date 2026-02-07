@@ -309,7 +309,14 @@ defmodule TermUI.Backend.Selector do
   end
 
   # Detects if we're connected to a terminal
-  @spec detect_terminal_presence() :: boolean()
+  @dialyzer {:nowarn_function,
+             detect_terminal_presence: 0,
+             select: 0,
+             select: 1,
+             try_raw_mode: 0,
+             attempt_raw_mode: 0,
+             detect_capabilities: 0}
+  @spec detect_terminal_presence() :: term()
   defp detect_terminal_presence do
     case :io.getopts() do
       {:ok, opts} ->

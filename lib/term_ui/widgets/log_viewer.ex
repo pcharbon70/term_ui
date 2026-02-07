@@ -47,12 +47,16 @@ defmodule TermUI.Widgets.LogViewer do
   alias TermUI.Renderer.Style
   alias TermUI.Theme
 
-  # Dialyzer: Suppress opaque type warnings for Style helpers
+  # Dialyzer: Suppress opaque type warnings for Style helpers and contract warnings for specific map types
   @dialyzer {:nowarn_function,
              fg_semantic: 1,
              fg_color: 1,
              fg_dim_semantic: 1,
-             fg_bg_semantic: 2}
+             fg_bg_semantic: 2,
+             new: 1,
+             add_line: 2,
+             clear: 1,
+             clear_filter: 1}
 
   @type log_level ::
           :debug | :info | :notice | :warning | :error | :critical | :alert | :emergency
@@ -816,10 +820,13 @@ defmodule TermUI.Widgets.LogViewer do
   end
 
   defp pattern_match?(line, filter) do
-    filter.pattern == nil or matches_regex_pattern?(line, filter) or matches_string_pattern?(line, filter)
+    filter.pattern == nil or matches_regex_pattern?(line, filter) or
+      matches_string_pattern?(line, filter)
   end
 
-  defp matches_regex_pattern?(line, %{pattern: %Regex{} = regex}), do: Regex.match?(regex, line.raw)
+  defp matches_regex_pattern?(line, %{pattern: %Regex{} = regex}),
+    do: Regex.match?(regex, line.raw)
+
   defp matches_regex_pattern?(_line, _filter), do: false
 
   defp matches_string_pattern?(line, %{pattern: pattern}) when is_binary(pattern) do

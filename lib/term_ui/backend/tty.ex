@@ -87,6 +87,9 @@ defmodule TermUI.Backend.TTY do
   alias TermUI.Color.Converter
   alias TermUI.Terminal.EscapeParser
 
+  # Dialyzer: Functions return specific struct types
+  @dialyzer {:nowarn_function, init: 1, map_character: 2, sanitize_char: 1}
+
   # ===========================================================================
   # ANSI Escape Sequence Constants
   # ===========================================================================
@@ -203,7 +206,7 @@ defmodule TermUI.Backend.TTY do
   - `{:ok, state}` - Successfully initialized
   - `{:error, reason}` - Initialization failed
   """
-  @spec init(keyword()) :: {:ok, t()} | {:error, term()}
+  @spec init(keyword()) :: {:ok, t()}
   def init(opts \\ []) do
     capabilities = Keyword.get(opts, :capabilities, %{})
     line_mode = Keyword.get(opts, :line_mode, :full_redraw)

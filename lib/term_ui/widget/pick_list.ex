@@ -44,7 +44,20 @@ defmodule TermUI.Widget.PickList do
   alias TermUI.Renderer.Style
 
   # Dialyzer: Suppress opaque type warnings for Style helpers
-  @dialyzer {:nowarn_function, build_style: 1, positioned_cell_safe: 4}
+  # Dialyzer: unused_fun and no_return warnings for private helper functions
+  @dialyzer {:nowarn_function,
+             build_style: 1,
+             positioned_cell_safe: 4,
+             render_border: 6,
+             render_items: 1,
+             render_item_list: 1,
+             render_item_cells: 5,
+             render_empty_items: 4,
+             truncate_item_text: 2,
+             render_status_line: 5,
+             item_style: 4,
+             render_filter_line: 5,
+             render: 2}
 
   # Border characters (single style)
   @border %{tl: "┌", tr: "┐", bl: "└", br: "┘", h: "─", v: "│"}
@@ -293,7 +306,8 @@ defmodule TermUI.Widget.PickList do
     cells = cells ++ [positioned_cell_safe(x, y, @border.tl, style)]
 
     cells =
-      cells ++ for(i <- 1..(title_start - 1), do: positioned_cell_safe(x + i, y, @border.h, style))
+      cells ++
+        for(i <- 1..(title_start - 1), do: positioned_cell_safe(x + i, y, @border.h, style))
 
     cells =
       cells ++
@@ -307,7 +321,8 @@ defmodule TermUI.Widget.PickList do
     title_end = title_start + String.length(title_padded)
 
     cells =
-      cells ++ for(i <- title_end..(width - 2), do: positioned_cell_safe(x + i, y, @border.h, style))
+      cells ++
+        for(i <- title_end..(width - 2), do: positioned_cell_safe(x + i, y, @border.h, style))
 
     cells = cells ++ [positioned_cell_safe(x + width - 1, y, @border.tr, style)]
 
@@ -327,7 +342,10 @@ defmodule TermUI.Widget.PickList do
 
     cells =
       cells ++
-        for(i <- 1..(width - 2), do: positioned_cell_safe(x + i, y + height - 1, @border.h, style))
+        for(
+          i <- 1..(width - 2),
+          do: positioned_cell_safe(x + i, y + height - 1, @border.h, style)
+        )
 
     cells = cells ++ [positioned_cell_safe(x + width - 1, y + height - 1, @border.br, style)]
 
@@ -349,8 +367,17 @@ defmodule TermUI.Widget.PickList do
   end
 
   defp render_items(params) do
-    %{items: items, selected_index: _selected_index, scroll_offset: _scroll_offset,
-            x: x, y: y, width: width, height: _height, style: style, highlight_style: _highlight_style} = params
+    %{
+      items: items,
+      selected_index: _selected_index,
+      scroll_offset: _scroll_offset,
+      x: x,
+      y: y,
+      width: width,
+      height: _height,
+      style: style,
+      highlight_style: _highlight_style
+    } = params
 
     if items == [] do
       render_empty_items(x, y, width, style)
@@ -373,8 +400,17 @@ defmodule TermUI.Widget.PickList do
   end
 
   defp render_item_list(params) do
-    %{items: items, selected_index: selected_index, scroll_offset: scroll_offset,
-            x: x, y: y, width: width, height: height, style: style, highlight_style: highlight_style} = params
+    %{
+      items: items,
+      selected_index: selected_index,
+      scroll_offset: scroll_offset,
+      x: x,
+      y: y,
+      width: width,
+      height: height,
+      style: style,
+      highlight_style: highlight_style
+    } = params
 
     items
     |> Enum.with_index()

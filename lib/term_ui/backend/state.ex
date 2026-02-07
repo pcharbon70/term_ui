@@ -105,6 +105,10 @@ defmodule TermUI.Backend.State do
         }
 
   @enforce_keys [:backend_module, :backend_mode]
+
+  # Dialyzer: Functions return specific struct types
+  @dialyzer {:nowarn_function, new_raw: 1, new_tty: 2}
+
   defstruct [
     :backend_module,
     :backend_state,

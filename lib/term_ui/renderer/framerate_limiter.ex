@@ -82,6 +82,9 @@ defmodule TermUI.Renderer.FramerateLimiter do
             frame_timestamps: [],
             internal_dirty: nil
 
+  # Dialyzer: Functions with unmatched return values
+  @dialyzer {:nowarn_function, schedule_tick: 1, calculate_stats: 1, handle_call: 3}
+
   # Client API
 
   @doc """

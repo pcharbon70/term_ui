@@ -98,6 +98,9 @@ defmodule TermUI.Input.Selector do
   alias TermUI.Input.Raw
   alias TermUI.Input.TTY
 
+  # Dialyzer: Functions return specific module types
+  @dialyzer {:nowarn_function, select: 0, select: 1}
+
   @doc """
   Selects the appropriate input handler based on the current backend mode.
 

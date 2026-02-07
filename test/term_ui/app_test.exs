@@ -50,11 +50,12 @@ defmodule TermUI.AppTest do
     end
 
     test "passes options to Runtime" do
-      {:ok, pid} = App.start(SimpleCounter,
-        skip_terminal: true,
-        backend: :tty,
-        render_interval: 100
-      )
+      {:ok, pid} =
+        App.start(SimpleCounter,
+          skip_terminal: true,
+          backend: :tty,
+          render_interval: 100
+        )
 
       assert is_pid(pid)
 
@@ -67,10 +68,11 @@ defmodule TermUI.AppTest do
     end
 
     test "accepts name option for registered process" do
-      {:ok, _pid} = App.start(SimpleCounter,
-        skip_terminal: true,
-        name: :test_app
-      )
+      {:ok, _pid} =
+        App.start(SimpleCounter,
+          skip_terminal: true,
+          name: :test_app
+        )
 
       # Verify we can access by name
       state = TermUI.Runtime.get_state(:test_app)
@@ -117,6 +119,7 @@ defmodule TermUI.AppTest do
 
           # Wait for it to stop
           ref = Process.monitor(pid)
+
           receive do
             {:DOWN, ^ref, :process, ^pid, :normal} ->
               {:ok, :exited_normally}
@@ -159,6 +162,7 @@ defmodule TermUI.AppTest do
 
           # Wait for it to stop
           ref = Process.monitor(pid)
+
           receive do
             {:DOWN, ^ref, :process, ^pid, :normal} ->
               {:ok, :exited_normally}
@@ -198,6 +202,7 @@ defmodule TermUI.AppTest do
 
           # Wait for it to stop
           ref = Process.monitor(pid)
+
           receive do
             {:DOWN, ^ref, :process, ^pid, :normal} ->
               {:ok, :exited_normally}
@@ -232,10 +237,11 @@ defmodule TermUI.AppTest do
     end
 
     test "returns backend mode after starting app" do
-      {:ok, pid} = App.start(SimpleCounter,
-        skip_terminal: true,
-        backend: :tty
-      )
+      {:ok, pid} =
+        App.start(SimpleCounter,
+          skip_terminal: true,
+          backend: :tty
+        )
 
       # When skip_terminal is true, backend mode is :skip
       assert App.backend_mode() == :skip
@@ -350,10 +356,11 @@ defmodule TermUI.AppTest do
 
   describe "shutdown/0" do
     test "shuts down running Runtime process" do
-      {:ok, _pid} = App.start(SimpleCounter,
-        skip_terminal: true,
-        name: :test_shutdown
-      )
+      {:ok, _pid} =
+        App.start(SimpleCounter,
+          skip_terminal: true,
+          name: :test_shutdown
+        )
 
       assert Process.alive?(Process.whereis(:test_shutdown))
 

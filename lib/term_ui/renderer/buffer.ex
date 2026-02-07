@@ -26,6 +26,9 @@ defmodule TermUI.Renderer.Buffer do
   @max_rows 500
   @max_cols 1000
 
+  # Dialyzer: max_rows/0 and max_cols/0 return specific constants, not general pos_integer()
+  @dialyzer {:nowarn_function, max_rows: 0, max_cols: 0, write_grapheme: 5}
+
   @type t :: %__MODULE__{
           table: :ets.tid(),
           rows: pos_integer(),

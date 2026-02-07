@@ -34,6 +34,9 @@ defmodule TermUI.Renderer.SequenceBuffer do
   alias TermUI.Renderer.Style
   alias TermUI.SGR
 
+  # Dialyzer: new/0 and new/1 return specific struct types with defaults
+  @dialyzer {:nowarn_function, new: 0, new: 1}
+
   @type t :: %__MODULE__{
           buffer: iolist(),
           size: non_neg_integer(),
@@ -208,7 +211,7 @@ defmodule TermUI.Renderer.SequenceBuffer do
   @doc """
   Returns the current buffer contents as iodata without flushing.
   """
-  @spec to_iodata(t()) :: iodata()
+  @spec to_iodata(t()) :: iolist()
   def to_iodata(%__MODULE__{buffer: buffer}) do
     Enum.reverse(buffer)
   end

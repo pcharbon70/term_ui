@@ -58,6 +58,9 @@ defmodule TermUI.Widgets.ContextMenu do
   alias TermUI.Event
   alias TermUI.Widgets.ContextMenu.Behavior
 
+  # Dialyzer: Functions return specific map types
+  @dialyzer {:nowarn_function, action: 3, separator: 0, new: 1, show: 1, hide: 1}
+
   # Item constructors
 
   @doc """

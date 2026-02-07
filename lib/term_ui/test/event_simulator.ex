@@ -31,6 +31,9 @@ defmodule TermUI.Test.EventSimulator do
   alias TermUI.Event.Paste
   alias TermUI.Event.Resize
 
+  # Dialyzer: Functions return specific event types
+  @dialyzer {:nowarn_function, simulate_shortcut: 1, simulate_navigation: 2}
+
   @doc """
   Simulates a key press event.
 

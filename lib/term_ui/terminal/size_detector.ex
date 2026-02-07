@@ -41,6 +41,15 @@ defmodule TermUI.Terminal.SizeDetector do
   # malicious environment variables or terminal responses.
   @max_terminal_dimension 9999
 
+  # Dialyzer: Functions return specific types or constants
+  @dialyzer {:nowarn_function,
+             max_dimension: 0,
+             detect: 0,
+             detect: 1,
+             detect_from_io: 0,
+             detect_from_stty: 0,
+             validate_size: 2}
+
   @doc """
   Returns the maximum valid terminal dimension.
   """

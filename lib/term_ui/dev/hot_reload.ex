@@ -41,6 +41,10 @@ defmodule TermUI.Dev.HotReload do
           on_reload: (module() -> any()) | nil
         }
 
+  # Dialyzer: Pattern match coverage warnings
+  @dialyzer {:nowarn_function,
+             handle_info: 2, reload_module: 1, check_for_changes: 1, recompile_file: 1}
+
   # Client API
 
   @doc """

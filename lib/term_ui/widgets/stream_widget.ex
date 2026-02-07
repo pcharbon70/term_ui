@@ -63,6 +63,10 @@ defmodule TermUI.Widgets.StreamWidget do
           last_update: DateTime.t() | nil
         }
 
+  # Dialyzer: Functions return specific struct types or specific map types
+  @dialyzer {:nowarn_function,
+             new: 1, add_item: 2, pause: 1, resume: 1, clear: 1, set_overflow_strategy: 2}
+
   @default_buffer_size 1000
   @default_demand 10
   @page_size 20

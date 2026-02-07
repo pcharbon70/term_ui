@@ -50,8 +50,8 @@ defmodule TermUI.Widgets.Dialog do
   alias TermUI.Renderer.Style
   alias TermUI.Theme
 
-  # Dialyzer: Suppress opaque type warnings for Style helpers
-  @dialyzer {:nowarn_function, bg_theme: 1}
+  # Dialyzer: Suppress opaque type warnings for Style helpers and contract warnings for specific map types
+  @dialyzer {:nowarn_function, bg_theme: 1, new: 1, show: 1, hide: 1, set_content: 2}
 
   @doc """
   Creates new Dialog widget props.
@@ -296,6 +296,7 @@ defmodule TermUI.Widgets.Dialog do
   defp build_button_texts(state) do
     Enum.map(state.buttons, fn button ->
       label = button.label
+
       if button.id == state.focused_button do
         "[ " <> label <> " ]"
       else
@@ -318,7 +319,8 @@ defmodule TermUI.Widgets.Dialog do
       if click_x >= current_x and click_x < current_x + button_width do
         {:halt, button.id}
       else
-        {:cont, {remaining_texts, current_x + button_width + 1}}  # +1 for space between buttons
+        # +1 for space between buttons
+        {:cont, {remaining_texts, current_x + button_width + 1}}
       end
     end)
   end

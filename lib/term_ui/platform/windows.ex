@@ -20,6 +20,10 @@ defmodule TermUI.Platform.Windows do
   - Console event loop for input
   """
 
+  # Dialyzer: Functions return specific map types
+  @dialyzer {:nowarn_function,
+             info: 0, vt_support_available?: 0, capability_hints: 0, minimum_version: 0}
+
   @doc """
   Returns Windows-specific terminal information.
 

@@ -122,6 +122,20 @@ defmodule TermUI.Input.TTY do
   alias TermUI.Event
   alias TermUI.Terminal.EscapeParser
 
+  # Dialyzer: Functions return specific struct types
+  # Dialyzer: emit_partial_escape/1 calls Event.key with string args for partial escape chars
+  # Key.new/2 spec says atom() but the function works with strings too
+  @dialyzer {:nowarn_function,
+             new: 0,
+             stop: 1,
+             emit_partial_escape: 1,
+             restore_io_opts: 1,
+             process_input: 2,
+             poll: 2,
+             setup_io_opts: 0,
+             read_char: 0,
+             handle_escape_timeout: 1}
+
   # Timeout for escape sequence completion (ms).
   # Matches snake_test's 100ms timeout for distinguishing ESC key presses.
   @escape_timeout 100

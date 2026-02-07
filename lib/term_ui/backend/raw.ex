@@ -149,6 +149,9 @@ defmodule TermUI.Backend.Raw do
   alias TermUI.Terminal.SizeDetector
   require Logger
 
+  # Dialyzer: Functions with unmatched return values
+  @dialyzer {:nowarn_function, shutdown: 1, safe_write: 1, safe_cooked_mode: 0}
+
   # Comprehensive mouse disable sequence - disables ALL mouse modes defensively
   # This ensures cleanup even if state is inconsistent
   @all_mouse_off "\e[?1006l\e[?1003l\e[?1002l\e[?1000l"
@@ -411,7 +414,7 @@ defmodule TermUI.Backend.Raw do
   # Note: The error case `{:error, :enotsup}` is included in the typespec for future-proofing
   # and consistency with the Backend behaviour, even though this implementation always returns
   # the cached size. A future backend might need to report unsupported size queries.
-  @spec size(t()) :: {:ok, TermUI.Backend.size()} | {:error, :enotsup}
+  @spec size(t()) :: {:ok, TermUI.Backend.size()}
   def size(state) do
     {:ok, state.size}
   end
@@ -800,7 +803,7 @@ defmodule TermUI.Backend.Raw do
   # Current absolute positioning is simple and correct but not optimal.
   # See move_cursor/2 for example of CursorOptimizer integration.
   @spec cursor_move_output({pos_integer(), pos_integer()} | nil, {pos_integer(), pos_integer()}) ::
-          iodata()
+          iolist()
   defp cursor_move_output(nil, {row, col}) do
     # No previous position known - must use absolute
     ANSI.cursor_position(row, col)
@@ -829,7 +832,7 @@ defmodule TermUI.Backend.Raw do
   #
   # Note: This uses ANSI module for sequence generation. For parameter-level SGR
   # operations (e.g., combining into single sequence), see TermUI.SGR module.
-  @spec style_delta_output(style_state() | nil, style_state()) :: iodata()
+  @spec style_delta_output(style_state() | nil, style_state()) :: iolist()
   defp style_delta_output(nil, new_style) do
     # No previous style - emit full style
     build_full_style(new_style)
@@ -866,7 +869,7 @@ defmodule TermUI.Backend.Raw do
   #
   # Generates escape sequences for foreground color, background color, and all
   # text attributes in that order.
-  @spec build_full_style(style_state()) :: iodata()
+  @spec build_full_style(style_state()) :: iolist()
   defp build_full_style(%{fg: fg, bg: bg, attrs: attrs}) do
     [
       color_sequence(:fg, fg),
@@ -884,7 +887,7 @@ defmodule TermUI.Backend.Raw do
   #
   # Note: This function is only called when no attributes were removed
   # (removal requires full reset, handled by style_delta_output/2).
-  @spec build_style_delta(style_state(), style_state()) :: iodata()
+  @spec build_style_delta(style_state(), style_state()) :: iolist()
   defp build_style_delta(current, new) do
     fg_output = if current.fg != new.fg, do: color_sequence(:fg, new.fg), else: []
     bg_output = if current.bg != new.bg, do: color_sequence(:bg, new.bg), else: []

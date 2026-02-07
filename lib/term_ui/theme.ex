@@ -91,9 +91,18 @@ defmodule TermUI.Theme do
   # These helpers provide type constraints for Style operations
   # We suppress dialyzer warnings because we know the color atoms are valid
 
-  @dialyzer {:nowarn_function, fg_style: 1, fg_bg_style: 2, fg_bold: 1, fg_bg_bold: 2,
-              fg_bold_underline: 1, fg_dim: 1, fg_underline: 1, fg_bg_reverse: 2,
-              fg_bg_bold_reverse: 2, fg_bg_underline: 2, style_from_theme: 4}
+  @dialyzer {:nowarn_function,
+             fg_style: 1,
+             fg_bg_style: 2,
+             fg_bold: 1,
+             fg_bg_bold: 2,
+             fg_bold_underline: 1,
+             fg_dim: 1,
+             fg_underline: 1,
+             fg_bg_reverse: 2,
+             fg_bg_bold_reverse: 2,
+             fg_bg_underline: 2,
+             style_from_theme: 4}
 
   @doc false
   @spec fg_style(atom()) :: Style.t()
@@ -139,7 +148,12 @@ defmodule TermUI.Theme do
   @spec fg_bg_bold_reverse(atom(), atom()) :: Style.t()
   defp fg_bg_bold_reverse(fg_color, bg_color)
        when is_atom(fg_color) and is_atom(bg_color),
-       do: Style.new() |> Style.fg(fg_color) |> Style.bg(bg_color) |> Style.bold() |> Style.reverse()
+       do:
+         Style.new()
+         |> Style.fg(fg_color)
+         |> Style.bg(bg_color)
+         |> Style.bold()
+         |> Style.reverse()
 
   @doc false
   @spec fg_bg_underline(atom(), atom()) :: Style.t()

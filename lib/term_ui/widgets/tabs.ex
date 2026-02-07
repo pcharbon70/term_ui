@@ -35,6 +35,9 @@ defmodule TermUI.Widgets.Tabs do
 
   alias TermUI.Event
 
+  # Dialyzer: Functions return specific map types
+  @dialyzer {:nowarn_function, new: 1, remove_tab: 2}
+
   @doc """
   Creates new Tabs widget props.
 

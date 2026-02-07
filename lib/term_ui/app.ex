@@ -152,6 +152,9 @@ defmodule TermUI.App do
   alias TermUI.PersistentTerms
   alias TermUI.Runtime
 
+  # Dialyzer: Functions return specific types
+  @dialyzer {:nowarn_function, run: 2, shutdown: 1}
+
   @type root_module :: module()
   @type option ::
           {:backend, :auto | :raw | :tty}
@@ -314,8 +317,13 @@ defmodule TermUI.App do
   defp supports?(:mouse, capabilities), do: Map.get(capabilities, :mouse, false)
   defp supports?(:colors, capabilities), do: get_color_mode(capabilities) != :monochrome
   defp supports?(:true_color, capabilities), do: get_color_mode(capabilities) == :true_color
-  defp supports?(:color_256, capabilities), do: get_color_mode(capabilities) in [:color_256, :true_color]
-  defp supports?(:color_16, capabilities), do: get_color_mode(capabilities) in [:color_16, :color_256, :true_color]
+
+  defp supports?(:color_256, capabilities),
+    do: get_color_mode(capabilities) in [:color_256, :true_color]
+
+  defp supports?(:color_16, capabilities),
+    do: get_color_mode(capabilities) in [:color_16, :color_256, :true_color]
+
   defp supports?(:monochrome, capabilities), do: get_color_mode(capabilities) == :monochrome
   defp supports?(_, _capabilities), do: false
 
@@ -363,11 +371,16 @@ defmodule TermUI.App do
   defp ensure_terminal_cleanup do
     # Try to restore terminal via direct escape sequences
     # This ensures cleanup even if Runtime GenServer is dead
-    IO.write("\e[?1006l\e[?1003l\e[?1002l\e[?1000l")  # Disable mouse tracking
-    IO.write("\e[?25h")  # Show cursor
-    IO.write("\e[0m")  # Reset colors
-    IO.write("\e[2J")  # Clear screen
-    IO.write("\e[H")  # Move cursor to home
+    # Disable mouse tracking
+    IO.write("\e[?1006l\e[?1003l\e[?1002l\e[?1000l")
+    # Show cursor
+    IO.write("\e[?25h")
+    # Reset colors
+    IO.write("\e[0m")
+    # Clear screen
+    IO.write("\e[2J")
+    # Move cursor to home
+    IO.write("\e[H")
     :ok
   rescue
     _ -> :error

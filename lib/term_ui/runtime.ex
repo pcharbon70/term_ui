@@ -42,6 +42,26 @@ defmodule TermUI.Runtime do
   alias TermUI.Terminal
   alias TermUI.Terminal.InputReader
 
+  # Dialyzer: Functions with unmatched return values in side-effect calls
+  @dialyzer {:nowarn_function,
+             init: 1,
+             handle_call: 3,
+             handle_info: 2,
+             terminate: 2,
+             process_render_tick: 1,
+             cleanup_input_reader: 1,
+             cleanup_input_handler: 1,
+             cleanup_resize_callback: 1,
+             cleanup_backend: 1,
+             cleanup_shutdown: 1,
+             cleanup_terminal_restore: 1,
+             cleanup_mouse_tracking: 0,
+             cleanup_persistent_terms: 0,
+             ensure_echo_enabled: 0,
+             render_with_buffer_manager: 2,
+             render_to_tty_backend: 2,
+             extract_all_cells: 1}
+
   @type option ::
           {:root, module()}
           | {:name, GenServer.name()}
@@ -280,7 +300,8 @@ defmodule TermUI.Runtime do
     root_module = Keyword.fetch!(opts, :root)
     render_interval = Keyword.get(opts, :render_interval, @default_render_interval)
 
-    {backend_mode, backend, backend_state, capabilities, terminal_started, buffer_manager, dimensions} =
+    {backend_mode, backend, backend_state, capabilities, terminal_started, buffer_manager,
+     dimensions} =
       init_backend(opts)
 
     # Store backend info in persistent_term for global access
@@ -296,21 +317,22 @@ defmodule TermUI.Runtime do
     # Register for resize callbacks if using new input handler
     register_resize_callback(use_input_handler, backend_mode)
 
-    state = build_initial_state(%{
-      root_module: root_module,
-      root_state: root_state,
-      render_interval: render_interval,
-      terminal_started: terminal_started,
-      buffer_manager: buffer_manager,
-      dimensions: dimensions,
-      input_reader: input_reader,
-      backend_mode: backend_mode,
-      backend: backend,
-      backend_state: backend_state,
-      capabilities: capabilities,
-      input_handler: input_handler,
-      input_state: input_state
-    })
+    state =
+      build_initial_state(%{
+        root_module: root_module,
+        root_state: root_state,
+        render_interval: render_interval,
+        terminal_started: terminal_started,
+        buffer_manager: buffer_manager,
+        dimensions: dimensions,
+        input_reader: input_reader,
+        backend_mode: backend_mode,
+        backend: backend,
+        backend_state: backend_state,
+        capabilities: capabilities,
+        input_handler: input_handler,
+        input_state: input_state
+      })
 
     # Schedule first render
     schedule_render(render_interval)
@@ -423,12 +445,15 @@ defmodule TermUI.Runtime do
 
   defp init_raw_backend(buffer_manager, {cols, rows}) do
     backend = TermUI.Backend.Raw
-    {:ok, backend_state} = backend.init(
-      alternate_screen: true,
-      hide_cursor: true,
-      mouse_tracking: :all,
-      size: {cols, rows}
-    )
+
+    {:ok, backend_state} =
+      backend.init(
+        alternate_screen: true,
+        hide_cursor: true,
+        mouse_tracking: :all,
+        size: {cols, rows}
+      )
+
     {:raw, backend, backend_state, nil, true, buffer_manager, {cols, rows}}
   end
 
@@ -489,9 +514,11 @@ defmodule TermUI.Runtime do
       state = %{state | event_queue: new_queue}
       # Log if event was dropped
       case result do
-        {:dropped, _} -> :ok  # EventQueue already logged
+        # EventQueue already logged
+        {:dropped, _} -> :ok
         :ok -> :ok
       end
+
       # Process queued events
       state = process_event_queue(state)
       {:noreply, state}
@@ -575,6 +602,7 @@ defmodule TermUI.Runtime do
         {:dropped, _} -> :ok
         :ok -> :ok
       end
+
       {:noreply, state}
     end
   end
@@ -1124,7 +1152,8 @@ defmodule TermUI.Runtime do
   end
 
   defp empty_cell?(%Cell{} = cell) do
-    cell.char == " " and cell.bg == :default and cell.fg == :default and MapSet.size(cell.attrs) == 0
+    cell.char == " " and cell.bg == :default and cell.fg == :default and
+      MapSet.size(cell.attrs) == 0
   end
 
   defp find_cell_column(cell, row) do

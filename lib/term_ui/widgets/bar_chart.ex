@@ -216,7 +216,8 @@ defmodule TermUI.Widgets.BarChart do
     VizHelper.maybe_style(result, style)
   end
 
-  defp build_bar_char(row, bar_height, index, bar_char, _empty_char, colors) when row < bar_height do
+  defp build_bar_char(row, bar_height, index, bar_char, _empty_char, colors)
+       when row < bar_height do
     color = VizHelper.cycle_color(colors, index)
     {bar_char, color}
   end

@@ -27,6 +27,11 @@ defmodule TermUI.Renderer.CursorOptimizer do
       new_optimizer = CursorOptimizer.advance(optimizer, 5)
   """
 
+  # Dialyzer: Functions return specific struct types or specific integers,
+  # but the public spec uses general types for API clarity.
+  @dialyzer {:nowarn_function,
+             new: 0, new: 2, max_position: 0, cost_cr: 0, cost_lf: 0, cost_home: 0}
+
   @type t :: %__MODULE__{
           row: pos_integer(),
           col: pos_integer(),

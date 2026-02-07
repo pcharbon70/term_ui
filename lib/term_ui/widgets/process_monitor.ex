@@ -47,12 +47,18 @@ defmodule TermUI.Widgets.ProcessMonitor do
   alias TermUI.Renderer.Style
   alias TermUI.Theme
 
-  # Dialyzer: Suppress opaque type warnings for Style helpers
+  # Dialyzer: Suppress opaque type warnings for Style helpers and contract warnings for specific map types
   @dialyzer {:nowarn_function,
              fg_semantic: 1,
              fg_color: 1,
              fg_bold_semantic: 1,
-             fg_bold_help: 0}
+             fg_bold_help: 0,
+             new: 1,
+             refresh: 1,
+             set_interval: 2,
+             set_sort: 3,
+             handle_info: 2,
+             unmount: 1}
 
   @type sort_field :: :pid | :name | :reductions | :memory | :queue | :status
   @type sort_direction :: :asc | :desc
@@ -119,8 +125,9 @@ defmodule TermUI.Widgets.ProcessMonitor do
     do: Style.new() |> Style.fg(color) |> Style.bold()
 
   @spec fg_bold_help() :: Style.t()
-  defp fg_bold_help(),
-    do: Style.new() |> Style.fg(Theme.get_semantic(:help)) |> Style.dim()
+  defp fg_bold_help do
+    Style.new() |> Style.fg(Theme.get_semantic(:help)) |> Style.dim()
+  end
 
   # ----------------------------------------------------------------------------
   # Props

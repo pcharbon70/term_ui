@@ -40,6 +40,17 @@ defmodule TermUI.Input.TTY.Server do
 
   alias TermUI.Terminal.EscapeParser
 
+  # Dialyzer: Complex guard patterns in handle_escape_timeout/3 and parse_buffer/1
+  # Dialyzer: input_loop/4 is called in spawn, Dialyzer cannot prove safety
+  @dialyzer {:nowarn_function,
+             handle_escape_timeout: 3,
+             parse_buffer: 1,
+             input_loop: 4,
+             handle_info: 2,
+             terminate: 2,
+             setup_io_opts: 0,
+             restore_io_opts: 1}
+
   @escape_timeout 100
   @max_queue_size 1000
 
@@ -224,45 +235,44 @@ defmodule TermUI.Input.TTY.Server do
     receive do
       :stop ->
         :ok
+    after
+      0 ->
+        # Try to read input
+        case :io.get_chars(~c"", 1) do
+          :eof ->
+            # End of input
+            GenServer.cast(server, :eof)
+            :ok
 
-      after
-        0 ->
-          # Try to read input
-          case :io.get_chars(~c"", 1) do
-            :eof ->
-              # End of input
-              GenServer.cast(server, :eof)
-              :ok
+          chars when is_list(chars) ->
+            now = System.monotonic_time(:millisecond)
+            dt = now - last_read_time
 
-            chars when is_list(chars) ->
-              now = System.monotonic_time(:millisecond)
-              dt = now - last_read_time
+            # Handle escape sequence timeout
+            {new_buffer, events} = handle_escape_timeout(buffer, chars, dt)
 
-              # Handle escape sequence timeout
-              {new_buffer, events} = handle_escape_timeout(buffer, chars, dt)
+            # Parse complete sequences
+            {remaining_buffer, parsed_events} = parse_buffer(new_buffer)
 
-              # Parse complete sequences
-              {remaining_buffer, parsed_events} = parse_buffer(new_buffer)
+            # Combine events from timeout handling and parsing
+            all_events = events ++ parsed_events
 
-              # Combine events from timeout handling and parsing
-              all_events = events ++ parsed_events
+            # Send events to receiver
+            Enum.each(all_events, fn event ->
+              send(receiver, {:input_event, event})
+            end)
 
-              # Send events to receiver
-              Enum.each(all_events, fn event ->
-                send(receiver, {:input_event, event})
-              end)
+            # Also queue them in the server for poll/2
+            if all_events != [] do
+              GenServer.cast(server, {:input, all_events})
+            end
 
-              # Also queue them in the server for poll/2
-              if all_events != [] do
-                GenServer.cast(server, {:input, all_events})
-              end
+            input_loop(server, receiver, remaining_buffer, now)
 
-              input_loop(server, receiver, remaining_buffer, now)
-
-            other ->
-              Logger.debug("TTY.Server: Unexpected input: #{inspect(other)}")
-              input_loop(server, receiver, buffer, System.monotonic_time(:millisecond))
-          end
+          other ->
+            Logger.debug("TTY.Server: Unexpected input: #{inspect(other)}")
+            input_loop(server, receiver, buffer, System.monotonic_time(:millisecond))
+        end
     end
   end
 

@@ -27,6 +27,11 @@ defmodule TermUI.Renderer.Cell do
   - `:strikethrough` - Strikethrough text
   """
 
+  # Dialyzer: named_colors/0 and valid_attributes/0 return specific lists
+  # from module attributes, not general atom() lists.
+  # wide_placeholder/1 returns specific struct, not general t().
+  @dialyzer {:nowarn_function, named_colors: 0, valid_attributes: 0, wide_placeholder: 1}
+
   @type color :: :default | atom() | 0..255 | {0..255, 0..255, 0..255}
 
   @type attribute ::
@@ -155,6 +160,7 @@ defmodule TermUI.Renderer.Cell do
       iex> Cell.empty()
       %Cell{char: " ", fg: :default, bg: :default, attrs: MapSet.new()}
   """
+  @dialyzer {:nowarn_function, empty: 0}
   @spec empty() :: t()
   def empty do
     %__MODULE__{}

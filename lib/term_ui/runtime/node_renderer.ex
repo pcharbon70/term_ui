@@ -15,6 +15,22 @@ defmodule TermUI.Runtime.NodeRenderer do
   alias TermUI.Renderer.Cell
   alias TermUI.Renderer.Style
 
+  # Dialyzer: Functions with unmatched return values
+  @dialyzer {:nowarn_function,
+             render_node: 5,
+             render_text: 5,
+             render_line: 5,
+             render_children_vertical: 5,
+             render_children_horizontal: 5,
+             render_positioned_cells: 5,
+             render_viewport: 1,
+             render_and_copy_viewport: 4,
+             fill_overlay_background: 4,
+             fill_overlay_area: 6,
+             fill_background: 6,
+             apply_parent_style_to_cell: 2,
+             copy_viewport_region: 2}
+
   @doc """
   Renders a node tree to the buffer starting at the given position.
 
@@ -329,14 +345,26 @@ defmodule TermUI.Runtime.NodeRenderer do
   # Viewport rendering - clips content to a region with scroll offsets
   # Creates a temporary buffer to render content, then copies visible portion
   defp render_viewport(params) do
-    %{content: content, buffer: buffer, dest_row: dest_row, dest_col: dest_col, style: style,
-            scroll_x: scroll_x, scroll_y: scroll_y, vp_width: vp_width, vp_height: vp_height} = params
+    %{
+      content: content,
+      buffer: buffer,
+      dest_row: dest_row,
+      dest_col: dest_col,
+      style: style,
+      scroll_x: scroll_x,
+      scroll_y: scroll_y,
+      vp_width: vp_width,
+      vp_height: vp_height
+    } = params
 
-    {content_width, content_height} = calculate_viewport_content_size(scroll_x, scroll_y, vp_width, vp_height)
+    {content_width, content_height} =
+      calculate_viewport_content_size(scroll_x, scroll_y, vp_width, vp_height)
 
     case Buffer.new(content_height, content_width) do
       {:ok, temp_buffer} ->
-        opts = build_viewport_opts(buffer, dest_row, dest_col, scroll_x, scroll_y, vp_width, vp_height)
+        opts =
+          build_viewport_opts(buffer, dest_row, dest_col, scroll_x, scroll_y, vp_width, vp_height)
+
         render_and_copy_viewport(temp_buffer, content, style, opts)
 
       _error ->

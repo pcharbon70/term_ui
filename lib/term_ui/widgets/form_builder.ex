@@ -45,8 +45,9 @@ defmodule TermUI.Widgets.FormBuilder do
   alias TermUI.Theme
   alias TermUI.Widgets.WidgetHelpers, as: Helpers
 
-  # Dialyzer: Suppress opaque type warnings for Style helpers
-  @dialyzer {:nowarn_function, fg_semantic: 1}
+  # Dialyzer: Suppress opaque type warnings for Style helpers and contract warnings for specific map types
+  @dialyzer {:nowarn_function,
+             fg_semantic: 1, new: 1, set_values: 2, valid?: 1, validate: 1, reset: 1}
 
   @type field_type :: :text | :password | :checkbox | :radio | :select | :multi_select
 

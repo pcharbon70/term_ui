@@ -128,7 +128,7 @@ defmodule TermUI.Widgets.TextInput.Line do
   alias TermUI.Theme
 
   # Dialyzer: Suppress opaque type warnings for Style helpers
-  @dialyzer {:nowarn_function, fg_semantic: 1, fg_color: 1}
+  @dialyzer {:nowarn_function, fg_semantic: 1, fg_color: 1, new: 1, clear: 1}
 
   @typedoc """
   TextInput.Line state structure.

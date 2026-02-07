@@ -68,6 +68,7 @@ defmodule TermUI.Renderer.Style do
       iex> Style.new()
       %Style{fg: nil, bg: nil, attrs: MapSet.new()}
   """
+  @dialyzer {:nowarn_function, new: 0, reset: 1}
   @spec new() :: t()
   def new do
     %__MODULE__{}

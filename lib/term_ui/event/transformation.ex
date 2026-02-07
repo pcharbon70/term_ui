@@ -18,6 +18,9 @@ defmodule TermUI.Event.Transformation do
 
   alias TermUI.Event.Mouse
 
+  # Dialyzer: Functions return specific map types
+  @dialyzer {:nowarn_function, with_metadata: 2, envelope: 2}
+
   @doc """
   Transforms screen coordinates to component-local coordinates.
 

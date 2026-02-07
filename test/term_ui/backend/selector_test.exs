@@ -619,26 +619,29 @@ defmodule TermUI.Backend.SelectorTest do
 
   describe "logging" do
     test "logs backend selection at info level" do
-      log = capture_log(fn ->
-        Selector.select()
-      end)
+      log =
+        capture_log(fn ->
+          Selector.select()
+        end)
 
       assert log =~ "TermUI: Backend selected"
     end
 
     test "logs forced backend selection" do
-      log = capture_log(fn ->
-        Selector.select(TermUI.Backend.TTY)
-      end)
+      log =
+        capture_log(fn ->
+          Selector.select(TermUI.Backend.TTY)
+        end)
 
       assert log =~ "TermUI: Using forced backend"
       assert log =~ "TermUI.Backend.TTY"
     end
 
     test "logs forced backend with options" do
-      log = capture_log(fn ->
-        Selector.select({TermUI.Backend.TTY, [line_mode: :full_redraw]})
-      end)
+      log =
+        capture_log(fn ->
+          Selector.select({TermUI.Backend.TTY, [line_mode: :full_redraw]})
+        end)
 
       assert log =~ "TermUI: Using forced backend"
       assert log =~ "TermUI.Backend.TTY"

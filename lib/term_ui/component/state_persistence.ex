@@ -26,6 +26,9 @@ defmodule TermUI.Component.StatePersistence do
   @table_name :term_ui_component_states
   @metadata_table :term_ui_persistence_metadata
 
+  # Dialyzer: Functions return specific types
+  @dialyzer {:nowarn_function, init: 1, recover: 2, get_metadata: 1}
+
   # Client API
 
   @doc """

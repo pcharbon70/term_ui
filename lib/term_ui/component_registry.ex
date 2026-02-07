@@ -27,6 +27,9 @@ defmodule TermUI.ComponentRegistry do
   @pid_index :term_ui_component_pid_index
   @parent_table :term_ui_component_parents
 
+  # Dialyzer: Functions return specific types
+  @dialyzer {:nowarn_function, init: 1, get_info: 1, handle_call: 3}
+
   # Client API
 
   @doc """

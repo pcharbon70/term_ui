@@ -48,6 +48,9 @@ defmodule TermUI.Widgets.CommandPalette do
   alias TermUI.Renderer.Style
   alias TermUI.Theme
 
+  # Dialyzer: Functions return specific map types
+  @dialyzer {:nowarn_function, new: 1, show: 1, hide: 1, toggle: 1}
+
   @doc """
   Creates new CommandPalette widget props.
 

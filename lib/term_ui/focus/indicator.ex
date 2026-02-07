@@ -19,6 +19,9 @@ defmodule TermUI.Focus.Indicator do
 
   alias TermUI.Renderer.Style
 
+  # Dialyzer: Functions return specific atom types
+  @dialyzer {:nowarn_function, focus_border_color: 0}
+
   @type border_style :: :none | :single | :double | :rounded | :thick
 
   @type indicator_style :: %{
@@ -128,7 +131,7 @@ defmodule TermUI.Focus.Indicator do
 
   Boolean indicating animation support.
   """
-  @spec animate?() :: boolean()
+  @spec animate?() :: false
   def animate? do
     # Animation disabled by default for simplicity
     false

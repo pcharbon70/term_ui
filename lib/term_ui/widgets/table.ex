@@ -49,6 +49,9 @@ defmodule TermUI.Widgets.Table do
   alias TermUI.Layout.Constraint
   alias TermUI.Widgets.Table.Column
 
+  # Dialyzer: Functions return specific map types
+  @dialyzer {:nowarn_function, new: 1, clear_selection: 1}
+
   @type selection_mode :: :none | :single | :multi
   @type sort_direction :: :asc | :desc | nil
 

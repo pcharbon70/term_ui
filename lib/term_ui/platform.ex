@@ -6,6 +6,10 @@ defmodule TermUI.Platform do
   selecting the appropriate implementation for the current OS.
   """
 
+  # Dialyzer: Functions return specific map types
+  @dialyzer {:nowarn_function,
+             info: 0, platform: 0, check_wsl: 0, parse_version_string: 1, os_version: 0}
+
   @type platform :: :linux | :macos | :windows | :freebsd | :unknown
   @type version :: {non_neg_integer(), non_neg_integer(), non_neg_integer()} | nil
 

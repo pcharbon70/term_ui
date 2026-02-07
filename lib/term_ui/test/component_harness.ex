@@ -288,7 +288,7 @@ defmodule TermUI.Test.ComponentHarness do
   @doc """
   Checks if state has changed since last render.
   """
-  @spec state_changed?(t()) :: boolean()
+  @spec state_changed?(t()) :: true
   def state_changed?(%__MODULE__{renders: [], state: _}), do: true
 
   def state_changed?(%__MODULE__{} = _harness) do
@@ -320,7 +320,7 @@ defmodule TermUI.Test.ComponentHarness do
   @doc """
   Resets the harness to initial state.
   """
-  @spec reset(t()) :: {:ok, t()} | {:error, term()}
+  @spec reset(t()) :: {:ok, t()}
   def reset(%__MODULE__{} = harness) do
     with {:ok, state} <- init_component(harness.module, harness.props) do
       TestRenderer.clear(harness.renderer)

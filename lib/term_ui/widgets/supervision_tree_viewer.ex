@@ -59,14 +59,20 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
   alias TermUI.Renderer.Style
   alias TermUI.Theme
 
-  # Dialyzer: Suppress opaque type warnings for Style helpers
+  # Dialyzer: Suppress opaque type warnings for Style helpers and contract warnings for specific map types
   @dialyzer {:nowarn_function,
              fg_semantic: 1,
              fg_bold_semantic: 1,
              fg_dim_semantic: 1,
              fg_bold_help: 0,
              collect_supervisor_ids: 1,
-             collect_children_supervisor_ids: 1}
+             collect_children_supervisor_ids: 1,
+             new: 1,
+             refresh: 1,
+             set_root: 2,
+             expand_all: 1,
+             collapse_all: 1,
+             flatten_tree: 3}
 
   @type node_type :: :supervisor | :worker
   @type node_status :: :running | :restarting | :terminated | :undefined
@@ -127,8 +133,9 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
     do: Style.new() |> Style.fg(color) |> Style.dim()
 
   @spec fg_bold_help() :: Style.t()
-  defp fg_bold_help(),
-    do: Style.new() |> Style.fg(Theme.get_semantic(:help)) |> Style.dim()
+  defp fg_bold_help do
+    Style.new() |> Style.fg(Theme.get_semantic(:help)) |> Style.dim()
+  end
 
   # ----------------------------------------------------------------------------
   # Icon Functions
@@ -143,6 +150,7 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
 
   defp get_strategy_display do
     chars = CharacterSet.current_charset()
+
     %{
       one_for_one: "1:1",
       one_for_all: "1:*",
@@ -1021,7 +1029,15 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
     end
   end
 
-  defp render_node_line(node, selected, expanded, chars, status_icons, type_icons, strategy_display) do
+  defp render_node_line(
+         node,
+         selected,
+         expanded,
+         chars,
+         status_icons,
+         type_icons,
+         strategy_display
+       ) do
     indent = String.duplicate("  ", node.depth)
     expand_indicator = expand_indicator(node, expanded, chars)
     status_ind = status_indicator(node.status, status_icons)
@@ -1040,7 +1056,9 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
   defp expand_indicator(node, expanded, chars) do
     case {node.type, node.children} do
       {:supervisor, children} when is_list(children) and length(children) > 0 ->
-        if MapSet.member?(expanded, node.id), do: "#{chars.arrow_down} ", else: "#{chars.arrow_right} "
+        if MapSet.member?(expanded, node.id),
+          do: "#{chars.arrow_down} ",
+          else: "#{chars.arrow_right} "
 
       {:supervisor, _} ->
         "#{chars.arrow_right} "
@@ -1050,7 +1068,8 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
     end
   end
 
-  defp strategy_string(%{type: :supervisor, strategy: strategy}, strategy_display) when is_binary(strategy) do
+  defp strategy_string(%{type: :supervisor, strategy: strategy}, strategy_display)
+       when is_binary(strategy) do
     " [#{Map.get(strategy_display, strategy, "?")}]"
   end
 
@@ -1087,7 +1106,10 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
           info_style = fg_semantic(Theme.get_semantic(:info))
 
           lines = [
-            text("#{String.duplicate(chars.h_line, 3)} Process Info #{String.duplicate(chars.h_line, 3)}", info_style),
+            text(
+              "#{String.duplicate(chars.h_line, 3)} Process Info #{String.duplicate(chars.h_line, 3)}",
+              info_style
+            ),
             text("  ID: #{inspect(node.id)}", nil),
             text("  PID: #{inspect(node.pid)}", nil),
             text("  Name: #{inspect(node.name)}", nil),

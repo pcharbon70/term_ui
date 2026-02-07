@@ -58,6 +58,9 @@ defmodule TermUI.Widgets.ContextMenu.Inline do
   alias TermUI.Event
   alias TermUI.Widgets.ContextMenu.Behavior
 
+  # Dialyzer: Functions return specific map types
+  @dialyzer {:nowarn_function, new: 1, show: 1, hide: 1, handle_info: 2, execute_menu_action: 2}
+
   @type orientation :: :horizontal | :vertical
 
   # ----------------------------------------------------------------------------

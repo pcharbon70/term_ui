@@ -34,6 +34,14 @@ defmodule TermUI.ComponentServer do
   @default_init_timeout 5_000
   @default_unmount_timeout 5_000
 
+  # Dialyzer: Functions with unmatched return values
+  @dialyzer {:nowarn_function,
+             execute_hooks: 2,
+             execute_commands: 2,
+             props_changed?: 2,
+             handle_call: 3,
+             handle_info: 2}
+
   @type state :: %{
           module: module(),
           component_state: term(),

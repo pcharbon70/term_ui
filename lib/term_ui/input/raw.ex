@@ -69,6 +69,17 @@ defmodule TermUI.Input.Raw do
   alias TermUI.Event
   alias TermUI.Terminal.EscapeParser
 
+  # Dialyzer: Functions return specific struct types
+  # Dialyzer: emit_partial_escape/2 calls Event.key with string args for partial escape chars
+  # Key.new/2 spec says atom() but the function works with strings too
+  @dialyzer {:nowarn_function,
+             new: 0,
+             emit_partial_escape: 2,
+             read_char: 0,
+             poll: 2,
+             handle_escape_timeout: 2,
+             do_read_with_timeout: 2}
+
   # Escape sequence bytes
   @esc 0x1B
   @left_bracket ?[

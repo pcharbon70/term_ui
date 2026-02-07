@@ -33,7 +33,13 @@ defmodule TermUI.Input.TTYTest do
     test "state struct has buffer, event_queue, and IO opts fields" do
       state = TTY.new()
       # Verify the struct has the expected fields (including IO opts fields)
-      assert Map.keys(state) -- [:__struct__] == [:buffer, :event_queue, :io_opts_restored, :io_opts_set, :original_opts]
+      assert Map.keys(state) -- [:__struct__] == [
+               :buffer,
+               :event_queue,
+               :io_opts_restored,
+               :io_opts_set,
+               :original_opts
+             ]
     end
   end
 
@@ -331,7 +337,9 @@ defmodule TermUI.Input.TTYTest do
 
     test "moduledoc mentions :io.get_chars" do
       {:docs_v1, _, :elixir, _, %{"en" => moduledoc}, _, _} = Code.fetch_docs(TTY)
-      assert String.contains?(moduledoc, ":io.get_chars") or String.contains?(moduledoc, "get_chars")
+
+      assert String.contains?(moduledoc, ":io.get_chars") or
+               String.contains?(moduledoc, "get_chars")
     end
 
     test "moduledoc explains arrow keys work normally" do
@@ -391,7 +399,9 @@ defmodule TermUI.Input.TTYTest do
     test "moduledoc explains IEx compatibility" do
       {:docs_v1, _, :elixir, _, %{"en" => moduledoc}, _, _} = Code.fetch_docs(TTY)
       assert String.contains?(moduledoc, "IEx")
-      assert String.contains?(moduledoc, "Compatible") or String.contains?(moduledoc, "IEx compatible")
+
+      assert String.contains?(moduledoc, "Compatible") or
+               String.contains?(moduledoc, "IEx compatible")
     end
 
     test "moduledoc mentions snake_test" do
@@ -406,7 +416,9 @@ defmodule TermUI.Input.TTYTest do
       raw_state = Raw.new()
 
       # TTY has additional IO opts fields for IEx compatibility
-      tty_fields = Map.keys(tty_state) -- [:__struct__, :io_opts_restored, :io_opts_set, :original_opts]
+      tty_fields =
+        Map.keys(tty_state) -- [:__struct__, :io_opts_restored, :io_opts_set, :original_opts]
+
       raw_fields = Map.keys(raw_state) -- [:__struct__]
 
       # The core fields match

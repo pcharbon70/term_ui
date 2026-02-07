@@ -22,6 +22,10 @@ defmodule TermUI.Terminal.InputReader do
   alias TermUI.Event
   alias TermUI.Terminal.EscapeParser
 
+  # Dialyzer: handle_info(:escape_timeout, ...) calls Event.key with string args
+  # Key.new/2 spec says atom() but the function works with strings too
+  @dialyzer {:nowarn_function, handle_info: 2, cancel_timer: 1}
+
   @escape_timeout 50
 
   defstruct [:target, :port, :buffer, :timer_ref]

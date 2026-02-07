@@ -39,6 +39,13 @@ defmodule TermUI.PersistentTerms do
   alias TermUI.Backend.Selector
   require Logger
 
+  # Dialyzer: Pattern match coverage warnings
+  @dialyzer {:nowarn_function,
+             cleanup: 0,
+             store_backend_context: 2,
+             determine_character_set: 1,
+             detect_capabilities: 0}
+
   @doc """
   Stores backend context in persistent_term.
 

@@ -77,6 +77,10 @@ defmodule TermUI.CharacterSet do
   - `:unicode` - Full Unicode box-drawing characters
   - `:ascii` - ASCII fallback characters
   """
+
+  # Dialyzer: Functions return specific list types
+  @dialyzer {:nowarn_function, keys: 0}
+
   @type charset :: :unicode | :ascii
 
   @typedoc """

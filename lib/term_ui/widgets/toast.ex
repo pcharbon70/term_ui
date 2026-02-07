@@ -41,6 +41,9 @@ defmodule TermUI.Widgets.Toast do
     error: :cross_mark
   }
 
+  # Dialyzer: Functions return specific map types
+  @dialyzer {:nowarn_function, new: 1, dismiss_toast: 1}
+
   @doc """
   Creates new Toast widget props.
 
@@ -277,6 +280,9 @@ defmodule TermUI.Widgets.ToastManager do
   """
 
   alias TermUI.Widgets.Toast
+
+  # Dialyzer: Functions return specific map types
+  @dialyzer {:nowarn_function, new: 1, tick: 1, clear_all: 1}
 
   @doc """
   Creates a new ToastManager.

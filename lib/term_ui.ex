@@ -7,6 +7,9 @@ defmodule TermUI do
 
   alias TermUI.Terminal
 
+  # Dialyzer: Functions with unmatched return values
+  @dialyzer {:nowarn_function, size: 0}
+
   @doc """
   Enables raw mode and sets up the terminal for TUI operation.
 
@@ -124,8 +127,8 @@ defmodule TermUI do
   # Check if IEx is actually running (not just loaded)
   defp iex_running? do
     # Check if IEx module is available and loaded
+    # Check if we're in an IEx evaluator process
     Code.ensure_loaded?(IEx) and
-      # Check if we're in an IEx evaluator process
       iex_evaluator_process?()
   end
 

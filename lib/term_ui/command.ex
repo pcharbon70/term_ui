@@ -28,6 +28,11 @@ defmodule TermUI.Command do
       end
   """
 
+  # Dialyzer: Command constructors return specific struct types with known
+  # type: atoms, but the public spec uses the general t() type for API clarity.
+  @dialyzer {:nowarn_function,
+             timer: 2, interval: 2, file_read: 2, send_after: 3, quit: 1, none: 0, valid?: 1}
+
   @type t :: %__MODULE__{
           id: reference() | nil,
           type: atom(),

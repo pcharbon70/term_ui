@@ -44,6 +44,10 @@ defmodule TermUI.Widgets.Menu do
   alias TermUI.CharacterSet
   alias TermUI.Event
 
+  # Dialyzer: Functions return specific map types
+  @dialyzer {:nowarn_function,
+             action: 3, submenu: 3, separator: 0, checkbox: 3, new: 1, expand: 2, collapse: 2}
+
   @type item_type :: :action | :submenu | :separator | :checkbox
 
   # Item constructors

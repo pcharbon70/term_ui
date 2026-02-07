@@ -22,7 +22,19 @@ defmodule TermUI.MixProject do
       docs: docs(),
 
       # Test coverage
-      test_coverage: [tool: ExCoveralls]
+      test_coverage: [tool: ExCoveralls],
+
+      # Dialyzer
+      # Note: unknown_type warnings for Event.ex are false positives from nested module types
+      # We have not found a working way to suppress these via Dialyzer configuration
+      dialyzer: [
+        flags: [
+          :error_handling,
+          :underspecs,
+          :unmatched_returns
+        ],
+        plt_add_apps: [:mix, :ex_unit]
+      ]
     ]
   end
 
@@ -52,6 +64,7 @@ defmodule TermUI.MixProject do
 
       # Code quality
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
 
       # Testing
       {:excoveralls, "~> 0.18", only: :test},

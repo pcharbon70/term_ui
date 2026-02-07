@@ -78,6 +78,9 @@ defmodule TermUI.Widgets.SplitPane do
   @resize_step 1
   @large_resize_step 5
 
+  # Dialyzer: Functions return specific map types
+  @dialyzer {:nowarn_function, new: 1, collapse: 2, expand: 2, toggle: 2, set_content: 3}
+
   # ----------------------------------------------------------------------------
   # Pane Constructors
   # ----------------------------------------------------------------------------
@@ -752,7 +755,9 @@ defmodule TermUI.Widgets.SplitPane do
     if can_move_divider?(pane_before, pane_after) do
       {size_before, size_after} = get_pane_sizes(state, pane_before, pane_after)
       {new_size_before, new_size_after} = {size_before + delta, size_after - delta}
-      {final_before, final_after} = apply_resize_constraints(pane_before, pane_after, new_size_before, new_size_after)
+
+      {final_before, final_after} =
+        apply_resize_constraints(pane_before, pane_after, new_size_before, new_size_after)
 
       if final_before != size_before do
         update_pane_sizes(state, divider_idx, final_before, final_after)

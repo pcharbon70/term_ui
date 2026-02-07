@@ -19,6 +19,10 @@ defmodule TermUI.Terminal.EscapeParser do
 
   alias TermUI.Event
 
+  # Dialyzer: parse_bytes/2 and parse_escape_sequence/1 call Event.key with string args
+  # Key.new/2 spec says atom() but the function works with strings too
+  @dialyzer {:nowarn_function, parse_bytes: 2, parse_escape_sequence: 1}
+
   @escape 0x1B
   @delete 0x7F
 

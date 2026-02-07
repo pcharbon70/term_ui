@@ -36,6 +36,15 @@ defmodule TermUI.FocusManager do
   alias TermUI.EventRouter
   alias TermUI.SpatialIndex
 
+  # Dialyzer: Pattern match and unmatched return warnings
+  @dialyzer {:nowarn_function,
+             get_focused: 0,
+             set_focused: 1,
+             find_next: 2,
+             find_prev: 2,
+             handle_call: 3,
+             clear_focus: 0}
+
   # Client API
 
   @doc """

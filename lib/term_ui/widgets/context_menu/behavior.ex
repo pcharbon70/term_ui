@@ -37,6 +37,9 @@ defmodule TermUI.Widgets.ContextMenu.Behavior do
       end
   """
 
+  # Dialyzer: Functions return specific map types
+  @dialyzer {:nowarn_function, close_menu: 1, select_at_cursor: 1}
+
   # ----------------------------------------------------------------------------
   # Item Selection
   # ----------------------------------------------------------------------------

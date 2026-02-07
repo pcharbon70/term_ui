@@ -212,6 +212,7 @@ defmodule TermUI.Integration.IExLifecycleTest do
       for _ <- 1..5 do
         Runtime.send_event(runtime, Event.key(:up))
       end
+
       Runtime.sync(runtime)
       state = Runtime.get_state(runtime)
       assert state.root_state.count == 6
@@ -285,6 +286,7 @@ defmodule TermUI.Integration.IExLifecycleTest do
         for _ <- 1..cycle do
           Runtime.send_event(runtime, Event.key(:up))
         end
+
         Runtime.sync(runtime)
 
         state = Runtime.get_state(runtime)
@@ -390,6 +392,7 @@ defmodule TermUI.Integration.IExLifecycleTest do
       for _ <- 1..5 do
         Runtime.send_event(runtime, Event.key("t"))
       end
+
       Runtime.sync(runtime)
 
       state = Runtime.get_state(runtime)
