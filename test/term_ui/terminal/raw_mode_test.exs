@@ -223,6 +223,21 @@ defmodule TermUI.Terminal.RawModeTest do
     end
   end
 
+  describe "stty raw arguments" do
+    test "uses explicit min/time arguments for portable raw mode setup" do
+      assert Terminal.raw_stty_args() == [
+               "raw",
+               "-echo",
+               "-isig",
+               "-ixon",
+               "min",
+               "1",
+               "time",
+               "0"
+             ]
+    end
+  end
+
   defp start_terminal do
     case Terminal.start_link() do
       {:ok, pid} -> {pid, :started}

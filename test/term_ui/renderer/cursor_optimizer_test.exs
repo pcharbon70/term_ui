@@ -325,6 +325,68 @@ defmodule TermUI.Renderer.CursorOptimizerTest do
     end
   end
 
+  describe "raw mode safety - no bare newlines" do
+    # In OTP 28 raw mode, OPOST is disabled so bare \n causes staircase
+    # rendering (LF without CR). All movement sequences must use ANSI
+    # escape sequences instead of bare control characters like \n.
+
+    test "moving down from col 1 to col 1 uses escape sequence, not bare \\n" do
+      {seq, _cost} = CursorOptimizer.optimal_move(1, 1, 3, 1)
+      binary = IO.iodata_to_binary(seq)
+      # Must NOT contain bare \n
+      refute String.contains?(binary, "\n"),
+             "Expected no bare \\n in movement sequence, got: #{inspect(binary)}"
+    end
+
+    test "moving down 1 row from col 1 to col 1 uses escape sequence" do
+      {seq, _cost} = CursorOptimizer.optimal_move(1, 1, 2, 1)
+      binary = IO.iodata_to_binary(seq)
+
+      refute String.contains?(binary, "\n"),
+             "Expected no bare \\n in movement sequence, got: #{inspect(binary)}"
+    end
+
+    test "CR + down movement uses escape sequence, not bare \\n" do
+      # From (1, 10) to (3, 1) - should use CR + escape down
+      {seq, _cost} = CursorOptimizer.optimal_move(1, 10, 3, 1)
+      binary = IO.iodata_to_binary(seq)
+
+      refute String.contains?(binary, "\n"),
+             "Expected no bare \\n in CR+down sequence, got: #{inspect(binary)}"
+    end
+
+    test "no bare \\n in any movement to column 1 below current" do
+      # Test various row distances
+      for row_diff <- [1, 2, 3, 5, 10, 20] do
+        {seq, _cost} = CursorOptimizer.optimal_move(1, 1, 1 + row_diff, 1)
+        binary = IO.iodata_to_binary(seq)
+
+        refute String.contains?(binary, "\n"),
+               "Row diff #{row_diff}: expected no bare \\n, got: #{inspect(binary)}"
+      end
+    end
+
+    test "no bare \\n from any starting position" do
+      # Test from various column positions
+      for from_col <- [1, 5, 10, 40, 80] do
+        {seq, _cost} = CursorOptimizer.optimal_move(1, from_col, 5, 1)
+        binary = IO.iodata_to_binary(seq)
+
+        refute String.contains?(binary, "\n"),
+               "From col #{from_col}: expected no bare \\n, got: #{inspect(binary)}"
+      end
+    end
+
+    test "move_to/3 never produces bare \\n" do
+      optimizer = CursorOptimizer.new(1, 1)
+      {seq, _opt} = CursorOptimizer.move_to(optimizer, 5, 1)
+      binary = IO.iodata_to_binary(seq)
+
+      refute String.contains?(binary, "\n"),
+             "move_to produced bare \\n: #{inspect(binary)}"
+    end
+  end
+
   describe "bounds checking" do
     test "max_position/0 returns maximum supported position" do
       max = CursorOptimizer.max_position()

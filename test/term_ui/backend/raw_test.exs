@@ -395,6 +395,26 @@ defmodule TermUI.Backend.RawTest do
     end
   end
 
+  describe "shutdown/1 input drain" do
+    test "shutdown drains pending input without hanging" do
+      # Verify that shutdown completes in a reasonable time even when there's
+      # no input to drain (the drain should not block on empty input).
+      {:ok, state} = Raw.init(size: {24, 80})
+
+      # This should complete quickly (drain loop exits when no data available)
+      task = Task.async(fn -> Raw.shutdown(state) end)
+      # 5 second timeout - drain should complete in well under 1 second
+      assert :ok = Task.await(task, 5_000)
+    end
+
+    test "shutdown with alternate screen false still works" do
+      {:ok, state} = Raw.init(size: {24, 80}, alternate_screen: false)
+
+      task = Task.async(fn -> Raw.shutdown(state) end)
+      assert :ok = Task.await(task, 5_000)
+    end
+  end
+
   describe "move_cursor/2 callback" do
     setup do
       {:ok, state} = Raw.init(size: {24, 80})

@@ -158,6 +158,7 @@ defmodule TermUI.App do
           | {:name, GenServer.name()}
           | {:render_interval, pos_integer()}
           | {:skip_terminal, boolean()}
+          | {:use_input_handler, boolean() | :auto}
   @type supports_query ::
           :unicode
           | :mouse
@@ -192,13 +193,16 @@ defmodule TermUI.App do
   """
   @spec start(root_module(), [option()]) :: {:ok, pid()} | {:error, term()}
   def start(root_module, opts \\ []) do
-    runtime_opts = [
-      {:root, root_module},
-      {:use_input_handler, true}
-      | Keyword.take(opts, [:name, :backend, :render_interval, :skip_terminal])
-    ]
+    Runtime.start_link(runtime_options(root_module, opts))
+  end
 
-    Runtime.start_link(runtime_opts)
+  @doc false
+  @spec runtime_options(root_module(), [option()]) :: keyword()
+  def runtime_options(root_module, opts \\ []) do
+    [
+      {:root, root_module}
+      | Keyword.take(opts, [:name, :backend, :render_interval, :skip_terminal, :use_input_handler])
+    ]
   end
 
   @doc """

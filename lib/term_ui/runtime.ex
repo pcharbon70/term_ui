@@ -50,7 +50,10 @@ defmodule TermUI.Runtime do
           | {:render_interval, pos_integer()}
           | {:backend, :auto | :raw | :tty}
           | {:skip_terminal, boolean()}
-          | {:use_input_handler, boolean()}
+          | {:use_input_handler, boolean() | :auto}
+
+  @type use_input_handler_opt :: boolean() | :auto
+  @type input_strategy :: :input_handler | :legacy_reader | :none
 
   # Default render interval in milliseconds (~60 FPS)
   @default_render_interval 16
@@ -284,10 +287,18 @@ defmodule TermUI.Runtime do
     )
 
     root_state = init_config.root_module.init(opts)
-    {input_handler, input_state} = init_input_handler(init_config, backend_result.backend_mode)
-    input_reader = init_legacy_input_reader(init_config, backend_result.terminal_started)
 
-    maybe_register_resize_callback(init_config, backend_result.backend_mode)
+    input_strategy =
+      resolve_input_strategy(
+        init_config.use_input_handler,
+        backend_result.backend_mode,
+        backend_result.terminal_started
+      )
+
+    {input_handler, input_state} = init_input_handler(input_strategy, backend_result.backend_mode)
+    input_reader = init_legacy_input_reader(input_strategy)
+
+    maybe_register_resize_callback(input_strategy, backend_result.backend_mode)
 
     {:ok, command_executor} = CommandExecutor.start_link()
 
@@ -315,9 +326,15 @@ defmodule TermUI.Runtime do
       render_interval: Keyword.get(opts, :render_interval, @default_render_interval),
       skip_terminal: Keyword.get(opts, :skip_terminal, false),
       backend_opt: Keyword.get(opts, :backend, :auto),
-      use_input_handler: Keyword.get(opts, :use_input_handler, true)
+      use_input_handler:
+        opts
+        |> Keyword.get(:use_input_handler, :auto)
+        |> normalize_use_input_handler_opt()
     }
   end
+
+  defp normalize_use_input_handler_opt(value) when value in [true, false, :auto], do: value
+  defp normalize_use_input_handler_opt(_), do: :auto
 
   defp init_backend(%{skip_terminal: true}) do
     %{
@@ -346,28 +363,49 @@ defmodule TermUI.Runtime do
     }
   end
 
-  defp init_input_handler(%{use_input_handler: true}, backend_mode)
-       when backend_mode in [:raw, :tty] do
+  @doc false
+  @spec resolve_input_strategy(use_input_handler_opt(), State.backend_mode(), boolean()) ::
+          input_strategy()
+  def resolve_input_strategy(:auto, :raw, true), do: :legacy_reader
+  def resolve_input_strategy(:auto, :tty, _terminal_started), do: :input_handler
+
+  def resolve_input_strategy(:auto, _backend_mode, _terminal_started), do: :none
+
+  def resolve_input_strategy(true, :raw, true), do: :legacy_reader
+  def resolve_input_strategy(true, :tty, _terminal_started), do: :input_handler
+
+  def resolve_input_strategy(true, _backend_mode, terminal_started) do
+    if terminal_started, do: :legacy_reader, else: :none
+  end
+
+  def resolve_input_strategy(false, _backend_mode, true), do: :legacy_reader
+  def resolve_input_strategy(false, _backend_mode, _terminal_started), do: :none
+
+  defp init_input_handler(:input_handler, backend_mode) when backend_mode in [:raw, :tty] do
     handler = InputSelector.select(backend_mode)
     {handler, handler.new()}
   end
 
-  defp init_input_handler(_config, _backend_mode), do: {nil, nil}
+  defp init_input_handler(_strategy, _backend_mode), do: {nil, nil}
 
-  defp init_legacy_input_reader(%{use_input_handler: false}, true = _terminal_started) do
+  defp init_legacy_input_reader(:legacy_reader) do
     {:ok, reader_pid} = InputReader.start_link(target: self())
-    Terminal.register_resize_callback(self())
+
+    if Process.whereis(Terminal) do
+      Terminal.register_resize_callback(self())
+    end
+
     reader_pid
   end
 
-  defp init_legacy_input_reader(_config, _terminal_started), do: nil
+  defp init_legacy_input_reader(_strategy), do: nil
 
-  defp maybe_register_resize_callback(%{use_input_handler: true}, backend_mode)
+  defp maybe_register_resize_callback(:input_handler, backend_mode)
        when backend_mode in [:raw, :tty] do
     if Process.whereis(Terminal), do: Terminal.register_resize_callback(self())
   end
 
-  defp maybe_register_resize_callback(_config, _backend_mode), do: :ok
+  defp maybe_register_resize_callback(_strategy, _backend_mode), do: :ok
 
   defp build_init_state(
          init_config,
@@ -416,8 +454,8 @@ defmodule TermUI.Runtime do
 
   defp select_backend(backend_opt) do
     case Selector.select(backend_opt) do
-      {:raw, _raw_state} ->
-        select_raw_backend_with_fallback()
+      {:raw, raw_state} ->
+        select_raw_backend_with_fallback(raw_state)
 
       {:tty, capabilities} ->
         init_tty_backend(capabilities)
@@ -436,28 +474,41 @@ defmodule TermUI.Runtime do
     end
   end
 
-  defp select_raw_backend_with_fallback do
-    case setup_terminal_and_buffers() do
+  defp select_raw_backend_with_fallback(raw_state) do
+    raw_mode_already_started = raw_mode_started_by_selector?(raw_state)
+
+    case setup_terminal_and_buffers(raw_mode_already_started) do
       {true, buffer_manager, dimensions} ->
         init_raw_backend(buffer_manager, dimensions)
 
       {false, nil, nil} ->
+        recover_after_raw_setup_failure(raw_mode_already_started)
         init_tty_backend(Selector.detect_capabilities())
     end
   end
 
   defp select_explicit_raw_backend do
-    case setup_terminal_and_buffers() do
+    case setup_terminal_and_buffers(false) do
       {true, buffer_manager, dimensions} ->
         init_raw_backend(buffer_manager, dimensions)
 
       {false, nil, nil} ->
+        recover_after_raw_setup_failure(true)
         raise "Raw backend requested but unavailable"
     end
   end
 
+  defp raw_mode_started_by_selector?(%{raw_mode_started: raw_mode_started}) do
+    raw_mode_started == true
+  end
+
   defp init_raw_backend(buffer_manager, dimensions) do
     backend = TermUI.Backend.Raw
+
+    # Enable ONLCR translation: in OTP 28 raw mode, OPOST is disabled so bare
+    # \n won't include a carriage return. This safety net translates \n → \r\n
+    # at the TerminalOutput chokepoint, matching the ncurses approach.
+    TermUI.TerminalOutput.enable_onlcr()
 
     {:ok, backend_state} =
       backend.init(
@@ -476,20 +527,18 @@ defmodule TermUI.Runtime do
     {:tty, backend, backend_state, capabilities, false, nil, nil}
   end
 
-  defp setup_terminal_and_buffers do
+  defp setup_terminal_and_buffers(raw_mode_already_started) do
     # Enable raw mode first
-    with {:ok, _} <- Terminal.enable_raw_mode(),
-         :ok <- Terminal.enter_alternate_screen(),
-         :ok <- Terminal.hide_cursor(),
-         :ok <- Terminal.enable_mouse_tracking(:all),
+    with {:ok, _terminal_pid} <- ensure_terminal_started(),
+         :ok <- ensure_raw_mode(raw_mode_already_started, Terminal),
          {rows, cols} <- get_terminal_dimensions_safe(),
          {:ok, buffer_pid} <- BufferManager.start_link(rows: rows, cols: cols) do
-      {true, buffer_pid, {cols, rows}}
+      {true, buffer_pid, normalize_terminal_dimensions(rows, cols)}
     else
       {:error, {:already_started, buffer_pid}} ->
         # BufferManager already started, use it
         {rows, cols} = get_terminal_dimensions_safe()
-        {true, buffer_pid, {cols, rows}}
+        {true, buffer_pid, normalize_terminal_dimensions(rows, cols)}
 
       {:error, _reason} ->
         {false, nil, nil}
@@ -501,12 +550,73 @@ defmodule TermUI.Runtime do
     _ -> {false, nil, nil}
   end
 
+  @doc false
+  @spec ensure_raw_mode(boolean(), module()) :: :ok | {:error, term()}
+  def ensure_raw_mode(true, terminal_module) do
+    # Even though Selector already called :shell.start_interactive({:noshell, :raw}),
+    # we must still call enable_raw_mode to apply stty settings (-echo, -opost, etc.)
+    # that are not set by :shell.start_interactive alone.
+    case terminal_module.enable_raw_mode() do
+      {:ok, _state} -> :ok
+      # Non-fatal: Selector already activated raw mode at the Erlang level
+      {:error, _reason} -> :ok
+    end
+  end
+
+  def ensure_raw_mode(false, terminal_module) do
+    case terminal_module.enable_raw_mode() do
+      {:ok, _state} -> :ok
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @doc false
+  @spec recover_after_raw_setup_failure(boolean(), module()) :: :ok
+  def recover_after_raw_setup_failure(raw_mode_attempted, terminal_module \\ Terminal)
+
+  def recover_after_raw_setup_failure(false, _terminal_module), do: :ok
+
+  def recover_after_raw_setup_failure(true, terminal_module) do
+    _ = safe_restore_terminal(terminal_module)
+    :ok
+  end
+
+  defp safe_restore_terminal(terminal_module) do
+    if function_exported?(terminal_module, :restore, 0) do
+      terminal_module.restore()
+    else
+      :ok
+    end
+  rescue
+    _ -> :ok
+  catch
+    _, _ -> :ok
+  end
+
+  defp ensure_terminal_started do
+    case Terminal.start_link() do
+      {:ok, pid} ->
+        {:ok, pid}
+
+      {:error, {:already_started, pid}} ->
+        {:ok, pid}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
   defp get_terminal_dimensions_safe do
     case Terminal.get_terminal_size() do
       {:ok, {rows, cols}} -> {rows, cols}
       {:error, _reason} -> {24, 80}
     end
   end
+
+  @doc false
+  @spec normalize_terminal_dimensions(pos_integer(), pos_integer()) ::
+          {pos_integer(), pos_integer()}
+  def normalize_terminal_dimensions(rows, cols), do: {rows, cols}
 
   @impl true
   def handle_cast({:event, event}, state) do
@@ -730,12 +840,22 @@ defmodule TermUI.Runtime do
   defp terminate_shutdown(%{shutting_down: true}), do: :ok
   defp terminate_shutdown(state), do: do_shutdown(state)
 
-  defp terminate_legacy_restore(%{terminal_started: true, backend: nil}), do: Terminal.restore()
+  # Always restore terminal state when terminal was started, regardless of backend.
+  # Previously this only called Terminal.restore() when backend was nil, which meant
+  # the Raw backend never got stty settings restored (echo, signals, OPOST).
+  defp terminate_legacy_restore(%{terminal_started: true}) do
+    if Process.whereis(Terminal) do
+      Terminal.restore()
+    end
+  end
+
   defp terminate_legacy_restore(_state), do: :ok
 
   defp terminate_defensive_cleanup do
     TermUI.TerminalOutput.write("\e[?1006l\e[?1003l\e[?1002l\e[?1000l")
     TermUI.TerminalOutput.write("\e[?25h")
+    # Disable ONLCR now that we're leaving raw mode
+    TermUI.TerminalOutput.disable_onlcr()
   end
 
   defp terminate_persistent_terms do
@@ -1144,13 +1264,13 @@ defmodule TermUI.Runtime do
         current_row = Buffer.get_row(current, row)
         previous_row = Buffer.get_row(previous, row)
 
-        # Find changed cells in this row (non-empty cells only for efficiency)
+        # Find changed cells in this row. We must emit changed space cells too,
+        # otherwise previously rendered content is never cleared.
         changed_in_row =
           current_row
           |> Enum.with_index(1)
-          |> Enum.filter(fn {%Cell{char: char} = cell, col} ->
-            char != " " and
-              not Cell.equal?(cell, Enum.at(previous_row, col - 1, Cell.empty()))
+          |> Enum.filter(fn {cell, col} ->
+            should_emit_diff_cell?(cell, Enum.at(previous_row, col - 1, Cell.empty()))
           end)
           |> Enum.flat_map(fn {cell, col} ->
             cell_to_backend_tuple(cell, row, col)
@@ -1175,13 +1295,19 @@ defmodule TermUI.Runtime do
   defp normalize_color(nil), do: :default
   defp normalize_color(color), do: color
 
+  @doc false
+  @spec should_emit_diff_cell?(Cell.t(), Cell.t()) :: boolean()
+  def should_emit_diff_cell?(current_cell, previous_cell) do
+    not Cell.equal?(current_cell, previous_cell)
+  end
+
   # --- Resize Handling ---
 
   defp handle_resize(rows, cols, state) do
     # Skip if terminal not available
     if state.terminal_started do
       # Update dimensions in state
-      new_dimensions = {cols, rows}
+      new_dimensions = normalize_terminal_dimensions(rows, cols)
 
       # Resize buffer manager
       if state.buffer_manager do

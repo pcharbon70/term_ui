@@ -11,9 +11,12 @@ defmodule TermUI.Renderer.CursorOptimizer do
     * Absolute positioning: `ESC[{r};{c}H` (6-10 bytes)
     * Relative up/down/left/right: `ESC[{n}A/B/C/D` (4-6 bytes)
     * Carriage return: `\\r` (1 byte)
-    * Newline: `\\n` (1 byte)
     * Home: `ESC[H` (3 bytes)
     * Literal spaces for small rightward moves (1 byte each)
+
+  Note: This module intentionally avoids bare `\\n` (LF) for cursor movement.
+  In OTP 28 raw mode, OPOST is disabled so bare `\\n` would cause staircase
+  rendering. All vertical movement uses ANSI escape sequences instead.
 
   ## Usage
 
@@ -258,8 +261,12 @@ defmodule TermUI.Renderer.CursorOptimizer do
 
   defp add_space_option(options, _row_diff, _col_diff), do: options
 
+  # Uses ANSI cursor down (\e[B) instead of bare \n. In OTP 28 raw mode,
+  # OPOST is disabled so bare \n would cause staircase rendering (LF without CR).
+  # ANSI cursor down works correctly regardless of terminal mode.
   defp add_newline_options(options, row_diff, 1, 1) when row_diff > 0 do
-    [{String.duplicate("\n", row_diff), row_diff} | options]
+    {v_seq, v_cost} = vertical_sequence(row_diff)
+    [{v_seq, v_cost} | options]
   end
 
   defp add_newline_options(options, _row_diff, _from_col, _to_col), do: options
@@ -292,22 +299,10 @@ defmodule TermUI.Renderer.CursorOptimizer do
     if row_diff == 0 do
       [{"\r", cost_cr()}]
     else
-      # CR + vertical movement
-      options = []
-
-      # Option 1: CR + newlines (for moving down to column 1)
-      options =
-        if row_diff > 0 do
-          # \r\n\n\n... is 1 + row_diff bytes
-          lf_seq = ["\r", String.duplicate("\n", row_diff)]
-          [{lf_seq, cost_cr() + row_diff} | options]
-        else
-          options
-        end
-
-      # Option 2: CR + escape sequence (for up or large down)
+      # CR + vertical movement using ANSI escape sequences.
+      # Previously used bare \n which is broken in OTP 28 raw mode (OPOST disabled).
       {v_seq, v_cost} = vertical_sequence(row_diff)
-      [{["\r", v_seq], cost_cr() + v_cost} | options]
+      [{["\r", v_seq], cost_cr() + v_cost}]
     end
   end
 

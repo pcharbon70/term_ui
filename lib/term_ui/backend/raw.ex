@@ -364,6 +364,12 @@ defmodule TermUI.Backend.Raw do
     # Use defensive cleanup - disable ALL modes regardless of state
     safe_write(@all_mouse_off)
 
+    # Drain any pending input to prevent buffered mouse events from
+    # leaking as visible text when returning to normal mode.
+    # Must happen AFTER mouse tracking is disabled but BEFORE leaving
+    # alternate screen, so events generated in alt screen are consumed.
+    drain_pending_input()
+
     # Show cursor (always, even if state says visible - defensive)
     safe_write(ANSI.cursor_show())
 
@@ -1460,6 +1466,51 @@ defmodule TermUI.Backend.Raw do
     e ->
       Logger.warning("Failed to write during shutdown: #{Exception.message(e)}")
       :ok
+  end
+
+  # Drains pending input bytes to prevent buffered escape sequences (e.g. mouse
+  # wheel events) from leaking as visible text after leaving alternate screen.
+  #
+  # Strategy: temporarily set stty to non-blocking mode (min 0 time 1 = 0.1s
+  # timeout), read and discard all pending bytes, then restore blocking mode.
+  # This is the standard approach used by TUI frameworks for input draining.
+  defp drain_pending_input do
+    # Set non-blocking: min 0 (no minimum chars), time 1 (0.1s timeout)
+    case TermUI.TermUtils.safe_stty(["min", "0", "time", "1"]) do
+      {:ok, _} ->
+        drain_input_loop(0)
+        # Restore blocking mode for any subsequent IO
+        TermUI.TermUtils.safe_stty(["min", "1", "time", "0"])
+
+      {:error, _} ->
+        # stty not available (e.g., non-Unix) — skip drain
+        :ok
+    end
+  rescue
+    _ -> :ok
+  catch
+    _, _ -> :ok
+  end
+
+  @drain_max_iterations 20
+  defp drain_input_loop(n) when n >= @drain_max_iterations, do: :ok
+
+  defp drain_input_loop(n) do
+    # In non-blocking mode, IO.getn returns immediately with available data
+    # or :eof/error when nothing is available.
+    case IO.getn("", 64) do
+      data when is_binary(data) and byte_size(data) > 0 ->
+        drain_input_loop(n + 1)
+
+      [_ | _] ->
+        drain_input_loop(n + 1)
+
+      _ ->
+        # No more data available (empty, :eof, or error)
+        :ok
+    end
+  rescue
+    _ -> :ok
   end
 
   # Error-safe cooked mode restoration

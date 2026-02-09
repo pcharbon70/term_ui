@@ -2,6 +2,26 @@ defmodule TermUI.AppTest do
   use TermUI.TestCase, async: false
 
   alias TermUI.App
+  alias TermUI.Terminal
+
+  defp stop_terminal_if_running do
+    case Process.whereis(Terminal) do
+      nil ->
+        :ok
+
+      pid when is_pid(pid) ->
+        if Process.alive?(pid) do
+          ref = Process.monitor(pid)
+          Process.exit(pid, :shutdown)
+
+          receive do
+            {:DOWN, ^ref, :process, ^pid, _reason} -> :ok
+          after
+            500 -> :ok
+          end
+        end
+    end
+  end
 
   # Clean up persistent_term values between tests
   setup do
@@ -22,6 +42,8 @@ defmodule TermUI.AppTest do
       else
         :persistent_term.erase(:term_ui_capabilities)
       end
+
+      stop_terminal_if_running()
     end)
 
     :ok
@@ -86,6 +108,52 @@ defmodule TermUI.AppTest do
       # This would fail if we pass invalid options
       # For now, we just verify the happy path
       assert {:ok, _pid} = App.start(SimpleCounter, skip_terminal: true)
+    end
+
+    test "raw backend does not fail with :noproc when terminal process is not pre-started" do
+      stop_terminal_if_running()
+
+      result =
+        Task.async(fn ->
+          Process.flag(:trap_exit, true)
+          App.start(SimpleCounter, backend: :raw)
+        end)
+        |> Task.await(2000)
+
+      refute match?(
+               {:error, {:noproc, {GenServer, :call, [TermUI.Terminal, :enable_raw_mode, _]}}},
+               result
+             )
+
+      case result do
+        {:ok, pid} ->
+          assert is_pid(pid)
+          assert Process.alive?(pid)
+          assert :ok = App.shutdown(pid)
+
+        {:error, {%RuntimeError{message: "Raw backend requested but unavailable"}, _stacktrace}} ->
+          :ok
+
+        other ->
+          flunk("unexpected raw backend start result: #{inspect(other)}")
+      end
+    end
+  end
+
+  describe "runtime option normalization" do
+    test "forwards use_input_handler when explicitly provided" do
+      runtime_opts =
+        App.runtime_options(SimpleCounter, backend: :tty, use_input_handler: false)
+
+      assert runtime_opts[:root] == SimpleCounter
+      assert runtime_opts[:backend] == :tty
+      assert runtime_opts[:use_input_handler] == false
+    end
+
+    test "does not force use_input_handler when omitted" do
+      runtime_opts = App.runtime_options(SimpleCounter, backend: :tty)
+
+      refute Keyword.has_key?(runtime_opts, :use_input_handler)
     end
   end
 

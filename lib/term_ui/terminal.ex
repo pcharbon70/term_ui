@@ -25,6 +25,8 @@ defmodule TermUI.Terminal do
   # This is kept as a constant for performance in cleanup paths
   @all_mouse_off "\e[?1006l\e[?1003l\e[?1002l\e[?1000l"
 
+  @raw_stty_args ["raw", "-echo", "-isig", "-ixon", "min", "1", "time", "0"]
+
   # Client API
 
   @doc """
@@ -60,6 +62,12 @@ defmodule TermUI.Terminal do
   @spec enable_raw_mode() :: {:ok, State.t()} | {:error, term()}
   def enable_raw_mode do
     GenServer.call(__MODULE__, :enable_raw_mode)
+  end
+
+  @doc false
+  @spec raw_stty_args() :: [String.t()]
+  def raw_stty_args do
+    @raw_stty_args
   end
 
   @doc """
@@ -465,7 +473,7 @@ defmodule TermUI.Terminal do
     # time 0: timeout in tenths of a second (0 = no timeout)
     # -isig: disable signal generation (Ctrl+C etc handled by app)
     # -ixon: disable XON/XOFF flow control
-    case TermUtils.safe_stty(["raw", "-echo", "-isig", "-ixon", "1", "0"]) do
+    case TermUtils.safe_stty(raw_stty_args()) do
       {:ok, _output} ->
         :ok
 
@@ -537,6 +545,8 @@ defmodule TermUI.Terminal do
       do_disable_raw_mode(state.original_settings)
     end
 
+    ensure_cooked_mode()
+
     # Reset terminal attributes (colors, styles)
     write_to_terminal(ANSI.reset())
 
@@ -545,6 +555,18 @@ defmodule TermUI.Terminal do
     end
 
     State.new()
+  end
+
+  defp ensure_cooked_mode do
+    case :erlang.apply(:shell, :start_interactive, [{:noshell, :cooked}]) do
+      :ok -> :ok
+      {:error, _reason} -> :ok
+    end
+  rescue
+    _e in UndefinedFunctionError -> :ok
+    _ -> :ok
+  catch
+    _, _ -> :ok
   end
 
   defp disable_current_mouse_mode(mode) do
