@@ -277,16 +277,9 @@ defmodule TermUI.Runtime do
   def init(opts) do
     Process.flag(:trap_exit, true)
 
-    TermUI.DebugLog.clear()
-    TermUI.DebugLog.log("=== Runtime.init START ===")
-
     opts = Config.merge_options(opts)
     init_config = parse_init_options(opts)
     backend_result = init_backend(init_config)
-
-    TermUI.DebugLog.log("  backend_mode", backend_result.backend_mode)
-    TermUI.DebugLog.log("  terminal_started", backend_result.terminal_started)
-    TermUI.DebugLog.log("  stty at init", TermUI.DebugLog.stty_short())
 
     PersistentTerms.store_backend_context(
       backend_result.backend_mode,
@@ -515,7 +508,13 @@ defmodule TermUI.Runtime do
     # Enable ONLCR translation: in OTP 28 raw mode, OPOST is disabled so bare
     # \n won't include a carriage return. This safety net translates \n → \r\n
     # at the TerminalOutput chokepoint, matching the ncurses approach.
-    TermUI.TerminalOutput.enable_onlcr()
+    #
+    # On ConPTY/WSL, stty fails so kernel OPOST/ONLCR stay ON — the kernel
+    # already handles LF→CRLF translation. Enabling our ONLCR too would cause
+    # double translation (\n → \r\n → kernel sees \n again → \r\r\n).
+    unless TermUI.TerminalOutput.needs_hard_reset?() do
+      TermUI.TerminalOutput.enable_onlcr()
+    end
 
     {:ok, backend_state} =
       backend.init(
@@ -808,52 +807,14 @@ defmodule TermUI.Runtime do
 
   @impl true
   def terminate(_reason, state) do
-    alias TermUI.DebugLog, as: D
-    D.log("=== Runtime.terminate START ===")
-    D.log("  backend", Map.get(state, :backend))
-    D.log("  backend_mode", Map.get(state, :backend_mode))
-    D.log("  terminal_started", Map.get(state, :terminal_started))
-    D.log("  input_reader", Map.get(state, :input_reader))
-    D.log("  shutting_down", Map.get(state, :shutting_down))
-    D.log("  stty BEFORE", D.stty_short())
-    D.log("  group_leader", Process.group_leader())
-
-    D.log(">> terminate_input_reader")
     safe_cleanup(fn -> terminate_input_reader(state) end)
-    D.log("<< terminate_input_reader done")
-
-    D.log(">> terminate_input_handler")
     safe_cleanup(fn -> terminate_input_handler(state) end)
-    D.log("<< terminate_input_handler done")
-
-    D.log(">> terminate_backend")
     safe_cleanup(fn -> terminate_backend(state) end)
-    D.log("<< terminate_backend done")
-    D.log("  stty AFTER backend", D.stty_short())
-
-    D.log(">> terminate_resize_callback")
     safe_cleanup(fn -> terminate_resize_callback(state) end)
-    D.log("<< terminate_resize_callback done")
-
-    D.log(">> terminate_shutdown")
     safe_cleanup(fn -> terminate_shutdown(state) end)
-    D.log("<< terminate_shutdown done")
-
-    D.log(">> terminate_legacy_restore")
     safe_cleanup(fn -> terminate_legacy_restore(state) end)
-    D.log("<< terminate_legacy_restore done")
-    D.log("  stty AFTER legacy_restore", D.stty_short())
-
-    D.log(">> terminate_defensive_cleanup")
     safe_cleanup(fn -> terminate_defensive_cleanup() end)
-    D.log("<< terminate_defensive_cleanup done")
-    D.log("  stty AFTER defensive", D.stty_short())
-
-    D.log(">> terminate_persistent_terms")
     safe_cleanup(fn -> terminate_persistent_terms() end)
-    D.log("<< terminate_persistent_terms done")
-
-    D.log("=== Runtime.terminate END ===")
     :ok
   end
 
@@ -894,15 +855,9 @@ defmodule TermUI.Runtime do
   defp terminate_legacy_restore(_state), do: :ok
 
   defp terminate_defensive_cleanup do
-    alias TermUI.DebugLog, as: D
-    D.log("  defensive: write_to_tty cleanup_sequence")
     TermUI.TerminalOutput.write_to_tty(TermUI.TerminalOutput.cleanup_sequence())
-    D.log("  defensive: disable_onlcr")
     TermUI.TerminalOutput.disable_onlcr()
-    D.log("  defensive: stty sane")
-    sane_result = TermUI.TermUtils.safe_stty(["sane"])
-    D.log("  defensive: stty sane result", sane_result)
-    D.log("  defensive: stty AFTER sane", D.stty_short())
+    TermUI.TermUtils.safe_stty(["sane"])
   end
 
   defp terminate_persistent_terms do

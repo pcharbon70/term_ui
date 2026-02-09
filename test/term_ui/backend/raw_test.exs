@@ -1590,6 +1590,17 @@ defmodule TermUI.Backend.RawTest do
 
   describe "enable_mouse/2 callback" do
     setup do
+      # Override ConPTY detection so mouse tracking tests run on all platforms
+      key = {TermUI.TerminalOutput, :needs_hard_reset}
+      original = :persistent_term.get(key, :unset)
+      :persistent_term.put(key, false)
+
+      on_exit(fn ->
+        if original == :unset,
+          do: :persistent_term.erase(key),
+          else: :persistent_term.put(key, original)
+      end)
+
       {:ok, state} = Raw.init(size: {24, 80}, alternate_screen: false)
       %{state: state}
     end
@@ -1674,6 +1685,16 @@ defmodule TermUI.Backend.RawTest do
 
   describe "disable_mouse/1 callback" do
     setup do
+      key = {TermUI.TerminalOutput, :needs_hard_reset}
+      original = :persistent_term.get(key, :unset)
+      :persistent_term.put(key, false)
+
+      on_exit(fn ->
+        if original == :unset,
+          do: :persistent_term.erase(key),
+          else: :persistent_term.put(key, original)
+      end)
+
       {:ok, state} = Raw.init(size: {24, 80}, alternate_screen: false)
       %{state: state}
     end
@@ -1728,6 +1749,16 @@ defmodule TermUI.Backend.RawTest do
 
   describe "enable_mouse/2 and disable_mouse/1 integration" do
     setup do
+      key = {TermUI.TerminalOutput, :needs_hard_reset}
+      original = :persistent_term.get(key, :unset)
+      :persistent_term.put(key, false)
+
+      on_exit(fn ->
+        if original == :unset,
+          do: :persistent_term.erase(key),
+          else: :persistent_term.put(key, original)
+      end)
+
       {:ok, state} = Raw.init(size: {24, 80}, alternate_screen: false)
       %{state: state}
     end
@@ -1925,6 +1956,16 @@ defmodule TermUI.Backend.RawTest do
     import ExUnit.CaptureIO
 
     setup do
+      key = {TermUI.TerminalOutput, :needs_hard_reset}
+      original = :persistent_term.get(key, :unset)
+      :persistent_term.put(key, false)
+
+      on_exit(fn ->
+        if original == :unset,
+          do: :persistent_term.erase(key),
+          else: :persistent_term.put(key, original)
+      end)
+
       {:ok, state} = Raw.init(size: {24, 80}, alternate_screen: false)
       %{state: state}
     end

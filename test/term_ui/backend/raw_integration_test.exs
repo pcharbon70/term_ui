@@ -364,6 +364,16 @@ defmodule TermUI.Backend.RawIntegrationTest do
 
   describe "mouse tracking integration" do
     setup do
+      key = {TermUI.TerminalOutput, :needs_hard_reset}
+      original = :persistent_term.get(key, :unset)
+      :persistent_term.put(key, false)
+
+      on_exit(fn ->
+        if original == :unset,
+          do: :persistent_term.erase(key),
+          else: :persistent_term.put(key, original)
+      end)
+
       {:ok, state} = Raw.init(size: {24, 80}, alternate_screen: false)
       %{state: state}
     end

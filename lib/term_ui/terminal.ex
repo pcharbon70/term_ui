@@ -318,26 +318,32 @@ defmodule TermUI.Terminal do
 
   @impl true
   def handle_call({:enable_mouse_tracking, mode}, _from, state) do
-    # First disable any existing tracking
-    if state.mouse_tracking != :off do
-      disable_current_mouse_mode(state.mouse_tracking)
-    end
-
-    # Enable new tracking mode with SGR
-    # Map user-friendly mode names to ANSI protocol modes:
-    # :click -> :normal (1000), :drag -> :button (1002), :all -> :all (1003)
-    ansi_mode =
-      case mode do
-        :click -> :normal
-        :drag -> :button
-        :all -> :all
+    if TerminalOutput.needs_hard_reset?() do
+      # ConPTY/WSL: skip mouse tracking — disable sequences are silently
+      # ignored, causing escape codes to leak into the shell after exit.
+      {:reply, :ok, state}
+    else
+      # First disable any existing tracking
+      if state.mouse_tracking != :off do
+        disable_current_mouse_mode(state.mouse_tracking)
       end
 
-    write_to_terminal(ANSI.enable_mouse_tracking(ansi_mode))
-    write_to_terminal(ANSI.enable_sgr_mouse())
+      # Enable new tracking mode with SGR
+      # Map user-friendly mode names to ANSI protocol modes:
+      # :click -> :normal (1000), :drag -> :button (1002), :all -> :all (1003)
+      ansi_mode =
+        case mode do
+          :click -> :normal
+          :drag -> :button
+          :all -> :all
+        end
 
-    new_state = %{state | mouse_tracking: mode}
-    {:reply, :ok, new_state}
+      write_to_terminal(ANSI.enable_mouse_tracking(ansi_mode))
+      write_to_terminal(ANSI.enable_sgr_mouse())
+
+      new_state = %{state | mouse_tracking: mode}
+      {:reply, :ok, new_state}
+    end
   end
 
   @impl true
@@ -483,39 +489,22 @@ defmodule TermUI.Terminal do
   end
 
   defp do_disable_raw_mode(original_settings) do
-    alias TermUI.DebugLog, as: D
-
-    D.log(
-      "  do_disable_raw_mode: original_settings=#{inspect(is_binary(original_settings) and original_settings != "")}"
-    )
-
     restore_result =
       if is_binary(original_settings) and original_settings != "" do
-        D.log("  restoring original stty settings (#{byte_size(original_settings)} bytes)")
-        result = restore_terminal_settings(original_settings)
-        D.log("  restore_terminal_settings result", result)
-        result
+        restore_terminal_settings(original_settings)
       else
-        D.log("  no original settings to restore")
         {:error, :no_original_settings}
       end
 
     if match?({:error, _}, restore_result) do
-      D.log("  falling back to stty sane")
-      sane_result = restore_stty_sane()
-      D.log("  stty sane result", sane_result)
+      restore_stty_sane()
     end
 
-    D.log("  stty AFTER do_disable_raw_mode", D.stty_short())
     :ok
   rescue
-    e ->
-      TermUI.DebugLog.log("  do_disable_raw_mode RESCUED: #{inspect(e)}")
-      :ok
+    _ -> :ok
   catch
-    kind, reason ->
-      TermUI.DebugLog.log("  do_disable_raw_mode CAUGHT: #{kind} #{inspect(reason)}")
-      :ok
+    _, _ -> :ok
   end
 
   defp restore_terminal_settings(settings) do
@@ -541,21 +530,10 @@ defmodule TermUI.Terminal do
   end
 
   defp do_restore(state) do
-    alias TermUI.DebugLog, as: D
-    D.log("=== Terminal.do_restore START ===")
-    D.log("  raw_mode_active", state.raw_mode_active)
-    D.log("  cursor_visible", state.cursor_visible)
-    D.log("  alternate_screen_active", state.alternate_screen_active)
-    D.log("  original_settings present?", is_binary(state.original_settings))
-    D.log("  stty BEFORE", D.stty_short())
-
     # Phase 1: Write cleanup directly to /dev/tty FIRST (most reliable path).
-    D.log("Phase 1: write_to_tty cleanup_sequence")
     TerminalOutput.write_to_tty(TerminalOutput.cleanup_sequence())
-    D.log("  done")
 
     # Phase 2: Write cleanup via Erlang IO as backup.
-    D.log("Phase 2: IO.write backup")
     write_to_terminal(@all_mouse_off)
 
     if not state.cursor_visible do
@@ -567,53 +545,31 @@ defmodule TermUI.Terminal do
     end
 
     write_to_terminal(ANSI.reset())
-    D.log("  done")
 
     # Phase 3: Transition Erlang IO to cooked mode BEFORE stty restoration.
-    D.log("Phase 3: ensure_cooked_mode")
-    D.log("  stty BEFORE cooked", D.stty_short())
     ensure_cooked_mode()
-    D.log("  stty AFTER cooked", D.stty_short())
 
     # Phase 4: Restore kernel terminal settings AFTER cooked mode transition.
     if state.raw_mode_active do
-      D.log("Phase 4: do_disable_raw_mode")
       do_disable_raw_mode(state.original_settings)
-      D.log("  stty AFTER disable_raw", D.stty_short())
-    else
-      D.log("Phase 4: SKIPPED (not raw_mode_active)")
     end
 
     # Phase 5: Disable ONLCR (no longer needed outside raw mode)
-    D.log("Phase 5: disable_onlcr")
     TerminalOutput.disable_onlcr()
 
     if :ets.whereis(@ets_table) != :undefined do
       :ets.insert(@ets_table, {:raw_mode_active, false})
     end
 
-    D.log("=== Terminal.do_restore END ===")
     State.new()
   end
 
   defp ensure_cooked_mode do
-    alias TermUI.DebugLog, as: D
-    D.log("  ensure_cooked_mode: calling :shell.start_interactive({:noshell, :cooked})")
-    result = :erlang.apply(:shell, :start_interactive, [{:noshell, :cooked}])
-    D.log("  ensure_cooked_mode result", result)
-    result
+    :erlang.apply(:shell, :start_interactive, [{:noshell, :cooked}])
   rescue
-    _e in UndefinedFunctionError ->
-      TermUI.DebugLog.log("  ensure_cooked_mode: UndefinedFunctionError")
-      :ok
-
-    e ->
-      TermUI.DebugLog.log("  ensure_cooked_mode RESCUED: #{inspect(e)}")
-      :ok
+    _ -> :ok
   catch
-    kind, reason ->
-      TermUI.DebugLog.log("  ensure_cooked_mode CAUGHT: #{kind} #{inspect(reason)}")
-      :ok
+    _, _ -> :ok
   end
 
   defp disable_current_mouse_mode(mode) do

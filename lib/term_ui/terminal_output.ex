@@ -85,37 +85,21 @@ defmodule TermUI.TerminalOutput do
   """
   @spec write_to_tty(iodata()) :: :ok
   def write_to_tty(data) do
-    alias TermUI.DebugLog, as: D
     binary = IO.iodata_to_binary(data)
 
-    D.log(
-      "write_to_tty: #{byte_size(binary)} bytes, escape_seqs=#{inspect(binary |> String.replace("\e", "ESC"))}"
-    )
-
-    tty_ok = write_to_tty_device(binary)
-    D.log("  /dev/tty write: #{tty_ok}")
-
-    if tty_ok do
+    if write_to_tty_device(binary) do
       :ok
     else
-      stderr_ok = write_to_stderr(binary)
-      D.log("  stderr write: #{stderr_ok}")
-
-      if stderr_ok do
+      if write_to_stderr(binary) do
         :ok
       else
-        D.log("  falling back to IO.write")
         write(data)
       end
     end
   rescue
-    e ->
-      TermUI.DebugLog.log("write_to_tty RESCUED: #{inspect(e)}")
-      :ok
+    _ -> :ok
   catch
-    kind, reason ->
-      TermUI.DebugLog.log("write_to_tty CAUGHT: #{kind} #{inspect(reason)}")
-      :ok
+    _, _ -> :ok
   end
 
   @doc """
