@@ -30,12 +30,16 @@ defmodule TermUI.Widget.Block do
   # Dialyzer: Suppress opaque type warnings for Style helpers
   # Dialyzer: no_return warnings for functions that don't return
   # no_opaque: Style contains MapSet which triggers false positive call_without_opaque warnings
-  @dialyzer [:no_opaque,
-             nowarn_function: [build_style: 1,
-                               positioned_cell_safe: 4,
-                               do_render_top: 5,
-                               render_bottom_border: 3,
-                               render_side_borders: 3]]
+  @dialyzer [
+    :no_opaque,
+    nowarn_function: [
+      build_style: 1,
+      positioned_cell_safe: 4,
+      do_render_top: 5,
+      render_bottom_border: 3,
+      render_side_borders: 3
+    ]
+  ]
 
   # Border character sets
   @borders %{

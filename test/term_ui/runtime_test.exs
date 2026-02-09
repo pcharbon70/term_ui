@@ -594,5 +594,4 @@ defmodule TermUI.RuntimeTest do
       assert state.input_state == nil
     end
   end
-
 end
