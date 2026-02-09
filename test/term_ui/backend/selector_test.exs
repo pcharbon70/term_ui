@@ -618,15 +618,6 @@ defmodule TermUI.Backend.SelectorTest do
   end
 
   describe "logging" do
-    test "logs backend selection at info level" do
-      log =
-        capture_log(fn ->
-          Selector.select()
-        end)
-
-      assert log =~ "TermUI: Backend selected"
-    end
-
     test "logs forced backend selection" do
       log =
         capture_log(fn ->

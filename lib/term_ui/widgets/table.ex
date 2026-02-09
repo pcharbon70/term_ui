@@ -364,8 +364,19 @@ defmodule TermUI.Widgets.Table do
     end
   end
 
-  defp format_header_text(header, _column_key, _state, _chars) do
-    header
+  defp format_header_text(header, column_key, state, chars) do
+    if state.sort_column == column_key do
+      indicator =
+        case state.sort_direction do
+          :asc -> chars.arrow_up
+          :desc -> chars.arrow_down
+          nil -> ""
+        end
+
+      header <> " " <> indicator
+    else
+      header
+    end
   end
 
   defp render_rows(state, visible_rows, column_widths) do

@@ -26,7 +26,7 @@ defmodule TermUI.MixProject do
 
       # Dialyzer
       # Note: unknown_type warnings for Event.ex are false positives from nested module types
-      # We have not found a working way to suppress these via Dialyzer configuration
+      # Note: call_without_opaque warnings are due to MapSet nested in opaque Style type
       dialyzer: [
         flags: [
           :error_handling,

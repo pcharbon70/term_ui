@@ -149,7 +149,7 @@ defmodule TermUI.Widget.Progress do
 
   @spec positioned_cell_safe(integer(), integer(), String.t(), Style.t()) :: RenderNode.t()
   defp positioned_cell_safe(x, y, char, style),
-    do: positioned_cell_safe(x, y, char, style)
+    do: positioned_cell(x, y, char, style)
 
   # ----------------------------------------------------------------------------
   # Style Building

@@ -312,6 +312,21 @@ defmodule TermUI.Widgets.FormBuilder do
     {:ok, state}
   end
 
+  defp handle_space_on_field(%{type: :multi_select} = field, state) do
+    current_values = Map.get(state.values, field.id, [])
+    {value, _label} = Enum.at(field.options, state.focused_option, {"", ""})
+
+    updated_values =
+      if value in current_values do
+        List.delete(current_values, value)
+      else
+        [value | current_values]
+      end
+
+    state = update_value(state, field.id, updated_values)
+    {:ok, state}
+  end
+
   defp handle_space_on_field(_field, state), do: {:ok, state}
 
   @impl true

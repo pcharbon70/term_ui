@@ -1,0 +1,13 @@
+lib/term_ui/event.ex:37:14:unknown_type
+lib/term_ui/event.ex:37:26:unknown_type
+lib/term_ui/event.ex:37:38:unknown_type
+lib/term_ui/event.ex:37:51:unknown_type
+lib/term_ui/event.ex:37:64:unknown_type
+lib/term_ui/event.ex:37:76:unknown_type
+lib/term_ui/event.ex:37:87:unknown_type
+lib/term_ui/widget/block.ex:141:60:call_without_opaque
+lib/term_ui/widget/label.ex:126:40:call_without_opaque
+lib/term_ui/widget/list.ex:203:40:call_without_opaque
+lib/term_ui/widget/progress.ex:132:40:call_without_opaque
+lib/term_ui/widget/progress.ex:140:42:call_without_opaque
+lib/term_ui/widget/text_input.ex:203:42:call_without_opaque

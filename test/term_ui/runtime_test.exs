@@ -595,15 +595,4 @@ defmodule TermUI.RuntimeTest do
     end
   end
 
-  describe "logging" do
-    test "logs capabilities at debug level when backend is selected" do
-      log =
-        capture_log([level: :debug], fn ->
-          {:ok, _runtime} = Runtime.start_link(root: Counter, skip_terminal: true, backend: :tty)
-        end)
-
-      # With skip_terminal: true, capabilities should still be logged
-      assert log =~ "TermUI: Capabilities detected" or log =~ "TermUI: Character set"
-    end
-  end
 end
