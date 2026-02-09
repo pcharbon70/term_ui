@@ -360,33 +360,43 @@ defmodule TermUI.Backend.Raw do
   """
   @spec shutdown(t()) :: :ok
   def shutdown(state) do
+    alias TermUI.DebugLog, as: D
+    D.log("=== Raw.shutdown START ===")
+    D.log("  mouse_mode", state.mouse_mode)
+    D.log("  alternate_screen", state.alternate_screen)
+    D.log("  stty BEFORE", D.stty_short())
+
     # --- Phase 1: Direct-to-TTY cleanup FIRST (guaranteed delivery) ---
-    # Write the full cleanup sequence directly to /dev/tty, bypassing the
-    # Erlang IO system entirely. This is the most reliable path and must
-    # happen before any mode transitions that could disrupt IO routing.
-    TerminalOutput.write_to_tty(TerminalOutput.cleanup_sequence())
+    D.log("Phase 1: write_to_tty cleanup_sequence")
+    tty_result = TerminalOutput.write_to_tty(TerminalOutput.cleanup_sequence())
+    D.log("  write_to_tty result", tty_result)
 
     # --- Phase 2: Write cleanup via Erlang IO as backup ---
-    # These writes go through the group leader and may fail during shutdown,
-    # but serve as a redundant safety net.
-    safe_write(@all_mouse_off)
-    safe_write(ANSI.cursor_show())
-    safe_write(ANSI.reset())
+    D.log("Phase 2: IO.write backup")
+    r1 = safe_write(@all_mouse_off)
+    D.log("  mouse_off via IO.write", r1)
+    r2 = safe_write(ANSI.cursor_show())
+    D.log("  cursor_show via IO.write", r2)
+    r3 = safe_write(ANSI.reset())
+    D.log("  reset via IO.write", r3)
 
     if state.alternate_screen do
-      safe_write(ANSI.leave_alternate_screen())
+      r4 = safe_write(ANSI.leave_alternate_screen())
+      D.log("  leave_alt_screen via IO.write", r4)
     end
 
     # --- Phase 3: Drain pending input ---
-    # After mouse-off has been sent (Phase 1+2), drain any buffered mouse
-    # events to prevent them from appearing as garbage text in the shell.
-    # NOTE: The InputReader must be stopped before this is called (done by
-    # Runtime.terminate ordering) to avoid stdin read contention.
+    D.log("Phase 3: drain_pending_input")
     drain_pending_input()
+    D.log("  drain done")
 
     # --- Phase 4: Cooked mode transition (may disrupt IO system) ---
+    D.log("Phase 4: safe_cooked_mode")
+    D.log("  stty BEFORE cooked", D.stty_short())
     safe_cooked_mode()
+    D.log("  stty AFTER cooked", D.stty_short())
 
+    D.log("=== Raw.shutdown END ===")
     :ok
   end
 
@@ -1465,10 +1475,12 @@ defmodule TermUI.Backend.Raw do
   # Error-safe write for shutdown - logs errors but continues
   defp safe_write(data) do
     TerminalOutput.write(data)
+    :ok
   rescue
     e ->
+      TermUI.DebugLog.log("safe_write FAILED: #{Exception.message(e)}")
       Logger.warning("Failed to write during shutdown: #{Exception.message(e)}")
-      :ok
+      {:error, e}
   end
 
   # Drains pending input bytes to prevent buffered escape sequences (e.g. mouse
@@ -1478,50 +1490,68 @@ defmodule TermUI.Backend.Raw do
   # timeout), read and discard all pending bytes, then restore blocking mode.
   # This is the standard approach used by TUI frameworks for input draining.
   defp drain_pending_input do
+    alias TermUI.DebugLog, as: D
     # Set non-blocking: min 0 (no minimum chars), time 1 (0.1s timeout)
     case TermUI.TermUtils.safe_stty(["min", "0", "time", "1"]) do
       {:ok, _} ->
-        drain_input_loop(0)
+        D.log("  drain: set non-blocking, starting loop")
+        drained = drain_input_loop(0, 0)
+        D.log("  drain: consumed #{drained} bytes total")
         # Restore blocking mode for any subsequent IO
         TermUI.TermUtils.safe_stty(["min", "1", "time", "0"])
 
-      {:error, _} ->
-        # stty not available (e.g., non-Unix) — skip drain
+      {:error, reason} ->
+        D.log("  drain: stty non-blocking FAILED: #{inspect(reason)}")
         :ok
     end
   rescue
-    _ -> :ok
+    e ->
+      TermUI.DebugLog.log("  drain RESCUED: #{inspect(e)}")
+      :ok
   catch
     _, _ -> :ok
   end
 
   @drain_max_iterations 20
-  defp drain_input_loop(n) when n >= @drain_max_iterations, do: :ok
+  defp drain_input_loop(n, total_bytes) when n >= @drain_max_iterations do
+    TermUI.DebugLog.log(
+      "  drain: hit max iterations (#{@drain_max_iterations}), total=#{total_bytes}"
+    )
 
-  defp drain_input_loop(n) do
-    # In non-blocking mode, IO.getn returns immediately with available data
-    # or :eof/error when nothing is available.
+    total_bytes
+  end
+
+  defp drain_input_loop(n, total_bytes) do
     case IO.getn("", 64) do
       data when is_binary(data) and byte_size(data) > 0 ->
-        drain_input_loop(n + 1)
+        TermUI.DebugLog.log("  drain[#{n}]: got #{byte_size(data)} bytes: #{inspect(data)}")
+        drain_input_loop(n + 1, total_bytes + byte_size(data))
 
-      [_ | _] ->
-        drain_input_loop(n + 1)
+      [_ | _] = _data ->
+        TermUI.DebugLog.log("  drain[#{n}]: got iolist")
+        drain_input_loop(n + 1, total_bytes + 1)
 
-      _ ->
-        # No more data available (empty, :eof, or error)
-        :ok
+      other ->
+        TermUI.DebugLog.log("  drain[#{n}]: no data (#{inspect(other)}), done")
+        total_bytes
     end
   rescue
-    _ -> :ok
+    e ->
+      TermUI.DebugLog.log("  drain[#{n}] RESCUED: #{inspect(e)}")
+      total_bytes
   end
 
   # Error-safe cooked mode restoration
   defp safe_cooked_mode do
-    :shell.start_interactive({:noshell, :cooked})
+    alias TermUI.DebugLog, as: D
+    D.log("  safe_cooked_mode: calling :shell.start_interactive({:noshell, :cooked})")
+    result = :shell.start_interactive({:noshell, :cooked})
+    D.log("  safe_cooked_mode result", result)
+    result
   rescue
     e in UndefinedFunctionError ->
-      # :shell.start_interactive/1 not available (pre-OTP 28)
+      TermUI.DebugLog.log("  safe_cooked_mode: UndefinedFunctionError (pre-OTP 28)")
+
       Logger.warning(
         "Cooked mode restoration not available (OTP 28+ required): #{Exception.message(e)}"
       )
@@ -1529,10 +1559,12 @@ defmodule TermUI.Backend.Raw do
       :ok
 
     e ->
+      TermUI.DebugLog.log("  safe_cooked_mode RESCUED: #{inspect(e)}")
       Logger.warning("Failed to restore cooked mode: #{Exception.message(e)}")
       :ok
   catch
     kind, reason ->
+      TermUI.DebugLog.log("  safe_cooked_mode CAUGHT: #{kind} #{inspect(reason)}")
       Logger.warning("Failed to restore cooked mode: #{kind} - #{inspect(reason)}")
       :ok
   end

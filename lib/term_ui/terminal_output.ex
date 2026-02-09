@@ -44,7 +44,10 @@ defmodule TermUI.TerminalOutput do
   @spec disable_onlcr() :: :ok
   def disable_onlcr do
     :persistent_term.erase(@onlcr_key)
+    :persistent_term.erase({__MODULE__, :needs_hard_reset})
     :ok
+  rescue
+    _ -> :ok
   end
 
   @doc """
@@ -82,17 +85,37 @@ defmodule TermUI.TerminalOutput do
   """
   @spec write_to_tty(iodata()) :: :ok
   def write_to_tty(data) do
+    alias TermUI.DebugLog, as: D
     binary = IO.iodata_to_binary(data)
 
-    cond do
-      write_to_tty_device(binary) -> :ok
-      write_to_stderr(binary) -> :ok
-      true -> write(data)
+    D.log(
+      "write_to_tty: #{byte_size(binary)} bytes, escape_seqs=#{inspect(binary |> String.replace("\e", "ESC"))}"
+    )
+
+    tty_ok = write_to_tty_device(binary)
+    D.log("  /dev/tty write: #{tty_ok}")
+
+    if tty_ok do
+      :ok
+    else
+      stderr_ok = write_to_stderr(binary)
+      D.log("  stderr write: #{stderr_ok}")
+
+      if stderr_ok do
+        :ok
+      else
+        D.log("  falling back to IO.write")
+        write(data)
+      end
     end
   rescue
-    _ -> :ok
+    e ->
+      TermUI.DebugLog.log("write_to_tty RESCUED: #{inspect(e)}")
+      :ok
   catch
-    _, _ -> :ok
+    kind, reason ->
+      TermUI.DebugLog.log("write_to_tty CAUGHT: #{kind} #{inspect(reason)}")
+      :ok
   end
 
   @doc """
@@ -101,6 +124,11 @@ defmodule TermUI.TerminalOutput do
   This includes all escape sequences needed to restore the terminal to a
   normal state after a TUI session: disable all mouse tracking modes,
   show cursor, reset SGR attributes, and leave alternate screen.
+
+  On ConPTY/WSL environments, individual DEC private mode reset sequences
+  (e.g. `\\e[?1003l`) are silently ignored by ConPTY's VT parser. In these
+  environments, a full RIS (`\\ec` — Reset to Initial State) is appended
+  as the only reliable way to clear mouse tracking state.
   """
   @spec cleanup_sequence() :: binary()
   def cleanup_sequence do
@@ -108,10 +136,48 @@ defmodule TermUI.TerminalOutput do
     # Show cursor (DECTCEM on)
     # Reset SGR attributes
     # Leave alternate screen (no-op if not in alt screen)
-    "\e[?1006l\e[?1003l\e[?1002l\e[?1000l" <>
-      "\e[?25h" <>
-      "\e[0m" <>
-      "\e[?1049l"
+    base =
+      "\e[?1006l\e[?1003l\e[?1002l\e[?1000l" <>
+        "\e[?25h" <>
+        "\e[0m" <>
+        "\e[?1049l"
+
+    if needs_hard_reset?() do
+      # ConPTY ignores individual mouse-off sequences. RIS is the nuclear
+      # option but it's the only thing that works. The screen will be cleared
+      # but the shell redraws its prompt immediately after.
+      base <> "\ec"
+    else
+      base
+    end
+  end
+
+  @doc """
+  Returns true when running under ConPTY/WSL where individual DEC private
+  mode reset sequences for mouse tracking are silently ignored.
+
+  Detection checks for WSL environment variables. This is cached via
+  persistent_term after the first call for efficiency.
+  """
+  @spec needs_hard_reset?() :: boolean()
+  def needs_hard_reset? do
+    key = {__MODULE__, :needs_hard_reset}
+
+    case :persistent_term.get(key, :unset) do
+      :unset ->
+        result = detect_conpty_environment()
+        :persistent_term.put(key, result)
+        result
+
+      cached ->
+        cached
+    end
+  end
+
+  defp detect_conpty_environment do
+    # WSL2 sets these environment variables
+    System.get_env("WSL_DISTRO_NAME") != nil or
+      System.get_env("WSL_INTEROP") != nil
   end
 
   @spec allow_current_process() :: true

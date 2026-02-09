@@ -213,6 +213,42 @@ defmodule TermUI.TerminalOutputTest do
     end
   end
 
+  describe "needs_hard_reset?/0" do
+    test "returns boolean" do
+      assert is_boolean(TerminalOutput.needs_hard_reset?())
+    end
+
+    test "result is cached in persistent_term" do
+      # Call once to populate cache
+      result = TerminalOutput.needs_hard_reset?()
+      # Second call should return same result (from cache)
+      assert TerminalOutput.needs_hard_reset?() == result
+    end
+
+    test "cleanup_sequence includes RIS when hard reset needed" do
+      key = {TerminalOutput, :needs_hard_reset}
+      original = :persistent_term.get(key, :unset)
+
+      on_exit(fn ->
+        if original == :unset do
+          :persistent_term.erase(key)
+        else
+          :persistent_term.put(key, original)
+        end
+      end)
+
+      # Force hard reset ON
+      :persistent_term.put(key, true)
+      seq = TerminalOutput.cleanup_sequence()
+      assert String.ends_with?(seq, "\ec")
+
+      # Force hard reset OFF
+      :persistent_term.put(key, false)
+      seq = TerminalOutput.cleanup_sequence()
+      refute String.contains?(seq, "\ec")
+    end
+  end
+
   describe "write_to_tty/1" do
     test "does not raise on any input" do
       assert :ok = TerminalOutput.write_to_tty("")

@@ -277,9 +277,16 @@ defmodule TermUI.Runtime do
   def init(opts) do
     Process.flag(:trap_exit, true)
 
+    TermUI.DebugLog.clear()
+    TermUI.DebugLog.log("=== Runtime.init START ===")
+
     opts = Config.merge_options(opts)
     init_config = parse_init_options(opts)
     backend_result = init_backend(init_config)
+
+    TermUI.DebugLog.log("  backend_mode", backend_result.backend_mode)
+    TermUI.DebugLog.log("  terminal_started", backend_result.terminal_started)
+    TermUI.DebugLog.log("  stty at init", TermUI.DebugLog.stty_short())
 
     PersistentTerms.store_backend_context(
       backend_result.backend_mode,
@@ -801,21 +808,52 @@ defmodule TermUI.Runtime do
 
   @impl true
   def terminate(_reason, state) do
-    # Each cleanup step is wrapped in safe_cleanup to ensure all steps run.
-    #
-    # ORDERING: Input reader must stop BEFORE backend shutdown because
-    # Raw.shutdown calls drain_pending_input() which reads from stdin.
-    # If the InputReader's io_reader_loop is still running, both compete
-    # for stdin reads, and drain_pending_input may fail to consume
-    # buffered mouse events that would leak as visible text.
+    alias TermUI.DebugLog, as: D
+    D.log("=== Runtime.terminate START ===")
+    D.log("  backend", Map.get(state, :backend))
+    D.log("  backend_mode", Map.get(state, :backend_mode))
+    D.log("  terminal_started", Map.get(state, :terminal_started))
+    D.log("  input_reader", Map.get(state, :input_reader))
+    D.log("  shutting_down", Map.get(state, :shutting_down))
+    D.log("  stty BEFORE", D.stty_short())
+    D.log("  group_leader", Process.group_leader())
+
+    D.log(">> terminate_input_reader")
     safe_cleanup(fn -> terminate_input_reader(state) end)
+    D.log("<< terminate_input_reader done")
+
+    D.log(">> terminate_input_handler")
     safe_cleanup(fn -> terminate_input_handler(state) end)
+    D.log("<< terminate_input_handler done")
+
+    D.log(">> terminate_backend")
     safe_cleanup(fn -> terminate_backend(state) end)
+    D.log("<< terminate_backend done")
+    D.log("  stty AFTER backend", D.stty_short())
+
+    D.log(">> terminate_resize_callback")
     safe_cleanup(fn -> terminate_resize_callback(state) end)
+    D.log("<< terminate_resize_callback done")
+
+    D.log(">> terminate_shutdown")
     safe_cleanup(fn -> terminate_shutdown(state) end)
+    D.log("<< terminate_shutdown done")
+
+    D.log(">> terminate_legacy_restore")
     safe_cleanup(fn -> terminate_legacy_restore(state) end)
+    D.log("<< terminate_legacy_restore done")
+    D.log("  stty AFTER legacy_restore", D.stty_short())
+
+    D.log(">> terminate_defensive_cleanup")
     safe_cleanup(fn -> terminate_defensive_cleanup() end)
+    D.log("<< terminate_defensive_cleanup done")
+    D.log("  stty AFTER defensive", D.stty_short())
+
+    D.log(">> terminate_persistent_terms")
     safe_cleanup(fn -> terminate_persistent_terms() end)
+    D.log("<< terminate_persistent_terms done")
+
+    D.log("=== Runtime.terminate END ===")
     :ok
   end
 
@@ -856,17 +894,15 @@ defmodule TermUI.Runtime do
   defp terminate_legacy_restore(_state), do: :ok
 
   defp terminate_defensive_cleanup do
-    # Write the full cleanup sequence directly to /dev/tty, bypassing the
-    # Erlang IO system which may be disrupted after cooked mode transition.
-    # This is the last-resort safety net that guarantees mouse-off and
-    # cursor-show reach the actual terminal device.
+    alias TermUI.DebugLog, as: D
+    D.log("  defensive: write_to_tty cleanup_sequence")
     TermUI.TerminalOutput.write_to_tty(TermUI.TerminalOutput.cleanup_sequence())
-    # Disable ONLCR now that we're leaving raw mode
+    D.log("  defensive: disable_onlcr")
     TermUI.TerminalOutput.disable_onlcr()
-    # Final safety net: ensure the kernel terminal driver has sane settings.
-    # This fixes line breaks (OPOST/ONLCR) if stty wasn't properly restored
-    # by earlier cleanup steps (e.g., ensure_cooked_mode overriding restoration).
-    _ = TermUI.TermUtils.safe_stty(["sane"])
+    D.log("  defensive: stty sane")
+    sane_result = TermUI.TermUtils.safe_stty(["sane"])
+    D.log("  defensive: stty sane result", sane_result)
+    D.log("  defensive: stty AFTER sane", D.stty_short())
   end
 
   defp terminate_persistent_terms do

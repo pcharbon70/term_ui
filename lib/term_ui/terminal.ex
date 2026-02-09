@@ -483,31 +483,39 @@ defmodule TermUI.Terminal do
   end
 
   defp do_disable_raw_mode(original_settings) do
-    # First try to restore original settings if we have them. If restoration
-    # fails (missing tty, invalid settings, etc.) fall back to `stty sane`
-    # so we at least restore newline handling and canonical output.
+    alias TermUI.DebugLog, as: D
+
+    D.log(
+      "  do_disable_raw_mode: original_settings=#{inspect(is_binary(original_settings) and original_settings != "")}"
+    )
+
     restore_result =
       if is_binary(original_settings) and original_settings != "" do
-        restore_terminal_settings(original_settings)
+        D.log("  restoring original stty settings (#{byte_size(original_settings)} bytes)")
+        result = restore_terminal_settings(original_settings)
+        D.log("  restore_terminal_settings result", result)
+        result
       else
+        D.log("  no original settings to restore")
         {:error, :no_original_settings}
       end
 
     if match?({:error, _}, restore_result) do
-      _ = restore_stty_sane()
+      D.log("  falling back to stty sane")
+      sane_result = restore_stty_sane()
+      D.log("  stty sane result", sane_result)
     end
 
-    # Note: ESC c (full terminal reset / RIS) was intentionally removed.
-    # Specific cleanup sequences (mouse-off, cursor-show, leave-alt-screen,
-    # SGR reset) are already written in do_restore phases 1-2. ESC c is too
-    # heavy-handed: it resets ALL terminal state and on ConPTY/Windows Terminal
-    # can have inconsistent behavior, potentially interfering with the shell
-    # session that takes over after the TUI exits.
+    D.log("  stty AFTER do_disable_raw_mode", D.stty_short())
     :ok
   rescue
-    _ -> :ok
+    e ->
+      TermUI.DebugLog.log("  do_disable_raw_mode RESCUED: #{inspect(e)}")
+      :ok
   catch
-    _, _ -> :ok
+    kind, reason ->
+      TermUI.DebugLog.log("  do_disable_raw_mode CAUGHT: #{kind} #{inspect(reason)}")
+      :ok
   end
 
   defp restore_terminal_settings(settings) do
@@ -533,12 +541,21 @@ defmodule TermUI.Terminal do
   end
 
   defp do_restore(state) do
+    alias TermUI.DebugLog, as: D
+    D.log("=== Terminal.do_restore START ===")
+    D.log("  raw_mode_active", state.raw_mode_active)
+    D.log("  cursor_visible", state.cursor_visible)
+    D.log("  alternate_screen_active", state.alternate_screen_active)
+    D.log("  original_settings present?", is_binary(state.original_settings))
+    D.log("  stty BEFORE", D.stty_short())
+
     # Phase 1: Write cleanup directly to /dev/tty FIRST (most reliable path).
-    # This bypasses the Erlang IO system entirely, guaranteeing mouse-off and
-    # cursor-show reach the terminal even if the group leader is disrupted.
+    D.log("Phase 1: write_to_tty cleanup_sequence")
     TerminalOutput.write_to_tty(TerminalOutput.cleanup_sequence())
+    D.log("  done")
 
     # Phase 2: Write cleanup via Erlang IO as backup.
+    D.log("Phase 2: IO.write backup")
     write_to_terminal(@all_mouse_off)
 
     if not state.cursor_visible do
@@ -550,39 +567,53 @@ defmodule TermUI.Terminal do
     end
 
     write_to_terminal(ANSI.reset())
+    D.log("  done")
 
     # Phase 3: Transition Erlang IO to cooked mode BEFORE stty restoration.
-    # ensure_cooked_mode may apply its own stty settings, so we call it first
-    # then override with the original settings in Phase 4.
+    D.log("Phase 3: ensure_cooked_mode")
+    D.log("  stty BEFORE cooked", D.stty_short())
     ensure_cooked_mode()
+    D.log("  stty AFTER cooked", D.stty_short())
 
     # Phase 4: Restore kernel terminal settings AFTER cooked mode transition.
-    # This ensures our stty restoration has the final say over terminal settings,
-    # not the cooked mode transition which may set different values.
     if state.raw_mode_active do
+      D.log("Phase 4: do_disable_raw_mode")
       do_disable_raw_mode(state.original_settings)
+      D.log("  stty AFTER disable_raw", D.stty_short())
+    else
+      D.log("Phase 4: SKIPPED (not raw_mode_active)")
     end
 
     # Phase 5: Disable ONLCR (no longer needed outside raw mode)
+    D.log("Phase 5: disable_onlcr")
     TerminalOutput.disable_onlcr()
 
     if :ets.whereis(@ets_table) != :undefined do
       :ets.insert(@ets_table, {:raw_mode_active, false})
     end
 
+    D.log("=== Terminal.do_restore END ===")
     State.new()
   end
 
   defp ensure_cooked_mode do
-    case :erlang.apply(:shell, :start_interactive, [{:noshell, :cooked}]) do
-      :ok -> :ok
-      {:error, _reason} -> :ok
-    end
+    alias TermUI.DebugLog, as: D
+    D.log("  ensure_cooked_mode: calling :shell.start_interactive({:noshell, :cooked})")
+    result = :erlang.apply(:shell, :start_interactive, [{:noshell, :cooked}])
+    D.log("  ensure_cooked_mode result", result)
+    result
   rescue
-    _e in UndefinedFunctionError -> :ok
-    _ -> :ok
+    _e in UndefinedFunctionError ->
+      TermUI.DebugLog.log("  ensure_cooked_mode: UndefinedFunctionError")
+      :ok
+
+    e ->
+      TermUI.DebugLog.log("  ensure_cooked_mode RESCUED: #{inspect(e)}")
+      :ok
   catch
-    _, _ -> :ok
+    kind, reason ->
+      TermUI.DebugLog.log("  ensure_cooked_mode CAUGHT: #{kind} #{inspect(reason)}")
+      :ok
   end
 
   defp disable_current_mouse_mode(mode) do
