@@ -1490,12 +1490,12 @@ defmodule TermUI.Backend.Raw do
   # Sets stty to non-blocking, reads and discards pending bytes, then restores.
   defp drain_pending_input do
     # Set non-blocking read: min 0 chars, timeout 0.1s
-    TermUtils.safe_stty(["min", "0", "time", "1"])
+    _ = TermUtils.safe_stty(["min", "0", "time", "1"])
 
     drain_input_loop(0, 20)
 
     # Restore blocking read
-    TermUtils.safe_stty(["min", "1", "time", "0"])
+    _ = TermUtils.safe_stty(["min", "1", "time", "0"])
   rescue
     _ -> :ok
   end

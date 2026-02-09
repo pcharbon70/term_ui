@@ -303,10 +303,10 @@ defmodule TermUI.Runtime do
     # Suppress default Logger handler to prevent bare \n writes to stdout
     # during raw mode (Logger output corrupts TUI rendering)
     logger_handler_config =
-      if not Keyword.get(opts, :skip_terminal, false) do
-        suppress_logger()
-      else
+      if Keyword.get(opts, :skip_terminal, false) do
         nil
+      else
+        suppress_logger()
       end
 
     {backend_mode, backend, backend_state, capabilities, terminal_started, buffer_manager,
@@ -804,7 +804,7 @@ defmodule TermUI.Runtime do
   defp suppress_logger do
     case :logger.get_handler_config(:default) do
       {:ok, config} ->
-        :logger.remove_handler(:default)
+        _ = :logger.remove_handler(:default)
         :persistent_term.put(:term_ui_logger_handler_config, config)
         config
 
@@ -824,7 +824,8 @@ defmodule TermUI.Runtime do
         :ok
 
       _ ->
-        :logger.add_handler(:default, module, config)
+        _ = :logger.add_handler(:default, module, config)
+        :ok
     end
 
     :persistent_term.erase(:term_ui_logger_handler_config)

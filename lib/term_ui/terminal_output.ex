@@ -65,7 +65,7 @@ defmodule TermUI.TerminalOutput do
     _, _ -> :ok
   end
 
-  @spec cleanup_sequence() :: binary()
+  @spec cleanup_sequence() :: String.t()
   def cleanup_sequence do
     base =
       "\e[?1006l\e[?1003l\e[?1002l\e[?1000l" <>
@@ -139,7 +139,7 @@ defmodule TermUI.TerminalOutput do
     case :file.open(@tty_path, [:write, :raw]) do
       {:ok, fd} ->
         result = :file.write(fd, binary)
-        :file.close(fd)
+        _ = :file.close(fd)
         result == :ok
 
       {:error, _} ->
