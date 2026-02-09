@@ -33,7 +33,8 @@ defmodule TermUI.Widget.Progress do
   alias TermUI.Renderer.Style
 
   # Dialyzer: Suppress opaque type warnings for Style helpers
-  @dialyzer {:nowarn_function, build_style: 1, positioned_cell_safe: 4}
+  # no_opaque: Style contains MapSet which triggers false positive call_without_opaque warnings
+  @dialyzer [:no_opaque, nowarn_function: [build_style: 1, positioned_cell_safe: 4]]
 
   @spinner_frames ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
 

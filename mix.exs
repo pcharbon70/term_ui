@@ -25,8 +25,8 @@ defmodule TermUI.MixProject do
       test_coverage: [tool: ExCoveralls],
 
       # Dialyzer
-      # Note: unknown_type warnings for Event.ex are false positives from nested module types
-      # Note: call_without_opaque warnings are due to MapSet nested in opaque Style type
+      # Note: call_without_opaque warnings suppressed with :no_opaque in widget modules
+      # due to MapSet nested in opaque Style type
       dialyzer: [
         flags: [
           :error_handling,
