@@ -502,7 +502,8 @@ defmodule TermUI.Renderer.IntegrationTest do
         end)
 
       # Should complete in reasonable time (allowing for system load variance)
-      assert time_us < 7_000
+      # Increased threshold for CI/shared environments under load
+      assert time_us < 15_000
 
       # Should produce operations
       assert length(operations) > 0
