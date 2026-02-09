@@ -41,6 +41,7 @@ defmodule TermUI.Runtime do
   alias TermUI.Runtime.State
   alias TermUI.Terminal
   alias TermUI.Terminal.InputReader
+  alias TermUI.TerminalOutput
 
   # Dialyzer: Functions with unmatched return values in side-effect calls
   @dialyzer {:nowarn_function,
@@ -55,7 +56,6 @@ defmodule TermUI.Runtime do
              cleanup_backend: 1,
              cleanup_shutdown: 1,
              cleanup_terminal_restore: 1,
-             cleanup_mouse_tracking: 0,
              cleanup_persistent_terms: 0,
              ensure_echo_enabled: 0,
              render_with_buffer_manager: 2,
@@ -300,6 +300,15 @@ defmodule TermUI.Runtime do
     root_module = Keyword.fetch!(opts, :root)
     render_interval = Keyword.get(opts, :render_interval, @default_render_interval)
 
+    # Suppress default Logger handler to prevent bare \n writes to stdout
+    # during raw mode (Logger output corrupts TUI rendering)
+    logger_handler_config =
+      if not Keyword.get(opts, :skip_terminal, false) do
+        suppress_logger()
+      else
+        nil
+      end
+
     {backend_mode, backend, backend_state, capabilities, terminal_started, buffer_manager,
      dimensions} =
       init_backend(opts)
@@ -331,7 +340,8 @@ defmodule TermUI.Runtime do
         backend_state: backend_state,
         capabilities: capabilities,
         input_handler: input_handler,
-        input_state: input_state
+        input_state: input_state,
+        logger_handler_config: logger_handler_config
       })
 
     # Schedule first render
@@ -415,7 +425,8 @@ defmodule TermUI.Runtime do
       backend_state: params.backend_state,
       capabilities: params.capabilities,
       input_handler: params.input_handler,
-      input_state: params.input_state
+      input_state: params.input_state,
+      logger_handler_config: params[:logger_handler_config]
     }
   end
 
@@ -445,6 +456,9 @@ defmodule TermUI.Runtime do
 
   defp init_raw_backend(buffer_manager, {cols, rows}) do
     backend = TermUI.Backend.Raw
+
+    # Enable ONLCR translation (bare \n → \r\n) since raw mode disables OPOST
+    TerminalOutput.enable_onlcr()
 
     {:ok, backend_state} =
       backend.init(
@@ -678,16 +692,25 @@ defmodule TermUI.Runtime do
 
   @impl true
   def terminate(_reason, state) do
-    # Wrap all cleanup in try/rescue to ensure we attempt all cleanup steps
-    # even if some fail
+    # Step 1: Restore logger FIRST (before any other cleanup that might log)
+    terminate_logger_restore(state)
 
+    # Step 2: Stop input reader BEFORE backend (prevents stdin contention during drain)
     cleanup_input_reader(state)
     cleanup_input_handler(state)
-    cleanup_resize_callback(state)
+
+    # Step 3: Backend shutdown (drain pending input, cooked mode)
     cleanup_backend(state)
+
+    # Step 4: Terminal restore and resize callback cleanup
+    cleanup_resize_callback(state)
     cleanup_shutdown(state)
     cleanup_terminal_restore(state)
-    cleanup_mouse_tracking()
+
+    # Step 5: Defensive cleanup (catches anything missed above)
+    terminate_defensive_cleanup()
+
+    # Step 6: Persistent terms and echo
     cleanup_persistent_terms()
     ensure_echo_enabled()
 
@@ -735,16 +758,9 @@ defmodule TermUI.Runtime do
   end
 
   defp cleanup_terminal_restore(state) do
-    if state.terminal_started and state.backend == nil do
+    if state.terminal_started do
       Terminal.restore()
     end
-  rescue
-    _ -> :ok
-  end
-
-  defp cleanup_mouse_tracking do
-    IO.write("\e[?1006l\e[?1003l\e[?1002l\e[?1000l")
-    IO.write("\e[?25h")
   rescue
     _ -> :ok
   end
@@ -757,6 +773,73 @@ defmodule TermUI.Runtime do
 
   defp ensure_echo_enabled do
     :io.setopts(echo: true)
+  rescue
+    _ -> :ok
+  end
+
+  defp terminate_logger_restore(state) do
+    restore_logger(state.logger_handler_config)
+  rescue
+    _ -> :ok
+  end
+
+  defp terminate_defensive_cleanup do
+    # Crash-safe logger restore from persistent_term
+    restore_logger_from_persistent_term()
+
+    # Direct-to-TTY cleanup (bypasses Erlang IO)
+    TerminalOutput.write_to_tty(TerminalOutput.cleanup_sequence())
+
+    # Cleanup ONLCR persistent_term
+    TerminalOutput.disable_onlcr()
+
+    # Safety net stty restore (skip on WSL where stty always fails)
+    unless TerminalOutput.needs_hard_reset?() do
+      TermUI.TermUtils.safe_stty(["sane"])
+    end
+  rescue
+    _ -> :ok
+  end
+
+  defp suppress_logger do
+    case :logger.get_handler_config(:default) do
+      {:ok, config} ->
+        :logger.remove_handler(:default)
+        :persistent_term.put(:term_ui_logger_handler_config, config)
+        config
+
+      _ ->
+        nil
+    end
+  rescue
+    _ -> nil
+  end
+
+  defp restore_logger(nil), do: :ok
+
+  defp restore_logger(%{module: module} = config) do
+    # Only add if not already present (idempotent)
+    case :logger.get_handler_config(:default) do
+      {:ok, _} ->
+        :ok
+
+      _ ->
+        :logger.add_handler(:default, module, config)
+    end
+
+    :persistent_term.erase(:term_ui_logger_handler_config)
+    :ok
+  rescue
+    _ -> :ok
+  end
+
+  defp restore_logger(_), do: :ok
+
+  defp restore_logger_from_persistent_term do
+    case :persistent_term.get(:term_ui_logger_handler_config, nil) do
+      nil -> :ok
+      config -> restore_logger(config)
+    end
   rescue
     _ -> :ok
   end
@@ -1132,8 +1215,8 @@ defmodule TermUI.Runtime do
   defp find_previous_cells_to_clear(current_row, previous_row, row) do
     previous_row
     |> Enum.with_index(1)
-    |> Enum.filter(fn {cell, _col} ->
-      displayable_cell?(cell) and needs_clearing?(cell, current_row)
+    |> Enum.filter(fn {prev_cell, col} ->
+      displayable_cell?(prev_cell) and needs_clearing_at?(col, prev_cell, current_row)
     end)
     |> Enum.map(fn {_prev_cell, col} ->
       # Send a clear cell (space with default styling)
@@ -1145,8 +1228,7 @@ defmodule TermUI.Runtime do
     cell.char != " " or (cell.bg != nil and cell.bg != :default)
   end
 
-  defp needs_clearing?(prev_cell, current_row) do
-    col = find_cell_column(prev_cell, current_row)
+  defp needs_clearing_at?(col, prev_cell, current_row) do
     current_cell = Enum.at(current_row, col - 1, Cell.empty())
     not Cell.equal?(current_cell, prev_cell) and empty_cell?(current_cell)
   end
@@ -1154,10 +1236,6 @@ defmodule TermUI.Runtime do
   defp empty_cell?(%Cell{} = cell) do
     cell.char == " " and cell.bg == :default and cell.fg == :default and
       MapSet.size(cell.attrs) == 0
-  end
-
-  defp find_cell_column(cell, row) do
-    Enum.find_index(row, fn c -> c == cell end) + 1
   end
 
   # Converts a Cell struct to the backend format: {{row, col}, {char, fg, bg, attrs}}
