@@ -3,7 +3,8 @@ defmodule TermUI.TerminalOutput do
 
   @suppress_key :suppress_terminal_output
   @allow_key :term_ui_allow_terminal_output
-  @onlcr_key :term_ui_onlcr_active
+  @onlcr_key {__MODULE__, :onlcr_active}
+  @tty_path ~c"/dev/tty"
 
   @spec write(iodata()) :: :ok
   def write(data) do
@@ -17,8 +18,7 @@ defmodule TermUI.TerminalOutput do
   end
 
   @doc """
-  Enables ONLCR (output newline to carriage-return + linefeed) translation
-  for the current process.
+  Enables ONLCR (output newline to carriage-return + linefeed) translation.
 
   In OTP 28 raw mode, both prim_tty and stty disable OPOST, meaning bare
   `\\n` is written as LF only (no CR). This causes "staircase" rendering
@@ -28,28 +28,31 @@ defmodule TermUI.TerminalOutput do
 
   This is safe because `\\n` (0x0A) never appears inside well-formed CSI
   escape sequences (parameter bytes are 0x30-0x3F, intermediates 0x20-0x2F).
+
+  This flag is process-independent (VM-global), so it applies consistently
+  across runtime, terminal, and helper processes.
   """
   @spec enable_onlcr() :: :ok
   def enable_onlcr do
-    Process.put(@onlcr_key, true)
+    :persistent_term.put(@onlcr_key, true)
     :ok
   end
 
   @doc """
-  Disables ONLCR translation for the current process.
+  Disables ONLCR translation.
   """
   @spec disable_onlcr() :: :ok
   def disable_onlcr do
-    Process.delete(@onlcr_key)
+    :persistent_term.erase(@onlcr_key)
     :ok
   end
 
   @doc """
-  Returns whether ONLCR translation is active for the current process.
+  Returns whether ONLCR translation is active.
   """
   @spec onlcr?() :: boolean()
   def onlcr? do
-    Process.get(@onlcr_key, false) == true
+    :persistent_term.get(@onlcr_key, false) == true
   end
 
   @spec enabled?() :: boolean()
@@ -59,6 +62,56 @@ defmodule TermUI.TerminalOutput do
     else
       true
     end
+  end
+
+  @doc """
+  Writes data directly to the terminal device, bypassing the Erlang IO
+  system's group leader routing.
+
+  This is essential for terminal cleanup during shutdown because
+  `:shell.start_interactive({:noshell, :cooked})` may reconfigure or replace
+  the IO handler process that the group leader points to. After that
+  transition, `IO.write` through the group leader silently fails (errors
+  caught by rescue), and critical cleanup sequences (mouse-off, cursor-show)
+  never reach the actual terminal.
+
+  Write path (first success wins):
+  1. Raw file write to `/dev/tty` — most reliable on Unix
+  2. `IO.write(:standard_error, ...)` — bypasses group leader, writes to fd 2
+  3. `IO.write(data)` via group leader — least reliable during shutdown
+  """
+  @spec write_to_tty(iodata()) :: :ok
+  def write_to_tty(data) do
+    binary = IO.iodata_to_binary(data)
+
+    cond do
+      write_to_tty_device(binary) -> :ok
+      write_to_stderr(binary) -> :ok
+      true -> write(data)
+    end
+  rescue
+    _ -> :ok
+  catch
+    _, _ -> :ok
+  end
+
+  @doc """
+  Returns the comprehensive terminal cleanup sequence as a single binary.
+
+  This includes all escape sequences needed to restore the terminal to a
+  normal state after a TUI session: disable all mouse tracking modes,
+  show cursor, reset SGR attributes, and leave alternate screen.
+  """
+  @spec cleanup_sequence() :: binary()
+  def cleanup_sequence do
+    # Disable ALL mouse tracking modes (defensive — covers any mode that was enabled)
+    # Show cursor (DECTCEM on)
+    # Reset SGR attributes
+    # Leave alternate screen (no-op if not in alt screen)
+    "\e[?1006l\e[?1003l\e[?1002l\e[?1000l" <>
+      "\e[?25h" <>
+      "\e[0m" <>
+      "\e[?1049l"
   end
 
   @spec allow_current_process() :: true
@@ -75,7 +128,7 @@ defmodule TermUI.TerminalOutput do
   # Avoids double-translation: \r\n is left unchanged.
   @spec maybe_translate_newlines(iodata()) :: iodata()
   defp maybe_translate_newlines(data) do
-    if Process.get(@onlcr_key, false) do
+    if onlcr?() do
       translate_lf(data)
     else
       data
@@ -108,6 +161,33 @@ defmodule TermUI.TerminalOutput do
 
   defp translate_lf(data) when is_integer(data) do
     if data == ?\n, do: "\r\n", else: data
+  end
+
+  # Writes directly to /dev/tty using raw file I/O, bypassing the Erlang IO
+  # server protocol entirely. This is the most direct path to the terminal.
+  @spec write_to_tty_device(binary()) :: boolean()
+  defp write_to_tty_device(binary) do
+    case :file.open(@tty_path, [:write, :raw]) do
+      {:ok, fd} ->
+        result = :file.write(fd, binary)
+        :file.close(fd)
+        result == :ok
+
+      {:error, _} ->
+        false
+    end
+  rescue
+    _ -> false
+  end
+
+  # Writes to :standard_error, which bypasses the group leader and writes
+  # directly to fd 2. On terminals, stderr goes to the same pty as stdout.
+  @spec write_to_stderr(binary()) :: boolean()
+  defp write_to_stderr(binary) do
+    IO.write(:standard_error, binary)
+    true
+  rescue
+    _ -> false
   end
 
   defp standard_io_group_leader? do

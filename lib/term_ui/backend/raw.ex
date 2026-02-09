@@ -360,28 +360,31 @@ defmodule TermUI.Backend.Raw do
   """
   @spec shutdown(t()) :: :ok
   def shutdown(state) do
-    # Disable mouse tracking if it was enabled
-    # Use defensive cleanup - disable ALL modes regardless of state
+    # --- Phase 1: Direct-to-TTY cleanup FIRST (guaranteed delivery) ---
+    # Write the full cleanup sequence directly to /dev/tty, bypassing the
+    # Erlang IO system entirely. This is the most reliable path and must
+    # happen before any mode transitions that could disrupt IO routing.
+    TerminalOutput.write_to_tty(TerminalOutput.cleanup_sequence())
+
+    # --- Phase 2: Write cleanup via Erlang IO as backup ---
+    # These writes go through the group leader and may fail during shutdown,
+    # but serve as a redundant safety net.
     safe_write(@all_mouse_off)
-
-    # Drain any pending input to prevent buffered mouse events from
-    # leaking as visible text when returning to normal mode.
-    # Must happen AFTER mouse tracking is disabled but BEFORE leaving
-    # alternate screen, so events generated in alt screen are consumed.
-    drain_pending_input()
-
-    # Show cursor (always, even if state says visible - defensive)
     safe_write(ANSI.cursor_show())
-
-    # Reset all text attributes
     safe_write(ANSI.reset())
 
-    # Leave alternate screen if it was entered
     if state.alternate_screen do
       safe_write(ANSI.leave_alternate_screen())
     end
 
-    # Return to cooked mode
+    # --- Phase 3: Drain pending input ---
+    # After mouse-off has been sent (Phase 1+2), drain any buffered mouse
+    # events to prevent them from appearing as garbage text in the shell.
+    # NOTE: The InputReader must be stopped before this is called (done by
+    # Runtime.terminate ordering) to avoid stdin read contention.
+    drain_pending_input()
+
+    # --- Phase 4: Cooked mode transition (may disrupt IO system) ---
     safe_cooked_mode()
 
     :ok

@@ -801,11 +801,17 @@ defmodule TermUI.Runtime do
 
   @impl true
   def terminate(_reason, state) do
-    # Each cleanup step is wrapped in safe_cleanup to ensure all steps run
+    # Each cleanup step is wrapped in safe_cleanup to ensure all steps run.
+    #
+    # ORDERING: Input reader must stop BEFORE backend shutdown because
+    # Raw.shutdown calls drain_pending_input() which reads from stdin.
+    # If the InputReader's io_reader_loop is still running, both compete
+    # for stdin reads, and drain_pending_input may fail to consume
+    # buffered mouse events that would leak as visible text.
     safe_cleanup(fn -> terminate_input_reader(state) end)
     safe_cleanup(fn -> terminate_input_handler(state) end)
-    safe_cleanup(fn -> terminate_resize_callback(state) end)
     safe_cleanup(fn -> terminate_backend(state) end)
+    safe_cleanup(fn -> terminate_resize_callback(state) end)
     safe_cleanup(fn -> terminate_shutdown(state) end)
     safe_cleanup(fn -> terminate_legacy_restore(state) end)
     safe_cleanup(fn -> terminate_defensive_cleanup() end)
@@ -817,6 +823,8 @@ defmodule TermUI.Runtime do
     fun.()
   rescue
     _ -> :ok
+  catch
+    _, _ -> :ok
   end
 
   defp terminate_input_reader(%{input_reader: nil}), do: :ok
@@ -841,21 +849,24 @@ defmodule TermUI.Runtime do
   defp terminate_shutdown(state), do: do_shutdown(state)
 
   # Always restore terminal state when terminal was started, regardless of backend.
-  # Previously this only called Terminal.restore() when backend was nil, which meant
-  # the Raw backend never got stty settings restored (echo, signals, OPOST).
-  defp terminate_legacy_restore(%{terminal_started: true}) do
-    if Process.whereis(Terminal) do
-      Terminal.restore()
-    end
-  end
+  # Use safe_restore_terminal/1 to avoid terminate-time failures if the Terminal
+  # process races down between whereis and restore call.
+  defp terminate_legacy_restore(%{terminal_started: true}), do: safe_restore_terminal(Terminal)
 
   defp terminate_legacy_restore(_state), do: :ok
 
   defp terminate_defensive_cleanup do
-    TermUI.TerminalOutput.write("\e[?1006l\e[?1003l\e[?1002l\e[?1000l")
-    TermUI.TerminalOutput.write("\e[?25h")
+    # Write the full cleanup sequence directly to /dev/tty, bypassing the
+    # Erlang IO system which may be disrupted after cooked mode transition.
+    # This is the last-resort safety net that guarantees mouse-off and
+    # cursor-show reach the actual terminal device.
+    TermUI.TerminalOutput.write_to_tty(TermUI.TerminalOutput.cleanup_sequence())
     # Disable ONLCR now that we're leaving raw mode
     TermUI.TerminalOutput.disable_onlcr()
+    # Final safety net: ensure the kernel terminal driver has sane settings.
+    # This fixes line breaks (OPOST/ONLCR) if stty wasn't properly restored
+    # by earlier cleanup steps (e.g., ensure_cooked_mode overriding restoration).
+    _ = TermUI.TermUtils.safe_stty(["sane"])
   end
 
   defp terminate_persistent_terms do

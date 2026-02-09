@@ -367,20 +367,11 @@ defmodule TermUI.App do
     Runtime.shutdown(pid)
   end
 
-  # Private helper to ensure terminal cleanup on crash
+  # Private helper to ensure terminal cleanup on crash.
+  # Uses direct /dev/tty write to bypass the Erlang IO system which may
+  # be in an inconsistent state after a crash.
   defp ensure_terminal_cleanup do
-    # Try to restore terminal via direct escape sequences
-    # This ensures cleanup even if Runtime GenServer is dead
-    # Disable mouse tracking
-    TermUI.TerminalOutput.write("\e[?1006l\e[?1003l\e[?1002l\e[?1000l")
-    # Show cursor
-    TermUI.TerminalOutput.write("\e[?25h")
-    # Reset colors
-    TermUI.TerminalOutput.write("\e[0m")
-    # Clear screen
-    TermUI.TerminalOutput.write("\e[2J")
-    # Move cursor to home
-    TermUI.TerminalOutput.write("\e[H")
+    TermUI.TerminalOutput.write_to_tty(TermUI.TerminalOutput.cleanup_sequence())
     :ok
   rescue
     _ -> :error

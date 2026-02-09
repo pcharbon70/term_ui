@@ -497,8 +497,12 @@ defmodule TermUI.Terminal do
       _ = restore_stty_sane()
     end
 
-    # Always write reset sequence as final cleanup
-    write_to_terminal(@reset_terminal)
+    # Note: ESC c (full terminal reset / RIS) was intentionally removed.
+    # Specific cleanup sequences (mouse-off, cursor-show, leave-alt-screen,
+    # SGR reset) are already written in do_restore phases 1-2. ESC c is too
+    # heavy-handed: it resets ALL terminal state and on ConPTY/Windows Terminal
+    # can have inconsistent behavior, potentially interfering with the shell
+    # session that takes over after the TUI exits.
     :ok
   rescue
     _ -> :ok
@@ -529,8 +533,12 @@ defmodule TermUI.Terminal do
   end
 
   defp do_restore(state) do
-    # Always disable ALL mouse tracking modes defensively
-    # This ensures cleanup even if state is inconsistent
+    # Phase 1: Write cleanup directly to /dev/tty FIRST (most reliable path).
+    # This bypasses the Erlang IO system entirely, guaranteeing mouse-off and
+    # cursor-show reach the terminal even if the group leader is disrupted.
+    TerminalOutput.write_to_tty(TerminalOutput.cleanup_sequence())
+
+    # Phase 2: Write cleanup via Erlang IO as backup.
     write_to_terminal(@all_mouse_off)
 
     if not state.cursor_visible do
@@ -541,14 +549,22 @@ defmodule TermUI.Terminal do
       write_to_terminal(ANSI.leave_alternate_screen())
     end
 
+    write_to_terminal(ANSI.reset())
+
+    # Phase 3: Transition Erlang IO to cooked mode BEFORE stty restoration.
+    # ensure_cooked_mode may apply its own stty settings, so we call it first
+    # then override with the original settings in Phase 4.
+    ensure_cooked_mode()
+
+    # Phase 4: Restore kernel terminal settings AFTER cooked mode transition.
+    # This ensures our stty restoration has the final say over terminal settings,
+    # not the cooked mode transition which may set different values.
     if state.raw_mode_active do
       do_disable_raw_mode(state.original_settings)
     end
 
-    ensure_cooked_mode()
-
-    # Reset terminal attributes (colors, styles)
-    write_to_terminal(ANSI.reset())
+    # Phase 5: Disable ONLCR (no longer needed outside raw mode)
+    TerminalOutput.disable_onlcr()
 
     if :ets.whereis(@ets_table) != :undefined do
       :ets.insert(@ets_table, {:raw_mode_active, false})

@@ -103,11 +103,9 @@ defmodule TermUI.TermUtils do
   """
   @spec safe_stty([binary()], options()) :: result()
   def safe_stty(args, opts \\ []) do
-    args = maybe_prefix_stty_tty(args)
-
     case validate_stty_args(args) do
       :ok ->
-        safe_command("stty", args, opts)
+        run_stty_command(args, opts)
 
       {:error, _} = error ->
         error
@@ -424,16 +422,30 @@ defmodule TermUI.TermUtils do
       String.contains?(output, "rows") or String.contains?(output, "columns")
   end
 
-  defp maybe_prefix_stty_tty(args) do
-    cond do
-      Enum.any?(args, &(&1 in ["-F", "-f"])) ->
-        args
+  defp run_stty_command(args, opts) do
+    # Respect explicit -F/-f from callers (validated to /dev/tty only).
+    if Enum.any?(args, &(&1 in ["-F", "-f"])) do
+      safe_command("stty", args, opts)
+    else
+      prefixed_args =
+        if tty_accessible?() do
+          [stty_file_flag(), @tty_path | args]
+        else
+          args
+        end
 
-      File.exists?(@tty_path) ->
-        [stty_file_flag(), @tty_path | args]
+      case safe_command("stty", prefixed_args, opts) do
+        {:ok, _} = ok ->
+          ok
 
-      true ->
-        args
+        {:error, _reason} when prefixed_args != args ->
+          # Some environments expose /dev/tty but still reject -F/-f access.
+          # Retry without explicit tty path before giving up.
+          safe_command("stty", args, opts)
+
+        {:error, _reason} = error ->
+          error
+      end
     end
   end
 
@@ -447,6 +459,21 @@ defmodule TermUI.TermUtils do
     case :os.type() do
       {:unix, os} when os in [:darwin, :freebsd, :openbsd, :netbsd, :dragonfly] -> "-f"
       _ -> "-F"
+    end
+  end
+
+  defp tty_accessible? do
+    if File.exists?(@tty_path) do
+      case File.open(@tty_path, [:read, :write]) do
+        {:ok, io_device} ->
+          File.close(io_device)
+          true
+
+        {:error, _reason} ->
+          false
+      end
+    else
+      false
     end
   end
 

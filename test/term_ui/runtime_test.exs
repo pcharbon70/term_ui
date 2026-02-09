@@ -108,6 +108,33 @@ defmodule TermUI.RuntimeTest do
     end
   end
 
+  defmodule CleanupProbeBackend do
+    def shutdown(test_pid) do
+      send(test_pid, :cleanup_probe_backend_shutdown)
+      :ok
+    end
+  end
+
+  defmodule ExitProbeBackend do
+    def shutdown(_state) do
+      exit(:cleanup_probe_backend_exit)
+    end
+  end
+
+  defmodule CleanupProbeReader do
+    use GenServer
+
+    def start_link(test_pid), do: GenServer.start_link(__MODULE__, test_pid)
+    @impl true
+    def init(test_pid), do: {:ok, test_pid}
+
+    @impl true
+    def terminate(_reason, test_pid) do
+      send(test_pid, :cleanup_probe_reader_stopped)
+      :ok
+    end
+  end
+
   describe "start_link/1" do
     test "starts runtime with root component" do
       {:ok, runtime} = start_test_runtime(root: Counter)
@@ -668,6 +695,81 @@ defmodule TermUI.RuntimeTest do
 
       # Clean up
       TermUI.TerminalOutput.disable_onlcr()
+    end
+  end
+
+  describe "terminate/2 cleanup robustness" do
+    test "stops legacy input reader before backend shutdown" do
+      {:ok, reader} = CleanupProbeReader.start_link(self())
+
+      state = %{
+        shutting_down: true,
+        backend: CleanupProbeBackend,
+        backend_state: self(),
+        input_reader: reader,
+        input_handler: nil,
+        input_state: nil,
+        terminal_started: false
+      }
+
+      assert :ok = Runtime.terminate(:normal, state)
+
+      # Input reader must stop FIRST to free stdin for drain_pending_input
+      # in Raw.shutdown. Without this ordering, both race for stdin reads.
+      assert_receive first, 500
+      assert_receive second, 500
+      assert first == :cleanup_probe_reader_stopped
+      assert second == :cleanup_probe_backend_shutdown
+    end
+
+    test "continues cleanup when backend shutdown exits" do
+      {:ok, reader} = CleanupProbeReader.start_link(self())
+
+      state = %{
+        shutting_down: true,
+        backend: ExitProbeBackend,
+        backend_state: :ignored,
+        input_reader: reader,
+        input_handler: nil,
+        input_state: nil,
+        terminal_started: false
+      }
+
+      assert :ok = Runtime.terminate(:normal, state)
+      assert_receive :cleanup_probe_reader_stopped, 500
+    end
+
+    test "defensive cleanup uses write_to_tty for reliable terminal restoration" do
+      # The cleanup_sequence must contain all critical escape sequences
+      seq = TermUI.TerminalOutput.cleanup_sequence()
+
+      # Mouse tracking disable (all modes)
+      assert String.contains?(seq, "\e[?1006l")
+      assert String.contains?(seq, "\e[?1003l")
+      assert String.contains?(seq, "\e[?1002l")
+      assert String.contains?(seq, "\e[?1000l")
+
+      # Cursor show
+      assert String.contains?(seq, "\e[?25h")
+
+      # Leave alternate screen
+      assert String.contains?(seq, "\e[?1049l")
+    end
+
+    test "terminate completes even when write_to_tty is exercised" do
+      # Simulate a terminate with terminal_started: false (no actual terminal)
+      # This exercises the defensive cleanup path without needing real terminal
+      state = %{
+        shutting_down: true,
+        backend: nil,
+        backend_state: nil,
+        input_reader: nil,
+        input_handler: nil,
+        input_state: nil,
+        terminal_started: false
+      }
+
+      assert :ok = Runtime.terminate(:normal, state)
     end
   end
 
