@@ -1042,14 +1042,7 @@ defmodule TermUI.Backend.Raw do
       # ConPTY/WSL: skip mouse tracking (see setup_mouse_tracking/1)
       {:ok, state}
     else
-      # Disable current mode if active (to avoid stacking modes)
-      if state.mouse_mode != :none do
-        current_ansi_mode = mouse_mode_to_ansi(state.mouse_mode)
-
-        if current_ansi_mode do
-          write_to_terminal(ANSI.disable_mouse_tracking(current_ansi_mode))
-        end
-      end
+      disable_current_mouse_mode(state.mouse_mode)
 
       # Enable new mode
       ansi_mode = mouse_mode_to_ansi(mode)
@@ -1389,20 +1382,27 @@ defmodule TermUI.Backend.Raw do
 
   def valid_position?(_state, _position), do: false
 
-  @doc """
-  Maps a Raw backend mouse mode to the corresponding ANSI protocol mode.
+  # Maps a Raw backend mouse mode to the corresponding ANSI protocol mode.
+  #
+  # This is used internally when emitting mouse tracking escape sequences.
+  #
+  # ## Examples
+  #
+  #     iex> Raw.mouse_mode_to_ansi(:click)
+  #     :normal
+  #     iex> Raw.mouse_mode_to_ansi(:drag)
+  #     :button
+  #     iex> Raw.mouse_mode_to_ansi(:all)
+  #     :all
+  defp disable_current_mouse_mode(:none), do: :ok
 
-  This is used internally when emitting mouse tracking escape sequences.
+  defp disable_current_mouse_mode(mode) do
+    case mouse_mode_to_ansi(mode) do
+      nil -> :ok
+      ansi_mode -> write_to_terminal(ANSI.disable_mouse_tracking(ansi_mode))
+    end
+  end
 
-  ## Examples
-
-      iex> Raw.mouse_mode_to_ansi(:click)
-      :normal
-      iex> Raw.mouse_mode_to_ansi(:drag)
-      :button
-      iex> Raw.mouse_mode_to_ansi(:all)
-      :all
-  """
   @spec mouse_mode_to_ansi(mouse_mode()) :: :normal | :button | :all | nil
   def mouse_mode_to_ansi(:none), do: nil
   def mouse_mode_to_ansi(:click), do: :normal

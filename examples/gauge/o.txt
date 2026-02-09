@@ -1,0 +1,55 @@
+=== CRLF Diagnostic v5 ===
+
+--- Test A: Platform ---
+WSL detected (needs_hard_reset?): true
+ONLCR active: false
+
+--- Test B: Gauge render cell positions ---
+  Row  1: cols 1-20 "GaugeWidgetExample"
+  Row  2: (empty)
+  Row  3: cols 1-24 "SimplePercentageGauge:"
+  Row  4: cols 1-30 "███████████████░░░░░░░░░░░░░░░"
+  Row  5: cols 1-2 "50"
+  Row  6: (empty)
+  Row  7: cols 1-23 "GaugewithColorZones:"
+  Row  8: cols 1-9 "CPUUsage"
+  Row  9: cols 1-30 "███████████████░░░░░░░░░░░░░░░"
+  Row 10: cols 1-33 "050100"
+  Row 11: (empty)
+  Row 12: cols 1-29 "GaugewithCustomCharacters:"
+  Row 13: cols 1-30 "▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░"
+  Row 14: cols 1-2 "50"
+  Row 15: (empty)
+  Row 16: (empty)
+  Row 17: cols 1-40 "┌─Controls───────────────────────────┐"
+  Row 18: cols 1-40 "│↑/↓Adjustvalueby5│"
+  Row 19: cols 1-40 "│←/→Adjustvalueby10│"
+  Row 20: cols 1-40 "│STogglebar/arcstyle│"
+
+  Total changed cells: 363
+  Row 1 cell columns: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+  Row 2 cell columns: []
+  Row 3 cell columns: [1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 19, 20, 21, 22, 23, 24]
+  Row 4 cell columns: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30]
+  Row 5 cell columns: [1, 2]
+
+--- Test C: draw_cells byte analysis ---
+[2J[1;1H  draw_cells output (28 bytes): "\e[39m\e[49mAB\e[2;1HCD\e[3;5HEF"
+  Hex: 1B 5B 33 39 6D 1B 5B 34 39 6D 41 42 1B 5B 32 3B 31 48 43 44 1B 5B 33 3B 35 48 45 46
+  LF (0x0A) count: 0
+  CR (0x0D) count: 0
+  Cursor position sequences found:
+    "\e[2;1H" → row=2, col=1
+    "\e[3;5H" → row=3, col=5
+
+--- Test D: Visual test ---
+Starting visual test in 2 seconds...
+You should see lines at column 1 and ABCDEF at col 10.
+If lines staircase right, the issue is in Raw.draw_cells / IO path.
+If lines are correct, the issue is in the render pipeline.
+[?1049h[?25l[2J[1;1H[39m[49mLine 1[2;1HLine 2[3;1HLine 3[5;1HLine 5[7;10HABCDEF[9;1HAll at col 1[11;1HPress Enter[?1006l[?1003l[?1002l[?1000l[?25h[0m[?1049l
+20:50:59.056 [warning] TermUtils: Command 'stty -F /dev/tty min 0 time 1' failed with code 1: /usr/bin/stty: /dev/tty: No such device or address
+
+
+20:50:59.061 [warning] TermUtils: Command 'stty min 0 time 1' failed with code 1: /usr/bin/stty: 'standard input': Inappropriate ioctl for device
+

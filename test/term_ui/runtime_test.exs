@@ -867,6 +867,121 @@ defmodule TermUI.RuntimeTest do
     end
   end
 
+  describe "logger suppression" do
+    # Ensure the :default logger handler is present before each test and
+    # restored after. Tests may add/remove it freely.
+    setup do
+      # If handler was removed by a prior test, we need a known-good config to restore from.
+      # Capture current config or use the persistent_term backup if available.
+      saved_config =
+        case :logger.get_handler_config(:default) do
+          {:ok, config} ->
+            config
+
+          {:error, _} ->
+            # Try persistent_term backup (set by suppress_logger)
+            case :persistent_term.get(:term_ui_logger_handler_config, nil) do
+              nil ->
+                # Last resort: add a minimal default handler
+                :logger.add_handler(:default, :logger_std_h, %{
+                  config: %{type: :standard_io},
+                  formatter: Logger.Formatter.new()
+                })
+
+                case :logger.get_handler_config(:default) do
+                  {:ok, config} -> config
+                  {:error, _} -> nil
+                end
+
+              config ->
+                Runtime.restore_logger(config)
+                config
+            end
+        end
+
+      on_exit(fn ->
+        # Always ensure the handler is restored
+        case :logger.get_handler_config(:default) do
+          {:ok, _} ->
+            :ok
+
+          {:error, _} ->
+            if saved_config, do: Runtime.restore_logger(saved_config)
+        end
+
+        # Clean up persistent_term backup
+        try do
+          :persistent_term.erase(:term_ui_logger_handler_config)
+        rescue
+          ArgumentError -> :ok
+        end
+      end)
+
+      %{saved_logger_config: saved_config}
+    end
+
+    test "skip_terminal does not suppress logger (config is nil)" do
+      {:ok, runtime} = start_test_runtime(root: Counter)
+
+      state = Runtime.get_state(runtime)
+      assert state.logger_handler_config == nil
+    end
+
+    test "suppress_logger removes the :default handler and returns config" do
+      config = Runtime.suppress_logger()
+      assert is_map(config)
+      assert Map.has_key?(config, :module)
+
+      # Handler should be removed
+      assert {:error, _} = :logger.get_handler_config(:default)
+    end
+
+    test "suppress_logger returns nil when handler already removed" do
+      :logger.remove_handler(:default)
+
+      assert Runtime.suppress_logger() == nil
+    end
+
+    test "restore_logger is idempotent (handles double restore)", %{
+      saved_logger_config: config
+    } do
+      assert :ok = Runtime.restore_logger(config)
+    end
+
+    test "restore_logger with nil is a no-op" do
+      assert :ok = Runtime.restore_logger(nil)
+    end
+
+    test "terminate handles nil logger_handler_config gracefully" do
+      state = %{
+        shutting_down: true,
+        backend: nil,
+        backend_state: nil,
+        input_reader: nil,
+        input_handler: nil,
+        input_state: nil,
+        terminal_started: false,
+        logger_handler_config: nil
+      }
+
+      assert :ok = Runtime.terminate(:normal, state)
+    end
+
+    test "terminate handles missing logger_handler_config key gracefully" do
+      state = %{
+        shutting_down: true,
+        backend: nil,
+        backend_state: nil,
+        input_reader: nil,
+        input_handler: nil,
+        input_state: nil,
+        terminal_started: false
+      }
+
+      assert :ok = Runtime.terminate(:normal, state)
+    end
+  end
+
   describe "logging" do
     test "logs capabilities at debug level when backend is selected" do
       log =

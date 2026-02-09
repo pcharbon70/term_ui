@@ -279,6 +279,10 @@ defmodule TermUI.Runtime do
 
     opts = Config.merge_options(opts)
     init_config = parse_init_options(opts)
+
+    logger_handler_config =
+      if init_config.skip_terminal, do: nil, else: suppress_logger()
+
     backend_result = init_backend(init_config)
 
     PersistentTerms.store_backend_context(
@@ -310,7 +314,8 @@ defmodule TermUI.Runtime do
         input_handler,
         input_state,
         input_reader,
-        command_executor
+        command_executor,
+        logger_handler_config
       )
 
     log_backend_selection(backend_result.backend_mode)
@@ -335,6 +340,42 @@ defmodule TermUI.Runtime do
 
   defp normalize_use_input_handler_opt(value) when value in [true, false, :auto], do: value
   defp normalize_use_input_handler_opt(_), do: :auto
+
+  # Removes the :default Logger handler to prevent console output from corrupting
+  # the TUI display. Logger messages contain \n which in raw mode (no OPOST)
+  # causes staircase rendering. The handler config is saved for restoration at
+  # terminate and backed up in persistent_term for crash safety.
+  @doc false
+  @spec suppress_logger() :: map() | nil
+  def suppress_logger do
+    case :logger.get_handler_config(:default) do
+      {:ok, config} ->
+        :persistent_term.put(:term_ui_logger_handler_config, config)
+        :logger.remove_handler(:default)
+        config
+
+      {:error, _} ->
+        # Handler already removed (e.g. test environment)
+        nil
+    end
+  end
+
+  # Restores the :default Logger handler from saved config.
+  # Handles double-restore gracefully (idempotent).
+  @doc false
+  @spec restore_logger(map() | nil) :: :ok
+  def restore_logger(nil), do: :ok
+
+  def restore_logger(config) do
+    module = Map.fetch!(config, :module)
+    handler_config = Map.drop(config, [:id, :module])
+
+    case :logger.add_handler(:default, module, handler_config) do
+      :ok -> :ok
+      {:error, {:already_exist, _}} -> :ok
+      {:error, _reason} -> :ok
+    end
+  end
 
   defp init_backend(%{skip_terminal: true}) do
     %{
@@ -414,7 +455,8 @@ defmodule TermUI.Runtime do
          input_handler,
          input_state,
          input_reader,
-         command_executor
+         command_executor,
+         logger_handler_config
        ) do
     %State{
       root_module: init_config.root_module,
@@ -437,7 +479,8 @@ defmodule TermUI.Runtime do
       backend_state: backend_result.backend_state,
       capabilities: backend_result.capabilities,
       input_handler: input_handler,
-      input_state: input_state
+      input_state: input_state,
+      logger_handler_config: logger_handler_config
     }
   end
 
@@ -505,16 +548,11 @@ defmodule TermUI.Runtime do
   defp init_raw_backend(buffer_manager, dimensions) do
     backend = TermUI.Backend.Raw
 
-    # Enable ONLCR translation: in OTP 28 raw mode, OPOST is disabled so bare
-    # \n won't include a carriage return. This safety net translates \n → \r\n
+    # Enable ONLCR translation: in OTP 28 raw mode, prim_tty bypasses kernel
+    # OPOST so bare \n is LF-only (no CR). This safety net translates \n → \r\n
     # at the TerminalOutput chokepoint, matching the ncurses approach.
-    #
-    # On ConPTY/WSL, stty fails so kernel OPOST/ONLCR stay ON — the kernel
-    # already handles LF→CRLF translation. Enabling our ONLCR too would cause
-    # double translation (\n → \r\n → kernel sees \n again → \r\r\n).
-    unless TermUI.TerminalOutput.needs_hard_reset?() do
-      TermUI.TerminalOutput.enable_onlcr()
-    end
+    # Required on ALL platforms including WSL (empirically verified).
+    TermUI.TerminalOutput.enable_onlcr()
 
     {:ok, backend_state} =
       backend.init(
@@ -807,6 +845,7 @@ defmodule TermUI.Runtime do
 
   @impl true
   def terminate(_reason, state) do
+    safe_cleanup(fn -> terminate_logger_restore(state) end)
     safe_cleanup(fn -> terminate_input_reader(state) end)
     safe_cleanup(fn -> terminate_input_handler(state) end)
     safe_cleanup(fn -> terminate_backend(state) end)
@@ -825,6 +864,9 @@ defmodule TermUI.Runtime do
   catch
     _, _ -> :ok
   end
+
+  defp terminate_logger_restore(%{logger_handler_config: config}), do: restore_logger(config)
+  defp terminate_logger_restore(_state), do: :ok
 
   defp terminate_input_reader(%{input_reader: nil}), do: :ok
   defp terminate_input_reader(%{input_reader: reader}), do: InputReader.stop(reader)
@@ -855,13 +897,24 @@ defmodule TermUI.Runtime do
   defp terminate_legacy_restore(_state), do: :ok
 
   defp terminate_defensive_cleanup do
+    restore_logger_from_persistent_term()
     TermUI.TerminalOutput.write_to_tty(TermUI.TerminalOutput.cleanup_sequence())
     TermUI.TerminalOutput.disable_onlcr()
     TermUI.TermUtils.safe_stty(["sane"])
   end
 
+  defp restore_logger_from_persistent_term do
+    case :persistent_term.get(:term_ui_logger_handler_config, nil) do
+      nil -> :ok
+      config -> restore_logger(config)
+    end
+  end
+
   defp terminate_persistent_terms do
     if PersistentTerms.owns_terms?(self()), do: PersistentTerms.cleanup()
+    :persistent_term.erase(:term_ui_logger_handler_config)
+  rescue
+    ArgumentError -> :ok
   end
 
   # --- Event Dispatch ---
