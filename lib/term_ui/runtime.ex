@@ -1231,7 +1231,16 @@ defmodule TermUI.Runtime do
 
   defp needs_clearing_at?(col, prev_cell, current_row) do
     current_cell = Enum.at(current_row, col - 1, Cell.empty())
-    not Cell.equal?(current_cell, prev_cell) and empty_cell?(current_cell)
+    cells_differ = not Cell.equal?(current_cell, prev_cell)
+
+    # Only clear if:
+    # 1. Current cell is empty (nothing new to render), OR
+    # 2. Previous cell had colored background AND current cell has no text (just space)
+    # This prevents clearing overwriting new text content while still clearing colored backgrounds
+    had_colored_bg = prev_cell.bg != nil and prev_cell.bg != :default
+    has_no_text = current_cell.char == " "
+
+    cells_differ and (empty_cell?(current_cell) or (had_colored_bg and has_no_text))
   end
 
   defp empty_cell?(%Cell{} = cell) do

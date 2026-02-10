@@ -736,12 +736,13 @@ defmodule TermUI.Backend.Raw do
   end
 
   def draw_cells(state, cells) when is_list(cells) do
-    # Sort cells by row then column for sequential output
-    sorted_cells = Enum.sort_by(cells, fn {{row, col}, _cell} -> {row, col} end)
-
-    # Process cells and build output
+    # Group cells by row and process each row with a reset at the end
+    # This prevents style bleeding from one row to the next
     {output, final_pos, final_style} =
-      process_cells(sorted_cells, state.cursor_position, state.current_style)
+      cells
+      |> Enum.group_by(fn {{row, _col}, _cell} -> row end)
+      |> Enum.sort()
+      |> process_cells_by_row(state.cursor_position, state.current_style)
 
     # Write batched output to terminal
     write_to_terminal(output)
@@ -752,17 +753,28 @@ defmodule TermUI.Backend.Raw do
     {:ok, updated_state}
   end
 
-  # Process a list of cells, accumulating output as iolist
-  # Returns {iolist, final_cursor_position, final_style}
-  @spec process_cells(
-          [{TermUI.Backend.position(), TermUI.Backend.cell()}],
-          {pos_integer(), pos_integer()} | nil,
-          style_state() | nil
-        ) :: {iolist(), {pos_integer(), pos_integer()}, style_state()}
-  defp process_cells(cells, current_pos, current_style) do
-    Enum.reduce(cells, {[], current_pos, current_style}, fn {{row, col} = target_pos,
-                                                             {char, fg, bg, attrs}},
-                                                            {output_acc, cursor_pos, style} ->
+  # Process cells grouped by row, emitting a reset after each row
+  defp process_cells_by_row(rows_with_cells, initial_pos, initial_style) do
+    Enum.reduce(rows_with_cells, {[], initial_pos, initial_style}, fn {_row, cells},
+                                                                            {output_acc,
+                                                                             cursor_pos, style} ->
+      # Sort cells within row by column
+      sorted_cells = Enum.sort_by(cells, fn {{_row, col}, _cell} -> col end)
+
+      # Process all cells in this row
+      {row_output, row_end_pos, _row_end_style} =
+        process_row_cells(sorted_cells, cursor_pos, style)
+
+      # Append row output and reset after row to prevent style bleeding
+      {[output_acc, row_output, ANSI.reset()], row_end_pos, nil}
+    end)
+  end
+
+  # Process cells within a single row
+  defp process_row_cells(cells, initial_pos, initial_style) do
+    Enum.reduce(cells, {[], initial_pos, initial_style}, fn {{row, col} = target_pos,
+                                                              {char, fg, bg, attrs}},
+                                                             {output_acc, cursor_pos, style} ->
       # Generate cursor movement if needed
       cursor_output = cursor_move_output(cursor_pos, target_pos)
 
