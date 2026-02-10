@@ -73,7 +73,9 @@ defmodule TermUI.Runtime do
   # Default render interval in milliseconds (~60 FPS)
   @default_render_interval 16
 
-  # Input polling interval (same as render interval)
+  # Timeout for input handler poll calls in the async reader process.
+  # For Raw handler: controls how long each poll waits before returning :timeout.
+  # For TTY handler: ignored (TTY.poll blocks regardless of timeout).
   @input_poll_interval 16
 
   # --- Public API ---
@@ -347,10 +349,16 @@ defmodule TermUI.Runtime do
     # Schedule first render
     schedule_render(render_interval)
 
-    # Schedule first input poll (if using new input handler)
-    if input_handler do
-      schedule_input_poll()
-    end
+    # Spawn async reader process for input handler (runs poll loop in separate process)
+    state =
+      if state.input_handler do
+        reader_pid =
+          spawn_input_handler_reader(state.input_handler, state.input_state, self())
+
+        %{state | input_handler_reader: reader_pid}
+      else
+        state
+      end
 
     {:ok, state}
   end
@@ -420,6 +428,7 @@ defmodule TermUI.Runtime do
       buffer_manager: params.buffer_manager,
       dimensions: params.dimensions,
       input_reader: params.input_reader,
+      input_handler_reader: nil,
       backend_mode: params.backend_mode,
       backend: params.backend,
       backend_state: params.backend_state,
@@ -574,35 +583,19 @@ defmodule TermUI.Runtime do
   end
 
   @impl true
-  def handle_info(:input_poll, state) do
-    # Poll input handler for new events
-    if state.shutting_down or state.input_handler == nil do
+  def handle_info(:input_eof, state) do
+    # EOF from async input handler reader - initiate shutdown
+    if state.shutting_down do
       {:noreply, state}
     else
-      case state.input_handler.poll(state.input_state, @input_poll_interval) do
-        {{:ok, event}, new_input_state} ->
-          # Dispatch the event and continue polling
-          state = %{state | input_state: new_input_state}
-          state = dispatch_event(event, state)
-          schedule_input_poll()
-          {:noreply, state}
-
-        {:timeout, new_input_state} ->
-          # No input, but continue polling
-          schedule_input_poll()
-          {:noreply, %{state | input_state: new_input_state}}
-
-        {:eof, _new_input_state} ->
-          # EOF - initiate shutdown
-          state = initiate_shutdown(%{state | input_state: nil})
-          {:noreply, state}
-      end
+      state = initiate_shutdown(%{state | input_handler_reader: nil})
+      {:noreply, state}
     end
   end
 
   @impl true
   def handle_info({:input, event}, state) do
-    # Keyboard/mouse input from InputReader
+    # Keyboard/mouse input from InputReader or async input handler reader
     if state.shutting_down do
       {:noreply, state}
     else
@@ -642,6 +635,22 @@ defmodule TermUI.Runtime do
   def handle_info(:stop_runtime, state) do
     # Stop the GenServer after shutdown cleanup
     {:stop, :normal, state}
+  end
+
+  # Handle linked process exits (input handler reader, etc.)
+  @impl true
+  def handle_info({:EXIT, pid, reason}, state) do
+    if pid == state[:input_handler_reader] do
+      Logger.warning("Input handler reader exited: #{inspect(reason)}")
+      {:noreply, %{state | input_handler_reader: nil}}
+    else
+      # Forward to root module or ignore
+      if function_exported?(state.root_module, :handle_info, 2) do
+        handle_root_info({:EXIT, pid, reason}, state)
+      else
+        {:noreply, state}
+      end
+    end
   end
 
   # Catch-all for unknown messages - forward to root module's handle_info if it exists
@@ -726,6 +735,13 @@ defmodule TermUI.Runtime do
   end
 
   defp cleanup_input_handler(state) do
+    # Kill the async reader process first
+    if is_pid(state[:input_handler_reader]) and Process.alive?(state[:input_handler_reader]) do
+      Process.unlink(state[:input_handler_reader])
+      Process.exit(state[:input_handler_reader], :shutdown)
+    end
+
+    # Then stop the handler (restores IO opts for TTY, etc.)
     if state.input_handler and state.input_state do
       state.input_handler.stop(state.input_state)
     end
@@ -1045,8 +1061,27 @@ defmodule TermUI.Runtime do
     Process.send_after(self(), :render, interval)
   end
 
-  defp schedule_input_poll do
-    Process.send_after(self(), :input_poll, @input_poll_interval)
+  # Spawns a linked process that runs the input handler's poll loop.
+  # Events are sent as {:input, event} messages (same format as InputReader).
+  # This prevents blocking handlers (like Input.TTY) from freezing the GenServer.
+  defp spawn_input_handler_reader(handler, input_state, target) do
+    spawn_link(fn ->
+      input_handler_loop(handler, input_state, target)
+    end)
+  end
+
+  defp input_handler_loop(handler, input_state, target) do
+    case handler.poll(input_state, @input_poll_interval) do
+      {{:ok, event}, new_input_state} ->
+        send(target, {:input, event})
+        input_handler_loop(handler, new_input_state, target)
+
+      {:timeout, new_input_state} ->
+        input_handler_loop(handler, new_input_state, target)
+
+      {:eof, _new_input_state} ->
+        send(target, :input_eof)
+    end
   end
 
   defp process_render_tick(state) do

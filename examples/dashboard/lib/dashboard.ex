@@ -25,20 +25,35 @@ defmodule Dashboard do
   """
 
   @doc """
-  Starts the dashboard in non-blocking mode. Returns immediately with {:ok, pid}.
-  Useful for development in IEx.
+  Starts the dashboard interactively, blocking until the user quits.
+
+  This is the main entry point for both IEx and standalone use. It blocks
+  the calling process to take over terminal input - this is required for
+  keyboard controls to work when running from IEx.
+
+  ## From IEx
+
+      iex> Dashboard.start()
+      # Dashboard takes over terminal, press Q to quit
+
+  ## From command line
+
+      mix run -e "Dashboard.start()"
   """
   def start do
-    TermUI.Runtime.start_link(root: Dashboard.App)
+    TermUI.Runtime.run(root: Dashboard.App)
   end
 
   @doc """
-  Runs the dashboard in blocking mode. Takes over the terminal and blocks
-  until the user quits. This is the main entry point for running as a standalone app.
+  Starts the dashboard as a linked process (non-blocking).
+
+  Returns `{:ok, pid}` immediately. Useful for embedding in supervision
+  trees or programmatic control. Note: keyboard input will NOT work when
+  called from IEx because IEx's prompt competes for terminal input.
+
+  For interactive use from IEx, use `start/0` instead.
   """
-  def run do
-    # Ensure the Dashboard application is started (starts Metrics GenServer)
-    {:ok, _} = Application.ensure_all_started(:dashboard)
-    TermUI.Runtime.run(root: Dashboard.App)
+  def start_link do
+    TermUI.Runtime.start_link(root: Dashboard.App)
   end
 end
