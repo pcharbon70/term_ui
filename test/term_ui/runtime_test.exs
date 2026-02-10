@@ -593,5 +593,192 @@ defmodule TermUI.RuntimeTest do
       assert state.input_handler == nil
       assert state.input_state == nil
     end
+
+    test "input_handler_reader defaults to nil with skip_terminal" do
+      {:ok, runtime} = start_test_runtime(root: Counter)
+
+      state = Runtime.get_state(runtime)
+      assert state[:input_handler_reader] == nil
+    end
+  end
+
+  describe "async input handler reader" do
+    # Mock input handler that sends events from its poll function.
+    # Uses an Agent to feed events into the handler on demand.
+    defmodule MockInputHandler do
+      @behaviour TermUI.Input
+
+      defstruct [:agent]
+
+      def new do
+        # not used directly - tests create state with start/0
+        %__MODULE__{agent: nil}
+      end
+
+      def start do
+        {:ok, agent} = Agent.start_link(fn -> {:block, nil} end)
+        %__MODULE__{agent: agent}
+      end
+
+      @doc "Queue an event to be returned by the next poll call"
+      def push_event(%__MODULE__{agent: agent}, event) do
+        Agent.update(agent, fn _state -> {:event, event} end)
+      end
+
+      @doc "Signal EOF to be returned by the next poll call"
+      def push_eof(%__MODULE__{agent: agent}) do
+        Agent.update(agent, fn _state -> :eof end)
+      end
+
+      @impl true
+      def poll(%__MODULE__{agent: agent} = state, _timeout) do
+        # Spin-wait for an event or eof signal (simulates blocking IO)
+        result = spin_wait(agent)
+
+        case result do
+          {:event, event} ->
+            {{:ok, event}, state}
+
+          :eof ->
+            {:eof, state}
+        end
+      end
+
+      defp spin_wait(agent) do
+        case Agent.get(agent, & &1) do
+          {:block, _} ->
+            Process.sleep(5)
+            spin_wait(agent)
+
+          {:event, _event} = result ->
+            # Consume the event
+            Agent.update(agent, fn _state -> {:block, nil} end)
+            result
+
+          :eof ->
+            result = :eof
+            Agent.update(agent, fn _state -> {:block, nil} end)
+            result
+        end
+      end
+
+      @impl true
+      def mode(%__MODULE__{}), do: :tty
+
+      @impl true
+      def stop(%__MODULE__{agent: agent}) do
+        if agent && Process.alive?(agent), do: Agent.stop(agent)
+        :ok
+      end
+    end
+
+    test "async reader dispatches events to the runtime without blocking" do
+      # Start runtime with skip_terminal
+      {:ok, runtime} = start_test_runtime(root: Counter)
+
+      # Create a mock input handler and manually wire it up
+      mock_state = MockInputHandler.start()
+
+      # Spawn the async reader targeting the runtime
+      reader_pid =
+        spawn_link(fn ->
+          # Use the same loop the runtime uses internally
+          loop(MockInputHandler, mock_state, runtime)
+        end)
+
+      # Push a key event
+      MockInputHandler.push_event(mock_state, Event.key(:up))
+      Process.sleep(50)
+
+      # Verify the event was dispatched - runtime should still be responsive
+      state = Runtime.get_state(runtime)
+      assert state.root_state.count == 1
+
+      # Push another event
+      MockInputHandler.push_event(mock_state, Event.key(:up))
+      Process.sleep(50)
+
+      state = Runtime.get_state(runtime)
+      assert state.root_state.count == 2
+
+      # Cleanup
+      Process.unlink(reader_pid)
+      Process.exit(reader_pid, :shutdown)
+      MockInputHandler.stop(mock_state)
+    end
+
+    test "runtime remains responsive while async reader is waiting for input" do
+      {:ok, runtime} = start_test_runtime(root: Counter)
+
+      # Create a mock handler that blocks (no events pushed)
+      mock_state = MockInputHandler.start()
+
+      reader_pid =
+        spawn_link(fn ->
+          loop(MockInputHandler, mock_state, runtime)
+        end)
+
+      # The reader is now blocking in poll(). Verify the runtime is still responsive.
+      # Send events directly via Runtime.send_event (simulating other input sources)
+      Runtime.send_event(runtime, Event.key(:up))
+      Runtime.sync(runtime)
+
+      state = Runtime.get_state(runtime)
+      assert state.root_state.count == 1
+
+      # Runtime can still be queried
+      state2 = Runtime.get_state(runtime)
+      assert state2.root_state.count == 1
+
+      # Cleanup
+      Process.unlink(reader_pid)
+      Process.exit(reader_pid, :shutdown)
+      MockInputHandler.stop(mock_state)
+    end
+
+    test "input_eof message triggers shutdown" do
+      {:ok, runtime} = start_test_runtime(root: Counter)
+      ref = Process.monitor(runtime)
+
+      # Simulate what the async reader sends on EOF
+      send(runtime, :input_eof)
+
+      # Runtime should shut down
+      assert_receive {:DOWN, ^ref, :process, ^runtime, _reason}, 1000
+    end
+
+    test "reader process exit is handled gracefully" do
+      {:ok, runtime} = start_test_runtime(root: Counter)
+
+      # Simulate a reader crash by sending an EXIT message directly.
+      # The runtime traps exits, so {:EXIT, pid, reason} arrives as a message.
+      fake_reader_pid = spawn(fn -> :ok end)
+      Process.sleep(10)
+
+      # Set the input_handler_reader in state so the EXIT handler recognizes it
+      # We can't set it directly, so instead simulate the message the runtime handles
+      send(runtime, {:EXIT, fake_reader_pid, :some_crash_reason})
+      Process.sleep(50)
+
+      # Runtime should still be alive and responsive
+      assert Process.alive?(runtime)
+      state = Runtime.get_state(runtime)
+      assert state.root_state.count == 0
+    end
+
+    # Helper: same loop the runtime uses internally
+    defp loop(handler, input_state, target) do
+      case handler.poll(input_state, 16) do
+        {{:ok, event}, new_state} ->
+          send(target, {:input, event})
+          loop(handler, new_state, target)
+
+        {:timeout, new_state} ->
+          loop(handler, new_state, target)
+
+        {:eof, _new_state} ->
+          send(target, :input_eof)
+      end
+    end
   end
 end

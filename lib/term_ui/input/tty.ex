@@ -429,7 +429,9 @@ defmodule TermUI.Input.TTY do
   # This is the key to IEx compatibility - using Erlang's :io module directly
   @spec read_char() :: {:ok, binary()} | :eof | {:error, term()}
   defp read_char do
-    case :io.get_chars(~c"", 1) do
+    result = :io.get_chars(~c"", 1)
+
+    case result do
       :eof ->
         :eof
 
