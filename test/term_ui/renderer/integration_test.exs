@@ -244,8 +244,9 @@ defmodule TermUI.Renderer.IntegrationTest do
           String.length("\e[2;1HB") +
           String.length("\e[3;1HC")
 
-      # Optimized should be at least as good
-      assert byte_size(optimized_output) <= naive_size
+      # Optimized should be close to naive (may be slightly larger now that
+      # bare \n is replaced with ANSI \e[B for OTP 28 raw mode correctness)
+      assert byte_size(optimized_output) <= naive_size * 2
     end
   end
 
@@ -541,8 +542,9 @@ defmodule TermUI.Renderer.IntegrationTest do
         "\nCursor optimization: #{byte_size(optimized)} bytes vs #{naive_size} naive (#{savings}% savings)"
       )
 
-      # Should have some savings
-      assert byte_size(optimized) < naive_size
+      # Optimized should be reasonable (may be slightly larger now that
+      # bare \n is replaced with ANSI \e[B for OTP 28 raw mode correctness)
+      assert byte_size(optimized) < naive_size * 2
     end
   end
 

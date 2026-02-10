@@ -47,7 +47,8 @@ defmodule TermUI.Runtime.State do
           backend_state: term() | nil,
           capabilities: capabilities() | nil,
           input_handler: module() | nil,
-          input_state: term() | nil
+          input_state: term() | nil,
+          logger_handler_config: map() | nil
         }
 
   @type component_entry :: %{
@@ -80,6 +81,7 @@ defmodule TermUI.Runtime.State do
     backend_state: nil,
     capabilities: nil,
     input_handler: nil,
-    input_state: nil
+    input_state: nil,
+    logger_handler_config: nil
   ]
 end

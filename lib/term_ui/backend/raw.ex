@@ -147,6 +147,8 @@ defmodule TermUI.Backend.Raw do
   alias TermUI.Backend.InputBuffer
   alias TermUI.Renderer.CursorOptimizer
   alias TermUI.Terminal.SizeDetector
+  alias TermUI.TerminalOutput
+  alias TermUI.TermUtils
   require Logger
 
   # Dialyzer: Functions with unmatched return values
@@ -313,7 +315,9 @@ defmodule TermUI.Backend.Raw do
         write_to_terminal(ANSI.cursor_hide())
       end
 
-      if mouse_tracking != :none do
+      # Skip mouse tracking on WSL/ConPTY -- mouse-off sequences are silently
+      # ignored, so enabling mouse tracking leads to escape code leaks
+      if mouse_tracking != :none and not TerminalOutput.needs_hard_reset?() do
         ansi_mode = mouse_mode_to_ansi(mouse_tracking)
 
         if ansi_mode do
@@ -366,24 +370,22 @@ defmodule TermUI.Backend.Raw do
   """
   @spec shutdown(t()) :: :ok
   def shutdown(state) do
-    # Disable mouse tracking if it was enabled
-    # Use defensive cleanup - disable ALL modes regardless of state
+    # Phase 1: Direct-to-TTY write (most reliable, bypasses Erlang IO)
+    TerminalOutput.write_to_tty(TerminalOutput.cleanup_sequence())
+
+    # Phase 2: Erlang IO backup (in case /dev/tty write failed)
     safe_write(@all_mouse_off)
-
-    # Show cursor (always, even if state says visible - defensive)
     safe_write(ANSI.cursor_show())
-
-    # Reset all text attributes
     safe_write(ANSI.reset())
 
-    # Leave alternate screen if it was entered
     if state.alternate_screen do
-      # Ensure newline before exiting so prompt appears on clean line
-      safe_write("\r\n")
       safe_write(ANSI.leave_alternate_screen())
     end
 
-    # Return to cooked mode
+    # Phase 3: Drain pending input (mouse events buffered during shutdown)
+    drain_pending_input()
+
+    # Phase 4: Return to cooked mode
     safe_cooked_mode()
 
     :ok
@@ -1036,21 +1038,22 @@ defmodule TermUI.Backend.Raw do
   end
 
   def enable_mouse(state, mode) when mode in [:click, :drag, :all] do
-    # Disable current mode if active (to avoid stacking modes)
-    if state.mouse_mode != :none do
-      current_ansi_mode = mouse_mode_to_ansi(state.mouse_mode)
-
-      if current_ansi_mode do
-        write_to_terminal(ANSI.disable_mouse_tracking(current_ansi_mode))
+    # Skip mouse tracking on WSL/ConPTY
+    if TerminalOutput.needs_hard_reset?() do
+      {:ok, state}
+    else
+      # Disable current mode if active (to avoid stacking modes)
+      if state.mouse_mode != :none do
+        disable_current_mouse_mode(state.mouse_mode)
       end
+
+      # Enable new mode
+      ansi_mode = mouse_mode_to_ansi(mode)
+      write_to_terminal(ANSI.enable_mouse_tracking(ansi_mode))
+      write_to_terminal(ANSI.enable_sgr_mouse())
+
+      {:ok, %{state | mouse_mode: mode}}
     end
-
-    # Enable new mode
-    ansi_mode = mouse_mode_to_ansi(mode)
-    write_to_terminal(ANSI.enable_mouse_tracking(ansi_mode))
-    write_to_terminal(ANSI.enable_sgr_mouse())
-
-    {:ok, %{state | mouse_mode: mode}}
   end
 
   @doc """
@@ -1467,10 +1470,9 @@ defmodule TermUI.Backend.Raw do
     end
   end
 
-  # Writes data to the terminal, wrapping in try/rescue for error safety.
-  # Debug logging helps troubleshoot rendering issues without exposing errors to users.
+  # Writes data to the terminal via TerminalOutput (ONLCR-aware).
   defp write_to_terminal(data) do
-    IO.write(data)
+    TerminalOutput.write(data)
   rescue
     e ->
       Logger.debug("Terminal write failed: #{Exception.message(e)}")
@@ -1479,11 +1481,46 @@ defmodule TermUI.Backend.Raw do
 
   # Error-safe write for shutdown - logs errors but continues
   defp safe_write(data) do
-    IO.write(data)
+    TerminalOutput.write(data)
   rescue
-    e ->
-      Logger.warning("Failed to write during shutdown: #{Exception.message(e)}")
-      :ok
+    _ -> :ok
+  end
+
+  # Drains pending input bytes (e.g. mouse events buffered during shutdown).
+  # Sets stty to non-blocking, reads and discards pending bytes, then restores.
+  defp drain_pending_input do
+    # Set non-blocking read: min 0 chars, timeout 0.1s
+    _ = TermUtils.safe_stty(["min", "0", "time", "1"])
+
+    drain_input_loop(0, 20)
+
+    # Restore blocking read
+    _ = TermUtils.safe_stty(["min", "1", "time", "0"])
+  rescue
+    _ -> :ok
+  end
+
+  defp drain_input_loop(iteration, max) when iteration >= max, do: :ok
+
+  defp drain_input_loop(iteration, max) do
+    case IO.read(:stdio, 64) do
+      data when is_binary(data) and byte_size(data) > 0 ->
+        drain_input_loop(iteration + 1, max)
+
+      _ ->
+        :ok
+    end
+  rescue
+    _ -> :ok
+  end
+
+  # Disables the current mouse tracking mode
+  defp disable_current_mouse_mode(mode) do
+    ansi_mode = mouse_mode_to_ansi(mode)
+
+    if ansi_mode do
+      write_to_terminal(ANSI.disable_mouse_tracking(ansi_mode))
+    end
   end
 
   # Error-safe cooked mode restoration
