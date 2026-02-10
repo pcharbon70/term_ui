@@ -13,6 +13,7 @@ defmodule TermUI.Terminal do
   alias TermUI.ANSI
   alias TermUI.Terminal.SizeDetector
   alias TermUI.Terminal.State
+  alias TermUI.TerminalOutput
   alias TermUI.TermUtils
 
   # Dialyzer: unmatched_return, pattern_match_cov, guard_fail warnings
@@ -30,9 +31,6 @@ defmodule TermUI.Terminal do
              do_enable_raw_mode: 0}
 
   @ets_table :term_ui_terminal_state
-
-  # Full terminal reset sequence (not in ANSI module as it's rarely needed)
-  @reset_terminal "\ec"
 
   # Comprehensive mouse disable - disables ALL mouse modes defensively
   # This is kept as a constant for performance in cleanup paths
@@ -356,26 +354,32 @@ defmodule TermUI.Terminal do
 
   @impl true
   def handle_call({:enable_mouse_tracking, mode}, _from, state) do
-    # First disable any existing tracking
-    if state.mouse_tracking != :off do
-      disable_current_mouse_mode(state.mouse_tracking)
-    end
-
-    # Enable new tracking mode with SGR
-    # Map user-friendly mode names to ANSI protocol modes:
-    # :click -> :normal (1000), :drag -> :button (1002), :all -> :all (1003)
-    ansi_mode =
-      case mode do
-        :click -> :normal
-        :drag -> :button
-        :all -> :all
+    # Skip mouse tracking on WSL/ConPTY -- mouse-off sequences are silently
+    # ignored by ConPTY, so enabling mouse tracking leads to escape code leaks
+    if TerminalOutput.needs_hard_reset?() do
+      {:reply, :ok, state}
+    else
+      # First disable any existing tracking
+      if state.mouse_tracking != :off do
+        disable_current_mouse_mode(state.mouse_tracking)
       end
 
-    write_to_terminal(ANSI.enable_mouse_tracking(ansi_mode))
-    write_to_terminal(ANSI.enable_sgr_mouse())
+      # Enable new tracking mode with SGR
+      # Map user-friendly mode names to ANSI protocol modes:
+      # :click -> :normal (1000), :drag -> :button (1002), :all -> :all (1003)
+      ansi_mode =
+        case mode do
+          :click -> :normal
+          :drag -> :button
+          :all -> :all
+        end
 
-    new_state = %{state | mouse_tracking: mode}
-    {:reply, :ok, new_state}
+      write_to_terminal(ANSI.enable_mouse_tracking(ansi_mode))
+      write_to_terminal(ANSI.enable_sgr_mouse())
+
+      new_state = %{state | mouse_tracking: mode}
+      {:reply, :ok, new_state}
+    end
   end
 
   @impl true
@@ -511,7 +515,7 @@ defmodule TermUI.Terminal do
     # time 0: timeout in tenths of a second (0 = no timeout)
     # -isig: disable signal generation (Ctrl+C etc handled by app)
     # -ixon: disable XON/XOFF flow control
-    case TermUtils.safe_stty(["raw", "-echo", "-isig", "-ixon", "1", "0"]) do
+    case TermUtils.safe_stty(["raw", "-echo", "-isig", "-ixon", "min", "1", "time", "0"]) do
       {:ok, _output} ->
         :ok
 
@@ -529,8 +533,6 @@ defmodule TermUI.Terminal do
       restore_stty_sane()
     end
 
-    # Always write reset sequence as final cleanup
-    write_to_terminal(@reset_terminal)
     :ok
   rescue
     _ -> :ok
@@ -561,26 +563,33 @@ defmodule TermUI.Terminal do
   end
 
   defp do_restore(state) do
-    # Always disable ALL mouse tracking modes defensively
-    # This ensures cleanup even if state is inconsistent
+    # Phase 1: Direct-to-TTY write (most reliable, bypasses Erlang IO)
+    TerminalOutput.write_to_tty(TerminalOutput.cleanup_sequence())
+
+    # Phase 2: Erlang IO backup (in case /dev/tty write failed)
     write_to_terminal(@all_mouse_off)
 
     if not state.cursor_visible do
       write_to_terminal(ANSI.cursor_show())
     end
 
+    # Reset terminal attributes before leaving alt screen
+    write_to_terminal(ANSI.reset())
+
     if state.alternate_screen_active do
-      # Ensure newline before exiting so prompt appears on clean line
-      write_to_terminal("\r\n")
       write_to_terminal(ANSI.leave_alternate_screen())
     end
 
+    # Phase 3: Cooked mode (before stty so stty gets final say)
+    ensure_cooked_mode()
+
+    # Phase 4: Restore original stty settings
     if state.raw_mode_active do
       do_disable_raw_mode(state.original_settings)
     end
 
-    # Reset terminal attributes (colors, styles)
-    write_to_terminal(ANSI.reset())
+    # Phase 5: Cleanup ONLCR persistent_term
+    TerminalOutput.disable_onlcr()
 
     if :ets.whereis(@ets_table) != :undefined do
       :ets.insert(@ets_table, {:raw_mode_active, false})
@@ -605,9 +614,17 @@ defmodule TermUI.Terminal do
   end
 
   defp write_to_terminal(data) do
-    IO.write(data)
+    TerminalOutput.write(data)
   rescue
     _ -> :ok
+  end
+
+  defp ensure_cooked_mode do
+    :shell.start_interactive({:noshell, :cooked})
+  rescue
+    _ -> :ok
+  catch
+    _, _ -> :ok
   end
 
   defp terminal? do
@@ -650,12 +667,7 @@ defmodule TermUI.Terminal do
       case :ets.lookup(@ets_table, :raw_mode_active) do
         [{:raw_mode_active, true}] ->
           Logger.warning("Detected unclean termination from previous run, resetting terminal")
-          # Disable all mouse tracking modes first
-          write_to_terminal(@all_mouse_off)
-          write_to_terminal(ANSI.cursor_show())
-          write_to_terminal("\r\n")
-          write_to_terminal(ANSI.leave_alternate_screen())
-          write_to_terminal(@reset_terminal)
+          TerminalOutput.write_to_tty(TerminalOutput.cleanup_sequence())
 
         _ ->
           :ok

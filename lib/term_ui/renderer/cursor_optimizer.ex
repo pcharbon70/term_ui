@@ -263,8 +263,11 @@ defmodule TermUI.Renderer.CursorOptimizer do
 
   defp add_space_option(options, _row_diff, _col_diff), do: options
 
+  # Use ANSI cursor-down instead of bare \n to prevent staircase rendering
+  # when OPOST is disabled (OTP 28 raw mode, stty raw)
   defp add_newline_options(options, row_diff, 1, 1) when row_diff > 0 do
-    [{String.duplicate("\n", row_diff), row_diff} | options]
+    {v_seq, v_cost} = vertical_sequence(row_diff)
+    [{v_seq, v_cost} | options]
   end
 
   defp add_newline_options(options, _row_diff, _from_col, _to_col), do: options
@@ -300,17 +303,7 @@ defmodule TermUI.Renderer.CursorOptimizer do
       # CR + vertical movement
       options = []
 
-      # Option 1: CR + newlines (for moving down to column 1)
-      options =
-        if row_diff > 0 do
-          # \r\n\n\n... is 1 + row_diff bytes
-          lf_seq = ["\r", String.duplicate("\n", row_diff)]
-          [{lf_seq, cost_cr() + row_diff} | options]
-        else
-          options
-        end
-
-      # Option 2: CR + escape sequence (for up or large down)
+      # CR + ANSI cursor movement (no bare \n to avoid staircase rendering)
       {v_seq, v_cost} = vertical_sequence(row_diff)
       [{["\r", v_seq], cost_cr() + v_cost} | options]
     end
