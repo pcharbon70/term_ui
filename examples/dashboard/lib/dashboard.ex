@@ -25,23 +25,30 @@ defmodule Dashboard do
   """
 
   @doc """
-  Starts the dashboard interactively, blocking until the user quits.
+  Run the dashboard example application.
 
-  This is the main entry point for both IEx and standalone use. It blocks
-  the calling process to take over terminal input - this is required for
-  keyboard controls to work when running from IEx.
+  This is the main entry point for both IEx and command line use.
 
   ## From IEx
 
-      iex> Dashboard.start()
+      iex> Dashboard.run()
       # Dashboard takes over terminal, press Q to quit
 
   ## From command line
 
-      mix run -e "Dashboard.start()"
+      mix termui.run
+  """
+  def run do
+    TermUI.Runtime.run(root: Dashboard.App)
+  end
+
+  @doc """
+  Starts the dashboard interactively, blocking until the user quits.
+
+  This is an alias for `run/0` for backward compatibility.
   """
   def start do
-    TermUI.Runtime.run(root: Dashboard.App)
+    run()
   end
 
   @doc """

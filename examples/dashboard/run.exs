@@ -1,1 +1,1 @@
-Dashboard.run()
+Dashboard.App.run()
