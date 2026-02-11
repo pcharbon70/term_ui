@@ -1,7 +1,7 @@
 # Linux Manual Testing Checklist
 
 | Example | Tested | Description |
-|---------|:------::|-------------|
+|---------|:------:|-------------|
 | alert_dialog | [ ] | Standardized message dialogs and confirmations with predefined button configurations |
 | bar_chart | [ ] | Comparative values displayed as horizontal or vertical bars |
 | canvas | [ ] | Direct character buffer for custom drawing with primitives |
