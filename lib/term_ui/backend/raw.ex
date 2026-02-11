@@ -736,13 +736,15 @@ defmodule TermUI.Backend.Raw do
   end
 
   def draw_cells(state, cells) when is_list(cells) do
-    # Group cells by row and process each row with a reset at the end
-    # This prevents style bleeding from one row to the next
+    # Sort cells in row-major order, then by column within each row
+    sorted_cells =
+      Enum.sort_by(cells, fn {{row, col}, _cell} -> {row, col} end)
+
+    # Split into contiguous runs and render each with a single cursor position
+    runs = detect_runs(sorted_cells)
+
     {output, final_pos, final_style} =
-      cells
-      |> Enum.group_by(fn {{row, _col}, _cell} -> row end)
-      |> Enum.sort()
-      |> process_cells_by_row(state.cursor_position, state.current_style)
+      render_runs(runs, state.cursor_position, state.current_style)
 
     # Write batched output to terminal
     write_to_terminal(output)
@@ -753,43 +755,61 @@ defmodule TermUI.Backend.Raw do
     {:ok, updated_state}
   end
 
-  # Process cells grouped by row, emitting a reset after each row
-  defp process_cells_by_row(rows_with_cells, initial_pos, initial_style) do
-    Enum.reduce(rows_with_cells, {[], initial_pos, initial_style}, fn {_row, cells},
-                                                                            {output_acc,
-                                                                             cursor_pos, style} ->
-      # Sort cells within row by column
-      sorted_cells = Enum.sort_by(cells, fn {{_row, col}, _cell} -> col end)
+  # Detects contiguous runs of cells: same row with consecutive columns.
+  # Returns a list of runs, where each run is a non-empty list of cells
+  # that can be rendered with a single cursor positioning.
+  defp detect_runs([]), do: []
 
-      # Process all cells in this row
-      {row_output, row_end_pos, _row_end_style} =
-        process_row_cells(sorted_cells, cursor_pos, style)
+  defp detect_runs([first | rest]) do
+    {current_run, runs} =
+      Enum.reduce(rest, {[first], []}, fn {{row, col}, _cell_data} = cell,
+                                          {current_run, completed_runs} ->
+        # Get the last cell in the current run to check adjacency
+        [{{prev_row, prev_col}, _} | _] = current_run
 
-      # Append row output and reset after row to prevent style bleeding
-      {[output_acc, row_output, ANSI.reset()], row_end_pos, nil}
+        if row == prev_row and col == prev_col + 1 do
+          # Adjacent: extend current run (prepend for efficiency, reversed later)
+          {[cell | current_run], completed_runs}
+        else
+          # Gap or new row: finalize current run, start new one
+          {[cell], [Enum.reverse(current_run) | completed_runs]}
+        end
+      end)
+
+    # Don't forget the final run
+    Enum.reverse([Enum.reverse(current_run) | runs])
+  end
+
+  # Renders a list of runs into an iolist. Each run gets one cursor position
+  # at its start, then streams characters with inline style deltas only when
+  # the style changes. Style state is tracked continuously across runs (no
+  # per-row resets).
+  defp render_runs(runs, initial_pos, initial_style) do
+    Enum.reduce(runs, {[], initial_pos, initial_style}, fn run, {output_acc, cursor_pos, style} ->
+      {run_output, run_end_pos, run_end_style} =
+        render_single_run(run, cursor_pos, style)
+
+      {[output_acc, run_output], run_end_pos, run_end_style}
     end)
   end
 
-  # Process cells within a single row
-  defp process_row_cells(cells, initial_pos, initial_style) do
-    Enum.reduce(cells, {[], initial_pos, initial_style}, fn {{row, col} = target_pos,
-                                                              {char, fg, bg, attrs}},
-                                                             {output_acc, cursor_pos, style} ->
-      # Generate cursor movement if needed
-      cursor_output = cursor_move_output(cursor_pos, target_pos)
+  # Renders a single contiguous run. Emits one cursor position at the start,
+  # then for each cell: style delta (if changed) + character.
+  defp render_single_run([{{row, col}, _} | _] = run, cursor_pos, style) do
+    # Position cursor at run start
+    cursor_output = cursor_move_output(cursor_pos, {row, col})
 
-      # Generate style delta
-      new_style = %{fg: fg, bg: bg, attrs: normalize_attrs(attrs)}
-      style_output = style_delta_output(style, new_style)
+    # Stream characters with inline style changes
+    {chars_output, end_col, end_style} =
+      Enum.reduce(run, {[], col, style}, fn {{_row, _col}, {char, fg, bg, attrs}},
+                                            {out_acc, cur_col, cur_style} ->
+        new_style = %{fg: fg, bg: bg, attrs: normalize_attrs(attrs)}
+        style_output = style_delta_output(cur_style, new_style)
 
-      # Build cell output: [cursor_move, style_delta, character]
-      cell_output = [cursor_output, style_output, char]
+        {[out_acc, style_output, char], cur_col + 1, new_style}
+      end)
 
-      # After outputting character, cursor advances one column
-      new_cursor_pos = {row, col + 1}
-
-      {[output_acc, cell_output], new_cursor_pos, new_style}
-    end)
+    {[cursor_output, chars_output], {row, end_col}, end_style}
   end
 
   # Normalizes attributes to a sorted list for consistent comparison.

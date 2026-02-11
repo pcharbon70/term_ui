@@ -67,17 +67,10 @@ defmodule TermUI.TerminalOutput do
 
   @spec cleanup_sequence() :: String.t()
   def cleanup_sequence do
-    base =
-      "\e[?1006l\e[?1003l\e[?1002l\e[?1000l" <>
-        "\e[?25h" <>
-        "\e[0m" <>
-        "\e[?1049l"
-
-    if needs_hard_reset?() do
-      base <> "\ec"
-    else
-      base
-    end
+    "\e[?1006l\e[?1003l\e[?1002l\e[?1000l" <>
+      "\e[?25h" <>
+      "\e[0m" <>
+      "\e[?1049l"
   end
 
   @spec needs_hard_reset?() :: boolean()
