@@ -469,11 +469,14 @@ defmodule TermUI.Runtime do
     # Enable ONLCR translation (bare \n → \r\n) since raw mode disables OPOST
     TerminalOutput.enable_onlcr()
 
+    # Terminal GenServer already entered alternate screen and hid cursor in
+    # setup_terminal_and_buffers, so skip those here to avoid double entry.
+    # Mouse tracking is also already configured.
     {:ok, backend_state} =
       backend.init(
-        alternate_screen: true,
-        hide_cursor: true,
-        mouse_tracking: :all,
+        alternate_screen: false,
+        hide_cursor: false,
+        mouse_tracking: :none,
         size: {cols, rows}
       )
 
@@ -482,7 +485,7 @@ defmodule TermUI.Runtime do
 
   defp init_tty_backend(capabilities) do
     backend = TermUI.Backend.TTY
-    {:ok, backend_state} = backend.init(capabilities: capabilities)
+    {:ok, backend_state} = backend.init(capabilities: capabilities, alternate_screen: true)
     {:tty, backend, backend_state, capabilities, false, nil, nil}
   end
 
@@ -495,29 +498,32 @@ defmodule TermUI.Runtime do
   end
 
   defp setup_terminal_and_buffers do
-    # Start Terminal GenServer first, before calling any Terminal API functions
-    # The Terminal GenServer will detect if raw mode is already active (e.g., from Selector)
-    with {:ok, _pid} <- Terminal.start_link(),
-         :ok <- Terminal.enter_alternate_screen(),
-         :ok <- Terminal.hide_cursor(),
-         :ok <- Terminal.enable_mouse_tracking(:all),
-         {rows, cols} <- get_terminal_dimensions_safe(),
-         {:ok, buffer_pid} <- BufferManager.start_link(rows: rows, cols: cols) do
-      {true, buffer_pid, {cols, rows}}
-    else
-      {:error, {:already_started, buffer_pid}} ->
-        # BufferManager already started, use it
-        {rows, cols} = get_terminal_dimensions_safe()
-        {true, buffer_pid, {cols, rows}}
-
-      {:error, _reason} ->
-        {false, nil, nil}
-
-      _ ->
-        {false, nil, nil}
+    # Start Terminal GenServer (or reuse if already running)
+    case Terminal.start_link() do
+      {:ok, _pid} -> :ok
+      {:error, {:already_started, _pid}} -> :ok
+      {:error, reason} -> throw({:terminal_failed, reason})
     end
+
+    # Configure terminal for TUI mode
+    :ok = Terminal.enter_alternate_screen()
+    :ok = Terminal.hide_cursor()
+    :ok = Terminal.enable_mouse_tracking(:all)
+
+    {rows, cols} = get_terminal_dimensions_safe()
+
+    # Start BufferManager (or reuse if already running)
+    buffer_pid =
+      case BufferManager.start_link(rows: rows, cols: cols) do
+        {:ok, pid} -> pid
+        {:error, {:already_started, pid}} -> pid
+      end
+
+    {true, buffer_pid, {cols, rows}}
   rescue
     _ -> {false, nil, nil}
+  catch
+    {:terminal_failed, _} -> {false, nil, nil}
   end
 
   defp get_terminal_dimensions_safe do
@@ -1225,62 +1231,76 @@ defmodule TermUI.Runtime do
         current_row = Buffer.get_row(current, row)
         previous_row = Buffer.get_row(previous, row)
 
-        current_changed = find_current_changed_cells(current_row, previous_row, row)
-        previous_changed = find_previous_cells_to_clear(current_row, previous_row, row)
-
-        current_changed ++ previous_changed ++ acc
+        # Single O(n) zip pass instead of two O(n^2) passes with Enum.at
+        diff_row_cells(current_row, previous_row, row, 1, acc)
     end
   end
 
-  defp find_current_changed_cells(current_row, previous_row, row) do
-    current_row
-    |> Enum.with_index(1)
-    |> Enum.filter(fn {cell, col} ->
-      displayable_cell?(cell) and cell_changed_from_previous?(cell, col, previous_row)
-    end)
-    |> Enum.flat_map(fn {cell, col} ->
-      cell_to_backend_tuple(cell, row, col)
-    end)
+  # Zips current and previous rows in a single pass, emitting:
+  # - Changed displayable cells (new content to draw)
+  # - Clear cells (previous content that needs erasing)
+  defp diff_row_cells([], [], _row, _col, acc), do: acc
+
+  defp diff_row_cells([cur | cur_rest], [prev | prev_rest], row, col, acc) do
+    acc =
+      if Cell.equal?(cur, prev) do
+        # Identical — skip
+        acc
+      else
+        # Cells differ — check what to emit
+        cur_displayable = displayable_cell?(cur)
+        prev_displayable = displayable_cell?(prev)
+
+        acc =
+          if cur_displayable do
+            # New content to draw
+            cell_to_backend_tuple(cur, row, col) ++ acc
+          else
+            acc
+          end
+
+        if prev_displayable and not cur_displayable do
+          # Previous had content, current is empty — need to clear
+          [{{row, col}, {" ", :default, :default, []}} | acc]
+        else
+          if prev_displayable and cur_displayable and
+               prev.bg != nil and prev.bg != :default and cur.char == " " do
+            # Previous had colored bg, current is space — clear to remove bg
+            [{{row, col}, {" ", :default, :default, []}} | acc]
+          else
+            acc
+          end
+        end
+      end
+
+    diff_row_cells(cur_rest, prev_rest, row, col + 1, acc)
   end
 
-  defp cell_changed_from_previous?(cell, col, previous_row) do
-    prev_cell = Enum.at(previous_row, col - 1, Cell.empty())
-    not Cell.equal?(cell, prev_cell)
+  # Handle rows of different lengths (shouldn't happen normally, but be safe)
+  defp diff_row_cells([cur | cur_rest], [], row, col, acc) do
+    acc =
+      if displayable_cell?(cur) do
+        cell_to_backend_tuple(cur, row, col) ++ acc
+      else
+        acc
+      end
+
+    diff_row_cells(cur_rest, [], row, col + 1, acc)
   end
 
-  defp find_previous_cells_to_clear(current_row, previous_row, row) do
-    previous_row
-    |> Enum.with_index(1)
-    |> Enum.filter(fn {prev_cell, col} ->
-      displayable_cell?(prev_cell) and needs_clearing_at?(col, prev_cell, current_row)
-    end)
-    |> Enum.map(fn {_prev_cell, col} ->
-      # Send a clear cell (space with default styling)
-      {{row, col}, {" ", :default, :default, []}}
-    end)
+  defp diff_row_cells([], [prev | prev_rest], row, col, acc) do
+    acc =
+      if displayable_cell?(prev) do
+        [{{row, col}, {" ", :default, :default, []}} | acc]
+      else
+        acc
+      end
+
+    diff_row_cells([], prev_rest, row, col + 1, acc)
   end
 
   defp displayable_cell?(%Cell{} = cell) do
     cell.char != " " or (cell.bg != nil and cell.bg != :default)
-  end
-
-  defp needs_clearing_at?(col, prev_cell, current_row) do
-    current_cell = Enum.at(current_row, col - 1, Cell.empty())
-    cells_differ = not Cell.equal?(current_cell, prev_cell)
-
-    # Only clear if:
-    # 1. Current cell is empty (nothing new to render), OR
-    # 2. Previous cell had colored background AND current cell has no text (just space)
-    # This prevents clearing overwriting new text content while still clearing colored backgrounds
-    had_colored_bg = prev_cell.bg != nil and prev_cell.bg != :default
-    has_no_text = current_cell.char == " "
-
-    cells_differ and (empty_cell?(current_cell) or (had_colored_bg and has_no_text))
-  end
-
-  defp empty_cell?(%Cell{} = cell) do
-    cell.char == " " and cell.bg == :default and cell.fg == :default and
-      MapSet.size(cell.attrs) == 0
   end
 
   # Converts a Cell struct to the backend format: {{row, col}, {char, fg, bg, attrs}}
