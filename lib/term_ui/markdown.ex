@@ -276,18 +276,17 @@ defmodule TermUI.Markdown do
   # Node Processing
   defp process_node(%MDEx.Heading{level: 1, nodes: children}) do
     content = extract_text(children)
-    [[{"# " <> content, @header1_style}], [{"", nil}]]
+    [[{content, @header1_style}], [{"", nil}]]
   end
 
   defp process_node(%MDEx.Heading{level: 2, nodes: children}) do
     content = extract_text(children)
-    [[{"## " <> content, @header2_style}], [{"", nil}]]
+    [[{content, @header2_style}], [{"", nil}]]
   end
 
   defp process_node(%MDEx.Heading{level: level, nodes: children}) when level >= 3 do
-    prefix = String.duplicate("#", level) <> " "
     content = extract_text(children)
-    [[{prefix <> content, @header3_style}], [{"", nil}]]
+    [[{content, @header3_style}], [{"", nil}]]
   end
 
   defp process_node(%MDEx.Paragraph{nodes: children}) do

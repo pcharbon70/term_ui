@@ -3,20 +3,20 @@
 | Example | Tested | Description |
 |---------|:------:|-------------|
 | alert_dialog | [ ] | Standardized message dialogs and confirmations with predefined button configurations |
-| bar_chart | [ ] | Comparative values displayed as horizontal or vertical bars |
-| canvas | [ ] | Direct character buffer for custom drawing with primitives |
-| cluster_dashboard | [ ] | Visualization and monitoring of distributed Erlang/BEAM clusters |
-| command_palette | [ ] | Command dropdown for filtering and selecting commands with keyboard |
-| context_menu | [ ] | Floating menus at cursor position, triggered by right-click or keyboard |
+| bar_chart | [x] | Comparative values displayed as horizontal or vertical bars |
+| canvas | [x] | Direct character buffer for custom drawing with primitives |
+| cluster_dashboard | [x] | Visualization and monitoring of distributed Erlang/BEAM clusters |
+| command_palette | [x] | Command dropdown for filtering and selecting commands with keyboard |
+| context_menu | [x] | Floating menus at cursor position, triggered by right-click or keyboard |
 | dashboard | [ ] | System monitoring dashboard with multiple widgets and real-time updates |
-| dialog | [ ] | Modal dialogs with customizable buttons and content |
-| form_builder | [ ] | Structured forms with multiple field types and validation |
-| gauge | [ ] | Numeric values within a range using visual bars or arcs |
-| iex_counter | [ ] | Simple counter demonstrating TermUI's IEx compatibility |
-| line_chart | [ ] | Time series visualization using Braille patterns |
-| log_viewer | [ ] | Display and analyze log data with virtual scrolling |
-| markdown_viewer | [ ] | Render and display markdown content |
-| menu | [ ] | Hierarchical menus with various item types |
+| dialog | [x] | Modal dialogs with customizable buttons and content |
+| form_builder | [x] | Structured forms with multiple field types and validation |
+| gauge | [x] | Numeric values within a range using visual bars or arcs |
+| iex_counter | [x] | Simple counter demonstrating TermUI's IEx compatibility |
+| line_chart | [x] | Time series visualization using Braille patterns |
+| log_viewer | [x] | Display and analyze log data with virtual scrolling |
+| markdown_viewer | [x] | Render and display markdown content |
+| menu | [x] | Hierarchical menus with various item types |
 | multi_renderer | [ ] | Multi-renderer capabilities with automatic backend selection |
 | pick_list | [ ] | Modal selection dialogs with filtering support |
 | process_monitor | [ ] | Live BEAM process inspection and management |
