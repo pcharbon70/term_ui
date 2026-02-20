@@ -90,7 +90,7 @@ defmodule TermUI.TermUtils do
   def safe_stty(args, opts \\ []) do
     case validate_stty_args(args) do
       :ok ->
-        safe_command("stty", args, opts)
+        safe_stty_command(args, opts)
 
       {:error, _} = error ->
         error
@@ -209,6 +209,63 @@ defmodule TermUI.TermUtils do
     await_result(task, timeout, command)
   end
 
+  @spec safe_stty_command([binary()], options()) :: result()
+  defp safe_stty_command(args, opts) do
+    timeout = Keyword.get(opts, :timeout, @default_timeout)
+    validate_fn = Keyword.get(opts, :validate, &default_validate/1)
+
+    task =
+      Task.async(fn ->
+        try do
+          case run_stty(args) do
+            {output, 0} ->
+              case validate_fn.(output) do
+                :ok -> {:ok, String.trim(output)}
+                {:error, _} -> {:error, :output_validation_failed}
+              end
+
+            {error_output, _code} ->
+              if not_tty_error?(error_output) do
+                {:error, :not_tty}
+              else
+                Logger.warning(
+                  "TermUtils: Command 'stty #{Enum.join(args, " ")}' failed: #{error_output}"
+                )
+
+                {:error, :execution_failed}
+              end
+          end
+        rescue
+          _ ->
+            {:error, :execution_failed}
+        end
+      end)
+
+    await_result(task, timeout, "stty")
+  end
+
+  @spec run_stty([binary()]) :: {binary(), integer()}
+  defp run_stty(args) do
+    attempts = [
+      ["-F", "/dev/tty" | args],
+      ["-f", "/dev/tty" | args],
+      args
+    ]
+
+    Enum.reduce_while(attempts, {"", 1}, fn argv, _acc ->
+      result = System.cmd("stty", argv, stderr_to_stdout: true, parallelism: true)
+      if match?({_, 0}, result), do: {:halt, result}, else: {:cont, result}
+    end)
+  end
+
+  @spec not_tty_error?(binary()) :: boolean()
+  defp not_tty_error?(output) do
+    message = String.downcase(output)
+
+    String.contains?(message, "inappropriate ioctl for device") or
+      String.contains?(message, "not a tty")
+  end
+
   # Separate function to have access to timeout variable in catch block
   defp await_result(task, timeout, command) do
     case Task.await(task, timeout) do
@@ -238,6 +295,7 @@ defmodule TermUI.TermUtils do
     # Safe stty flags (non-injectable)
     safe_flags = [
       "-g",
+      "size",
       "raw",
       "-raw",
       "-echo",
