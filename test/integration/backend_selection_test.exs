@@ -26,6 +26,8 @@ defmodule TermUI.Integration.BackendSelectionTest do
     original_colorterm = System.get_env("COLORTERM")
     original_term = System.get_env("TERM")
     original_lang = System.get_env("LANG")
+    original_lc_all = System.get_env("LC_ALL")
+    original_lc_ctype = System.get_env("LC_CTYPE")
 
     on_exit(fn ->
       # Restore Application env
@@ -39,6 +41,8 @@ defmodule TermUI.Integration.BackendSelectionTest do
       restore_sys_env("COLORTERM", original_colorterm)
       restore_sys_env("TERM", original_term)
       restore_sys_env("LANG", original_lang)
+      restore_sys_env("LC_ALL", original_lc_all)
+      restore_sys_env("LC_CTYPE", original_lc_ctype)
     end)
 
     # Clear Application env for clean test state
@@ -204,6 +208,9 @@ defmodule TermUI.Integration.BackendSelectionTest do
 
     test "environment variable changes affect unicode detection" do
       # 1.5.2.3 continued - LANG affects unicode detection
+      System.delete_env("LC_ALL")
+      System.delete_env("LC_CTYPE")
+
       System.put_env("LANG", "en_US.UTF-8")
       caps = Selector.detect_capabilities()
       assert caps.unicode == true
