@@ -416,6 +416,24 @@ defmodule TermUI.Renderer.Buffer do
   defp build_cell(grapheme, nil), do: Cell.new(grapheme)
   defp build_cell(grapheme, style), do: Style.to_cell(style, grapheme)
 
+  @doc """
+  Fills the entire buffer with the given cell.
+
+  This is used to set a background before rendering content on top,
+  ensuring the diff algorithm detects all cells as changed on the
+  first frame (producing a full-screen draw).
+  """
+  @spec fill(t(), Cell.t()) :: :ok
+  def fill(%__MODULE__{} = buffer, %Cell{} = cell) do
+    entries =
+      for row <- 1..buffer.rows, col <- 1..buffer.cols do
+        {{row, col}, cell}
+      end
+
+    :ets.insert(buffer.table, entries)
+    :ok
+  end
+
   # Private helpers
 
   defp initialize_cells(%__MODULE__{} = buffer) do
