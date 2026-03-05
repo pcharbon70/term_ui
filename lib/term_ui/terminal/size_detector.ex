@@ -32,8 +32,6 @@ defmodule TermUI.Terminal.SizeDetector do
   integer overflow or resource exhaustion attacks through environment variables
   or malicious terminal responses.
   """
-
-  require Logger
   alias TermUI.TermUtils
 
   # Maximum terminal dimension (rows or columns).
@@ -103,10 +101,13 @@ defmodule TermUI.Terminal.SizeDetector do
   """
   @spec auto_detect() :: {:ok, {pos_integer(), pos_integer()}} | {:error, :size_detection_failed}
   def auto_detect do
+    # Return the first success
     with {:error, _} <- detect_from_io(),
          {:error, _} <- detect_from_env(),
          {:error, _} <- detect_from_stty() do
       {:error, :size_detection_failed}
+    else
+      {:ok, _size} = ok -> ok
     end
   end
 
