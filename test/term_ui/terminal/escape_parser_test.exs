@@ -230,6 +230,22 @@ defmodule TermUI.Terminal.EscapeParserTest do
   end
 
   describe "parse/1 - modified arrow keys" do
+    test "parses Shift+Tab (ESC[Z)" do
+      {events, remaining} = EscapeParser.parse("\e[Z")
+      assert remaining == <<>>
+      assert [%Event.Key{key: :tab, modifiers: modifiers}] = events
+      assert :shift in modifiers
+    end
+
+    test "parses Shift+Tab variant (ESC[1;2Z)" do
+      {events, remaining} = EscapeParser.parse("\e[1;2Z")
+      assert remaining == <<>>
+      assert [%Event.Key{key: :tab, modifiers: modifiers}] = events
+      assert :shift in modifiers
+      refute :alt in modifiers
+      refute :ctrl in modifiers
+    end
+
     test "parses Shift+Up (ESC[1;2A)" do
       {events, remaining} = EscapeParser.parse("\e[1;2A")
       assert remaining == <<>>

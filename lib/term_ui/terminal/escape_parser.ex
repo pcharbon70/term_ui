@@ -179,6 +179,9 @@ defmodule TermUI.Terminal.EscapeParser do
   defp parse_csi_sequence(<<"C", rest::binary>>), do: {:ok, Event.key(:right), rest}
   defp parse_csi_sequence(<<"D", rest::binary>>), do: {:ok, Event.key(:left), rest}
 
+  defp parse_csi_sequence(<<"Z", rest::binary>>),
+    do: {:ok, Event.key(:tab, modifiers: [:shift]), rest}
+
   # Home/End
   defp parse_csi_sequence(<<"H", rest::binary>>), do: {:ok, Event.key(:home), rest}
   defp parse_csi_sequence(<<"F", rest::binary>>), do: {:ok, Event.key(:end), rest}
@@ -220,6 +223,13 @@ defmodule TermUI.Terminal.EscapeParser do
 
     modifiers = decode_modifier(modifier - ?0)
     event = Event.key(key, modifiers: modifiers)
+    {:ok, event, rest}
+  end
+
+  # Modified Shift+Tab sequence: ESC [ 1 ; modifier Z
+  defp parse_csi_sequence(<<"1;", modifier, "Z", rest::binary>>) when modifier in ?0..?9 do
+    modifiers = decode_modifier(modifier - ?0)
+    event = Event.key(:tab, modifiers: modifiers)
     {:ok, event, rest}
   end
 
