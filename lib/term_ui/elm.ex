@@ -41,6 +41,11 @@ defmodule TermUI.Elm do
   @type msg :: Message.t()
   @type command :: term()
   @type render_tree :: term()
+  @type init_result ::
+          state()
+          | {state(), [command()]}
+          | {:ok, state()}
+          | {:ok, state(), [command()]}
 
   @type update_result ::
           {state(), [command()]}
@@ -143,7 +148,7 @@ defmodule TermUI.Elm do
 
   Initial state for the component.
   """
-  @callback init(opts :: keyword()) :: state()
+  @callback init(opts :: keyword()) :: init_result()
 
   @optional_callbacks [init: 1]
 
@@ -170,6 +175,24 @@ defmodule TermUI.Elm do
       defoverridable init: 1, event_to_msg: 2
     end
   end
+
+  @doc """
+  Normalizes init result to standard form.
+
+  Supports plain state as well as state with startup commands.
+  """
+  @spec normalize_init_result(init_result()) :: {state(), [command()]}
+  def normalize_init_result({:ok, state}), do: {state, []}
+
+  def normalize_init_result({:ok, state, commands}) when is_list(commands) do
+    {state, commands}
+  end
+
+  def normalize_init_result({state, commands}) when is_list(commands) do
+    {state, commands}
+  end
+
+  def normalize_init_result(state), do: {state, []}
 
   @doc """
   Normalizes update result to standard form.

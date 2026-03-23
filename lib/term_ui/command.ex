@@ -59,8 +59,8 @@ defmodule TermUI.Command do
       Command.timer(1000, :timer_done)
       Command.timer(500, {:tick, 1})
   """
-  @spec timer(pos_integer(), term()) :: t()
-  def timer(delay_ms, on_result) when is_integer(delay_ms) and delay_ms > 0 do
+  @spec timer(non_neg_integer(), term()) :: t()
+  def timer(delay_ms, on_result) when is_integer(delay_ms) and delay_ms >= 0 do
     %__MODULE__{
       type: :timer,
       payload: delay_ms,
@@ -194,7 +194,7 @@ defmodule TermUI.Command do
   @spec validate(t()) :: :ok | {:error, term()}
   def validate(%__MODULE__{type: :none}), do: :ok
 
-  def validate(%__MODULE__{type: :timer, payload: delay}) when is_integer(delay) and delay > 0,
+  def validate(%__MODULE__{type: :timer, payload: delay}) when is_integer(delay) and delay >= 0,
     do: :ok
 
   def validate(%__MODULE__{type: :interval, payload: interval})
