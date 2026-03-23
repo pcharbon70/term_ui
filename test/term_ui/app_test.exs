@@ -2,6 +2,7 @@ defmodule TermUI.AppTest do
   use ExUnit.Case, async: false
 
   alias TermUI.App
+  alias TermUI.Command
 
   # Clean up persistent_term values between tests
   setup do
@@ -36,6 +37,41 @@ defmodule TermUI.AppTest do
     def event_to_msg(_, _), do: :ignore
     def update(_, state), do: {state, []}
     def view(state), do: {:text, "Count: " <> to_string(state.count)}
+  end
+
+  defmodule InitCommandCounter do
+    use TermUI.Elm
+
+    def init(_opts) do
+      {:ok, %{ticks: 0}, [Command.timer(0, :tick)]}
+    end
+
+    def event_to_msg(_, _), do: :ignore
+
+    def update(:tick, state), do: {%{state | ticks: state.ticks + 1}, []}
+    def update(_, state), do: {state, []}
+    def view(_state), do: {:text, "Init command"}
+  end
+
+  defmodule RuntimeCommandCounter do
+    use TermUI.Elm
+
+    def init(_opts), do: %{ticks: 0, pongs: 0}
+
+    def event_to_msg(_, _), do: :ignore
+
+    def update(:start_timer, state) do
+      {state, [Command.timer(0, :tick)]}
+    end
+
+    def update(:start_send_after, state) do
+      {state, [Command.send_after(:root, :pong, 1)]}
+    end
+
+    def update(:tick, state), do: {%{state | ticks: state.ticks + 1}, []}
+    def update(:pong, state), do: {%{state | pongs: state.pongs + 1}, []}
+    def update(_, state), do: {state, []}
+    def view(_state), do: {:text, "Runtime commands"}
   end
 
   describe "start/2" do
@@ -213,6 +249,46 @@ defmodule TermUI.AppTest do
         end)
 
       assert {:ok, :exited_normally} = Task.await(task, 5000)
+    end
+  end
+
+  describe "root command execution" do
+    test "runs startup commands returned from init/1" do
+      {:ok, pid} = App.start(InitCommandCounter, skip_terminal: true)
+
+      Process.sleep(25)
+      :ok = TermUI.Runtime.sync(pid)
+
+      state = TermUI.Runtime.get_state(pid)
+      assert state.root_state.ticks == 1
+
+      GenServer.stop(pid)
+    end
+
+    test "executes runtime commands returned from update/2" do
+      {:ok, pid} = App.start(RuntimeCommandCounter, skip_terminal: true)
+
+      TermUI.Runtime.send_message(pid, :root, :start_timer)
+      Process.sleep(25)
+      :ok = TermUI.Runtime.sync(pid)
+
+      state = TermUI.Runtime.get_state(pid)
+      assert state.root_state.ticks == 1
+
+      GenServer.stop(pid)
+    end
+
+    test "routes send_after results to the target component message queue" do
+      {:ok, pid} = App.start(RuntimeCommandCounter, skip_terminal: true)
+
+      TermUI.Runtime.send_message(pid, :root, :start_send_after)
+      Process.sleep(25)
+      :ok = TermUI.Runtime.sync(pid)
+
+      state = TermUI.Runtime.get_state(pid)
+      assert state.root_state.pongs == 1
+
+      GenServer.stop(pid)
     end
   end
 

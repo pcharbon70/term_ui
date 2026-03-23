@@ -13,6 +13,14 @@ defmodule TermUI.CommandTest do
       assert cmd.timeout == :infinity
     end
 
+    test "accepts zero-delay timers for immediate scheduling" do
+      cmd = Command.timer(0, :timer_done)
+
+      assert cmd.type == :timer
+      assert cmd.payload == 0
+      assert cmd.on_result == :timer_done
+    end
+
     test "accepts tuple as result message" do
       cmd = Command.timer(500, {:tick, 1})
 
@@ -71,6 +79,10 @@ defmodule TermUI.CommandTest do
   describe "validate/1" do
     test "validates timer command" do
       assert :ok = Command.validate(Command.timer(100, :done))
+    end
+
+    test "validates zero-delay timer command" do
+      assert :ok = Command.validate(Command.timer(0, :done))
     end
 
     test "validates interval command" do

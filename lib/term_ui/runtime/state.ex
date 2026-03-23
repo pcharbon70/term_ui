@@ -12,8 +12,10 @@ defmodule TermUI.Runtime.State do
   - Shutdown status
   - Backend selection and capabilities
   - Input handler (Raw or TTY mode)
+  - Command executor for async side effects
   """
 
+  alias TermUI.Command.Executor
   alias TermUI.EventQueue
   alias TermUI.MessageQueue
 
@@ -47,6 +49,7 @@ defmodule TermUI.Runtime.State do
           backend: module() | nil,
           backend_state: term() | nil,
           capabilities: capabilities() | nil,
+          command_executor: Executor.t() | nil,
           input_handler: module() | nil,
           input_state: term() | nil,
           logger_handler_config: map() | nil
@@ -82,6 +85,7 @@ defmodule TermUI.Runtime.State do
     backend: nil,
     backend_state: nil,
     capabilities: nil,
+    command_executor: nil,
     input_handler: nil,
     input_state: nil,
     logger_handler_config: nil

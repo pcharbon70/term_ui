@@ -27,6 +27,8 @@ defmodule TermUI.Runtime do
   require Logger
 
   alias TermUI.Backend.Selector
+  alias TermUI.Command
+  alias TermUI.Command.Executor
   alias TermUI.Config
   alias TermUI.Elm
   alias TermUI.Event
@@ -318,8 +320,14 @@ defmodule TermUI.Runtime do
     # Store backend info in persistent_term for global access
     PersistentTerms.store_backend_context(backend_mode, capabilities)
 
-    # Initialize root component state
-    root_state = root_module.init(opts)
+    # Initialize async command execution before the root module boots.
+    {:ok, command_executor} = Executor.start_link()
+
+    # Initialize root component state and any startup commands.
+    {root_state, init_commands} =
+      opts
+      |> root_module.init()
+      |> Elm.normalize_init_result()
 
     # Initialize input handling
     {use_input_handler, input_handler, input_state, input_reader} =
@@ -341,6 +349,7 @@ defmodule TermUI.Runtime do
         backend: backend,
         backend_state: backend_state,
         capabilities: capabilities,
+        command_executor: command_executor,
         input_handler: input_handler,
         input_state: input_state,
         logger_handler_config: logger_handler_config
@@ -359,6 +368,11 @@ defmodule TermUI.Runtime do
       else
         state
       end
+
+    state =
+      init_commands
+      |> Enum.map(&{:root, &1})
+      |> then(&execute_commands(&1, state))
 
     {:ok, state}
   end
@@ -433,6 +447,7 @@ defmodule TermUI.Runtime do
       backend: params.backend,
       backend_state: params.backend_state,
       capabilities: params.capabilities,
+      command_executor: params.command_executor,
       input_handler: params.input_handler,
       input_state: params.input_state,
       logger_handler_config: params[:logger_handler_config]
@@ -679,6 +694,12 @@ defmodule TermUI.Runtime do
   @impl true
   def handle_info({:DOWN, _ref, :process, _pid, _reason}, state) do
     # Command task completed (handled via command_result)
+    {:noreply, state}
+  end
+
+  @impl true
+  def handle_info({:command_result, component_id, command_id, result}, state) do
+    state = handle_command_result(component_id, command_id, result, state)
     {:noreply, state}
   end
 
@@ -1091,15 +1112,43 @@ defmodule TermUI.Runtime do
       GenServer.cast(self(), :shutdown)
       %{state | shutting_down: true}
     else
-      # Track pending commands for execution
-      pending =
-        Enum.reduce(commands, state.pending_commands, fn {component_id, cmd}, acc ->
-          command_id = make_ref()
-          Map.put(acc, command_id, %{component_id: component_id, command: cmd})
-        end)
-
-      %{state | pending_commands: pending}
+      Enum.reduce(commands, state, fn {component_id, cmd}, acc ->
+        execute_command(component_id, cmd, acc)
+      end)
     end
+  end
+
+  defp execute_command(_component_id, %Command{type: :none}, state), do: state
+
+  defp execute_command(component_id, %Command{} = command, state) do
+    case Executor.execute(state.command_executor, command, self(), component_id) do
+      {:ok, command_id} ->
+        pending =
+          Map.put(state.pending_commands, command_id, %{
+            component_id: component_id,
+            command: command
+          })
+
+        %{state | pending_commands: pending}
+
+      {:error, reason} ->
+        enqueue_message(component_id, {:error, reason}, state)
+    end
+  end
+
+  defp execute_command(component_id, {:timer, ms, message}, state)
+       when is_integer(ms) and ms >= 0 do
+    execute_command(component_id, Command.timer(ms, message), state)
+  end
+
+  defp execute_command(_component_id, {:send, pid, message}, state) when is_pid(pid) do
+    send(pid, message)
+    state
+  end
+
+  defp execute_command(component_id, other, state) do
+    Logger.warning("Unknown command for #{inspect(component_id)}: #{inspect(other)}")
+    state
   end
 
   defp handle_command_result(component_id, command_id, result, state) do
@@ -1107,8 +1156,17 @@ defmodule TermUI.Runtime do
     pending = Map.delete(state.pending_commands, command_id)
     state = %{state | pending_commands: pending}
 
-    # Send result as message to component
-    enqueue_message(component_id, result, state)
+    if state.shutting_down do
+      state
+    else
+      case result do
+        {:send_to, target_component, message} ->
+          enqueue_message(target_component, message, state)
+
+        _ ->
+          enqueue_message(component_id, result, state)
+      end
+    end
   end
 
   # --- Rendering ---
@@ -1440,8 +1498,12 @@ defmodule TermUI.Runtime do
   end
 
   defp do_shutdown(state) do
-    # Wait for pending commands to complete (with timeout)
-    # For now, just clear them
+    if state.command_executor do
+      Enum.each(Map.keys(state.pending_commands), fn command_id ->
+        _ = Executor.cancel(state.command_executor, command_id)
+      end)
+    end
+
     state = %{state | pending_commands: %{}}
 
     # Terminate components (leaf to root)

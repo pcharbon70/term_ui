@@ -122,10 +122,15 @@ defmodule TermUI.Widgets.Table do
     state =
       state
       |> Map.put(:columns, new_props.columns)
-      |> Map.put(:data, new_props.data)
-
-    # Re-sort if data changed
-    state = apply_sort(state)
+      |> Map.put(:selection_mode, Map.get(new_props, :selection_mode, state.selection_mode))
+      |> Map.put(:sortable, Map.get(new_props, :sortable, state.sortable))
+      |> Map.put(:on_select, Map.get(new_props, :on_select, state.on_select))
+      |> Map.put(:on_sort, Map.get(new_props, :on_sort, state.on_sort))
+      |> Map.put(:header_style, Map.get(new_props, :header_style, state.header_style))
+      |> Map.put(:row_style, Map.get(new_props, :row_style, state.row_style))
+      |> Map.put(:selected_style, Map.get(new_props, :selected_style, state.selected_style))
+      |> Map.put(:alternating, Map.get(new_props, :alternating, state.alternating))
+      |> set_data(new_props.data)
 
     {:ok, state}
   end
@@ -480,6 +485,32 @@ defmodule TermUI.Widgets.Table do
   end
 
   @doc """
+  Replaces the table data and preserves table state as much as possible.
+
+  The cursor, selection, and scroll offset are clamped to the new row count,
+  and the current sort is re-applied.
+  """
+  @spec set_data(map(), [map()]) :: map()
+  def set_data(state, data) when is_list(data) do
+    max_index = max(0, length(data) - 1)
+
+    selected =
+      state.selected
+      |> Enum.filter(&(&1 <= max_index))
+      |> MapSet.new()
+
+    state =
+      state
+      |> Map.put(:data, data)
+      |> Map.put(:cursor, min(state.cursor, max_index))
+      |> Map.put(:selected, selected)
+      |> apply_sort()
+
+    max_offset = max(0, length(state.sorted_data) - state.visible_height)
+    %{state | scroll_offset: min(state.scroll_offset, max_offset)}
+  end
+
+  @doc """
   Gets the current selection.
 
   ## Returns
@@ -489,6 +520,14 @@ defmodule TermUI.Widgets.Table do
   @spec get_selection(map()) :: [map()]
   def get_selection(state) do
     get_selected_rows(state)
+  end
+
+  @doc """
+  Backwards-compatible alias for `get_selection/1`.
+  """
+  @spec get_selected(map()) :: [map()]
+  def get_selected(state) do
+    get_selection(state)
   end
 
   @doc """
