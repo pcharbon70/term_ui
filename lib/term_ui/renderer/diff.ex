@@ -304,6 +304,15 @@ defmodule TermUI.Renderer.Diff do
     end
   end
 
+  # A :reset op writes "\e[0m" to the terminal, clearing all SGR state.
+  # We must forget the tracked last_style so that the next :style op is
+  # re-emitted even if it matches what was active before the reset --
+  # otherwise multi-row spans that share a style lose their styling on
+  # every row but the first.
+  defp filter_redundant_style(:reset, {acc, _last_style}) do
+    {[:reset | acc], nil}
+  end
+
   defp filter_redundant_style(op, {acc, last_style}) do
     {[op | acc], last_style}
   end
