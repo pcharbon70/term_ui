@@ -1438,20 +1438,21 @@ defmodule TermUI.Runtime do
           BufferManager.resize(state.buffer_manager, rows, cols)
         end
 
-        # Clear screen through backend to avoid direct IO.write
-        state =
-          if state.backend do
-            {:ok, new_backend_state} = state.backend.clear(state.backend_state)
-            %{state | backend_state: new_backend_state}
-          else
-            state
-          end
-
         resize_event = Event.Resize.new(cols, rows)
         state = broadcast_event(resize_event, %{state | dimensions: new_dimensions})
 
-        state = %{state | dirty: true}
-        do_render(state)
+        # broadcast_event only enqueues; drain the queue so the upcoming
+        # render uses the new dimensions instead of the previous frame's.
+        # Without this the first frame after a resize draws stale content
+        # into the resized buffer -- visible as blanks (on grow) or
+        # clipping (on shrink) during drag-resize.
+        #
+        # We intentionally do not call backend.clear here: the diff
+        # already emits both content cells and erase cells for positions
+        # that went from content to empty, so the terminal repaints
+        # cleanly without a flicker-inducing full screen wipe.
+        state = process_messages(state)
+        finish_resize(state)
 
       state.backend != nil ->
         # Custom backend (SSH, etc.) — no Terminal singleton
@@ -1461,7 +1462,7 @@ defmodule TermUI.Runtime do
           BufferManager.resize(state.buffer_manager, rows, cols)
         end
 
-        # Update backend size and clear
+        # Update backend size (no clear -- see terminal_started branch).
         backend_state =
           if function_exported?(state.backend, :update_size, 3) do
             {:ok, bs} = state.backend.update_size(state.backend_state, rows, cols)
@@ -1470,19 +1471,37 @@ defmodule TermUI.Runtime do
             state.backend_state
           end
 
-        {:ok, backend_state} = state.backend.clear(backend_state)
+        # The diff renderer only emits erase cells when a buffer_manager is
+        # in play. Backends without one (TTY path) need a real clear so
+        # stale pre-resize content isn't left on screen.
+        backend_state =
+          if state.buffer_manager == nil do
+            {:ok, cleared} = state.backend.clear(backend_state)
+            cleared
+          else
+            backend_state
+          end
+
         state = %{state | backend_state: backend_state}
 
         resize_event = Event.Resize.new(cols, rows)
         state = broadcast_event(resize_event, %{state | dimensions: new_dimensions})
 
-        state = %{state | dirty: true}
-        do_render(state)
+        # See note on the terminal_started branch above -- drain the queue
+        # so the render uses the new dimensions, not the previous frame's.
+        state = process_messages(state)
+        finish_resize(state)
 
       true ->
         state
     end
   end
+
+  # process_messages can run a component's :quit command and flip
+  # shutting_down. Match process_render_tick's guard so we don't paint
+  # into a backend that's about to be torn down.
+  defp finish_resize(%{shutting_down: true} = state), do: state
+  defp finish_resize(state), do: do_render(%{state | dirty: true})
 
   # --- Shutdown ---
 
