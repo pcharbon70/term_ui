@@ -367,5 +367,52 @@ defmodule TermUI.Terminal.EscapeParserTest do
     test "returns false for empty input" do
       assert EscapeParser.partial_sequence?("") == false
     end
+
+    test "returns true for in-flight bracketed paste" do
+      assert EscapeParser.partial_sequence?("\e[200~partial content not yet ended") == true
+    end
+  end
+
+  describe "parse/1 - bracketed paste" do
+    test "parses a complete bracketed-paste sequence into a Paste event" do
+      input = "\e[200~hello\nworld\e[201~"
+      {events, remaining} = EscapeParser.parse(input)
+
+      assert [%TermUI.Event.Paste{content: "hello\nworld"}] = events
+      assert remaining == ""
+    end
+
+    test "preserves bytes after the paste end marker" do
+      input = "\e[200~abc\e[201~xyz"
+      {events, remaining} = EscapeParser.parse(input)
+
+      assert [%TermUI.Event.Paste{content: "abc"}, %TermUI.Event.Key{key: "x"} | _] = events
+      assert remaining == ""
+    end
+
+    test "incomplete paste (no end marker) is buffered" do
+      input = "\e[200~not finished yet"
+      {events, remaining} = EscapeParser.parse(input)
+
+      assert events == []
+      assert remaining == input
+    end
+
+    test "preserves embedded escape sequences inside paste body" do
+      input = "\e[200~line1\nline2\nline3\e[201~"
+      {events, _remaining} = EscapeParser.parse(input)
+
+      assert [%TermUI.Event.Paste{content: "line1\nline2\nline3"}] = events
+    end
+
+    test "bails out with a Paste event when an unterminated paste exceeds the buffer cap" do
+      # Just over 8 MiB of body, no \e[201~ end marker.
+      oversized = :binary.copy("x", 8 * 1024 * 1024 + 1)
+      input = "\e[200~" <> oversized
+      {events, remaining} = EscapeParser.parse(input)
+
+      assert [%TermUI.Event.Paste{content: ^oversized}] = events
+      assert remaining == ""
+    end
   end
 end

@@ -30,6 +30,11 @@ defmodule TermUI.Terminal.EscapeParser do
   # Provides defense against malicious input with huge coordinates.
   @max_mouse_coordinate 9999
 
+  # Maximum bytes to buffer for an unterminated bracketed-paste sequence.
+  # Generous enough that real pastes never trip it; prevents unbounded memory
+  # growth from a stuck terminal that emits ESC[200~ but never the end marker.
+  @max_paste_buffer 8 * 1024 * 1024
+
   @doc """
   Parses input bytes into a list of events and remaining bytes.
 
@@ -193,6 +198,30 @@ defmodule TermUI.Terminal.EscapeParser do
   defp parse_csi_sequence(<<"4~", rest::binary>>), do: {:ok, Event.key(:end), rest}
   defp parse_csi_sequence(<<"5~", rest::binary>>), do: {:ok, Event.key(:page_up), rest}
   defp parse_csi_sequence(<<"6~", rest::binary>>), do: {:ok, Event.key(:page_down), rest}
+
+  # Bracketed paste: ESC [ 200 ~ content ESC [ 201 ~
+  # Scan forward for the end marker and emit the parked content as a single
+  # Paste event. Without the end marker, return :incomplete so InputReader
+  # keeps buffering — up to @max_paste_buffer, after which we bail out and
+  # emit whatever we have so the buffer cannot grow without bound. An
+  # eventually arriving \e[201~ is then swallowed by the stray-end clause.
+  defp parse_csi_sequence(<<"200~", rest::binary>>) do
+    case :binary.match(rest, <<@escape, "[201~">>) do
+      {pos, _len} ->
+        content = binary_part(rest, 0, pos)
+        tail = binary_part(rest, pos + 6, byte_size(rest) - pos - 6)
+        {:ok, Event.paste(content), tail}
+
+      :nomatch when byte_size(rest) > @max_paste_buffer ->
+        {:ok, Event.paste(rest), <<>>}
+
+      :nomatch ->
+        :incomplete
+    end
+  end
+
+  # Stray paste-end marker (defensive): consume silently.
+  defp parse_csi_sequence(<<"201~", rest::binary>>), do: {:ok, Event.key(:unknown), rest}
 
   # Function keys F1-F4 (some terminals)
   defp parse_csi_sequence(<<"11~", rest::binary>>), do: {:ok, Event.key(:f1), rest}
@@ -408,6 +437,7 @@ defmodule TermUI.Terminal.EscapeParser do
   @spec partial_sequence?(binary()) :: boolean()
   def partial_sequence?(<<@escape>>), do: true
   def partial_sequence?(<<@escape, "[">>), do: true
+  def partial_sequence?(<<@escape, "[200~", _rest::binary>>), do: true
   def partial_sequence?(<<@escape, "[", rest::binary>>), do: partial_csi?(rest)
   def partial_sequence?(<<@escape, "O">>), do: true
   def partial_sequence?(_), do: false
