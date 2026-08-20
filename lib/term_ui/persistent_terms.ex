@@ -37,7 +37,6 @@ defmodule TermUI.PersistentTerms do
   """
 
   alias TermUI.Backend.Selector
-  require Logger
 
   # Dialyzer: Pattern match coverage warnings
   @dialyzer {:nowarn_function,
@@ -159,11 +158,7 @@ defmodule TermUI.PersistentTerms do
   # Private Functions
 
   defp detect_capabilities do
-    # Defer to Backend.Selector for capability detection
-    case Selector.detect_capabilities() do
-      caps when is_map(caps) -> caps
-      _ -> %{}
-    end
+    Selector.detect_capabilities()
   rescue
     _ -> %{}
   end

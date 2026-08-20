@@ -33,13 +33,14 @@ defmodule TermUI.Input.TTYTest do
     test "state struct has buffer, event_queue, and IO opts fields" do
       state = TTY.new()
       # Verify the struct has the expected fields (including IO opts fields)
-      assert Map.keys(state) -- [:__struct__] == [
-               :buffer,
-               :event_queue,
-               :io_opts_restored,
-               :io_opts_set,
-               :original_opts
-             ]
+      assert state |> Map.keys() |> List.delete(:__struct__) |> MapSet.new() ==
+               MapSet.new([
+                 :buffer,
+                 :event_queue,
+                 :io_opts_restored,
+                 :io_opts_set,
+                 :original_opts
+               ])
     end
   end
 

@@ -191,6 +191,17 @@ defmodule TermUI.Terminal.EscapeParser do
   defp parse_csi_sequence(<<"H", rest::binary>>), do: {:ok, Event.key(:home), rest}
   defp parse_csi_sequence(<<"F", rest::binary>>), do: {:ok, Event.key(:end), rest}
 
+  # Terminal focus tracking
+  defp parse_csi_sequence(<<"I", rest::binary>>), do: {:ok, Event.focus(:gained), rest}
+  defp parse_csi_sequence(<<"O", rest::binary>>), do: {:ok, Event.focus(:lost), rest}
+
+  # X10 mouse events: ESC [ M Cb Cx Cy. Each value has an offset of 32.
+  defp parse_csi_sequence(<<"M", cb, cx, cy, rest::binary>>)
+       when cb >= 32 and cx >= 33 and cy >= 33 do
+    event = decode_mouse_event(cb - 32, cx - 32, cy - 32, :press)
+    {:ok, event, rest}
+  end
+
   # Tilde sequences: ESC [ number ~
   defp parse_csi_sequence(<<"1~", rest::binary>>), do: {:ok, Event.key(:home), rest}
   defp parse_csi_sequence(<<"2~", rest::binary>>), do: {:ok, Event.key(:insert), rest}

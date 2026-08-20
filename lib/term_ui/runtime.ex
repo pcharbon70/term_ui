@@ -126,6 +126,16 @@ defmodule TermUI.Runtime do
     end
   end
 
+  defp start(opts) do
+    {name, opts} = Keyword.pop(opts, :name)
+
+    if name do
+      GenServer.start(__MODULE__, opts, name: name)
+    else
+      GenServer.start(__MODULE__, opts)
+    end
+  end
+
   @doc """
   Returns a child specification for starting the runtime in a supervisor.
 
@@ -275,14 +285,17 @@ defmodule TermUI.Runtime do
   """
   @spec run([option()]) :: :ok | {:error, term()}
   def run(opts) do
-    case start_link(opts) do
+    case start(opts) do
       {:ok, runtime} ->
         # Monitor the runtime process and block until it exits
         ref = Process.monitor(runtime)
 
         receive do
-          {:DOWN, ^ref, :process, ^runtime, _reason} ->
+          {:DOWN, ^ref, :process, ^runtime, reason} when reason in [:normal, :shutdown] ->
             :ok
+
+          {:DOWN, ^ref, :process, ^runtime, reason} ->
+            {:error, reason}
         end
 
       {:error, reason} ->
@@ -324,8 +337,10 @@ defmodule TermUI.Runtime do
     {:ok, command_executor} = Executor.start_link()
 
     # Initialize root component state and any startup commands.
+    root_opts = Keyword.put_new(opts, :dimensions, dimensions || {80, 24})
+
     {root_state, init_commands} =
-      opts
+      root_opts
       |> root_module.init()
       |> Elm.normalize_init_result()
 
@@ -501,7 +516,8 @@ defmodule TermUI.Runtime do
   defp init_tty_backend(capabilities) do
     backend = TermUI.Backend.TTY
     {:ok, backend_state} = backend.init(capabilities: capabilities, alternate_screen: true)
-    {:tty, backend, backend_state, capabilities, false, nil, nil}
+    {rows, cols} = backend_state.size
+    {:tty, backend, backend_state, capabilities, false, nil, {cols, rows}}
   end
 
   defp init_explicit_backend(TermUI.Backend.Raw, _opts) do
@@ -517,11 +533,7 @@ defmodule TermUI.Runtime do
     {:ok, {rows, cols}} = module.size(backend_state)
 
     # Start BufferManager for the custom backend
-    buffer_pid =
-      case BufferManager.start_link(rows: rows, cols: cols) do
-        {:ok, pid} -> pid
-        {:error, {:already_started, pid}} -> pid
-      end
+    {:ok, buffer_pid} = BufferManager.start_link(rows: rows, cols: cols, name: nil)
 
     {:custom, module, backend_state, nil, false, buffer_pid, {cols, rows}}
   end
@@ -736,17 +748,18 @@ defmodule TermUI.Runtime do
     end
   end
 
+  defp handle_root_info(_msg, %{shutting_down: true} = state), do: {:noreply, state}
+
   defp handle_root_info(msg, state) do
     case state.root_module.handle_info(msg, state.root_state) do
-      {new_root_state, commands} ->
-        state = update_root_state(state, new_root_state)
-        tagged_commands = Enum.map(commands, fn cmd -> {:root, cmd} end)
-        state = execute_commands(tagged_commands, state)
+      :noreply ->
         {:noreply, state}
 
-      new_root_state ->
+      result ->
+        {new_root_state, commands} = Elm.normalize_update_result(result, state.root_state)
         state = update_root_state(state, new_root_state)
-        {:noreply, state}
+        tagged_commands = Enum.map(commands, fn command -> {:root, command} end)
+        {:noreply, execute_commands(tagged_commands, state)}
     end
   end
 
@@ -772,7 +785,12 @@ defmodule TermUI.Runtime do
   end
 
   @impl true
-  def terminate(_reason, state) do
+  def terminate(reason, state) do
+    # Let the root release application workers before terminal teardown.
+    terminate_root(reason, state)
+    cleanup_command_executor(state)
+    cleanup_buffer_manager(state)
+
     # Step 1: Restore logger FIRST (before any other cleanup that might log)
     terminate_logger_restore(state)
 
@@ -789,13 +807,25 @@ defmodule TermUI.Runtime do
     cleanup_terminal_restore(state)
 
     # Step 5: Defensive cleanup (catches anything missed above)
-    terminate_defensive_cleanup()
+    terminate_defensive_cleanup(state)
 
     # Step 6: Persistent terms and echo
     cleanup_persistent_terms()
     ensure_echo_enabled(state)
 
     :ok
+  end
+
+  defp terminate_root(reason, state) do
+    if function_exported?(state.root_module, :terminate, 2) do
+      state.root_module.terminate(reason, state.root_state)
+    end
+
+    :ok
+  rescue
+    _ -> :ok
+  catch
+    _, _ -> :ok
   end
 
   defp cleanup_input_reader(state) do
@@ -814,7 +844,7 @@ defmodule TermUI.Runtime do
     end
 
     # Then stop the handler (restores IO opts for TTY, etc.)
-    if state.input_handler and state.input_state do
+    if not is_nil(state.input_handler) and not is_nil(state.input_state) do
       state.input_handler.stop(state.input_state)
     end
   rescue
@@ -830,7 +860,7 @@ defmodule TermUI.Runtime do
   end
 
   defp cleanup_backend(state) do
-    if state.backend and state.backend_state do
+    if not is_nil(state.backend) and not is_nil(state.backend_state) do
       state.backend.shutdown(state.backend_state)
     end
   rescue
@@ -861,14 +891,42 @@ defmodule TermUI.Runtime do
     _ -> :ok
   end
 
-  defp ensure_echo_enabled(state) do
-    # Only restore echo on local terminals, not custom backends (SSH)
-    if state.backend_mode in [:raw, :tty, :skip] do
-      :io.setopts(echo: true)
+  defp cleanup_command_executor(state) do
+    if is_pid(state.command_executor) and Process.alive?(state.command_executor) do
+      GenServer.stop(state.command_executor, :normal)
     end
+
+    :ok
+  rescue
+    _ -> :ok
+  catch
+    :exit, _ -> :ok
+  end
+
+  defp cleanup_buffer_manager(%{backend_mode: :custom, buffer_manager: buffer_manager})
+       when is_pid(buffer_manager) do
+    if Process.alive?(buffer_manager) do
+      GenServer.stop(buffer_manager, :normal)
+    end
+
+    :ok
+  rescue
+    _ -> :ok
+  catch
+    :exit, _ -> :ok
+  end
+
+  defp cleanup_buffer_manager(_state), do: :ok
+
+  defp ensure_echo_enabled(%{backend_mode: backend_mode})
+       when backend_mode in [:raw, :tty] do
+    # Only restore echo on local terminals, not custom backends (SSH)
+    :io.setopts(echo: true)
   rescue
     _ -> :ok
   end
+
+  defp ensure_echo_enabled(_state), do: :ok
 
   defp terminate_logger_restore(state) do
     restore_logger(state.logger_handler_config)
@@ -876,7 +934,8 @@ defmodule TermUI.Runtime do
     _ -> :ok
   end
 
-  defp terminate_defensive_cleanup do
+  defp terminate_defensive_cleanup(%{backend_mode: backend_mode})
+       when backend_mode in [:raw, :tty] do
     # Crash-safe logger restore from persistent_term
     restore_logger_from_persistent_term()
 
@@ -893,6 +952,8 @@ defmodule TermUI.Runtime do
   rescue
     _ -> :ok
   end
+
+  defp terminate_defensive_cleanup(_state), do: :ok
 
   defp suppress_logger do
     case :logger.get_handler_config(:default) do
@@ -1218,42 +1279,45 @@ defmodule TermUI.Runtime do
     state
   end
 
+  defp do_render(%{backend: nil} = state), do: %{state | dirty: false}
+
   defp do_render(state) do
-    # Render if backend is available (TTY backend works even without terminal_started)
-    if state.backend do
-      # Call view on root component with error handling
-      %{module: module, state: component_state} = Map.get(state.components, :root)
+    render_tree = root_view(state)
+    {cells, backend_state} = render_cells(render_tree, state)
 
-      render_tree =
-        try do
-          module.view(component_state)
-        rescue
-          error ->
-            require Logger
-            Logger.error("Component :root crashed in view: #{inspect(error)}")
-            # Return a simple error indicator
-            {:text, "[Render Error]"}
-        end
+    state.backend
+    |> draw_and_flush(backend_state, cells)
+    |> then(&%{state | dirty: false, backend_state: &1})
+  end
 
-      # Different rendering paths for Raw vs TTY backends
-      {cells, new_backend_state} =
-        if state.buffer_manager do
-          # Raw backend: use double buffering with diffing
-          render_with_buffer_manager(render_tree, state)
-        else
-          # TTY backend: create temporary buffer, render all cells
-          render_to_tty_backend(render_tree, state)
-        end
+  defp root_view(state) do
+    %{module: module, state: component_state} = Map.fetch!(state.components, :root)
 
-      # Delegate rendering to backend
-      {:ok, new_backend_state} = state.backend.draw_cells(new_backend_state, cells)
+    module.view(component_state)
+  rescue
+    error ->
+      require Logger
+      Logger.error("Component :root crashed in view: #{inspect(error)}")
+      {:text, "[Render Error]"}
+  end
 
-      # Flush any pending output
-      {:ok, ^new_backend_state} = state.backend.flush(new_backend_state)
+  defp render_cells(render_tree, %{buffer_manager: buffer_manager} = state)
+       when not is_nil(buffer_manager),
+       do: render_with_buffer_manager(render_tree, state)
 
-      %{state | dirty: false, backend_state: new_backend_state}
-    else
-      %{state | dirty: false}
+  defp render_cells(render_tree, state), do: render_to_tty_backend(render_tree, state)
+
+  defp draw_and_flush(backend, backend_state, cells) do
+    case backend.draw_cells(backend_state, cells) do
+      {:ok, drawn_backend_state} -> flush_backend(backend, drawn_backend_state)
+      {:error, reason} -> exit({:shutdown, {:backend_draw_failed, reason}})
+    end
+  end
+
+  defp flush_backend(backend, backend_state) do
+    case backend.flush(backend_state) do
+      {:ok, flushed_backend_state} -> flushed_backend_state
+      {:error, reason} -> exit({:shutdown, {:backend_flush_failed, reason}})
     end
   end
 
@@ -1318,10 +1382,7 @@ defmodule TermUI.Runtime do
         cells_in_row =
           buffer_row
           |> Enum.with_index(1)
-          |> Enum.filter(fn {%TermUI.Renderer.Cell{} = cell, _col} ->
-            # Include non-space characters OR spaces with non-default background
-            cell.char != " " or (cell.bg != nil and cell.bg != :default)
-          end)
+          |> Enum.filter(fn {%TermUI.Renderer.Cell{} = cell, _col} -> displayable_cell?(cell) end)
           |> Enum.flat_map(fn {cell, col} -> cell_to_backend_tuple(cell, row, col) end)
 
         cells_in_row ++ acc
@@ -1350,36 +1411,7 @@ defmodule TermUI.Runtime do
   defp diff_row_cells([], [], _row, _col, acc), do: acc
 
   defp diff_row_cells([cur | cur_rest], [prev | prev_rest], row, col, acc) do
-    acc =
-      if Cell.equal?(cur, prev) do
-        # Identical — skip
-        acc
-      else
-        # Cells differ — check what to emit
-        cur_displayable = displayable_cell?(cur)
-        prev_displayable = displayable_cell?(prev)
-
-        acc =
-          if cur_displayable do
-            # New content to draw
-            cell_to_backend_tuple(cur, row, col) ++ acc
-          else
-            acc
-          end
-
-        if prev_displayable and not cur_displayable do
-          # Previous had content, current is empty — need to clear
-          [{{row, col}, {" ", :default, :default, []}} | acc]
-        else
-          if prev_displayable and cur_displayable and
-               prev.bg != nil and prev.bg != :default and cur.char == " " do
-            # Previous had colored bg, current is space — clear to remove bg
-            [{{row, col}, {" ", :default, :default, []}} | acc]
-          else
-            acc
-          end
-        end
-      end
+    acc = diff_cell(cur, prev, row, col, acc)
 
     diff_row_cells(cur_rest, prev_rest, row, col + 1, acc)
   end
@@ -1407,8 +1439,40 @@ defmodule TermUI.Runtime do
     diff_row_cells([], prev_rest, row, col + 1, acc)
   end
 
+  defp diff_cell(cur, prev, row, col, acc) do
+    if Cell.equal?(cur, prev) do
+      acc
+    else
+      diff_changed_cell(cur, prev, row, col, acc)
+    end
+  end
+
+  defp diff_changed_cell(cur, prev, row, col, acc) do
+    cur_displayable? = displayable_cell?(cur)
+    prev_displayable? = displayable_cell?(prev)
+    acc = maybe_draw_cell(cur, row, col, acc, cur_displayable?)
+
+    if clear_previous_cell?(cur, prev, cur_displayable?, prev_displayable?) do
+      [{{row, col}, {" ", :default, :default, []}} | acc]
+    else
+      acc
+    end
+  end
+
+  defp maybe_draw_cell(cell, row, col, acc, true),
+    do: cell_to_backend_tuple(cell, row, col) ++ acc
+
+  defp maybe_draw_cell(_cell, _row, _col, acc, false), do: acc
+
+  defp clear_previous_cell?(_cur, _prev, false, true), do: true
+
+  defp clear_previous_cell?(cur, prev, true, true),
+    do: prev.bg not in [nil, :default] and cur.char == " "
+
+  defp clear_previous_cell?(_cur, _prev, _cur_displayable?, _prev_displayable?), do: false
+
   defp displayable_cell?(%Cell{} = cell) do
-    cell.char != " " or (cell.bg != nil and cell.bg != :default)
+    cell.char != " " or (cell.bg != nil and cell.bg != :default) or MapSet.size(cell.attrs) > 0
   end
 
   # Converts a Cell struct to the backend format: {{row, col}, {char, fg, bg, attrs}}

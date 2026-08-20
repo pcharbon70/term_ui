@@ -2,7 +2,7 @@ defmodule TermUI.MixProject do
   use Mix.Project
 
   @version "1.0.0-rc"
-  @source_url "https://github.com/pcharbon70/term_ui"
+  @source_url "https://github.com/mikehostetler/term_ui"
 
   def project do
     [
@@ -71,14 +71,14 @@ defmodule TermUI.MixProject do
       {:stream_data, "~> 1.0", only: :test},
 
       # Streaming
-      {:gen_stage, "~> 1.2"},
+      {:gen_stage, "~> 1.2", optional: true},
 
       # Markdown processing
-      {:mdex, "~> 0.10"},
+      {:mdex, "~> 0.10", optional: true},
 
       # Syntax highlighting for code blocks
-      {:makeup, "~> 1.1"},
-      {:makeup_elixir, "~> 1.0"},
+      {:makeup, "~> 1.1", optional: true},
+      {:makeup_elixir, "~> 1.0", optional: true},
 
       # LLM usage rules
       {:usage_rules, "~> 0.1", only: :dev, runtime: false}

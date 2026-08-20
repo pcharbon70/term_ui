@@ -82,7 +82,7 @@ defmodule TermUI.Renderer.BufferManager do
   alias TermUI.Renderer.Buffer
 
   @type t :: %__MODULE__{
-          name: atom(),
+          name: atom() | pid(),
           current: Buffer.t(),
           previous: Buffer.t(),
           dirty: :atomics.atomics_ref()
@@ -102,7 +102,7 @@ defmodule TermUI.Renderer.BufferManager do
 
     * `:rows` - Number of rows (required)
     * `:cols` - Number of columns (required)
-    * `:name` - GenServer name (default: `__MODULE__`)
+    * `:name` - GenServer name (default: `__MODULE__`); use `nil` for an unnamed manager
 
   ## Examples
 
@@ -110,8 +110,10 @@ defmodule TermUI.Renderer.BufferManager do
   """
   @spec start_link(keyword()) :: GenServer.on_start()
   def start_link(opts) do
-    name = Keyword.get(opts, :name, __MODULE__)
-    GenServer.start_link(__MODULE__, opts, name: name)
+    case Keyword.get(opts, :name, __MODULE__) do
+      nil -> GenServer.start_link(__MODULE__, opts)
+      name -> GenServer.start_link(__MODULE__, opts, name: name)
+    end
   end
 
   @doc """
@@ -320,7 +322,7 @@ defmodule TermUI.Renderer.BufferManager do
   def init(opts) do
     rows = Keyword.fetch!(opts, :rows)
     cols = Keyword.fetch!(opts, :cols)
-    name = Keyword.get(opts, :name, __MODULE__)
+    name = Keyword.get(opts, :name, __MODULE__) || self()
 
     {:ok, current} = Buffer.new(rows, cols)
     {:ok, previous} = Buffer.new(rows, cols)

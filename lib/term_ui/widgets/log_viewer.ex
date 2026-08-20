@@ -375,14 +375,10 @@ defmodule TermUI.Widgets.LogViewer do
     line_idx = get_actual_line_index(state, state.cursor)
 
     state =
-      cond do
-        state.selection_start == nil ->
-          # Start selection
-          %{state | selection_start: line_idx, selection_end: line_idx}
-
-        state.selection_start != nil ->
-          # Extend selection
-          %{state | selection_end: line_idx}
+      if is_nil(state.selection_start) do
+        %{state | selection_start: line_idx, selection_end: line_idx}
+      else
+        %{state | selection_end: line_idx}
       end
 
     {:ok, state}

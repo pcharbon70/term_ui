@@ -29,6 +29,19 @@ defmodule TermUI.Runtime.ShutdownTest do
     def event_to_msg(_event, _state), do: :ignore
   end
 
+  defmodule LifecycleComponent do
+    use TermUI.Elm
+
+    def init(opts), do: %{owner: Keyword.fetch!(opts, :owner), dimensions: opts[:dimensions]}
+    def update(_message, state), do: {state, []}
+    def view(_state), do: {:text, "lifecycle component"}
+
+    def terminate(reason, state) do
+      send(state.owner, {:root_terminated, reason, state.dimensions})
+      :ok
+    end
+  end
+
   describe "quit command" do
     test "Command.quit/0 creates quit command" do
       cmd = Command.quit()
@@ -167,6 +180,34 @@ defmodule TermUI.Runtime.ShutdownTest do
       Process.sleep(100)
       refute Process.alive?(runtime)
     end
+
+    test "calls the root cleanup with its final state" do
+      {:ok, runtime} =
+        Runtime.start_link(
+          root: LifecycleComponent,
+          owner: self(),
+          dimensions: {100, 40},
+          skip_terminal: true
+        )
+
+      Runtime.shutdown(runtime)
+
+      assert_receive {:root_terminated, :normal, {100, 40}}, 1_000
+    end
+
+    test "stops the command executor with the runtime" do
+      {:ok, runtime} =
+        Runtime.start_link(root: LifecycleComponent, owner: self(), skip_terminal: true)
+
+      executor = Runtime.get_state(runtime).command_executor
+      runtime_ref = Process.monitor(runtime)
+      executor_ref = Process.monitor(executor)
+
+      Runtime.shutdown(runtime)
+
+      assert_receive {:DOWN, ^runtime_ref, :process, ^runtime, :normal}, 1_000
+      assert_receive {:DOWN, ^executor_ref, :process, ^executor, :normal}, 1_000
+    end
   end
 
   describe "trap_exit" do
@@ -202,14 +243,15 @@ defmodule TermUI.Runtime.ShutdownTest do
     end
 
     test "messages are ignored during shutdown" do
-      {:ok, runtime} = Runtime.start_link(root: QuitComponent, skip_terminal: true)
+      {:ok, runtime} =
+        Runtime.start_link(root: LifecycleComponent, owner: self(), skip_terminal: true)
+
+      ref = Process.monitor(runtime)
 
       Runtime.shutdown(runtime)
+      send(runtime, :late_application_message)
 
-      # Try to send a message - should not crash
-      Runtime.send_message(runtime, :root, :some_message)
-
-      Process.sleep(100)
+      assert_receive {:DOWN, ^ref, :process, ^runtime, :normal}, 1_000
     end
   end
 

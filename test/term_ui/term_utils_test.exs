@@ -152,6 +152,7 @@ defmodule TermUI.TermUtilsTest do
 
   describe "integration - command execution" do
     @tag :external
+    @tag :requires_terminal
     test "safe_stty can save and restore settings" do
       # Save current settings
       case TermUtils.safe_stty(["-g"]) do

@@ -64,6 +64,165 @@ defmodule TermUI.RuntimeTest do
     def view(_state), do: {:text, "No init"}
   end
 
+  defmodule SessionRoot do
+    use TermUI.Elm
+
+    def init(opts) do
+      %{owner: Keyword.fetch!(opts, :owner), view: nil}
+    end
+
+    def handle_info({:session_view, view}, state) do
+      {%{state | view: view}, [{:send, state.owner, {:session_view_applied, view}}]}
+    end
+
+    def handle_info(:noop, _state), do: :noreply
+
+    def update(_message, state), do: {state, []}
+    def view(state), do: {:text, inspect(state.view)}
+  end
+
+  defmodule StyledBlankRoot do
+    use TermUI.Elm
+
+    alias TermUI.Component.RenderNode
+    alias TermUI.Renderer.Cell
+
+    def init(_opts), do: %{}
+    def update(_message, state), do: {state, []}
+
+    def view(_state) do
+      RenderNode.cells([%{x: 0, y: 0, cell: Cell.new(" ", attrs: [:reverse])}],
+        width: 2,
+        height: 2
+      )
+    end
+  end
+
+  defmodule CaptureBackend do
+    @behaviour TermUI.Backend
+
+    def init(opts), do: {:ok, %{owner: Keyword.fetch!(opts, :owner), size: {2, 2}}}
+    def shutdown(_state), do: :ok
+    def size(state), do: {:ok, state.size}
+    def move_cursor(state, _position), do: {:ok, state}
+    def hide_cursor(state), do: {:ok, state}
+    def show_cursor(state), do: {:ok, state}
+    def clear(state), do: {:ok, state}
+
+    def draw_cells(state, cells) do
+      send(state.owner, {:draw_cells, cells})
+      {:ok, state}
+    end
+
+    def flush(state), do: {:ok, state}
+    def poll_event(state, _timeout), do: {:timeout, state}
+  end
+
+  defmodule RunFailureRoot do
+    use TermUI.Elm
+
+    def init(opts) do
+      owner = Keyword.fetch!(opts, :owner)
+      marker = Keyword.fetch!(opts, :marker)
+      send(owner, {:run_root_initialized, self(), marker})
+      %{}
+    end
+
+    def update(_message, state), do: {state, []}
+    def view(_state), do: {:text, "failure test"}
+  end
+
+  defmodule RunFailureBackend do
+    @behaviour TermUI.Backend
+
+    def init(opts) do
+      {:ok,
+       %{
+         owner: Keyword.fetch!(opts, :owner),
+         failure: Keyword.fetch!(opts, :failure),
+         size: {2, 2}
+       }}
+    end
+
+    def shutdown(_state), do: :ok
+    def size(state), do: {:ok, state.size}
+    def move_cursor(state, _position), do: {:ok, state}
+    def hide_cursor(state), do: {:ok, state}
+    def show_cursor(state), do: {:ok, state}
+    def clear(state), do: {:ok, state}
+
+    def draw_cells(%{failure: :draw} = state, _cells) do
+      fail_when_released(state, :draw, :draw_failed)
+    end
+
+    def draw_cells(state, _cells), do: {:ok, state}
+
+    def flush(%{failure: :flush} = state) do
+      fail_when_released(state, :flush, :flush_failed)
+    end
+
+    def flush(state), do: {:ok, state}
+    def poll_event(state, _timeout), do: {:timeout, state}
+
+    defp fail_when_released(state, stage, reason) do
+      send(state.owner, {:backend_failure_ready, self(), stage})
+
+      receive do
+        {:release_backend_failure, ^stage} -> {:error, reason}
+      end
+    end
+  end
+
+  defp assert_run_failure(stage, expected_reason) do
+    owner = self()
+    marker = make_ref()
+    runtime_name = :"run_failure_#{System.unique_integer([:positive])}"
+
+    caller =
+      spawn(fn ->
+        previous_trap_exit = Process.flag(:trap_exit, false)
+        send(owner, {:run_caller_ready, self(), previous_trap_exit})
+
+        result =
+          Runtime.run(
+            root: RunFailureRoot,
+            owner: owner,
+            marker: marker,
+            name: runtime_name,
+            backend: {RunFailureBackend, [owner: owner, failure: stage]},
+            render_interval: 60_000
+          )
+
+        send(owner, {:run_result, self(), result})
+      end)
+
+    caller_ref = Process.monitor(caller)
+    assert_receive {:run_caller_ready, ^caller, false}, 1_000
+    assert_receive {:run_root_initialized, runtime, ^marker}, 1_000
+
+    state = Runtime.get_state(runtime)
+    buffer_manager = state.buffer_manager
+    command_executor = state.command_executor
+    runtime_ref = Process.monitor(runtime)
+    buffer_ref = Process.monitor(buffer_manager)
+    executor_ref = Process.monitor(command_executor)
+
+    assert Process.whereis(runtime_name) == runtime
+
+    Runtime.force_render(runtime)
+    assert_receive {:backend_failure_ready, ^runtime, ^stage}, 1_000
+    assert caller in elem(Process.info(runtime, :monitored_by), 1)
+
+    send(runtime, {:release_backend_failure, stage})
+
+    assert_receive {:run_result, ^caller, {:error, ^expected_reason}}, 1_000
+    assert_receive {:DOWN, ^runtime_ref, :process, ^runtime, ^expected_reason}, 1_000
+    assert_receive {:DOWN, ^buffer_ref, :process, ^buffer_manager, :normal}, 1_000
+    assert_receive {:DOWN, ^executor_ref, :process, ^command_executor, :normal}, 1_000
+    assert_receive {:DOWN, ^caller_ref, :process, ^caller, :normal}, 1_000
+    refute Process.whereis(runtime_name)
+  end
+
   describe "start_link/1" do
     test "starts runtime with root component" do
       {:ok, runtime} = start_test_runtime(root: Counter)
@@ -102,6 +261,16 @@ defmodule TermUI.RuntimeTest do
 
       state = Runtime.get_state(runtime)
       assert state.render_interval == 100
+    end
+  end
+
+  describe "run/1" do
+    test "returns a draw failure and stops runtime-owned processes" do
+      assert_run_failure(:draw, {:shutdown, {:backend_draw_failed, :draw_failed}})
+    end
+
+    test "returns a flush failure and stops runtime-owned processes" do
+      assert_run_failure(:flush, {:shutdown, {:backend_flush_failed, :flush_failed}})
     end
   end
 
@@ -199,7 +368,48 @@ defmodule TermUI.RuntimeTest do
     end
   end
 
+  describe "application messages" do
+    test "routes external messages through the Elm result contract" do
+      {:ok, runtime} = start_test_runtime(root: SessionRoot, owner: self())
+      view = %{revision: 2, status: :running}
+
+      send(runtime, {:session_view, view})
+      assert :ok = Runtime.sync(runtime)
+
+      assert Runtime.get_state(runtime).root_state.view == view
+      assert_receive {:session_view_applied, ^view}
+    end
+
+    test "keeps application state when handle_info returns noreply" do
+      {:ok, runtime} = start_test_runtime(root: SessionRoot, owner: self())
+      Process.sleep(20)
+      original = Runtime.get_state(runtime).root_state
+      refute Runtime.get_state(runtime).dirty
+
+      send(runtime, :noop)
+      assert :ok = Runtime.sync(runtime)
+
+      assert Runtime.get_state(runtime).root_state == original
+      refute Runtime.get_state(runtime).dirty
+    end
+  end
+
   describe "dirty flag and rendering" do
+    test "renders attributes on a blank cell" do
+      {:ok, runtime} =
+        Runtime.start_link(
+          root: StyledBlankRoot,
+          backend: {CaptureBackend, [owner: self()]},
+          render_interval: 1
+        )
+
+      assert_receive {:draw_cells, cells}, 1_000
+      assert {{1, 1}, {" ", :default, :default, attributes}} = List.keyfind(cells, {1, 1}, 0)
+      assert :reverse in attributes
+
+      Runtime.shutdown(runtime)
+    end
+
     test "marks dirty when state changes" do
       {:ok, runtime} = start_test_runtime(root: Counter, render_interval: 10)
 
@@ -295,6 +505,16 @@ defmodule TermUI.RuntimeTest do
 
       # Process should have stopped after cleanup
       refute Process.alive?(runtime)
+    end
+
+    test "headless shutdown does not run terminal cleanup" do
+      log =
+        capture_log(fn ->
+          {:ok, runtime} = start_test_runtime(root: Counter)
+          GenServer.stop(runtime)
+        end)
+
+      refute log =~ "stty"
     end
   end
 
@@ -461,13 +681,13 @@ defmodule TermUI.RuntimeTest do
     end
 
     test "stores backend mode in persistent_term" do
-      {:ok, runtime} = start_test_runtime(root: Counter)
+      {:ok, _runtime} = start_test_runtime(root: Counter)
 
       assert Runtime.backend_mode() == :skip
     end
 
     test "stores capabilities in persistent_term" do
-      {:ok, runtime} = start_test_runtime(root: Counter)
+      {:ok, _runtime} = start_test_runtime(root: Counter)
 
       # skip_terminal mode doesn't set capabilities
       assert Runtime.capabilities() == nil

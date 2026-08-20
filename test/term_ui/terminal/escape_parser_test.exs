@@ -415,4 +415,26 @@ defmodule TermUI.Terminal.EscapeParserTest do
       assert remaining == ""
     end
   end
+
+  describe "parse/1 - focus tracking" do
+    test "parses focus gain and focus loss" do
+      {events, remaining} = EscapeParser.parse("\e[I\e[O")
+
+      assert [
+               %TermUI.Event.Focus{action: :gained},
+               %TermUI.Event.Focus{action: :lost}
+             ] = events
+
+      assert remaining == ""
+    end
+  end
+
+  describe "parse/1 - X10 mouse input" do
+    test "parses an X10 left-button press with zero-based coordinates" do
+      {events, remaining} = EscapeParser.parse("\e[M !!")
+
+      assert [%TermUI.Event.Mouse{action: :press, button: :left, x: 0, y: 0}] = events
+      assert remaining == ""
+    end
+  end
 end

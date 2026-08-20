@@ -112,6 +112,18 @@ defmodule TermUI.Elm do
   @callback update(msg(), state()) :: update_result()
 
   @doc """
+  Handles application messages sent to the runtime process.
+
+  This callback uses the same result contract as `update/2`. It is useful for
+  subscriptions, task results, and other OTP messages that do not come from
+  terminal input.
+  """
+  @callback handle_info(message :: term(), state()) :: update_result()
+
+  @doc "Handles final application cleanup before the runtime stops."
+  @callback terminate(reason :: term(), state()) :: term()
+
+  @doc """
   Renders the current state to a render tree.
 
   View functions must be pure—given the same state, they always produce
@@ -150,7 +162,7 @@ defmodule TermUI.Elm do
   """
   @callback init(opts :: keyword()) :: init_result()
 
-  @optional_callbacks [init: 1]
+  @optional_callbacks [init: 1, handle_info: 2, terminate: 2]
 
   defmacro __using__(_opts) do
     quote do
@@ -172,7 +184,13 @@ defmodule TermUI.Elm do
       @doc false
       def event_to_msg(_event, _state), do: :ignore
 
-      defoverridable init: 1, event_to_msg: 2
+      @doc false
+      def handle_info(_message, _state), do: :noreply
+
+      @doc false
+      def terminate(_reason, _state), do: :ok
+
+      defoverridable init: 1, event_to_msg: 2, handle_info: 2, terminate: 2
     end
   end
 

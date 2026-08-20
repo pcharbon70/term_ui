@@ -8,8 +8,8 @@ defmodule TermUI.Integration.CrossPlatformTest do
 
   use ExUnit.Case, async: false
 
+  alias TermUI.Event.Key
   alias TermUI.IntegrationHelpers
-  alias TermUI.Parser.Events.KeyEvent
   alias TermUI.Platform
   alias TermUI.Platform.Unix
   alias TermUI.Platform.Windows
@@ -94,36 +94,36 @@ defmodule TermUI.Integration.CrossPlatformTest do
       {events, ""} = parse("abc")
 
       assert [
-               %KeyEvent{key: "a", modifiers: []},
-               %KeyEvent{key: "b", modifiers: []},
-               %KeyEvent{key: "c", modifiers: []}
+               %Key{key: "a", modifiers: []},
+               %Key{key: "b", modifiers: []},
+               %Key{key: "c", modifiers: []}
              ] = events
     end
 
     test "control characters are platform-agnostic" do
       # Ctrl+C is ASCII 3 everywhere
       {events, ""} = parse(<<3>>)
-      assert [%KeyEvent{key: "c", modifiers: [:ctrl]}] = events
+      assert [%Key{key: "c", modifiers: [:ctrl]}] = events
     end
 
     test "escape sequences follow VT100 standard" do
       # Arrow keys use same sequences on all platforms
       {events, ""} = parse("\e[A")
-      assert [%KeyEvent{key: :up, modifiers: []}] = events
+      assert [%Key{key: :up, modifiers: []}] = events
 
       {events, ""} = parse("\e[B")
-      assert [%KeyEvent{key: :down, modifiers: []}] = events
+      assert [%Key{key: :down, modifiers: []}] = events
     end
 
     test "enter key is consistent" do
       # Enter is carriage return (13) on all platforms
       {events, ""} = parse(<<13>>)
-      assert [%KeyEvent{key: :enter, modifiers: []}] = events
+      assert [%Key{key: :enter, modifiers: []}] = events
     end
 
     test "tab key is consistent" do
       {events, ""} = parse(<<9>>)
-      assert [%KeyEvent{key: :tab, modifiers: []}] = events
+      assert [%Key{key: :tab, modifiers: []}] = events
     end
 
     test "backspace handling" do

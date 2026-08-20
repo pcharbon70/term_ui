@@ -36,8 +36,6 @@ defmodule TermUI.ComponentSupervisor do
 
   use DynamicSupervisor
 
-  require Logger
-
   alias TermUI.Component.StatePersistence
   alias TermUI.ComponentRegistry
 

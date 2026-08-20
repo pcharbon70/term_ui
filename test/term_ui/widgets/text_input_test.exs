@@ -100,6 +100,51 @@ defmodule TermUI.Widgets.TextInputTest do
     end
   end
 
+  describe "bracketed paste" do
+    test "inserts multiline content at the cursor as one edit" do
+      test_pid = self()
+
+      props =
+        TextInput.new(
+          value: "Hello world",
+          multiline: true,
+          on_change: fn value -> send(test_pid, {:changed, value}) end
+        )
+
+      {:ok, state} = TextInput.init(props)
+      state = %{state | cursor_col: 6}
+
+      {:ok, state} = TextInput.handle_event(Event.paste("first\r\nsecond\n"), state)
+
+      assert TextInput.get_value(state) == "Hello first\nsecond\nworld"
+      assert TextInput.get_cursor(state) == {2, 0}
+      assert_receive {:changed, "Hello first\nsecond\nworld"}
+      refute_receive {:changed, _value}
+    end
+
+    test "replaces newlines with spaces in single-line mode" do
+      props = TextInput.new(value: "ab")
+      {:ok, state} = TextInput.init(props)
+      state = %{state | cursor_col: 1}
+
+      {:ok, state} = TextInput.handle_event(Event.paste("one\r\ntwo"), state)
+
+      assert TextInput.get_value(state) == "aone twob"
+      assert TextInput.get_cursor(state) == {0, 8}
+    end
+
+    test "does not exceed the multiline line limit" do
+      props = TextInput.new(value: "start\nend", multiline: true, max_lines: 3)
+      {:ok, state} = TextInput.init(props)
+      state = %{state | cursor_col: 5}
+
+      {:ok, state} = TextInput.handle_event(Event.paste(" one\ntwo\nthree"), state)
+
+      assert TextInput.get_value(state) == "start one\ntwo\nend"
+      assert TextInput.get_cursor(state) == {1, 3}
+    end
+  end
+
   describe "backspace" do
     test "deletes character before cursor" do
       props = TextInput.new(value: "Hello")

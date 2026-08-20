@@ -496,8 +496,6 @@ defmodule TermUI.FocusManager do
     nil
   end
 
-  defp find_next([], _current), do: nil
-
   defp find_next(list, nil) do
     # No current focus, return first
     List.first(list)
@@ -513,8 +511,6 @@ defmodule TermUI.FocusManager do
         Enum.at(list, next_idx)
     end
   end
-
-  defp find_prev([], _current), do: nil
 
   defp find_prev(list, nil) do
     # No current focus, return last

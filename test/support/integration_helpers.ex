@@ -6,8 +6,8 @@ defmodule TermUI.IntegrationHelpers do
   capturing output, and simulating input.
   """
 
-  alias TermUI.Parser
   alias TermUI.Terminal
+  alias TermUI.Terminal.EscapeParser
 
   @doc """
   Starts the Terminal GenServer for integration tests.
@@ -325,7 +325,6 @@ defmodule TermUI.IntegrationHelpers do
   """
   @spec parse(binary()) :: {list(), binary()}
   def parse(input) do
-    {events, remaining, _state} = Parser.parse(input, Parser.new())
-    {events, remaining}
+    EscapeParser.parse(input)
   end
 end

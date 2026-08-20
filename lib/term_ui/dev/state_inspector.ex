@@ -87,6 +87,10 @@ defmodule TermUI.Dev.StateInspector do
     render_value_by_type(value, depth, String.duplicate("  ", depth))
   end
 
+  defp render_value_by_type(%{__struct__: _} = value, depth, _indent) do
+    render_struct_tree(value, depth)
+  end
+
   defp render_value_by_type(value, depth, indent) when is_map(value) do
     render_map_value(value, depth, indent)
   end
@@ -100,13 +104,7 @@ defmodule TermUI.Dev.StateInspector do
     |> ensure_indent_applied(indent)
   end
 
-  defp render_value_by_type(value, depth, indent) do
-    if struct_value?(value) do
-      render_struct_tree(value, depth)
-    else
-      [indent <> format_value(value)]
-    end
-  end
+  defp render_value_by_type(value, _depth, indent), do: [indent <> format_value(value)]
 
   defp render_map_value(value, _depth, indent) when map_size(value) == 0 do
     [indent <> "%{}"]
@@ -225,12 +223,8 @@ defmodule TermUI.Dev.StateInspector do
     end
   end
 
-  defp struct_value?(%{__struct__: _}), do: true
-  defp struct_value?(_), do: false
-
   defp simple_value?(value) do
-    is_atom(value) or is_number(value) or is_binary(value) or
-      is_boolean(value) or is_nil(value) or is_pid(value) or is_reference(value)
+    is_atom(value) or is_number(value) or is_binary(value) or is_pid(value) or is_reference(value)
   end
 
   defp format_key(key) when is_atom(key), do: to_string(key)

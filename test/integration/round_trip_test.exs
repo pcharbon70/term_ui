@@ -22,8 +22,8 @@ defmodule TermUI.Integration.RoundTripTest do
   use ExUnit.Case, async: false
 
   alias TermUI.ANSI
+  alias TermUI.Event.{Focus, Key, Mouse, Paste}
   alias TermUI.IntegrationHelpers
-  alias TermUI.Parser.Events.{FocusEvent, KeyEvent, MouseEvent, PasteEvent}
 
   import IntegrationHelpers, only: [parse: 1]
 
@@ -74,100 +74,100 @@ defmodule TermUI.Integration.RoundTripTest do
   describe "1.6.2.2 key event round-trip" do
     test "simple characters parse correctly" do
       {events, ""} = parse("a")
-      assert [%KeyEvent{key: "a", modifiers: []}] = events
+      assert [%Key{key: "a", modifiers: []}] = events
 
       {events, ""} = parse("Z")
-      assert [%KeyEvent{key: "Z", modifiers: []}] = events
+      assert [%Key{key: "Z", modifiers: []}] = events
 
       {events, ""} = parse("5")
-      assert [%KeyEvent{key: "5", modifiers: []}] = events
+      assert [%Key{key: "5", modifiers: []}] = events
     end
 
     test "control characters parse correctly" do
       {events, ""} = parse(<<1>>)
-      assert [%KeyEvent{key: "a", modifiers: [:ctrl]}] = events
+      assert [%Key{key: "a", modifiers: [:ctrl]}] = events
 
       {events, ""} = parse(<<3>>)
-      assert [%KeyEvent{key: "c", modifiers: [:ctrl]}] = events
+      assert [%Key{key: "c", modifiers: [:ctrl]}] = events
 
       {events, ""} = parse(<<26>>)
-      assert [%KeyEvent{key: "z", modifiers: [:ctrl]}] = events
+      assert [%Key{key: "z", modifiers: [:ctrl]}] = events
     end
 
     test "special keys parse correctly" do
       # Enter
       {events, ""} = parse(<<13>>)
-      assert [%KeyEvent{key: :enter, modifiers: []}] = events
+      assert [%Key{key: :enter, modifiers: []}] = events
 
       # Tab
       {events, ""} = parse(<<9>>)
-      assert [%KeyEvent{key: :tab, modifiers: []}] = events
+      assert [%Key{key: :tab, modifiers: []}] = events
 
       # Backspace
       {events, ""} = parse(<<127>>)
-      assert [%KeyEvent{key: :backspace, modifiers: []}] = events
+      assert [%Key{key: :backspace, modifiers: []}] = events
     end
 
     test "arrow keys parse correctly" do
       {events, ""} = parse("\e[A")
-      assert [%KeyEvent{key: :up, modifiers: []}] = events
+      assert [%Key{key: :up, modifiers: []}] = events
 
       {events, ""} = parse("\e[B")
-      assert [%KeyEvent{key: :down, modifiers: []}] = events
+      assert [%Key{key: :down, modifiers: []}] = events
 
       {events, ""} = parse("\e[C")
-      assert [%KeyEvent{key: :right, modifiers: []}] = events
+      assert [%Key{key: :right, modifiers: []}] = events
 
       {events, ""} = parse("\e[D")
-      assert [%KeyEvent{key: :left, modifiers: []}] = events
+      assert [%Key{key: :left, modifiers: []}] = events
     end
 
     test "function keys parse correctly" do
       {events, ""} = parse("\eOP")
-      assert [%KeyEvent{key: :f1, modifiers: []}] = events
+      assert [%Key{key: :f1, modifiers: []}] = events
 
       {events, ""} = parse("\eOQ")
-      assert [%KeyEvent{key: :f2, modifiers: []}] = events
+      assert [%Key{key: :f2, modifiers: []}] = events
 
       {events, ""} = parse("\eOR")
-      assert [%KeyEvent{key: :f3, modifiers: []}] = events
+      assert [%Key{key: :f3, modifiers: []}] = events
 
       {events, ""} = parse("\eOS")
-      assert [%KeyEvent{key: :f4, modifiers: []}] = events
+      assert [%Key{key: :f4, modifiers: []}] = events
 
       {events, ""} = parse("\e[15~")
-      assert [%KeyEvent{key: :f5, modifiers: []}] = events
+      assert [%Key{key: :f5, modifiers: []}] = events
     end
 
     test "home/end/page keys parse correctly" do
       {events, ""} = parse("\e[H")
-      assert [%KeyEvent{key: :home, modifiers: []}] = events
+      assert [%Key{key: :home, modifiers: []}] = events
 
       {events, ""} = parse("\e[F")
-      assert [%KeyEvent{key: :end, modifiers: []}] = events
+      assert [%Key{key: :end, modifiers: []}] = events
 
       {events, ""} = parse("\e[5~")
-      assert [%KeyEvent{key: :page_up, modifiers: []}] = events
+      assert [%Key{key: :page_up, modifiers: []}] = events
 
       {events, ""} = parse("\e[6~")
-      assert [%KeyEvent{key: :page_down, modifiers: []}] = events
+      assert [%Key{key: :page_down, modifiers: []}] = events
     end
 
     test "multiple events parse in sequence" do
       {events, ""} = parse("abc")
 
       assert [
-               %KeyEvent{key: "a", modifiers: []},
-               %KeyEvent{key: "b", modifiers: []},
-               %KeyEvent{key: "c", modifiers: []}
+               %Key{key: "a", modifiers: []},
+               %Key{key: "b", modifiers: []},
+               %Key{key: "c", modifiers: []}
              ] = events
 
       {events, ""} = parse("a\e[Ab")
 
       assert [
-               %KeyEvent{key: "a", modifiers: []},
-               %KeyEvent{key: :up, modifiers: []},
-               %KeyEvent{key: "b", modifiers: []}
+               %Key{key: "a", modifiers: []},
+               %Key{key: :up, modifiers: []},
+               %Key{key: "b", modifiers: []}
              ] = events
     end
 
@@ -191,18 +191,18 @@ defmodule TermUI.Integration.RoundTripTest do
       # X10 needs 3 characters after M
       {events, ""} = parse("\e[M !!")
       assert length(events) == 1
-      [%MouseEvent{} = event] = events
-      assert event.button in [:left, :none]
+      [%Mouse{} = event] = events
+      assert event.button == :left
     end
 
     test "SGR mouse events parse correctly" do
       {events, ""} = parse("\e[<0;5;10M")
 
       assert length(events) == 1
-      [%MouseEvent{} = event] = events
+      [%Mouse{} = event] = events
       assert event.button == :left
-      assert event.x == 5
-      assert event.y == 10
+      assert event.x == 4
+      assert event.y == 9
       assert event.action == :press
     end
 
@@ -210,45 +210,47 @@ defmodule TermUI.Integration.RoundTripTest do
       {events, ""} = parse("\e[<0;5;10m")
 
       assert length(events) == 1
-      [%MouseEvent{} = event] = events
+      [%Mouse{} = event] = events
       assert event.action == :release
     end
 
     test "mouse button types parse correctly" do
       {events, ""} = parse("\e[<1;1;1M")
-      [%MouseEvent{} = event] = events
+      [%Mouse{} = event] = events
       assert event.button == :middle
 
       {events, ""} = parse("\e[<2;1;1M")
-      [%MouseEvent{} = event] = events
+      [%Mouse{} = event] = events
       assert event.button == :right
     end
 
     test "mouse modifier keys parse correctly" do
       # Shift modifier (4)
       {events, ""} = parse("\e[<4;1;1M")
-      [%MouseEvent{} = event] = events
+      [%Mouse{} = event] = events
       assert :shift in event.modifiers
 
       # Ctrl modifier (16)
       {events, ""} = parse("\e[<16;1;1M")
-      [%MouseEvent{} = event] = events
+      [%Mouse{} = event] = events
       assert :ctrl in event.modifiers
 
       # Alt modifier (8)
       {events, ""} = parse("\e[<8;1;1M")
-      [%MouseEvent{} = event] = events
+      [%Mouse{} = event] = events
       assert :alt in event.modifiers
     end
 
     test "scroll events parse correctly" do
       {events, ""} = parse("\e[<64;1;1M")
-      [%MouseEvent{} = event] = events
-      assert event.button == :wheel_up
+      [%Mouse{} = event] = events
+      assert event.action == :scroll_up
+      assert event.button == nil
 
       {events, ""} = parse("\e[<65;1;1M")
-      [%MouseEvent{} = event] = events
-      assert event.button == :wheel_down
+      [%Mouse{} = event] = events
+      assert event.action == :scroll_down
+      assert event.button == nil
     end
   end
 
@@ -330,16 +332,16 @@ defmodule TermUI.Integration.RoundTripTest do
       {events, ""} = parse("\e[200~pasted text\e[201~")
 
       assert length(events) == 1
-      [%PasteEvent{content: content}] = events
+      [%Paste{content: content}] = events
       assert content == "pasted text"
     end
 
     test "focus events parse correctly" do
       {events, ""} = parse("\e[I")
-      assert [%FocusEvent{focused: true}] = events
+      assert [%Focus{action: :gained}] = events
 
       {events, ""} = parse("\e[O")
-      assert [%FocusEvent{focused: false}] = events
+      assert [%Focus{action: :lost}] = events
     end
   end
 

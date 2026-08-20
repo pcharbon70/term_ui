@@ -261,6 +261,13 @@ defmodule TermUI.Widgets.TextInput do
     {:ok, state}
   end
 
+  # Bracketed paste is one edit and one change notification.
+  def handle_event(%Event.Paste{content: content}, state) do
+    state = insert_paste(state, content)
+    notify_change(state)
+    {:ok, state}
+  end
+
   # Focus events
   def handle_event(%Event.Focus{action: :gained}, state) do
     {:ok, %{state | focused: true}}
@@ -407,6 +414,58 @@ defmodule TermUI.Widgets.TextInput do
     lines = List.replace_at(state.lines, state.cursor_row, new_line)
 
     %{state | lines: lines, cursor_col: state.cursor_col + String.length(char)}
+  end
+
+  defp insert_paste(%{multiline: false} = state, content) do
+    content
+    |> normalize_line_endings()
+    |> String.replace("\n", " ")
+    |> then(&insert_char(state, &1))
+  end
+
+  defp insert_paste(state, content) do
+    pasted_lines =
+      content
+      |> normalize_line_endings()
+      |> split_pasted_lines(state)
+
+    line = current_line(state)
+    {before_cursor, after_cursor} = String.split_at(line, state.cursor_col)
+    [first_line | remaining_lines] = pasted_lines
+    inserted_lines = [before_cursor <> first_line | remaining_lines]
+    last_index = length(inserted_lines) - 1
+    last_line = List.last(inserted_lines)
+
+    inserted_lines =
+      List.replace_at(inserted_lines, last_index, last_line <> after_cursor)
+
+    {lines_before, [_current_line | lines_after]} = Enum.split(state.lines, state.cursor_row)
+    lines = lines_before ++ inserted_lines ++ lines_after
+
+    %{
+      state
+      | lines: lines,
+        cursor_row: state.cursor_row + last_index,
+        cursor_col: String.length(last_line)
+    }
+    |> adjust_scroll()
+  end
+
+  defp normalize_line_endings(content) do
+    content
+    |> String.replace("\r\n", "\n")
+    |> String.replace("\r", "\n")
+  end
+
+  defp split_pasted_lines(content, %{max_lines: nil}), do: String.split(content, "\n")
+
+  defp split_pasted_lines(content, state) do
+    available = max(1, state.max_lines - line_count(state) + 1)
+
+    content
+    |> String.splitter("\n")
+    |> Enum.take(available)
+    |> Enum.map(&:binary.copy/1)
   end
 
   defp insert_newline(state) do

@@ -24,6 +24,17 @@ defmodule TermUI.Renderer.BufferManagerTest do
 
       Process.flag(:trap_exit, false)
     end
+
+    test "supports independent unnamed managers" do
+      {:ok, first} = BufferManager.start_link(rows: 2, cols: 3, name: nil)
+      {:ok, second} = BufferManager.start_link(rows: 4, cols: 5, name: nil)
+
+      assert BufferManager.dimensions(first) == {2, 3}
+      assert BufferManager.dimensions(second) == {4, 5}
+
+      GenServer.stop(first)
+      GenServer.stop(second)
+    end
   end
 
   describe "get_current_buffer/1" do

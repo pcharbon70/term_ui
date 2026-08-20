@@ -31,8 +31,10 @@ defmodule TermUI.Widgets.SupervisionTreeViewerTest do
     use Supervisor
 
     def start_link(opts) do
-      name = Keyword.get(opts, :name, __MODULE__)
-      Supervisor.start_link(__MODULE__, opts, name: name)
+      case Keyword.get(opts, :name) do
+        nil -> Supervisor.start_link(__MODULE__, opts)
+        name -> Supervisor.start_link(__MODULE__, opts, name: name)
+      end
     end
 
     @impl true
@@ -55,8 +57,10 @@ defmodule TermUI.Widgets.SupervisionTreeViewerTest do
     use Supervisor
 
     def start_link(opts) do
-      name = Keyword.get(opts, :name, __MODULE__)
-      Supervisor.start_link(__MODULE__, opts, name: name)
+      case Keyword.get(opts, :name) do
+        nil -> Supervisor.start_link(__MODULE__, opts)
+        name -> Supervisor.start_link(__MODULE__, opts, name: name)
+      end
     end
 
     @impl true
@@ -79,7 +83,10 @@ defmodule TermUI.Widgets.SupervisionTreeViewerTest do
 
   setup do
     # Start Theme server for color support
-    {:ok, _theme_pid} = Theme.start_link(theme: :dark)
+    case Theme.start_link(theme: :dark) do
+      {:ok, _theme_pid} -> :ok
+      {:error, {:already_started, _theme_pid}} -> :ok
+    end
 
     on_exit(fn ->
       # Theme server will be automatically stopped when test process exits

@@ -319,11 +319,8 @@ defmodule TermUI.Backend.Raw do
       # ignored, so enabling mouse tracking leads to escape code leaks
       if mouse_tracking != :none and not TerminalOutput.needs_hard_reset?() do
         ansi_mode = mouse_mode_to_ansi(mouse_tracking)
-
-        if ansi_mode do
-          write_to_terminal(ANSI.enable_mouse_tracking(ansi_mode))
-          write_to_terminal(ANSI.enable_sgr_mouse())
-        end
+        write_to_terminal(ANSI.enable_mouse_tracking(ansi_mode))
+        write_to_terminal(ANSI.enable_sgr_mouse())
       end
 
       # Clear screen and home cursor

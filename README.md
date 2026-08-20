@@ -112,10 +112,15 @@ Add `term_ui` to your dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:term_ui, "~> 0.2.0"}
+    {:term_ui, github: "mikehostetler/term_ui"}
   ]
 end
 ```
+
+The core runtime has no required package dependencies. Add `:gen_stage` only
+when you use the StreamWidget GenStage adapter. Add `:mdex`, `:makeup`, and
+`:makeup_elixir` only when you need full Markdown rendering. Without them, the
+Markdown viewer uses plain text. These features stay in the same TermUI package.
 
 ## Quick Start
 
