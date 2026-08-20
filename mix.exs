@@ -15,7 +15,7 @@ defmodule TermUI.MixProject do
 
       # Hex package
       name: "TermUI",
-      description: "A direct-mode Terminal UI framework for Elixir/BEAM",
+      description: "A small Elm terminal runtime for Elixir and the BEAM",
       package: package(),
       source_url: @source_url,
       homepage_url: @source_url,
@@ -25,9 +25,9 @@ defmodule TermUI.MixProject do
       test_coverage: [tool: ExCoveralls],
 
       # Dialyzer
-      # Note: call_without_opaque warnings suppressed with :no_opaque in widget modules
-      # due to MapSet nested in opaque Style type
       dialyzer: [
+        ignore_warnings: ".dialyzer_ignore.exs",
+        list_unused_filters: true,
         flags: [
           :error_handling,
           :underspecs,
@@ -59,6 +59,12 @@ defmodule TermUI.MixProject do
 
   defp deps do
     [
+      # Markdown parsing
+      {:mdex, "~> 0.13.5"},
+
+      # Public data schemas and struct definitions
+      {:zoi, "~> 0.18.7"},
+
       # Documentation
       {:ex_doc, "~> 0.31", only: :dev, runtime: false},
 
@@ -68,17 +74,6 @@ defmodule TermUI.MixProject do
 
       # Testing
       {:excoveralls, "~> 0.18", only: :test},
-      {:stream_data, "~> 1.0", only: :test},
-
-      # Streaming
-      {:gen_stage, "~> 1.2", optional: true},
-
-      # Markdown processing
-      {:mdex, "~> 0.10", optional: true},
-
-      # Syntax highlighting for code blocks
-      {:makeup, "~> 1.1", optional: true},
-      {:makeup_elixir, "~> 1.0", optional: true},
 
       # LLM usage rules
       {:usage_rules, "~> 0.1", only: :dev, runtime: false}
@@ -113,73 +108,77 @@ defmodule TermUI.MixProject do
       extras: [
         "README.md",
         "CHANGELOG.md",
-        "guides/user/README.md": [filename: "user-guides", title: "User Guides"],
-        "guides/user/01-overview.md": [title: "Overview"],
-        "guides/user/02-getting-started.md": [title: "Getting Started"],
-        "guides/user/03-elm-architecture.md": [title: "The Elm Architecture"],
-        "guides/user/04-events.md": [title: "Events"],
-        "guides/user/05-styling.md": [title: "Styling"],
-        "guides/user/06-layout.md": [title: "Layout"],
-        "guides/user/07-widgets.md": [title: "Widgets"],
-        "guides/user/08-terminal.md": [title: "Terminal"],
-        "guides/user/09-commands.md": [title: "Commands"],
-        "guides/user/10-advanced-widgets.md": [title: "Advanced Widgets"],
-        "guides/developer/README.md": [filename: "developer-guides", title: "Developer Guides"],
-        "guides/developer/01-architecture-overview.md": [title: "Architecture Overview"],
-        "guides/developer/02-runtime-internals.md": [title: "Runtime Internals"],
-        "guides/developer/03-rendering-pipeline.md": [title: "Rendering Pipeline"],
-        "guides/developer/04-event-system.md": [title: "Event System"],
-        "guides/developer/05-buffer-management.md": [title: "Buffer Management"],
-        "guides/developer/06-terminal-layer.md": [title: "Terminal Layer"],
-        "guides/developer/07-elm-implementation.md": [title: "Elm Implementation"],
-        "guides/developer/08-creating-widgets.md": [title: "Creating Widgets"],
-        "guides/developer/09-testing-framework.md": [title: "Testing Framework"]
-      ],
-      groups_for_extras: [
-        "User Guides": ~r/guides\/user\/.*/,
-        "Developer Guides": ~r/guides\/developer\/.*/
+        "guides/architecture.md": [title: "Architecture"],
+        "guides/backend.md": [title: "Backend Contract"],
+        "guides/widgets.md": [title: "Pure Widgets"],
+        "guides/interaction.md": [title: "Clipboard, Selection, and Mouse"],
+        "guides/markdown-and-diffs.md": [title: "Markdown and Diffs"],
+        "guides/removed-and-deferred.md": [title: "Removed and Deferred Features"],
+        "guides/migration-1.0.md": [title: "Migration to 1.0"]
       ],
       groups_for_modules: [
         Core: [
           TermUI,
           TermUI.Elm,
           TermUI.Runtime,
-          TermUI.Component,
-          TermUI.Event
+          TermUI.Event,
+          TermUI.Command,
+          TermUI.Clipboard,
+          TermUI.Clipboard.Operation,
+          TermUI.Frame,
+          TermUI.Cell,
+          TermUI.Style,
+          TermUI.DisplayWidth,
+          TermUI.Markdown,
+          TermUI.Mouse,
+          TermUI.Mouse.Region,
+          TermUI.Mouse.Tracker,
+          TermUI.Selection
         ],
-        Widgets: ~r/TermUI\.Widgets\..*/,
-        Rendering: [
-          TermUI.Renderer.Style,
-          TermUI.Renderer.Cell,
-          TermUI.Renderer.Buffer,
-          TermUI.Component.RenderNode
+        Widgets: [
+          TermUI.Widget,
+          TermUI.Widget.AlertDialog,
+          TermUI.Widget.BarChart,
+          TermUI.Widget.Block,
+          TermUI.Widget.Button,
+          TermUI.Widget.Canvas,
+          TermUI.Widget.ClusterDashboard,
+          TermUI.Widget.CommandPalette,
+          TermUI.Widget.ContextMenu,
+          TermUI.Widget.Dialog,
+          TermUI.Widget.DiffViewer,
+          TermUI.Widget.FormBuilder,
+          TermUI.Widget.Gauge,
+          TermUI.Widget.Label,
+          TermUI.Widget.LineChart,
+          TermUI.Widget.LineInput,
+          TermUI.Widget.List,
+          TermUI.Widget.LogViewer,
+          TermUI.Widget.MarkdownViewer,
+          TermUI.Widget.Menu,
+          TermUI.Widget.PickList,
+          TermUI.Widget.ProcessMonitor,
+          TermUI.Widget.Progress,
+          TermUI.Widget.ScrollBar,
+          TermUI.Widget.Sparkline,
+          TermUI.Widget.SplitPane,
+          TermUI.Widget.Stream,
+          TermUI.Widget.StreamWidget,
+          TermUI.Widget.SupervisionTree,
+          TermUI.Widget.SupervisionTreeViewer,
+          TermUI.Widget.Table,
+          TermUI.Widget.Table.Column,
+          TermUI.Widget.Tabs,
+          TermUI.Widget.TextArea,
+          TermUI.Widget.TextInput,
+          TermUI.Widget.TextInput.Line,
+          TermUI.Widget.Toast,
+          TermUI.Widget.Toast.Manager,
+          TermUI.Widget.TreeView,
+          TermUI.Widget.Viewport
         ],
-        Layout: ~r/TermUI\.Layout\..*/,
-        Terminal: ~r/TermUI\.Terminal\..*/
-      ],
-      before_closing_body_tag: %{
-        html: """
-        <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
-        <script>
-          document.addEventListener("DOMContentLoaded", function () {
-            mermaid.initialize({ startOnLoad: false, theme: "default" });
-            let id = 0;
-            for (const codeEl of document.querySelectorAll("pre code.mermaid")) {
-              const preEl = codeEl.parentElement;
-              const graphDefinition = codeEl.textContent;
-              const graphEl = document.createElement("div");
-              const graphId = "mermaid-graph-" + id++;
-              mermaid.render(graphId, graphDefinition).then(({svg, bindFunctions}) => {
-                graphEl.innerHTML = svg;
-                bindFunctions?.(graphEl);
-                preEl.insertAdjacentElement("afterend", graphEl);
-                preEl.remove();
-              });
-            }
-          });
-        </script>
-        """
-      }
+        Backends: [TermUI.Backend]
+      ]
     ]
   end
 end

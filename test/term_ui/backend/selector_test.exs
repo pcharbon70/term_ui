@@ -5,6 +5,11 @@ defmodule TermUI.Backend.SelectorTest do
   alias TermUI.Backend.Selector
   import TermUI.Backend.SelectorTestHelpers
 
+  setup_all do
+    Code.ensure_loaded!(Selector)
+    :ok
+  end
+
   describe "module structure" do
     test "module compiles successfully" do
       assert Code.ensure_loaded?(Selector)
@@ -20,34 +25,9 @@ defmodule TermUI.Backend.SelectorTest do
   end
 
   describe "documentation" do
-    test "module has comprehensive moduledoc" do
+    test "module stays out of the public documentation" do
       {:docs_v1, _, :elixir, _, module_doc, _, _} = Code.fetch_docs(Selector)
-      assert module_doc != :none
-      assert module_doc != :hidden
-
-      %{"en" => doc} = module_doc
-
-      # Check key documentation topics are covered
-      assert String.contains?(doc, "try raw mode first"),
-             "Should document the selection strategy"
-
-      assert String.contains?(doc, "heuristics") or String.contains?(doc, "Heuristics"),
-             "Should explain why heuristics are insufficient"
-
-      assert String.contains?(doc, "Nerves"),
-             "Should mention Nerves as an example"
-
-      assert String.contains?(doc, "SSH"),
-             "Should mention SSH sessions as an example"
-
-      assert String.contains?(doc, "IEx") or String.contains?(doc, "remsh"),
-             "Should mention remote IEx as an example"
-
-      assert String.contains?(doc, "{:raw, state}"),
-             "Should document raw return value"
-
-      assert String.contains?(doc, "{:tty, capabilities}"),
-             "Should document tty return value"
+      assert module_doc == :hidden
     end
 
     test "select/0 has documentation" do
@@ -295,6 +275,7 @@ defmodule TermUI.Backend.SelectorTest do
 
     test "function exports attempt_raw_mode for testability" do
       # attempt_raw_mode is exported (doc false) to allow testing the core logic
+      Code.ensure_loaded!(Selector)
       assert function_exported?(Selector, :attempt_raw_mode, 0)
     end
   end

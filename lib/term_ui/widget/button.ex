@@ -1,194 +1,95 @@
 defmodule TermUI.Widget.Button do
-  @moduledoc """
-  An interactive button widget.
+  @moduledoc "A pure keyboard and mouse button."
 
-  Button responds to Enter/Space keys when focused and mouse clicks.
-  It displays visual feedback for different states.
+  @behaviour TermUI.Widget
 
-  ## Usage
+  alias TermUI.{Event, Style}
+  alias TermUI.Widget.Helpers
 
-      Button.render(%{
-        label: "Submit",
-        on_click: fn -> send(self(), :submitted) end
-      }, state, area)
+  @type t :: %__MODULE__{
+          id: term(),
+          label: String.t(),
+          focused: boolean(),
+          pressed: boolean(),
+          disabled: boolean(),
+          message: term(),
+          style: Style.t(),
+          focus_style: Style.t(),
+          disabled_style: Style.t()
+        }
 
-  ## Props
+  @schema Zoi.struct(__MODULE__, %{
+            id: Zoi.any() |> Zoi.default(nil),
+            label: Zoi.string() |> Zoi.default("Button"),
+            focused: Zoi.boolean() |> Zoi.default(false),
+            pressed: Zoi.boolean() |> Zoi.default(false),
+            disabled: Zoi.boolean() |> Zoi.default(false),
+            message: Zoi.any() |> Zoi.default(nil),
+            style: Zoi.struct(Style) |> Zoi.default(%Style{}),
+            focus_style:
+              Zoi.struct(Style)
+              |> Zoi.default(%Style{fg: :cyan, attrs: MapSet.new([:bold])}),
+            disabled_style: Zoi.struct(Style) |> Zoi.default(%Style{fg: :bright_black})
+          })
+  @enforce_keys Zoi.Struct.enforce_keys(@schema)
+  defstruct Zoi.Struct.struct_fields(@schema)
 
-  - `:label` - Button text (required)
-  - `:on_click` - Callback function invoked on activation
-  - `:disabled` - Whether button is disabled (default: `false`)
-  - `:style` - Style options
-  - `:focused_style` - Style when focused
-  - `:pressed_style` - Style when pressed
-  """
-
-  use TermUI.StatefulComponent
-
-  alias TermUI.Component.RenderNode
-  alias TermUI.Event
-  alias TermUI.Renderer.Style
-
-  # Dialyzer: Suppress opaque type warnings for Style helpers
-  @dialyzer {:nowarn_function, build_style: 1, positioned_cell_safe: 4, render: 2}
-
-  @doc """
-  Initializes the button state.
-  """
   @impl true
-  def init(props) do
-    state = %{
-      pressed: false,
-      hovered: false,
-      disabled: Map.get(props, :disabled, false),
-      props: props
+  def init(opts) do
+    id = Keyword.get(opts, :id)
+
+    %__MODULE__{
+      id: id,
+      label: opts |> Keyword.get(:label, "Button") |> to_string(),
+      focused: Keyword.get(opts, :focused, false),
+      disabled: Keyword.get(opts, :disabled, false),
+      message: Keyword.get(opts, :message, {:pressed, id}),
+      style: Keyword.get(opts, :style, Style.new()),
+      focus_style: Keyword.get(opts, :focus_style, Style.new(fg: :cyan, attrs: [:bold])),
+      disabled_style: Keyword.get(opts, :disabled_style, Style.new(fg: :bright_black))
     }
-
-    {:ok, state}
   end
 
-  @doc """
-  Handles events for the button.
-  """
   @impl true
-  def handle_event(%Event.Key{key: key}, state) when key in [:enter, :space] do
-    if state.disabled do
-      {:ok, state}
-    else
-      {:ok, %{state | pressed: true}, [{:send, self(), :click}]}
-    end
-  end
+  def update(_event, %{disabled: true} = state), do: {state, []}
+  def update(%Event.Key{key: key}, state) when key in [:enter, :space], do: press(state)
+  def update(%Event.Text{text: " "}, state), do: press(state)
 
-  def handle_event(%Event.Mouse{action: :click}, state) do
-    if state.disabled do
-      {:ok, state}
-    else
-      {:ok, %{state | pressed: true}, [{:send, self(), :click}]}
-    end
-  end
+  def update(%Event.Mouse{action: :press, button: :left}, state),
+    do: {%{state | pressed: true}, []}
 
-  def handle_event(%Event.Mouse{action: :press}, state) do
-    if state.disabled do
-      {:ok, state}
-    else
-      {:ok, %{state | pressed: true}}
-    end
-  end
+  def update(%Event.Mouse{action: :release, button: :left}, state),
+    do: press(%{state | pressed: false})
 
-  def handle_event(%Event.Mouse{action: :release}, state) do
-    {:ok, %{state | pressed: false}}
-  end
+  def update(%Event.Focus{action: :gained}, state), do: {%{state | focused: true}, []}
 
-  def handle_event(%Event.Focus{action: :gained}, state) do
-    {:ok, state}
-  end
+  def update(%Event.Focus{action: :lost}, state),
+    do: {%{state | focused: false, pressed: false}, []}
 
-  def handle_event(%Event.Focus{action: :lost}, state) do
-    {:ok, %{state | pressed: false}}
-  end
+  def update(_event, state), do: {state, []}
 
-  def handle_event(_event, state) do
-    {:ok, state}
-  end
-
-  @doc """
-  Handles messages to the button.
-  """
   @impl true
-  def handle_info(:click, state) do
-    # Invoke on_click callback
-    props = state.props
-    on_click = Map.get(props, :on_click)
+  def view(state, {width, _height} = dimensions) do
+    style =
+      cond do
+        state.disabled -> state.disabled_style
+        state.focused or state.pressed -> state.focus_style
+        true -> state.style
+      end
 
-    if is_function(on_click, 0) do
-      on_click.()
-    end
+    marker = if state.pressed, do: "<", else: "["
+    end_marker = if state.pressed, do: ">", else: "]"
 
-    {:ok, %{state | pressed: false}}
+    row = [
+      {Helpers.align(marker <> " " <> state.label <> " " <> end_marker, width, :center), style}
+    ]
+
+    Helpers.frame([row], dimensions)
   end
 
-  def handle_info(_msg, state) do
-    {:ok, state}
-  end
+  @doc "Sets keyboard focus."
+  @spec focus(t(), boolean()) :: t()
+  def focus(state, focused \\ true), do: %{state | focused: focused}
 
-  @doc """
-  Renders the button.
-  """
-  @impl true
-  def render(state, area) do
-    props = state.props
-    label = Map.get(props, :label, "Button")
-    disabled = state.disabled
-
-    style = get_style(props, state)
-
-    # Center the label
-    text = center_text(label, area.width)
-
-    cells =
-      text
-      |> String.graphemes()
-      |> Enum.with_index()
-      |> Enum.filter(fn {_char, x} -> x < area.width end)
-      |> Enum.map(fn {char, x} ->
-        cell_style =
-          if disabled do
-            build_style(%{fg: :bright_black})
-          else
-            style
-          end
-
-        positioned_cell_safe(x, 0, char, cell_style)
-      end)
-
-    RenderNode.cells(cells)
-  end
-
-  # Private Functions
-
-  defp get_style(props, state) do
-    if state.pressed do
-      build_style(Map.get(props, :pressed_style, %{fg: :black, bg: :white}))
-    else
-      build_style(Map.get(props, :style, %{}))
-    end
-  end
-
-  defp build_style(opts) when is_map(opts) do
-    style_list =
-      opts
-      |> Enum.map(fn
-        {:fg, color} -> {:fg, color}
-        {:bg, color} -> {:bg, color}
-        {:bold, true} -> {:attrs, [:bold]}
-        _ -> nil
-      end)
-      |> Enum.reject(&is_nil/1)
-
-    Style.new(style_list)
-  end
-
-  defp build_style(_), do: Style.new()
-
-  # ----------------------------------------------------------------------------
-  # Style Helper Functions
-  # ----------------------------------------------------------------------------
-
-  @spec positioned_cell_safe(integer(), integer(), String.t(), Style.t()) :: RenderNode.t()
-  defp positioned_cell_safe(x, y, char, style),
-    do: positioned_cell(x, y, char, style)
-
-  # ----------------------------------------------------------------------------
-  # Utility Functions
-  # ----------------------------------------------------------------------------
-
-  defp center_text(text, width) do
-    len = String.length(text)
-
-    if len >= width do
-      String.slice(text, 0, width)
-    else
-      padding = div(width - len, 2)
-      text |> String.pad_leading(len + padding) |> String.pad_trailing(width)
-    end
-  end
+  defp press(state), do: {%{state | pressed: false}, [state.message]}
 end

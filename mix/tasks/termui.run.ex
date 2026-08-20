@@ -18,7 +18,6 @@ defmodule Mix.Tasks.Termui.Run do
 
       --module MODULE    - Module name containing run/0 (default: autodetect)
       --function NAME    - Function name to call (default: run)
-      --iex              - Run in IEx-compatible mode (same as env TERM_UI_IEX_MODE=true)
 
   ## How it works
 
@@ -35,9 +34,7 @@ defmodule Mix.Tasks.Termui.Run do
   @impl true
   def run(args) do
     {opts, _} =
-      OptionParser.parse!(args,
-        strict: [module: :string, function: :string, iex: :boolean]
-      )
+      OptionParser.parse!(args, strict: [module: :string, function: :string])
 
     # Ensure project is compiled
     Mix.Project.get!()
@@ -53,11 +50,6 @@ defmodule Mix.Tasks.Termui.Run do
       end
 
     function = Keyword.get(opts, :function, "run") |> String.to_atom()
-
-    # Set IEx mode if requested
-    if Keyword.get(opts, :iex) do
-      Application.put_env(:term_ui, :iex_compatible, true)
-    end
 
     # Run the application
     apply(module, function, [])

@@ -1,11 +1,5 @@
 defmodule TermUI.ANSI do
-  @moduledoc """
-  ANSI escape sequence generation for terminal control.
-
-  This module provides functions to generate ANSI escape sequences for cursor
-  control, screen manipulation, colors, styles, and special terminal modes.
-  All functions return iolists for efficient concatenation.
-  """
+  @moduledoc false
 
   # Dialyzer: All functions in this module are pure data constructors that return
   # specific iolist structures. The iolist() spec is correct for the API, but

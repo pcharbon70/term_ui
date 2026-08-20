@@ -1,37 +1,5 @@
 defmodule TermUI.Terminal.SizeDetector do
-  @moduledoc """
-  Terminal size detection utilities.
-
-  This module provides centralized terminal size detection that can be used
-  by both the Terminal module and backend implementations. It attempts multiple
-  methods in order of reliability:
-
-  1. Erlang `:io` module (most reliable when available)
-  2. LINES/COLUMNS environment variables
-  3. `stty size` command (last resort)
-
-  All methods validate dimensions against practical bounds to prevent resource
-  exhaustion from malicious input.
-
-  ## Size Format
-
-  All functions return size as `{rows, cols}` (height, width) to match standard
-  terminal conventions where rows come first.
-
-  ## Example
-
-      iex> SizeDetector.detect()
-      {:ok, {24, 80}}
-
-      iex> SizeDetector.detect(size: {40, 120})
-      {:ok, {40, 120}}
-
-  ## Bounds Checking
-
-  Detected sizes are validated against `max_dimension/0` (9999) to prevent
-  integer overflow or resource exhaustion attacks through environment variables
-  or malicious terminal responses.
-  """
+  @moduledoc false
   alias TermUI.TermUtils
 
   # Maximum terminal dimension (rows or columns).

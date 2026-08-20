@@ -263,7 +263,9 @@ defmodule TermUI.TermUtils do
     message = String.downcase(output)
 
     String.contains?(message, "inappropriate ioctl for device") or
-      String.contains?(message, "not a tty")
+      String.contains?(message, "not a tty") or
+      String.contains?(message, "not a terminal") or
+      String.contains?(message, "isn't a terminal")
   end
 
   # Separate function to have access to timeout variable in catch block

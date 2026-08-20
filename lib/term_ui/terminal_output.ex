@@ -6,7 +6,7 @@ defmodule TermUI.TerminalOutput do
   @onlcr_key {__MODULE__, :onlcr_active}
   @tty_path ~c"/dev/tty"
 
-  @spec write(iodata()) :: :ok
+  @spec write(iodata()) :: :ok | {:error, term()}
   def write(data) do
     if enabled?() do
       IO.write(maybe_translate_newlines(data))
@@ -14,7 +14,9 @@ defmodule TermUI.TerminalOutput do
       :ok
     end
   rescue
-    _ -> :ok
+    exception -> {:error, exception}
+  catch
+    kind, reason -> {:error, {kind, reason}}
   end
 
   @spec enable_onlcr() :: :ok
@@ -68,6 +70,7 @@ defmodule TermUI.TerminalOutput do
   @spec cleanup_sequence() :: String.t()
   def cleanup_sequence do
     "\e[?1006l\e[?1003l\e[?1002l\e[?1000l" <>
+      "\e[?2004l\e[?1004l" <>
       "\e[?25h" <>
       "\e[0m" <>
       "\e[?1049l"

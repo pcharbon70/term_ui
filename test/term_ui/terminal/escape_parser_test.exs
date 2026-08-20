@@ -4,36 +4,47 @@ defmodule TermUI.Terminal.EscapeParserTest do
   alias TermUI.Event
   alias TermUI.Terminal.EscapeParser
 
+  test "rejects zero SGR mouse coordinates without raising" do
+    assert {[%TermUI.Event.Key{key: :unknown}], ""} =
+             EscapeParser.parse("\e[<0;0;0M")
+  end
+
   describe "parse/1 - single characters" do
     test "parses lowercase letters" do
       {events, remaining} = EscapeParser.parse("a")
       assert remaining == <<>>
-      assert [%Event.Key{key: "a", modifiers: []}] = events
+      assert [%Event.Text{text: "a"}] = events
     end
 
     test "parses uppercase letters" do
       {events, remaining} = EscapeParser.parse("A")
       assert remaining == <<>>
-      assert [%Event.Key{key: "A"}] = events
+      assert [%Event.Text{text: "A"}] = events
     end
 
     test "parses numbers" do
       {events, remaining} = EscapeParser.parse("5")
       assert remaining == <<>>
-      assert [%Event.Key{key: "5"}] = events
+      assert [%Event.Text{text: "5"}] = events
     end
 
     test "parses special characters" do
       {events, remaining} = EscapeParser.parse("@")
       assert remaining == <<>>
-      assert [%Event.Key{key: "@"}] = events
+      assert [%Event.Text{text: "@"}] = events
+    end
+
+    test "parses space as text" do
+      {events, remaining} = EscapeParser.parse(" ")
+      assert remaining == <<>>
+      assert [%Event.Text{text: " "}] = events
     end
 
     test "parses multiple characters" do
       {events, remaining} = EscapeParser.parse("abc")
       assert remaining == <<>>
       assert length(events) == 3
-      assert [%Event.Key{key: "a"}, %Event.Key{key: "b"}, %Event.Key{key: "c"}] = events
+      assert [%Event.Text{text: "a"}, %Event.Text{text: "b"}, %Event.Text{text: "c"}] = events
     end
   end
 
@@ -288,21 +299,21 @@ defmodule TermUI.Terminal.EscapeParserTest do
       # é is 0xC3 0xA9
       {events, remaining} = EscapeParser.parse("é")
       assert remaining == <<>>
-      assert [%Event.Key{key: "é"}] = events
+      assert [%Event.Text{text: "é"}] = events
     end
 
     test "parses 3-byte UTF-8 character" do
       # € is 0xE2 0x82 0xAC
       {events, remaining} = EscapeParser.parse("€")
       assert remaining == <<>>
-      assert [%Event.Key{key: "€"}] = events
+      assert [%Event.Text{text: "€"}] = events
     end
 
     test "parses 4-byte UTF-8 character" do
       # 😀 is 0xF0 0x9F 0x98 0x80
       {events, remaining} = EscapeParser.parse("😀")
       assert remaining == <<>>
-      assert [%Event.Key{key: "😀"}] = events
+      assert [%Event.Text{text: "😀"}] = events
     end
   end
 
@@ -386,7 +397,7 @@ defmodule TermUI.Terminal.EscapeParserTest do
       input = "\e[200~abc\e[201~xyz"
       {events, remaining} = EscapeParser.parse(input)
 
-      assert [%TermUI.Event.Paste{content: "abc"}, %TermUI.Event.Key{key: "x"} | _] = events
+      assert [%TermUI.Event.Paste{content: "abc"}, %TermUI.Event.Text{text: "x"} | _] = events
       assert remaining == ""
     end
 

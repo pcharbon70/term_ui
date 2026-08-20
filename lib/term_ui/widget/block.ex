@@ -1,280 +1,77 @@
 defmodule TermUI.Widget.Block do
-  @moduledoc """
-  A container widget that draws a border around its content.
+  @moduledoc "A bordered content block that produces a frame."
 
-  Block is the fundamental layout container. It renders a border,
-  optional title, and manages the layout of children within
-  its bordered area.
+  @behaviour TermUI.Widget
 
-  ## Usage
+  alias TermUI.{Frame, Style}
+  alias TermUI.Widget.Helpers
 
-      Block.render(%{
-        border: :single,
-        title: "Panel"
-      }, state, area)
+  @type t :: %__MODULE__{
+          rows: [Frame.row()],
+          title: String.t() | nil,
+          padding: non_neg_integer(),
+          style: Style.t(),
+          border_style: Style.t()
+        }
 
-  ## Props
+  @schema Zoi.struct(__MODULE__, %{
+            rows: Zoi.array() |> Zoi.default([]),
+            title: Zoi.any() |> Zoi.default(nil),
+            padding: Zoi.integer() |> Zoi.non_negative() |> Zoi.default(0),
+            style: Zoi.struct(Style) |> Zoi.default(%Style{}),
+            border_style: Zoi.struct(Style) |> Zoi.default(%Style{fg: :bright_black})
+          })
+  @enforce_keys Zoi.Struct.enforce_keys(@schema)
+  defstruct Zoi.Struct.struct_fields(@schema)
 
-  - `:border` - Border style: `:none`, `:single`, `:double`, `:rounded`, `:thick`
-  - `:title` - Optional title text
-  - `:title_align` - Title alignment: `:left`, `:center`, `:right`
-  - `:padding` - Padding inside border (integer or map with :top, :right, :bottom, :left)
-  - `:style` - Border style options
-  """
-
-  use TermUI.Container
-
-  alias TermUI.Component.RenderNode
-  alias TermUI.Renderer.Style
-
-  # Dialyzer: Suppress opaque type warnings for Style helpers
-  # Dialyzer: no_return warnings for functions that don't return
-  # no_opaque: Style contains MapSet which triggers false positive call_without_opaque warnings
-  @dialyzer [
-    :no_opaque,
-    nowarn_function: [
-      build_style: 1,
-      positioned_cell_safe: 4,
-      do_render_top: 5,
-      render_bottom_border: 3,
-      render_side_borders: 3
-    ]
-  ]
-
-  # Border character sets
-  @borders %{
-    none: %{tl: " ", tr: " ", bl: " ", br: " ", h: " ", v: " "},
-    single: %{tl: "┌", tr: "┐", bl: "└", br: "┘", h: "─", v: "│"},
-    double: %{tl: "╔", tr: "╗", bl: "╚", br: "╝", h: "═", v: "║"},
-    rounded: %{tl: "╭", tr: "╮", bl: "╰", br: "╯", h: "─", v: "│"},
-    thick: %{tl: "┏", tr: "┓", bl: "┗", br: "┛", h: "━", v: "┃"}
-  }
-
-  @doc """
-  Initializes the block state.
-  """
   @impl true
-  def init(props) do
-    {:ok, %{props: props}}
+  def init(opts) do
+    %__MODULE__{
+      rows: normalize_content(Keyword.get(opts, :content, Keyword.get(opts, :rows, []))),
+      title: Keyword.get(opts, :title),
+      padding: max(Keyword.get(opts, :padding, 0), 0),
+      style: Keyword.get(opts, :style, Style.new()),
+      border_style: Keyword.get(opts, :border_style, Style.new(fg: :bright_black))
+    }
   end
 
-  @doc """
-  Returns children to render.
-  """
   @impl true
-  def children(_state) do
-    # Block delegates children management to parent
-    []
+  def update(_event, state), do: {state, []}
+
+  @impl true
+  def view(state, {width, _height} = dimensions) do
+    inner_width = max(width - 2 - state.padding * 2, 0)
+    padding = String.duplicate(" ", state.padding)
+
+    rows =
+      List.duplicate("", state.padding) ++
+        Enum.flat_map(state.rows, fn row ->
+          row
+          |> plain_text()
+          |> Frame.wrap(max(inner_width, 1))
+          |> Enum.map(fn line -> [{padding, state.style}, {line, state.style}, padding] end)
+        end) ++ List.duplicate("", state.padding)
+
+    rows = Helpers.border(rows, dimensions, title: state.title, border_style: state.border_style)
+    Helpers.frame(rows, dimensions)
   end
 
-  @doc """
-  Calculates layout for children within the block.
-  """
-  @impl true
-  def layout(children, area, _state) do
-    # Children get the inner area (after border and padding)
-    Enum.map(children, fn child ->
-      {child, area}
+  @doc "Replaces the block content."
+  @spec set_content(t(), String.t() | [Frame.row()]) :: t()
+  def set_content(state, content), do: %{state | rows: normalize_content(content)}
+
+  defp normalize_content(content) when is_binary(content),
+    do: String.split(content, "\n", trim: false)
+
+  defp normalize_content(content) when is_list(content), do: content
+  defp normalize_content(content), do: [to_string(content)]
+
+  defp plain_text(row) when is_binary(row), do: row
+
+  defp plain_text(row) when is_list(row) do
+    Enum.map_join(row, fn
+      {text, %Style{}} -> IO.iodata_to_binary(text)
+      text -> IO.iodata_to_binary(text)
     end)
   end
-
-  @doc """
-  Handles events for the block.
-  """
-  @impl true
-  def handle_event(_event, state) do
-    {:ok, state}
-  end
-
-  @doc """
-  Renders the block border and content area.
-  """
-  @impl true
-  def render(state, area) do
-    props = state.props
-    border_type = Map.get(props, :border, :single)
-    title = Map.get(props, :title)
-    title_align = Map.get(props, :title_align, :left)
-    style_opts = Map.get(props, :style, %{})
-
-    style = build_style(style_opts)
-    border_chars = Map.get(@borders, border_type, @borders.single)
-
-    cells = render_border(border_chars, title, title_align, area, style)
-
-    RenderNode.cells(cells)
-  end
-
-  @doc """
-  Calculates the inner area after border and padding.
-  """
-  def inner_area(props, area) do
-    border_type = Map.get(props, :border, :single)
-    padding = normalize_padding(Map.get(props, :padding, 0))
-
-    # Border takes 1 cell on each side (unless :none)
-    border_offset = if border_type == :none, do: 0, else: 1
-
-    %{
-      x: area.x + border_offset + padding.left,
-      y: area.y + border_offset + padding.top,
-      width: max(0, area.width - 2 * border_offset - padding.left - padding.right),
-      height: max(0, area.height - 2 * border_offset - padding.top - padding.bottom)
-    }
-  end
-
-  # Private Functions
-
-  defp render_border(chars, title, title_align, area, style) do
-    cells = []
-
-    # Top border
-    cells = cells ++ render_top_border(chars, title, title_align, area, style)
-
-    # Side borders
-    cells = cells ++ render_side_borders(chars, area, style)
-
-    # Bottom border
-    cells = cells ++ render_bottom_border(chars, area, style)
-
-    cells
-  end
-
-  defp render_top_border(chars, title, title_align, area, style) do
-    if area.height < 1 || area.width < 1,
-      do: [],
-      else: do_render_top(chars, title, title_align, area, style)
-  end
-
-  defp do_render_top(chars, nil, _title_align, area, style) do
-    # No title - just border
-    [positioned_cell_safe(0, 0, chars.tl, style)] ++
-      for(x <- 1..(area.width - 2), do: positioned_cell_safe(x, 0, chars.h, style)) ++
-      [positioned_cell_safe(area.width - 1, 0, chars.tr, style)]
-  end
-
-  defp do_render_top(chars, title, title_align, area, style) do
-    # With title
-    inner_width = area.width - 2
-
-    if inner_width < 1 do
-      [
-        positioned_cell_safe(0, 0, chars.tl, style),
-        positioned_cell_safe(area.width - 1, 0, chars.tr, style)
-      ]
-    else
-      title_text = String.slice(title, 0, inner_width)
-      title_len = String.length(title_text)
-      remaining = inner_width - title_len
-
-      {left_pad, right_pad} =
-        case title_align do
-          :left -> {0, remaining}
-          :right -> {remaining, 0}
-          :center -> {div(remaining, 2), remaining - div(remaining, 2)}
-        end
-
-      top_cells = [positioned_cell_safe(0, 0, chars.tl, style)]
-
-      # Left padding
-      top_cells =
-        if left_pad > 0 do
-          top_cells ++ for(x <- 1..left_pad, do: positioned_cell_safe(x, 0, chars.h, style))
-        else
-          top_cells
-        end
-
-      # Title
-      top_cells =
-        top_cells ++
-          (title_text
-           |> String.graphemes()
-           |> Enum.with_index()
-           |> Enum.map(fn {char, i} ->
-             positioned_cell_safe(1 + left_pad + i, 0, char, style)
-           end))
-
-      # Right padding
-      top_cells =
-        if right_pad > 0 do
-          top_cells ++
-            for i <- 0..(right_pad - 1) do
-              positioned_cell_safe(1 + left_pad + title_len + i, 0, chars.h, style)
-            end
-        else
-          top_cells
-        end
-
-      top_cells ++ [positioned_cell_safe(area.width - 1, 0, chars.tr, style)]
-    end
-  end
-
-  defp render_side_borders(chars, area, style) do
-    if area.height < 3 || area.width < 2 do
-      []
-    else
-      for y <- 1..(area.height - 2) do
-        [
-          positioned_cell_safe(0, y, chars.v, style),
-          positioned_cell_safe(area.width - 1, y, chars.v, style)
-        ]
-      end
-      |> List.flatten()
-    end
-  end
-
-  defp render_bottom_border(chars, area, style) do
-    if area.height < 2 || area.width < 1 do
-      []
-    else
-      y = area.height - 1
-
-      [positioned_cell_safe(0, y, chars.bl, style)] ++
-        for(x <- 1..(area.width - 2), do: positioned_cell_safe(x, y, chars.h, style)) ++
-        [positioned_cell_safe(area.width - 1, y, chars.br, style)]
-    end
-  end
-
-  defp normalize_padding(padding) when is_integer(padding) do
-    %{top: padding, right: padding, bottom: padding, left: padding}
-  end
-
-  defp normalize_padding(padding) when is_map(padding) do
-    %{
-      top: Map.get(padding, :top, 0),
-      right: Map.get(padding, :right, 0),
-      bottom: Map.get(padding, :bottom, 0),
-      left: Map.get(padding, :left, 0)
-    }
-  end
-
-  defp normalize_padding(_), do: %{top: 0, right: 0, bottom: 0, left: 0}
-
-  # ----------------------------------------------------------------------------
-  # Style Helper Functions
-  # ----------------------------------------------------------------------------
-
-  @spec positioned_cell_safe(integer(), integer(), String.t(), Style.t()) :: RenderNode.t()
-  defp positioned_cell_safe(x, y, char, style),
-    do: positioned_cell(x, y, char, style)
-
-  # ----------------------------------------------------------------------------
-  # Style Building
-  # ----------------------------------------------------------------------------
-
-  defp build_style(opts) when is_map(opts) do
-    style_list =
-      opts
-      |> Enum.map(fn
-        {:fg, color} -> {:fg, color}
-        {:bg, color} -> {:bg, color}
-        {:bold, true} -> {:attrs, [:bold]}
-        _ -> nil
-      end)
-      |> Enum.reject(&is_nil/1)
-
-    Style.new(style_list)
-  end
-
-  defp build_style(_), do: Style.new()
 end

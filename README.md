@@ -1,238 +1,153 @@
 # TermUI
 
-[![Hex.pm](https://img.shields.io/hexpm/v/term_ui.svg)](https://hex.pm/packages/term_ui)
-[![Docs](https://img.shields.io/badge/hex-docs-blue.svg)](https://hexdocs.pm/term_ui)
-[![License](https://img.shields.io/hexpm/l/term_ui.svg)](https://github.com/pcharbon70/term_ui/blob/main/LICENSE)
+TermUI is a small terminal runtime for Elixir and the BEAM. It uses the Elm
+architecture and has one render value: `TermUI.Frame`.
 
-A direct-mode Terminal UI framework for Elixir/BEAM, inspired by [BubbleTea](https://github.com/charmbracelet/bubbletea) (Go) and [Ratatui](https://github.com/ratatui-org/ratatui) (Rust).
+The runtime owns application state, command execution, frame timing, and
+shutdown. A backend owns terminal setup, input, output, size, cursor state,
+capabilities, and cleanup.
 
-TermUI leverages BEAM's unique strengths—fault tolerance, actor model, hot code reloading—to build robust terminal applications using The Elm Architecture.
+## Install
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/pcharbon70/term_ui/main/assets/dashboard_blue.jpg" width="45%" alt="Blue Theme">
-  &nbsp;&nbsp;
-  <img src="https://raw.githubusercontent.com/pcharbon70/term_ui/main/assets/dashboard_yellow.jpg" width="45%" alt="Yellow Theme">
-</p>
-
-## Features
-
-- **Elm Architecture** - Predictable state management with `init/update/view`
-- **Rich Widget Library** - Gauges, tables, menus, charts, dialogs, and more
-- **Efficient Rendering** - Double-buffered differential updates at 60 FPS
-- **Themable** - True color RGB support (16 million colors)
-- **Cross-Platform** - Linux, macOS, Windows 10+ terminal support
-- **OTP Integration** - Supervision trees, fault tolerance, hot code reload
-- **IEx Compatible** - Run TUI applications directly in IEx for interactive development
-
-## IEx Compatibility
-
-TermUI applications work directly in IEx with no code changes. This is perfect for:
-- Interactive debugging and development
-- Admin tools and dashboards in production IEx sessions
-- Prototyping and testing TUI interfaces
-
-### Running in IEx
-
-```elixir
-# In your IEx session
-iex> TermUI.Runtime.run(root: MyApp.Counter)
-# Use arrow keys, press Q to quit, returns to IEx prompt
-```
-
-### How It Works
-
-TermUI uses Erlang's `:io.get_chars/2` for input instead of Elixir's `IO` module wrapper. This bypasses IEx's input interception, allowing TUI applications to receive keyboard input directly.
-
-### Detection and Configuration
-
-You can detect if your application is running in IEx:
-
-```elixir
-iex> TermUI.iex_mode?()
-true
-
-iex> TermUI.running_mode()
-:iex
-```
-
-Force IEx-compatible mode via configuration:
-
-```elixir
-# config/config.exs
-config :term_ui,
-  iex_compatible: true
-```
-
-Or via environment variable:
-
-```bash
-export TERM_UI_IEX_MODE=true
-```
-
-### Important Notes
-
-- **Arrow keys work immediately** - No need to press Enter for navigation
-- **All keyboard shortcuts work** - Including Tab, Enter, Escape, function keys
-- **Clean shutdown** - Terminal state is restored when the app exits
-- **IEx remains responsive** - The TUI app can be exited to return to IEx prompt
-
-## Widgets
-
-| Widget | Description |
-|--------|-------------|
-| **Gauge** | Progress bar with color zones |
-| **Sparkline** | Compact inline trend graph |
-| **Table** | Scrollable data table with selection and sorting |
-| **Menu** | Hierarchical menu with submenus |
-| **TextInput** | Single-line and multi-line text input |
-| **Dialog** | Modal dialog with buttons |
-| **PickList** | Modal selection with type-ahead filtering |
-| **Tabs** | Tabbed interface for switchable panels |
-| **AlertDialog** | Modal dialog for confirmations with standard button configurations |
-| **ContextMenu** | Right-click context menu with keyboard and mouse support |
-| **Toast** | Auto-dismissing notifications with stacking |
-| **Viewport** | Scrollable view with keyboard and mouse support |
-| **SplitPane** | Resizable multi-pane layouts for IDE-style interfaces |
-| **TreeView** | Hierarchical data display with expand/collapse |
-| **FormBuilder** | Structured forms with validation and multiple field types |
-| **CommandPalette** | VS Code-style command discovery with fuzzy search |
-| **BarChart** | Horizontal/vertical bar charts for categorical data |
-| **LineChart** | Line charts using Braille characters for sub-character resolution |
-| **Canvas** | Direct drawing surface for custom visualizations |
-| **LogViewer** | High-performance log viewer with virtual scrolling and filtering |
-| **StreamWidget** | GenStage-integrated widget with backpressure support |
-| **ProcessMonitor** | Live BEAM process inspection with sorting and filtering |
-| **SupervisionTreeViewer** | OTP supervision hierarchy visualization |
-| **ClusterDashboard** | Distributed Erlang cluster monitoring |
-
-## Installation
-
-Add `term_ui` to your dependencies in `mix.exs`:
+Add the release candidate to `mix.exs`:
 
 ```elixir
 def deps do
   [
-    {:term_ui, github: "mikehostetler/term_ui"}
+    {:term_ui, "~> 1.0.0-rc"}
   ]
 end
 ```
 
-The core runtime has no required package dependencies. Add `:gen_stage` only
-when you use the StreamWidget GenStage adapter. Add `:mdex`, `:makeup`, and
-`:makeup_elixir` only when you need full Markdown rendering. Without them, the
-Markdown viewer uses plain text. These features stay in the same TermUI package.
+TermUI uses MDEx to parse Markdown for terminal display. It uses Zoi schemas
+as the source for production struct fields and defaults.
 
-## Quick Start
+## Application contract
 
 ```elixir
 defmodule Counter do
   use TermUI.Elm
 
-  alias TermUI.Event
-  alias TermUI.Renderer.Style
+  alias TermUI.{Command, Event, Frame, Style}
 
-  def init(_opts), do: %{count: 0}
+  def init(opts) do
+    %{count: 0, dimensions: Keyword.fetch!(opts, :dimensions)}
+  end
 
   def event_to_msg(%Event.Key{key: :up}, _state), do: {:msg, :increment}
   def event_to_msg(%Event.Key{key: :down}, _state), do: {:msg, :decrement}
-  def event_to_msg(%Event.Key{key: "q"}, _state), do: {:msg, :quit}
-  def event_to_msg(_, _), do: :ignore
+  def event_to_msg(%Event.Text{text: text}, _state) when text in ["q", "Q"],
+    do: {:msg, :quit}
 
-  def update(:increment, state), do: {%{state | count: state.count + 1}, []}
-  def update(:decrement, state), do: {%{state | count: state.count - 1}, []}
-  def update(:quit, state), do: {state, [:quit]}
+  def event_to_msg(%Event.Resize{width: width, height: height}, _state),
+    do: {:msg, {:resize, width, height}}
 
-  def view(state) do
-    stack(:vertical, [
-      text("Counter Example", Style.new(fg: :cyan, attrs: [:bold])),
-      text("", nil),
-      text("Count: #{state.count}", nil),
-      text("", nil),
-      text("↑/↓ to change, Q to quit", Style.new(fg: :bright_black))
-    ])
+  def event_to_msg(_event, _state), do: :ignore
+
+  def update(:increment, state), do: %{state | count: state.count + 1}
+  def update(:decrement, state), do: %{state | count: state.count - 1}
+  def update(:quit, state), do: {state, [Command.shutdown()]}
+  def update({:resize, width, height}, state), do: %{state | dimensions: {width, height}}
+
+  def view(%{count: count, dimensions: {width, height}}) do
+    heading = Style.new(fg: :cyan, attrs: [:bold])
+
+    Frame.from_rows(
+      [[{"Counter", heading}], "", "Count: #{count}", "", "Up/Down: change  Q: quit"],
+      width,
+      height
+    )
   end
 end
 
-# Run the application
-TermUI.Runtime.run(root: Counter)
+TermUI.run(Counter)
 ```
 
-## Documentation
+`init/1` receives `:dimensions` as `{columns, rows}`. Printable input arrives
+as `Event.Text`. Named and modified keys arrive as `Event.Key`. Paste, mouse,
+resize, and focus input have separate event types.
 
-### User Guides
+`view/1` must return one complete `TermUI.Frame`. A frame contains its size,
+cells, and optional cursor. The cursor is `{column, row}` and is one-based.
 
-| Guide | Description |
-|-------|-------------|
-| [Overview](https://github.com/pcharbon70/term_ui/blob/main/guides/user/01-overview.md) | Introduction to TermUI concepts |
-| [Getting Started](https://github.com/pcharbon70/term_ui/blob/main/guides/user/02-getting-started.md) | First steps and setup |
-| [Elm Architecture](https://github.com/pcharbon70/term_ui/blob/main/guides/user/03-elm-architecture.md) | Understanding init/update/view |
-| [Events](https://github.com/pcharbon70/term_ui/blob/main/guides/user/04-events.md) | Handling keyboard and mouse input |
-| [Styling](https://github.com/pcharbon70/term_ui/blob/main/guides/user/05-styling.md) | Colors, attributes, and themes |
-| [Layout](https://github.com/pcharbon70/term_ui/blob/main/guides/user/06-layout.md) | Arranging components on screen |
-| [Widgets](https://github.com/pcharbon70/term_ui/blob/main/guides/user/07-widgets.md) | Using built-in widgets |
-| [Terminal](https://github.com/pcharbon70/term_ui/blob/main/guides/user/08-terminal.md) | Terminal capabilities and modes |
-| [Commands](https://github.com/pcharbon70/term_ui/blob/main/guides/user/09-commands.md) | Side effects and async operations |
-| [Advanced Widgets](https://github.com/pcharbon70/term_ui/blob/main/guides/user/10-advanced-widgets.md) | Navigation, visualization, streaming, and BEAM introspection widgets |
+## Effects
 
-### Developer Guides
+`update/2` returns new state or `{new_state, commands}`. Commands are data:
 
-| Guide | Description |
-|-------|-------------|
-| [Architecture Overview](https://github.com/pcharbon70/term_ui/blob/main/guides/developer/01-architecture-overview.md) | System layers and design |
-| [Runtime Internals](https://github.com/pcharbon70/term_ui/blob/main/guides/developer/02-runtime-internals.md) | GenServer event loop and state |
-| [Rendering Pipeline](https://github.com/pcharbon70/term_ui/blob/main/guides/developer/03-rendering-pipeline.md) | View to terminal output stages |
-| [Event System](https://github.com/pcharbon70/term_ui/blob/main/guides/developer/04-event-system.md) | Input parsing and dispatch |
-| [Buffer Management](https://github.com/pcharbon70/term_ui/blob/main/guides/developer/05-buffer-management.md) | ETS double buffering |
-| [Terminal Layer](https://github.com/pcharbon70/term_ui/blob/main/guides/developer/06-terminal-layer.md) | Raw mode and ANSI sequences |
-| [Elm Implementation](https://github.com/pcharbon70/term_ui/blob/main/guides/developer/07-elm-implementation.md) | Elm Architecture for OTP |
-| [Creating Widgets](https://github.com/pcharbon70/term_ui/blob/main/guides/developer/08-creating-widgets.md) | How to build and contribute widgets |
-| [Testing Framework](https://github.com/pcharbon70/term_ui/blob/main/guides/developer/09-testing-framework.md) | Component and widget testing |
+- `Command.message/1` queues an application message.
+- `Command.send/2` sends data to another process.
+- `Command.timer/2` queues a later application message.
+- `Command.async/2` runs work outside the runtime process. The function can
+  return any term. The runtime wraps a normal return as `{:ok, value}` and a
+  raised, thrown, or exited function as `{:error, reason}`. Its mapper always
+  receives this one runtime-produced result. For example, a function return of
+  `{:ok, value}` reaches the mapper as `{:ok, {:ok, value}}`.
+- `TermUI.Clipboard.copy/2` and `TermUI.Clipboard.clear/1` request bounded,
+  serialized OSC 52 clipboard output.
+- `Command.shutdown/1` requests one final render and cleanup.
 
-## Examples
+## Pure widgets
 
-The `examples/` directory contains standalone applications demonstrating each widget:
+A widget is not a process. The parent application owns widget state. It sends
+events to the widget and composes the returned frame into its application frame.
 
-| Example | Description |
-|---------|-------------|
-| [alert_dialog](https://github.com/pcharbon70/term_ui/tree/main/examples/alert_dialog) | Confirmation dialogs with standard buttons |
-| [bar_chart](https://github.com/pcharbon70/term_ui/tree/main/examples/bar_chart) | Horizontal and vertical bar charts |
-| [canvas](https://github.com/pcharbon70/term_ui/tree/main/examples/canvas) | Free-form drawing with box/braille characters |
-| [cluster_dashboard](https://github.com/pcharbon70/term_ui/tree/main/examples/cluster_dashboard) | Distributed Erlang cluster monitoring |
-| [command_palette](https://github.com/pcharbon70/term_ui/tree/main/examples/command_palette) | VS Code-style command discovery |
-| [context_menu](https://github.com/pcharbon70/term_ui/tree/main/examples/context_menu) | Right-click context menus |
-| [dashboard](https://github.com/pcharbon70/term_ui/tree/main/examples/dashboard) | System monitoring dashboard with multiple widgets |
-| [dialog](https://github.com/pcharbon70/term_ui/tree/main/examples/dialog) | Modal dialogs with buttons |
-| [form_builder](https://github.com/pcharbon70/term_ui/tree/main/examples/form_builder) | Structured forms with validation |
-| [gauge](https://github.com/pcharbon70/term_ui/tree/main/examples/gauge) | Progress bars and percentage indicators |
-| [line_chart](https://github.com/pcharbon70/term_ui/tree/main/examples/line_chart) | Braille-based line charts |
-| [log_viewer](https://github.com/pcharbon70/term_ui/tree/main/examples/log_viewer) | Real-time log display with filtering |
-| [menu](https://github.com/pcharbon70/term_ui/tree/main/examples/menu) | Nested menus with keyboard navigation |
-| [pick_list](https://github.com/pcharbon70/term_ui/tree/main/examples/pick_list) | Modal selection with type-ahead |
-| [process_monitor](https://github.com/pcharbon70/term_ui/tree/main/examples/process_monitor) | Live BEAM process inspection |
-| [sparkline](https://github.com/pcharbon70/term_ui/tree/main/examples/sparkline) | Inline data visualization |
-| [split_pane](https://github.com/pcharbon70/term_ui/tree/main/examples/split_pane) | Resizable multi-pane layouts |
-| [stream_widget](https://github.com/pcharbon70/term_ui/tree/main/examples/stream_widget) | Backpressure-aware data streaming |
-| [supervision_tree_viewer](https://github.com/pcharbon70/term_ui/tree/main/examples/supervision_tree_viewer) | OTP supervision hierarchy |
-| [table](https://github.com/pcharbon70/term_ui/tree/main/examples/table) | Scrollable data tables with selection |
-| [tabs](https://github.com/pcharbon70/term_ui/tree/main/examples/tabs) | Tab-based navigation |
-| [text_input](https://github.com/pcharbon70/term_ui/tree/main/examples/text_input) | Single and multi-line text input |
-| [toast](https://github.com/pcharbon70/term_ui/tree/main/examples/toast) | Auto-dismissing notifications |
-| [tree_view](https://github.com/pcharbon70/term_ui/tree/main/examples/tree_view) | Hierarchical data with expand/collapse |
-| [viewport](https://github.com/pcharbon70/term_ui/tree/main/examples/viewport) | Scrollable content areas |
-
-```bash
-# Run any example
-cd examples/dashboard
-mix deps.get
-mix termui.run
+```elixir
+list = TermUI.Widget.List.init(items: ["one", "two"])
+{list, messages} = TermUI.Widget.List.update(event, list)
+list_frame = TermUI.Widget.List.view(list, {30, 10})
+frame = TermUI.Frame.overlay(frame, list_frame, 2, 3)
 ```
 
-## Requirements
+Use `TermUI.Mouse` to route global events to local widget coordinates. Use
+`TermUI.Widget.mouse/4` to apply the local event. `TextInput` and `TextArea`
+support keyboard and mouse selection. Copy and cut return `{:copy, text}` to
+the parent, which can return a `TermUI.Clipboard.copy/2` command.
 
-- Elixir 1.15+
-- OTP 28+ (required for native raw terminal mode)
-- Terminal with Unicode support
+The supplied pure widgets include:
+
+- Text: label, single-line input, validated line input, multiline text area,
+  Markdown viewer, log viewer, stream view, and diff viewer.
+- Selection: button, list, pick list, menu, context menu, command palette,
+  tabs, table, tree view, and forms.
+- Layout: block, dialog, alert dialog, split pane, viewport, scrollbar, and toast.
+- Data views: progress, gauge, sparkline, bar chart, line chart, canvas,
+  process snapshots, supervision trees, and cluster snapshots.
+
+System views accept data snapshots from the parent. They do not start polling
+processes or perform RPC.
+
+## Markdown and diffs
+
+`TermUI.Widget.MarkdownViewer` uses MDEx and supports CommonMark headings,
+emphasis, links, quotes, lists, tasks, code blocks, rules, and tables.
+
+`TermUI.Widget.DiffViewer` accepts `:before` and `:after` text or a
+`:unified_diff`. It supports unified and side-by-side terminal views.
+
+## Backends
+
+Use `:auto`, `:raw`, or `:tty` with the `:backend` option. Tests can inject a
+module that implements `TermUI.Backend`.
+
+```elixir
+TermUI.start_link(Counter, backend: {MyTestBackend, owner: self()})
+```
+
+Raw mode needs OTP 28 or later. TTY mode is the fallback when raw mode is not
+available. The SSH backend from the pre-1.0 design is not part of this release
+candidate because its input was owned outside the backend contract.
+
+## Documents
+
+- [Architecture](guides/architecture.md)
+- [Backend contract](guides/backend.md)
+- [Pure widgets](guides/widgets.md)
+- [Clipboard, selection, and mouse](guides/interaction.md)
+- [Markdown and diff viewers](guides/markdown-and-diffs.md)
+- [Removed and deferred features](guides/removed-and-deferred.md)
+- [Migration to 1.0](guides/migration-1.0.md)
+- [Counter example](https://github.com/mikehostetler/term_ui/tree/main/examples/iex_counter)
 
 ## License
 
-MIT License - see [LICENSE](https://github.com/pcharbon70/term_ui/blob/main/LICENSE) for details.
+TermUI uses the MIT License. The repository includes the license text.

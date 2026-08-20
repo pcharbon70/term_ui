@@ -1,0 +1,426 @@
+defmodule TermUI.Backend.Manager do
+  @moduledoc false
+
+  use GenServer
+
+  alias TermUI.Backend
+  alias TermUI.Backend.{Raw, Selector, TTY}
+  alias TermUI.Clipboard.Operation
+  alias TermUI.Frame
+  alias TermUI.Terminal.SizeDetector
+
+  @input_poll_timeout 10
+  @fast_size_poll_interval 200
+  @fallback_size_poll_interval 1_000
+  @minimum_size_poll_interval 50
+
+  @type info :: %{
+          backend: module(),
+          size: Backend.size(),
+          capabilities: map()
+        }
+
+  @spec start_link(pid(), Backend.spec(), keyword()) :: GenServer.on_start()
+  def start_link(owner, spec, opts) when is_pid(owner) do
+    GenServer.start_link(__MODULE__, {owner, spec, opts})
+  end
+
+  @spec info(pid()) :: info()
+  def info(manager), do: GenServer.call(manager, :info)
+
+  @spec activate(pid()) :: :ok
+  def activate(manager), do: GenServer.call(manager, :activate)
+
+  @spec draw(pid(), Frame.t()) :: :ok | {:error, term()}
+  def draw(manager, frame), do: GenServer.call(manager, {:draw, frame})
+
+  @spec flush(pid()) :: :ok | {:error, term()}
+  def flush(manager), do: GenServer.call(manager, :flush)
+
+  @spec clipboard(pid(), Operation.t()) :: :ok | {:error, term()}
+  def clipboard(manager, %Operation{} = operation),
+    do: GenServer.call(manager, {:clipboard, operation})
+
+  @spec resize(pid(), Backend.size()) :: :ok | {:error, term()}
+  def resize(manager, size), do: GenServer.call(manager, {:resize, size})
+
+  @spec close(pid(), term()) :: :ok
+  def close(manager, reason) do
+    GenServer.call(manager, {:close, reason}, 5_000)
+  catch
+    :exit, _reason -> :ok
+  end
+
+  @impl true
+  def init({owner, spec, opts}) do
+    Process.flag(:trap_exit, true)
+    opts = Keyword.put_new(opts, :runtime, owner)
+
+    with {:ok, requested_size_poll_interval} <- parse_size_poll_interval(opts),
+         {:ok, backend, backend_state} <- open_backend(spec, opts),
+         {:ok, size} <- query_size(backend, backend_state),
+         {:ok, capabilities} <- query_capabilities(backend, backend_state) do
+      {:ok,
+       %{
+         owner: owner,
+         backend: backend,
+         backend_state: backend_state,
+         size: size,
+         capabilities: capabilities,
+         size_poll_interval: resolve_size_poll_interval(backend, requested_size_poll_interval),
+         active?: false,
+         closed?: false
+       }}
+    else
+      {:opened_error, backend, backend_state, reason} ->
+        close_backend(backend, backend_state, reason)
+        {:stop, reason}
+
+      {:error, reason} ->
+        {:stop, reason}
+    end
+  end
+
+  @impl true
+  def handle_call(:info, _from, state) do
+    {:reply, %{backend: state.backend, size: state.size, capabilities: state.capabilities}, state}
+  end
+
+  def handle_call(:activate, _from, %{active?: false} = state) do
+    send(self(), :poll_input)
+    schedule_size_poll(state)
+    {:reply, :ok, %{state | active?: true}}
+  end
+
+  def handle_call(:activate, _from, state), do: {:reply, :ok, state}
+
+  def handle_call({:draw, %Frame{} = frame}, _from, state) do
+    case invoke_state_callback(state, :draw, [frame]) do
+      {:ok, backend_state} -> {:reply, :ok, %{state | backend_state: backend_state}}
+      {:error, reason} -> {:reply, {:error, reason}, state}
+    end
+  end
+
+  def handle_call(:flush, _from, state) do
+    case invoke_state_callback(state, :flush, []) do
+      {:ok, backend_state} -> {:reply, :ok, %{state | backend_state: backend_state}}
+      {:error, reason} -> {:reply, {:error, reason}, state}
+    end
+  end
+
+  def handle_call({:clipboard, %Operation{} = operation}, _from, state) do
+    if function_exported?(state.backend, :clipboard, 2) do
+      case invoke_state_callback(state, :clipboard, [operation]) do
+        {:ok, backend_state} -> {:reply, :ok, %{state | backend_state: backend_state}}
+        {:error, reason} -> {:reply, {:error, reason}, state}
+      end
+    else
+      {:reply, {:error, backend_error(state.backend, :clipboard, :unsupported)}, state}
+    end
+  end
+
+  def handle_call({:resize, size}, _from, state) do
+    case invoke_state_callback(state, :resize, [size]) do
+      {:ok, backend_state} ->
+        {:reply, :ok, %{state | backend_state: backend_state, size: size}}
+
+      {:error, reason} ->
+        {:reply, {:error, reason}, state}
+    end
+  end
+
+  def handle_call({:close, reason}, _from, state) do
+    close_backend(state.backend, state.backend_state, reason)
+    {:stop, :normal, :ok, %{state | closed?: true, active?: false}}
+  end
+
+  @impl true
+  def handle_info(:poll_input, %{active?: true} = state) do
+    case invoke_poll(state) do
+      {:ok, event, backend_state} ->
+        send(state.owner, {:backend_event, event})
+        send(self(), :poll_input)
+        {:noreply, %{state | backend_state: backend_state}}
+
+      {:timeout, backend_state} ->
+        send(self(), :poll_input)
+        {:noreply, %{state | backend_state: backend_state}}
+
+      {:error, reason, backend_state} ->
+        send(state.owner, {:backend_failed, reason})
+        {:noreply, %{state | backend_state: backend_state, active?: false}}
+    end
+  end
+
+  def handle_info(:poll_input, state), do: {:noreply, state}
+
+  def handle_info(:poll_size, %{active?: true} = state) do
+    state =
+      case refresh_size(state) do
+        {:ok, size, backend_state} ->
+          if size != state.size, do: send(state.owner, {:backend_size, size})
+          %{state | size: size, backend_state: backend_state}
+
+        {:error, _reason} ->
+          state
+      end
+
+    schedule_size_poll(state)
+    {:noreply, state}
+  end
+
+  def handle_info(:poll_size, state), do: {:noreply, state}
+
+  def handle_info({:EXIT, owner, reason}, %{owner: owner} = state) do
+    {:stop, reason, state}
+  end
+
+  def handle_info({:EXIT, reader, reason}, state) do
+    if reader == input_reader(state.backend_state) and state.active? do
+      failure = backend_error(state.backend, :input, {:reader_exit, reason})
+      send(state.owner, {:backend_failed, failure})
+      {:noreply, %{state | active?: false}}
+    else
+      {:noreply, state}
+    end
+  end
+
+  @impl true
+  def terminate(reason, %{closed?: false} = state) do
+    close_backend(state.backend, state.backend_state, reason)
+    :ok
+  end
+
+  def terminate(_reason, _state), do: :ok
+
+  defp open_backend(:auto, opts) do
+    case Selector.select() do
+      {:raw, raw_opts} ->
+        start_backend(Raw, Keyword.merge(opts, Map.to_list(raw_opts)), raw?: true)
+
+      {:tty, capabilities} ->
+        start_backend(TTY, Keyword.put(opts, :capabilities, capabilities))
+    end
+  end
+
+  defp open_backend(:raw, opts) do
+    case Selector.attempt_raw_mode() do
+      {:raw, raw_opts} ->
+        start_backend(Raw, Keyword.merge(opts, Map.to_list(raw_opts)), raw?: true)
+
+      {:tty, capabilities} ->
+        {:error,
+         {:raw_mode_unavailable, Map.get(capabilities, :raw_mode_error, :already_started)}}
+    end
+  end
+
+  defp open_backend(:tty, opts), do: start_backend(TTY, opts)
+
+  defp open_backend({module, backend_opts}, opts)
+       when is_atom(module) and is_list(backend_opts) do
+    start_backend(module, Keyword.merge(opts, backend_opts))
+  end
+
+  defp open_backend(module, opts) when is_atom(module), do: start_backend(module, opts)
+
+  defp start_backend(module, opts, open_opts \\ []) do
+    case module.init(opts) do
+      {:ok, state} ->
+        {:ok, module, state}
+
+      {:error, reason} ->
+        maybe_restore_raw(open_opts)
+        {:error, {:backend_init_failed, module, reason}}
+
+      other ->
+        maybe_restore_raw(open_opts)
+        {:error, {:invalid_backend_init, module, other}}
+    end
+  rescue
+    exception ->
+      maybe_restore_raw(open_opts)
+      {:error, {:backend_init_failed, module, exception}}
+  catch
+    kind, reason ->
+      maybe_restore_raw(open_opts)
+      {:error, {:backend_init_failed, module, {kind, reason}}}
+  end
+
+  defp query_size(backend, backend_state) do
+    case backend.size(backend_state) do
+      {:ok, {rows, columns} = size}
+      when is_integer(rows) and rows > 0 and is_integer(columns) and columns > 0 ->
+        {:ok, size}
+
+      {:error, reason} ->
+        {:opened_error, backend, backend_state, backend_error(backend, :size, reason)}
+
+      other ->
+        {:opened_error, backend, backend_state,
+         backend_error(backend, :size, {:invalid_result, other})}
+    end
+  rescue
+    exception ->
+      {:opened_error, backend, backend_state, backend_error(backend, :size, exception)}
+  catch
+    kind, reason ->
+      {:opened_error, backend, backend_state, backend_error(backend, :size, {kind, reason})}
+  end
+
+  defp query_capabilities(backend, backend_state) do
+    case backend.capabilities(backend_state) do
+      capabilities when is_map(capabilities) ->
+        {:ok, capabilities}
+
+      other ->
+        {:opened_error, backend, backend_state,
+         backend_error(backend, :capabilities, {:invalid_result, other})}
+    end
+  rescue
+    exception ->
+      {:opened_error, backend, backend_state, backend_error(backend, :capabilities, exception)}
+  catch
+    kind, reason ->
+      {:opened_error, backend, backend_state,
+       backend_error(backend, :capabilities, {kind, reason})}
+  end
+
+  defp invoke_state_callback(state, stage, args) do
+    result = apply(state.backend, stage, [state.backend_state | args])
+
+    case result do
+      {:ok, backend_state} -> {:ok, backend_state}
+      {:error, reason} -> {:error, backend_error(state.backend, stage, reason)}
+      other -> {:error, backend_error(state.backend, stage, {:invalid_result, other})}
+    end
+  rescue
+    exception -> {:error, backend_error(state.backend, stage, exception)}
+  catch
+    kind, reason -> {:error, backend_error(state.backend, stage, {kind, reason})}
+  end
+
+  defp invoke_poll(state) do
+    case state.backend.poll_event(state.backend_state, @input_poll_timeout) do
+      {:ok, event, backend_state} ->
+        {:ok, event, backend_state}
+
+      {:timeout, backend_state} ->
+        {:timeout, backend_state}
+
+      {:error, reason, backend_state} ->
+        {:error, backend_error(state.backend, :input, reason), backend_state}
+
+      other ->
+        {:error, backend_error(state.backend, :input, {:invalid_result, other}),
+         state.backend_state}
+    end
+  rescue
+    exception ->
+      {:error, backend_error(state.backend, :input, exception), state.backend_state}
+  catch
+    kind, reason ->
+      {:error, backend_error(state.backend, :input, {kind, reason}), state.backend_state}
+  end
+
+  defp refresh_size(state) do
+    state
+    |> size_result()
+    |> normalize_size_result(state.backend)
+  rescue
+    exception -> {:error, backend_error(state.backend, :size, exception)}
+  catch
+    kind, reason -> {:error, backend_error(state.backend, :size, {kind, reason})}
+  end
+
+  defp size_result(state) do
+    if function_exported?(state.backend, :refresh_size, 1) do
+      state.backend.refresh_size(state.backend_state)
+    else
+      state.backend.size(state.backend_state)
+      |> add_backend_state(state.backend_state)
+    end
+  end
+
+  defp add_backend_state({:ok, size}, backend_state), do: {:ok, size, backend_state}
+  defp add_backend_state(other, _backend_state), do: other
+
+  defp normalize_size_result(
+         {:ok, {rows, columns} = size, backend_state},
+         _backend
+       )
+       when is_integer(rows) and rows > 0 and is_integer(columns) and columns > 0,
+       do: {:ok, size, backend_state}
+
+  defp normalize_size_result({:error, reason}, backend),
+    do: {:error, backend_error(backend, :size, reason)}
+
+  defp normalize_size_result(other, backend),
+    do: {:error, backend_error(backend, :size, {:invalid_result, other})}
+
+  defp close_backend(module, state, reason) do
+    module.shutdown(state, reason)
+  rescue
+    _exception -> :ok
+  catch
+    _kind, _reason -> :ok
+  end
+
+  defp backend_error(backend, stage, reason), do: {:backend, backend, stage, reason}
+
+  defp input_reader(%{input_reader: reader}), do: reader
+  defp input_reader(_backend_state), do: nil
+
+  defp parse_size_poll_interval(opts) do
+    case Keyword.get(opts, :size_poll_interval, :auto) do
+      :auto ->
+        {:ok, :auto}
+
+      :disabled ->
+        {:ok, nil}
+
+      interval when is_integer(interval) and interval >= @minimum_size_poll_interval ->
+        {:ok, interval}
+
+      invalid ->
+        {:error, {:invalid_size_poll_interval, invalid}}
+    end
+  end
+
+  defp resolve_size_poll_interval(_backend, nil), do: nil
+  defp resolve_size_poll_interval(_backend, interval) when is_integer(interval), do: interval
+
+  defp resolve_size_poll_interval(backend, :auto) when backend in [Raw, TTY] do
+    if fast_size_detection_available?(),
+      do: @fast_size_poll_interval,
+      else: @fallback_size_poll_interval
+  end
+
+  defp resolve_size_poll_interval(_backend, :auto), do: @fast_size_poll_interval
+
+  defp fast_size_detection_available? do
+    match?({:ok, _size}, SizeDetector.detect_from_io()) or
+      match?({:ok, _size}, SizeDetector.detect_from_env())
+  end
+
+  defp schedule_size_poll(%{size_poll_interval: nil}), do: :ok
+
+  defp schedule_size_poll(%{size_poll_interval: interval}) do
+    Process.send_after(self(), :poll_size, interval)
+    :ok
+  end
+
+  defp maybe_restore_raw(opts) do
+    if Keyword.get(opts, :raw?, false) do
+      try do
+        _result = :shell.start_interactive({:noshell, :cooked})
+        :ok
+      rescue
+        _exception -> :ok
+      catch
+        _kind, _reason -> :ok
+      end
+    else
+      :ok
+    end
+  end
+end

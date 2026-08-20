@@ -75,7 +75,20 @@ defmodule TermUI.Style do
           attrs: MapSet.t(attr())
         }
 
-  defstruct fg: nil, bg: nil, attrs: MapSet.new()
+  @valid_attributes [:bold, :dim, :italic, :underline, :blink, :reverse, :hidden, :strikethrough]
+
+  @schema Zoi.struct(__MODULE__, %{
+            fg: Zoi.any() |> Zoi.default(nil),
+            bg: Zoi.any() |> Zoi.default(nil),
+            attrs: Zoi.map_set(Zoi.enum(@valid_attributes)) |> Zoi.default(MapSet.new())
+          })
+
+  @enforce_keys Zoi.Struct.enforce_keys(@schema)
+  defstruct Zoi.Struct.struct_fields(@schema)
+
+  @doc "Returns the Zoi schema for terminal styles."
+  @spec schema() :: Zoi.schema()
+  def schema, do: @schema
 
   # Named color mappings for conversion
   @named_colors [
@@ -127,6 +140,10 @@ defmodule TermUI.Style do
   def new do
     %__MODULE__{}
   end
+
+  @doc "Creates a style from options."
+  @spec new(keyword() | map()) :: t()
+  def new(opts), do: from(opts)
 
   @doc """
   Creates a style from a keyword list or map.
@@ -207,6 +224,12 @@ defmodule TermUI.Style do
   @spec strikethrough(t()) :: t()
   def strikethrough(style), do: add_attr(style, :strikethrough)
 
+  @doc "Adds one text attribute."
+  @spec add_attr(t(), attr()) :: t()
+  def add_attr(style, attr) when attr in @valid_attributes do
+    %{style | attrs: MapSet.put(style.attrs, attr)}
+  end
+
   @doc """
   Removes an attribute from the style.
   """
@@ -229,6 +252,28 @@ defmodule TermUI.Style do
   @spec has_attr?(t(), attr()) :: boolean()
   def has_attr?(style, attr) do
     MapSet.member?(style.attrs, attr)
+  end
+
+  @doc "Returns true when two styles have the same visible values."
+  @spec equal?(t(), t()) :: boolean()
+  def equal?(%__MODULE__{} = left, %__MODULE__{} = right) do
+    left.fg == right.fg and left.bg == right.bg and MapSet.equal?(left.attrs, right.attrs)
+  end
+
+  @doc "Returns true when a style has no color or attribute."
+  @spec empty?(t()) :: boolean()
+  def empty?(%__MODULE__{} = style) do
+    is_nil(style.fg) and is_nil(style.bg) and MapSet.size(style.attrs) == 0
+  end
+
+  @doc "Creates a cell with this style."
+  @spec to_cell(t(), String.t()) :: TermUI.Cell.t()
+  def to_cell(%__MODULE__{} = style, grapheme) do
+    TermUI.Cell.new(grapheme,
+      fg: normalize_cell_color(style.fg),
+      bg: normalize_cell_color(style.bg),
+      attrs: MapSet.to_list(style.attrs)
+    )
   end
 
   # Public API - Merging and Inheritance
@@ -406,9 +451,10 @@ defmodule TermUI.Style do
 
   # Private helpers
 
-  defp add_attr(style, attr) do
-    %{style | attrs: MapSet.put(style.attrs, attr)}
-  end
+  defp normalize_cell_color(nil), do: :default
+  defp normalize_cell_color({:rgb, red, green, blue}), do: {red, green, blue}
+  defp normalize_cell_color({:indexed, index}), do: index
+  defp normalize_cell_color(color), do: color
 
   defp color_cube_index(value) do
     # Map 0-255 to 0-5
