@@ -7,4 +7,10 @@ defmodule TermUI.Widget.StreamWidget do
   defdelegate update(event, state), to: TermUI.Widget.Stream
   defdelegate view(state, dimensions), to: TermUI.Widget.Stream
   defdelegate push(state, item), to: TermUI.Widget.Stream
+  defdelegate push_many(state, items), to: TermUI.Widget.Stream
+  defdelegate offer_many(state, items), to: TermUI.Widget.Stream
+  defdelegate clear(state), to: TermUI.Widget.Stream
+  defdelegate reset_stats(state), to: TermUI.Widget.Stream
+  defdelegate set_overflow(state, overflow), to: TermUI.Widget.Stream
+  defdelegate stats(state), to: TermUI.Widget.Stream
 end
