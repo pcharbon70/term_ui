@@ -1,9 +1,16 @@
 defmodule TermUI.Widget.SplitPane do
-  @moduledoc "A pure horizontal or vertical frame composition widget."
+  @moduledoc """
+  A pure two-pane or multi-pane frame composition widget.
+
+  The original `:first`, `:second`, and `:ratio` options remain supported.
+  `:panes` accepts named pane data for larger layouts. Collapse state, weights,
+  separator focus, and mouse drag all remain in the returned widget value.
+  """
 
   @behaviour TermUI.Widget
 
   alias TermUI.{Event, Frame, Style}
+  alias TermUI.Widget.Helpers
 
   @type content ::
           Frame.t()
@@ -11,89 +18,359 @@ defmodule TermUI.Widget.SplitPane do
           | String.t()
           | {module(), term()}
           | (TermUI.Widget.dimensions() -> Frame.t())
+  @type pane :: %{required(:id) => term(), required(:content) => content()}
+  @type layout_entry :: %{
+          id: term(),
+          index: non_neg_integer(),
+          start: non_neg_integer(),
+          size: non_neg_integer(),
+          cross_size: pos_integer(),
+          content: content()
+        }
+  @type separator :: %{
+          index: non_neg_integer(),
+          position: non_neg_integer(),
+          before_index: non_neg_integer(),
+          after_index: non_neg_integer()
+        }
+  @type layout :: %{panes: [layout_entry()], separators: [separator()]}
+
   @type t :: %__MODULE__{
           first: content(),
           second: content(),
           direction: :horizontal | :vertical,
           ratio: float(),
-          dragging: boolean()
+          dragging: boolean(),
+          panes: [pane()],
+          ratios: [float()],
+          collapsed: [term()],
+          drag_separator: non_neg_integer() | nil,
+          focused_separator: non_neg_integer(),
+          min_size: pos_integer(),
+          legacy: boolean(),
+          keyboard_resize: boolean()
         }
+
   @schema Zoi.struct(__MODULE__, %{
             first: Zoi.any() |> Zoi.default([]),
             second: Zoi.any() |> Zoi.default([]),
             direction: Zoi.enum([:horizontal, :vertical]) |> Zoi.default(:horizontal),
             ratio: Zoi.number() |> Zoi.gte(0.1) |> Zoi.lte(0.9) |> Zoi.default(0.5),
-            dragging: Zoi.boolean() |> Zoi.default(false)
+            dragging: Zoi.boolean() |> Zoi.default(false),
+            panes: Zoi.array() |> Zoi.default([]),
+            ratios: Zoi.array(Zoi.number()) |> Zoi.default([]),
+            collapsed: Zoi.array() |> Zoi.default([]),
+            drag_separator:
+              Zoi.union([Zoi.integer() |> Zoi.non_negative(), Zoi.literal(nil)])
+              |> Zoi.default(nil),
+            focused_separator: Zoi.integer() |> Zoi.non_negative() |> Zoi.default(0),
+            min_size: Zoi.integer() |> Zoi.positive() |> Zoi.default(1),
+            legacy: Zoi.boolean() |> Zoi.default(true),
+            keyboard_resize: Zoi.boolean() |> Zoi.default(false)
           })
+
   @enforce_keys Zoi.Struct.enforce_keys(@schema)
   defstruct Zoi.Struct.struct_fields(@schema)
 
   @impl true
   def init(opts) do
+    first = Keyword.get(opts, :first, [])
+    second = Keyword.get(opts, :second, [])
+    legacy = not Keyword.has_key?(opts, :panes)
+
+    panes =
+      if legacy,
+        do: [%{id: :first, content: first}, %{id: :second, content: second}],
+        else: normalize_panes(Keyword.fetch!(opts, :panes))
+
+    ratio = opts |> Keyword.get(:ratio, 0.5) |> max(0.1) |> min(0.9)
+
+    ratios =
+      if legacy,
+        do: [ratio, 1.0 - ratio],
+        else: normalize_ratios(Keyword.get(opts, :ratios), length(panes))
+
+    collapsed = initial_collapsed(panes, Keyword.get(opts, :collapsed, []))
+
     %__MODULE__{
-      first: Keyword.get(opts, :first, []),
-      second: Keyword.get(opts, :second, []),
+      first: first,
+      second: second,
       direction: Keyword.get(opts, :direction, :horizontal),
-      ratio: opts |> Keyword.get(:ratio, 0.5) |> max(0.1) |> min(0.9),
-      dragging: false
+      ratio: ratio,
+      panes: Enum.map(panes, &Map.delete(&1, :collapsed)),
+      ratios: ratios,
+      collapsed: collapsed,
+      min_size: max(Keyword.get(opts, :min_size, 1), 1),
+      legacy: legacy,
+      keyboard_resize: Keyword.get(opts, :keyboard_resize, not legacy)
     }
   end
 
   @impl true
+  def update(%Event.Key{key: key}, %{keyboard_resize: true} = state) when key in [:left, :up],
+    do: resize_focused(state, -0.05)
+
+  def update(%Event.Key{key: key}, %{keyboard_resize: true} = state) when key in [:right, :down],
+    do: resize_focused(state, 0.05)
+
+  def update(%Event.Key{key: :tab, modifiers: modifiers}, %{keyboard_resize: true} = state) do
+    count = max(visible_count(state) - 1, 0)
+
+    if count == 0 do
+      {state, []}
+    else
+      delta = if :shift in modifiers, do: -1, else: 1
+      focused = rem(state.focused_separator + delta + count, count)
+      {%{state | focused_separator: focused}, [{:separator_focused, focused}]}
+    end
+  end
+
   def update(_event, state), do: {state, []}
 
   @impl true
   def mouse(%Event.Mouse{action: :press, button: :left} = event, state, dimensions) do
-    if separator?(state, event, dimensions),
-      do: {%{state | dragging: true}, []},
-      else: {state, []}
+    case separator_at(state, event, dimensions) do
+      nil ->
+        {state, []}
+
+      separator ->
+        {%{
+           state
+           | dragging: true,
+             drag_separator: separator.index,
+             focused_separator: separator.index
+         }, []}
+    end
   end
 
   def mouse(
         %Event.Mouse{action: :drag, button: :left} = event,
-        %{dragging: true} = state,
+        %{dragging: true, drag_separator: separator_index} = state,
         dimensions
       ) do
-    ratio = pointer_ratio(state.direction, event, dimensions)
-    state = %{state | ratio: ratio}
-    {state, [{:resized, ratio}]}
+    resize_to_pointer(state, separator_index, event, dimensions)
   end
 
   def mouse(%Event.Mouse{action: :release, button: :left}, state, _dimensions),
-    do: {%{state | dragging: false}, []}
+    do: {%{state | dragging: false, drag_separator: nil}, []}
 
   def mouse(event, state, _dimensions), do: update(event, state)
 
   @impl true
-  def view(%{direction: :vertical} = state, {width, height}) do
-    first_height = max(round((height - 1) * state.ratio), 1)
-    second_height = max(height - first_height - 1, 1)
+  def view(state, {width, height} = dimensions) do
+    %{panes: panes, separators: separators} = layout(state, dimensions)
+    separator_style = Style.new(fg: :bright_black)
 
     base =
-      Frame.new(width, height)
-      |> Frame.put_row(first_height + 1, [
-        {String.duplicate("─", width), Style.new(fg: :bright_black)}
-      ])
-
-    base
-    |> Frame.overlay(resolve(state.first, {width, first_height}), 1, 1)
-    |> Frame.overlay(resolve(state.second, {width, second_height}), 1, first_height + 2)
-  end
-
-  def view(state, {width, height}) do
-    first_width = max(round((width - 1) * state.ratio), 1)
-    second_width = max(width - first_width - 1, 1)
-    separator = Style.to_cell(Style.new(fg: :bright_black), "│")
-
-    base =
-      Enum.reduce(1..height, Frame.new(width, height), fn row, frame ->
-        Frame.put_cell(frame, row, first_width + 1, separator)
+      Enum.reduce(separators, Frame.new(width, height), fn separator, frame ->
+        draw_separator(frame, state.direction, separator.position, separator_style)
       end)
 
-    base
-    |> Frame.overlay(resolve(state.first, {first_width, height}), 1, 1)
-    |> Frame.overlay(resolve(state.second, {second_width, height}), first_width + 2, 1)
+    Enum.reduce(panes, base, fn pane, frame ->
+      if pane.size <= 0 do
+        frame
+      else
+        {pane_width, pane_height, column, row} = pane_geometry(state.direction, pane)
+        Frame.overlay(frame, resolve(pane.content, {pane_width, pane_height}), column, row)
+      end
+    end)
   end
+
+  @doc "Returns measured pane and separator positions for the supplied dimensions."
+  @spec layout(t(), TermUI.Widget.dimensions()) :: layout()
+  def layout(state, {width, height}) when width > 0 and height > 0 do
+    cross_size = if state.direction == :horizontal, do: height, else: width
+    main_size = if state.direction == :horizontal, do: width, else: height
+
+    visible =
+      state.panes
+      |> Enum.with_index()
+      |> Enum.reject(fn {pane, _index} -> pane.id in state.collapsed end)
+
+    separator_count = max(length(visible) - 1, 0)
+    available = max(main_size - separator_count, 0)
+
+    weights =
+      Enum.map(visible, fn {_pane, index} -> Enum.at(effective_ratios(state), index, 1.0) end)
+
+    sizes = allocate_sizes(weights, available, state.min_size)
+
+    {panes, separators, _start} =
+      visible
+      |> Enum.zip(sizes)
+      |> Enum.with_index()
+      |> Enum.reduce(
+        {[], [], 0},
+        fn {{{pane, index}, size}, visible_index}, {panes, separators, start} ->
+          entry = %{
+            id: pane.id,
+            index: index,
+            start: start,
+            size: size,
+            cross_size: cross_size,
+            content: pane_content(state, pane)
+          }
+
+          if visible_index < length(visible) - 1 do
+            {_next_pane, next_index} = Enum.at(visible, visible_index + 1)
+
+            separator = %{
+              index: visible_index,
+              position: start + size,
+              before_index: index,
+              after_index: next_index
+            }
+
+            {panes ++ [entry], separators ++ [separator], start + size + 1}
+          else
+            {panes ++ [entry], separators, start + size}
+          end
+        end
+      )
+
+    %{panes: panes, separators: separators}
+  end
+
+  @doc "Collapses a named pane."
+  @spec collapse(t(), term()) :: t()
+  def collapse(state, id) do
+    if Enum.any?(state.panes, &(&1.id == id)),
+      do: %{state | collapsed: Enum.uniq(state.collapsed ++ [id])},
+      else: state
+  end
+
+  @doc "Expands a named pane."
+  @spec expand(t(), term()) :: t()
+  def expand(state, id), do: %{state | collapsed: List.delete(state.collapsed, id)}
+
+  @doc "Toggles a named pane's collapse state."
+  @spec toggle(t(), term()) :: t()
+  def toggle(state, id),
+    do: if(collapsed?(state, id), do: expand(state, id), else: collapse(state, id))
+
+  @doc "Returns true when a named pane is collapsed."
+  @spec collapsed?(t(), term()) :: boolean()
+  def collapsed?(state, id), do: id in state.collapsed
+
+  @doc "Replaces content for a named pane."
+  @spec put_pane(t(), term(), content()) :: t()
+  def put_pane(state, id, content) do
+    panes =
+      Enum.map(state.panes, fn pane ->
+        if pane.id == id, do: %{pane | content: content}, else: pane
+      end)
+
+    case id do
+      :first when state.legacy -> %{state | panes: panes, first: content}
+      :second when state.legacy -> %{state | panes: panes, second: content}
+      _other -> %{state | panes: panes}
+    end
+  end
+
+  @doc "Moves keyboard resize focus to a zero-based visible separator."
+  @spec focus_separator(t(), non_neg_integer()) :: t()
+  def focus_separator(state, index) do
+    maximum = max(visible_count(state) - 2, 0)
+    %{state | focused_separator: Helpers.clamp(index, 0, maximum)}
+  end
+
+  defp resize_to_pointer(state, separator_index, event, dimensions) do
+    current_layout = layout(state, dimensions)
+
+    case Enum.at(current_layout.separators, separator_index) do
+      nil ->
+        {state, []}
+
+      separator ->
+        before = Enum.find(current_layout.panes, &(&1.index == separator.before_index))
+        after_pane = Enum.find(current_layout.panes, &(&1.index == separator.after_index))
+        pointer = if state.direction == :horizontal, do: event.x, else: event.y
+        pair_size = before.size + after_pane.size
+        minimum = min(state.min_size, max(div(pair_size, 2), 1))
+
+        before_size =
+          Helpers.clamp(
+            pointer - before.start,
+            minimum,
+            max(pair_size - minimum, minimum)
+          )
+
+        state =
+          set_pair_share(
+            state,
+            before.index,
+            after_pane.index,
+            before_size / max(pair_size, 1)
+          )
+
+        {state, [{:resized, resize_message(state, separator_index)}]}
+    end
+  end
+
+  defp resize_focused(state, delta) do
+    visible =
+      state.panes
+      |> Enum.with_index()
+      |> Enum.reject(fn {pane, _index} -> pane.id in state.collapsed end)
+
+    case Enum.at(Enum.chunk_every(visible, 2, 1, :discard), state.focused_separator) do
+      [{_before, before_index}, {_after, after_index}] ->
+        weights = effective_ratios(state)
+        pair = Enum.at(weights, before_index, 0.5) + Enum.at(weights, after_index, 0.5)
+        share = Enum.at(weights, before_index, 0.5) / max(pair, 0.0001)
+        state = set_pair_share(state, before_index, after_index, share + delta)
+        {state, [{:resized, resize_message(state, state.focused_separator)}]}
+
+      _other ->
+        {state, []}
+    end
+  end
+
+  defp set_pair_share(state, before_index, after_index, share) do
+    share = share |> max(0.1) |> min(0.9)
+    ratios = effective_ratios(state)
+    pair = Enum.at(ratios, before_index, 0.5) + Enum.at(ratios, after_index, 0.5)
+
+    ratios =
+      ratios
+      |> List.replace_at(before_index, pair * share)
+      |> List.replace_at(after_index, pair * (1.0 - share))
+
+    if state.legacy,
+      do: %{state | ratios: ratios, ratio: share},
+      else: %{state | ratios: ratios}
+  end
+
+  defp resize_message(%{legacy: true} = state, _separator_index), do: state.ratio
+
+  defp resize_message(state, separator_index),
+    do: %{separator: separator_index, ratios: state.ratios}
+
+  defp pane_content(%{legacy: true} = state, %{id: :first}), do: state.first
+  defp pane_content(%{legacy: true} = state, %{id: :second}), do: state.second
+  defp pane_content(_state, pane), do: pane.content
+
+  defp effective_ratios(%{legacy: true, ratio: ratio}), do: [ratio, 1.0 - ratio]
+  defp effective_ratios(state), do: state.ratios
+
+  defp separator_at(state, event, dimensions) do
+    pointer = if state.direction == :horizontal, do: event.x, else: event.y
+    Enum.find(layout(state, dimensions).separators, &(&1.position == pointer))
+  end
+
+  defp draw_separator(frame, :horizontal, position, style) do
+    cell = Style.to_cell(style, "│")
+    Enum.reduce(1..frame.height, frame, &Frame.put_cell(&2, &1, position + 1, cell))
+  end
+
+  defp draw_separator(frame, :vertical, position, style),
+    do: Frame.put_row(frame, position + 1, [{String.duplicate("─", frame.width), style}])
+
+  defp pane_geometry(:horizontal, pane),
+    do: {pane.size, pane.cross_size, pane.start + 1, 1}
+
+  defp pane_geometry(:vertical, pane),
+    do: {pane.cross_size, pane.size, 1, pane.start + 1}
 
   defp resolve(%Frame{} = frame, _dimensions), do: frame
 
@@ -105,17 +382,77 @@ defmodule TermUI.Widget.SplitPane do
   defp resolve(content, {width, height}) when is_binary(content),
     do: Frame.from_rows(String.split(content, "\n", trim: false), width, height)
 
-  defp resolve(rows, {width, height}) when is_list(rows), do: Frame.from_rows(rows, width, height)
+  defp resolve(rows, {width, height}) when is_list(rows),
+    do: Frame.from_rows(rows, width, height)
 
-  defp separator?(%{direction: :horizontal, ratio: ratio}, event, {width, _height}),
-    do: event.x == max(round((width - 1) * ratio), 1)
+  defp normalize_panes(panes) do
+    normalized =
+      panes
+      |> Enum.with_index()
+      |> Enum.map(fn
+        {%{id: _id, content: _content} = pane, _index} -> pane
+        {{id, content}, _index} -> %{id: id, content: content}
+        {content, index} -> %{id: index, content: content}
+      end)
 
-  defp separator?(%{direction: :vertical, ratio: ratio}, event, {_width, height}),
-    do: event.y == max(round((height - 1) * ratio), 1)
+    ids = Enum.map(normalized, & &1.id)
 
-  defp pointer_ratio(:horizontal, event, {width, _height}),
-    do: (event.x / max(width - 1, 1)) |> max(0.1) |> min(0.9)
+    if length(ids) == length(Enum.uniq(ids)),
+      do: normalized,
+      else: raise(ArgumentError, "pane ids must be unique")
+  end
 
-  defp pointer_ratio(:vertical, event, {_width, height}),
-    do: (event.y / max(height - 1, 1)) |> max(0.1) |> min(0.9)
+  defp initial_collapsed(panes, collapsed) do
+    pane_collapsed = for %{id: id, collapsed: true} <- panes, do: id
+    valid_ids = MapSet.new(Enum.map(panes, & &1.id))
+
+    (pane_collapsed ++ List.wrap(collapsed))
+    |> Enum.uniq()
+    |> Enum.filter(&MapSet.member?(valid_ids, &1))
+  end
+
+  defp normalize_ratios(nil, count), do: List.duplicate(1.0, count)
+
+  defp normalize_ratios(ratios, count) when is_list(ratios) and length(ratios) == count do
+    if Enum.all?(ratios, &(is_number(&1) and &1 > 0)),
+      do: Enum.map(ratios, &(&1 * 1.0)),
+      else: raise(ArgumentError, "pane ratios must be positive numbers")
+  end
+
+  defp normalize_ratios(_ratios, count),
+    do: raise(ArgumentError, "pane ratios must contain one value for each of the #{count} panes")
+
+  defp allocate_sizes([], _available, _minimum), do: []
+
+  defp allocate_sizes(weights, available, minimum) do
+    count = length(weights)
+
+    base =
+      if available >= count * minimum,
+        do: List.duplicate(minimum, count),
+        else: List.duplicate(0, count)
+
+    remaining = max(available - Enum.sum(base), 0)
+    total = Enum.sum(weights)
+    raw = Enum.map(weights, &(&1 / max(total, 0.0001) * remaining))
+    floors = Enum.map(raw, &floor/1)
+    extra = remaining - Enum.sum(floors)
+
+    order =
+      raw
+      |> Enum.with_index()
+      |> Enum.sort_by(fn {value, index} -> {-(value - floor(value)), index} end)
+      |> Enum.take(extra)
+      |> Enum.map(&elem(&1, 1))
+      |> MapSet.new()
+
+    base
+    |> Enum.zip(floors)
+    |> Enum.with_index()
+    |> Enum.map(fn {{base_size, floor_size}, index} ->
+      base_size + floor_size + if(MapSet.member?(order, index), do: 1, else: 0)
+    end)
+  end
+
+  defp visible_count(state), do: Enum.count(state.panes, &(&1.id not in state.collapsed))
 end

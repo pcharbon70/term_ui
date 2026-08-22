@@ -17,7 +17,8 @@ defmodule TermUI.Widget.MouseInteractionTest do
     SplitPane,
     Table,
     Tabs,
-    TreeView
+    TreeView,
+    Viewport
   }
 
   alias TermUI.Widget.Table.Column
@@ -86,6 +87,45 @@ defmodule TermUI.Widget.MouseInteractionTest do
              )
 
     refute scrollbar.dragging
+  end
+
+  test "viewport geometry and local scrollbar drag stay in pure state" do
+    viewport =
+      Viewport.init(
+        content: Enum.map(1..10, &"row #{&1} abcdef"),
+        scrollbars: :both
+      )
+
+    assert %{
+             content_width: 13,
+             content_height: 10,
+             viewport_width: 5,
+             viewport_height: 3,
+             max_scroll_x: 8,
+             max_scroll_y: 7,
+             visible_columns: 0..4,
+             visible_rows: 0..2
+           } = Viewport.geometry(viewport, {6, 4})
+
+    assert %TermUI.Frame{} = Viewport.view(viewport, {6, 4})
+
+    assert {viewport, [{:scrolled, {0, 7}}]} =
+             Widget.mouse(Viewport, Event.mouse(:press, :left, 5, 2), viewport, {6, 4})
+
+    assert viewport.dragging == :vertical
+
+    assert {viewport, [{:scrolled, {8, 7}}]} =
+             Widget.mouse(Viewport, Event.mouse(:press, :left, 4, 3), viewport, {6, 4})
+
+    assert viewport.dragging == :horizontal
+
+    assert {viewport, []} =
+             Widget.mouse(Viewport, Event.mouse(:release, :left, 4, 3), viewport, {6, 4})
+
+    assert viewport.dragging == nil
+
+    viewport = Viewport.scroll_into_view(%{viewport | scroll_x: 0, scroll_y: 0}, {12, 9}, {6, 4})
+    assert Viewport.position(viewport) == {8, 7}
   end
 
   test "split pane drag updates its ratio without an owner process" do
