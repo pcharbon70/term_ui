@@ -39,6 +39,43 @@ defmodule TermUI.TerminalOutputTest do
     refute TerminalOutput.onlcr?()
   end
 
+  test "translates binary and character input without changing other content" do
+    Application.put_env(:term_ui, :suppress_terminal_output, false)
+    assert :ok = TerminalOutput.enable_onlcr()
+
+    assert capture_io(fn ->
+             assert :ok = TerminalOutput.write("plain")
+             assert :ok = TerminalOutput.write(?x)
+             assert :ok = TerminalOutput.write(?\n)
+           end) == "plain120\r\n"
+  end
+
+  test "suppression blocks the standard terminal owner unless it opts in" do
+    Application.put_env(:term_ui, :suppress_terminal_output, true)
+    owner = self()
+    standard_io = Process.whereis(:standard_io) || Process.whereis(:user)
+
+    process =
+      spawn(fn ->
+        receive do
+          :check ->
+            send(
+              owner,
+              {:suppressed, TerminalOutput.enabled?(), TerminalOutput.write_to_tty("x")}
+            )
+
+            TerminalOutput.allow_current_process()
+            send(owner, {:allowed, TerminalOutput.enabled?()})
+        end
+      end)
+
+    assert Process.group_leader(process, standard_io)
+    send(process, :check)
+
+    assert_receive {:suppressed, false, :ok}
+    assert_receive {:allowed, true}
+  end
+
   test "builds cleanup output only for modes that were enabled" do
     minimal = TerminalOutput.cleanup_sequence() |> IO.iodata_to_binary()
     refute minimal =~ "\e[?1000l"

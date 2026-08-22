@@ -383,6 +383,23 @@ defmodule TermUI.Widget.AdvancedBehaviorTest do
       )
 
     assert %Frame{} = Tabs.view(tabs, {12, 3})
+    assert {tabs, _} = Tabs.update(Event.key(:left), tabs)
+    assert {tabs, _} = Tabs.update(Event.key(:end), tabs)
+    assert {tabs, _} = Tabs.update(Event.key(:home), tabs)
+    assert {^tabs, []} = Tabs.update(Event.key(:unknown), tabs)
+
+    negative_x = %Event.Mouse{
+      action: :release,
+      button: :left,
+      x: -1,
+      y: 0,
+      modifiers: [],
+      timestamp: 0
+    }
+
+    assert {^tabs, []} = Tabs.mouse(negative_x, tabs, {12, 3})
+    assert {^tabs, []} = Tabs.mouse(Event.mouse(:release, :left, 99, 0), tabs, {12, 3})
+
     assert {tabs, _} = Tabs.update(Event.key(:right), tabs)
     assert {^tabs, []} = Tabs.update(Event.key(:enter), tabs)
     tabs = Tabs.select(tabs, :rows)
@@ -395,5 +412,12 @@ defmodule TermUI.Widget.AdvancedBehaviorTest do
     assert {^empty, []} = Tabs.update(Event.key(:right), empty)
     assert {^empty, []} = Tabs.update(Event.key(:enter), empty)
     assert Tabs.selected(empty) == nil
+    assert %Frame{} = Tabs.view(empty, {12, 3})
+
+    labels = Tabs.init(tabs: ["Plain"])
+    assert Tabs.selected(labels) == %{id: "Plain", label: "Plain"}
+
+    assert %Frame{} =
+             Tabs.view(%{labels | tabs: [%{id: :text, label: "Text", content: "body"}]}, {12, 3})
   end
 end

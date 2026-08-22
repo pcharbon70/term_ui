@@ -45,13 +45,23 @@ defmodule TermUI.ClipboardTest do
 
     assert {:ok, "\e]52;p;\e\\"} =
              Clipboard.clear_operation(target: :primary) |> Clipboard.sequence()
+
+    assert {:ok, "\e]52;s;aGVsbG8=\e\\"} =
+             Clipboard.operation("hello", target: :secondary) |> Clipboard.sequence()
   end
 
   test "OSC 52 encoding rejects invalid targets and oversized content" do
     assert_raise ArgumentError, fn -> Clipboard.operation("hello", target: :invalid) end
+    assert_raise ArgumentError, fn -> Clipboard.operation("hello", max_bytes: 0) end
 
     operation = Clipboard.operation("toolong", max_bytes: 3)
     assert {:error, {:clipboard_too_large, 7, 3}} = Clipboard.sequence(operation)
+  end
+
+  test "clear creates a backend command with the default result mapper" do
+    assert %Command{kind: :clipboard, value: {operation, mapper}} = Clipboard.clear()
+    assert operation.kind == :clear
+    assert mapper.(:ok) == {:clipboard_result, :ok}
   end
 
   test "a caller can replace the result message mapper" do

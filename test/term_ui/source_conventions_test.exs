@@ -57,4 +57,20 @@ defmodule TermUI.SourceConventionsTest do
       assert {:error, [_error | _rest]} = Zoi.parse(schema, value)
     end)
   end
+
+  test "normalized event constructors keep their public types and modifiers" do
+    events = [
+      Event.key(:enter, modifiers: [:ctrl, :ctrl], timestamp: 1),
+      Event.text("x", timestamp: 2),
+      Event.paste("pasted", timestamp: 3),
+      Event.mouse(:press, :left, 4, 5, modifiers: [:shift, :shift], timestamp: 4),
+      Event.resize(80, 24, timestamp: 5),
+      Event.focus(:gained, timestamp: 6)
+    ]
+
+    assert Enum.map(events, &Event.type/1) == [:key, :text, :paste, :mouse, :resize, :focus]
+    assert Event.has_modifier?(hd(events), :ctrl)
+    assert hd(events).modifiers == [:ctrl]
+    assert Enum.at(events, 3).modifiers == [:shift]
+  end
 end
