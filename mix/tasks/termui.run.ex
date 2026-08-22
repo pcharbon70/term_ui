@@ -96,6 +96,7 @@ defmodule Mix.Tasks.Termui.Run do
       case segment do
         "iex" -> "IEx"
         "io" -> "IO"
+        "ui" -> "UI"
         "otp" -> "OTP"
         "tls" -> "TLS"
         "tcp" -> "TCP"
