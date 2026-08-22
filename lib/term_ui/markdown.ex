@@ -9,6 +9,7 @@ defmodule TermUI.Markdown do
   """
 
   alias TermUI.{DisplayWidth, Frame, Style}
+  alias TermUI.Markdown.Document
   alias TermUI.Widget.Helpers
 
   # Styles stored in MDEx node spans contain MapSet's opaque representation.
@@ -55,14 +56,28 @@ defmodule TermUI.Markdown do
     do: MDEx.parse_document(markdown, extension: @extensions)
 
   @doc "Renders Markdown to styled terminal rows."
-  @spec render(String.t(), pos_integer(), keyword()) :: [styled_line()]
+  @spec render(String.t() | Document.t(), pos_integer(), keyword()) :: [styled_line()]
   def render(markdown, width, opts \\ []) do
     render_with_elements(markdown, width, opts).lines
   end
 
   @doc "Renders Markdown and returns code-block metadata."
-  @spec render_with_elements(String.t(), pos_integer(), keyword()) :: result()
-  def render_with_elements(markdown, width, opts \\ []) when is_binary(markdown) and width > 0 do
+  @spec render_with_elements(String.t() | Document.t(), pos_integer(), keyword()) :: result()
+  def render_with_elements(markdown, width, opts \\ [])
+
+  def render_with_elements(%Document{} = document, width, opts) when width > 0 do
+    focused_id = Keyword.get(opts, :focused_element_id)
+
+    groups =
+      Enum.map(document.segments, &{:nodes, &1.nodes}) ++
+        if(document.pending == "", do: [], else: [pending_group(document.pending)])
+
+    {lines, elements} = render_groups(groups, width, focused_id)
+    lines = if lines == [], do: [[""]], else: trim_blank_tail(lines)
+    %{lines: lines, elements: elements, content_height: length(lines)}
+  end
+
+  def render_with_elements(markdown, width, opts) when is_binary(markdown) and width > 0 do
     focused_id = Keyword.get(opts, :focused_element_id)
 
     case parse(markdown) do
@@ -80,23 +95,51 @@ defmodule TermUI.Markdown do
   end
 
   @doc "Returns code blocks in source order without rendering the document."
-  @spec code_blocks(String.t()) :: [element()]
+  @spec code_blocks(String.t() | Document.t()) :: [element()]
   def code_blocks(markdown) do
     render_with_elements(markdown, 80).elements
   end
 
-  defp render_nodes(nodes, width, focused_id) do
+  defp render_nodes(nodes, width, focused_id, start_index \\ 0) do
     {lines, elements, _index} =
-      Enum.reduce(nodes, {[], [], 0}, fn node, {lines, elements, line_index} ->
+      Enum.reduce(nodes, {[], [], start_index}, fn node, {lines, elements, line_index} ->
         {node_lines, node_elements} = render_block(node, width, focused_id, line_index)
         separator = if lines == [] or node_lines == [], do: [], else: [[""]]
         start_shift = length(separator)
         node_elements = Enum.map(node_elements, &shift_element(&1, start_shift))
         next_lines = lines ++ separator ++ node_lines
-        {next_lines, elements ++ node_elements, length(next_lines)}
+        {next_lines, elements ++ node_elements, start_index + length(next_lines)}
       end)
 
     {lines, elements}
+  end
+
+  defp pending_group(pending) do
+    case parse(pending) do
+      {:ok, %MDEx.Document{nodes: nodes}} -> {:nodes, nodes}
+      {:error, _reason} -> {:source, pending}
+    end
+  end
+
+  defp render_groups(groups, width, focused_id) do
+    Enum.reduce(groups, {[], []}, fn group, {lines, elements} ->
+      separator = if lines == [], do: [], else: [[""]]
+      start_index = length(lines) + length(separator)
+
+      {group_lines, group_elements} =
+        case group do
+          {:nodes, nodes} ->
+            render_nodes(nodes, width, focused_id, start_index)
+
+          {:source, source} ->
+            rendered =
+              source |> String.split("\n", trim: false) |> Enum.flat_map(&wrap_spans([&1], width))
+
+            {rendered, []}
+        end
+
+      {lines ++ separator ++ group_lines, elements ++ group_elements}
+    end)
   end
 
   defp render_block(%MDEx.Heading{nodes: nodes, level: level}, width, _focused, _index) do

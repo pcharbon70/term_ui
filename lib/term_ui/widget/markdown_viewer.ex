@@ -4,6 +4,7 @@ defmodule TermUI.Widget.MarkdownViewer do
   @behaviour TermUI.Widget
 
   alias TermUI.{Event, Frame, Markdown}
+  alias TermUI.Markdown.Document
 
   @type t :: %__MODULE__{
           content: String.t(),
@@ -11,7 +12,8 @@ defmodule TermUI.Widget.MarkdownViewer do
           page_size: pos_integer(),
           elements: [Markdown.element()],
           focused: non_neg_integer(),
-          content_limit: pos_integer()
+          content_limit: pos_integer(),
+          document: Document.t()
         }
 
   @schema Zoi.struct(__MODULE__, %{
@@ -22,7 +24,8 @@ defmodule TermUI.Widget.MarkdownViewer do
             page_size: Zoi.integer() |> Zoi.positive() |> Zoi.default(20),
             elements: Zoi.array() |> Zoi.default([]),
             focused: Zoi.integer() |> Zoi.non_negative() |> Zoi.default(0),
-            content_limit: Zoi.integer() |> Zoi.positive() |> Zoi.default(2_000_000)
+            content_limit: Zoi.integer() |> Zoi.positive() |> Zoi.default(2_000_000),
+            document: Zoi.struct(Document) |> Zoi.default(%Document{})
           })
   @enforce_keys Zoi.Struct.enforce_keys(@schema)
   defstruct Zoi.Struct.struct_fields(@schema)
@@ -30,13 +33,16 @@ defmodule TermUI.Widget.MarkdownViewer do
   @impl true
   def init(opts) do
     content_limit = max(Keyword.get(opts, :content_limit, 2_000_000), 1)
-    content = opts |> Keyword.get(:content, "") |> to_string() |> retain_tail(content_limit)
+
+    document =
+      Document.new(Keyword.get(opts, :content, "") |> to_string(), content_limit: content_limit)
 
     %__MODULE__{
-      content: content,
+      content: document.content,
       page_size: max(Keyword.get(opts, :page_size, 20), 1),
-      elements: Markdown.code_blocks(content),
-      content_limit: content_limit
+      elements: Markdown.code_blocks(document),
+      content_limit: content_limit,
+      document: document
     }
   end
 
@@ -60,7 +66,7 @@ defmodule TermUI.Widget.MarkdownViewer do
   @impl true
   def view(state, {width, height} = dimensions) do
     focused_id = state.elements |> Enum.at(state.focused) |> then(&if(&1, do: &1.id))
-    result = Markdown.render_with_elements(state.content, width, focused_element_id: focused_id)
+    result = Markdown.render_with_elements(state.document, width, focused_element_id: focused_id)
 
     offset =
       if state.scroll == :end,
@@ -74,19 +80,31 @@ defmodule TermUI.Widget.MarkdownViewer do
   @doc "Replaces Markdown content and resets navigation."
   @spec set_content(t(), String.t()) :: t()
   def set_content(state, content) do
-    content = retain_tail(content, state.content_limit)
-    %{state | content: content, scroll: 0, focused: 0, elements: Markdown.code_blocks(content)}
+    document = Document.replace(state.document, content)
+
+    %{
+      state
+      | content: document.content,
+        document: document,
+        scroll: 0,
+        focused: 0,
+        elements: Markdown.code_blocks(document)
+    }
   end
 
   @doc "Appends a Markdown fragment within the configured content bound."
   @spec append(t(), String.t()) :: t()
-  def append(state, fragment),
-    do:
-      set_content(
-        %{state | scroll: :end},
-        retain_tail(state.content <> fragment, state.content_limit)
-      )
-      |> Map.put(:scroll, :end)
+  def append(state, fragment) do
+    document = Document.append(state.document, fragment)
+
+    %{
+      state
+      | content: document.content,
+        document: document,
+        elements: Markdown.code_blocks(document),
+        scroll: :end
+    }
+  end
 
   defp scroll(state, delta) do
     scroll = if state.scroll == :end, do: 0, else: state.scroll
@@ -107,21 +125,5 @@ defmodule TermUI.Widget.MarkdownViewer do
       nil -> {state, []}
       element -> {state, [{:copy, element.content}]}
     end
-  end
-
-  defp retain_tail(content, limit) when byte_size(content) <= limit, do: content
-
-  defp retain_tail(content, limit) do
-    content
-    |> binary_part(byte_size(content) - limit, limit)
-    |> valid_utf8_tail()
-  end
-
-  defp valid_utf8_tail(<<>>), do: ""
-
-  defp valid_utf8_tail(content) do
-    if String.valid?(content),
-      do: content,
-      else: content |> binary_part(1, byte_size(content) - 1) |> valid_utf8_tail()
   end
 end

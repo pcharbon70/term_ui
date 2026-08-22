@@ -19,6 +19,16 @@ viewer = TermUI.Widget.MarkdownViewer.init(content: markdown)
 frame = TermUI.Widget.MarkdownViewer.view(viewer, {80, 24})
 ```
 
+For streaming content, `append/2` uses a bounded `TermUI.Markdown.Document`.
+Completed top-level blocks are parsed once. The final paragraph, list, or fenced
+code block remains pending because more source can still extend it. Rendering
+reparses only that unfinished tail.
+
+```elixir
+viewer = TermUI.Widget.MarkdownViewer.init(content_limit: 2_000_000)
+viewer = TermUI.Widget.MarkdownViewer.append(viewer, token_fragment)
+```
+
 The viewer supports headings, emphasis, strong and strike-through text, inline
 code, links, images, quotes, ordered and unordered lists, task lists, code
 blocks, rules, and tables. Raw HTML is reduced to terminal-safe text.

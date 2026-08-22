@@ -2,6 +2,7 @@ defmodule TermUI.Widget.MarkdownViewerTest do
   use ExUnit.Case, async: true
 
   alias TermUI.{Event, Frame, Markdown}
+  alias TermUI.Markdown.Document
   alias TermUI.Widget.MarkdownViewer
 
   @markdown """
@@ -74,6 +75,55 @@ defmodule TermUI.Widget.MarkdownViewerTest do
     state = MarkdownViewer.set_content(state, "0123456789")
     assert state.content == "56789"
     assert state.scroll == 0
+  end
+
+  test "incremental documents parse completed blocks once and retain an unfinished tail" do
+    document = Document.new("one\n\npartial")
+
+    assert document.parsed_segments == 1
+    assert document.pending == "partial"
+    assert Document.committed_bytes(document) == byte_size("one\n\n")
+
+    document = Document.append(document, " paragraph")
+    assert document.parsed_segments == 1
+    assert document.pending == "partial paragraph"
+
+    document = Document.append(document, "\n\nnext")
+    assert document.parsed_segments == 2
+    assert document.pending == "next"
+
+    text = document |> Markdown.render(40) |> Frame.from_rows(40, 3) |> Frame.row_text(1)
+    assert text =~ "one"
+  end
+
+  test "an incomplete fenced block stays pending until its closing boundary" do
+    document = Document.new("```elixir\nIO")
+    assert document.segments == []
+    assert document.pending == "```elixir\nIO"
+
+    document = Document.append(document, ".puts(:ok)\n```\n\nAfter")
+    assert document.parsed_segments == 1
+    assert document.pending == "After"
+    assert [%{language: "elixir", content: content}] = Markdown.code_blocks(document)
+    assert content =~ "IO.puts"
+
+    state = MarkdownViewer.init(content: "first\n\npartial")
+    state = MarkdownViewer.append(state, " block\n\nnext")
+    assert state.document.parsed_segments == 2
+    assert state.content == state.document.content
+  end
+
+  test "fragmented incremental rendering preserves full list semantics" do
+    source = "- one\n\n  continuation\n\n- two\n\nAfter"
+
+    document =
+      source
+      |> String.graphemes()
+      |> Enum.chunk_every(5)
+      |> Enum.map(&Enum.join/1)
+      |> Enum.reduce(Document.new(), &Document.append(&2, &1))
+
+    assert Markdown.render(document, 40) == Markdown.render(source, 40)
   end
 
   test "all navigation paths remain bounded with and without code blocks" do
