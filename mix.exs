@@ -68,10 +68,10 @@ defmodule TermUI.MixProject do
 
       # Documentation
       {:ex_doc, "~> 0.31", only: :dev, runtime: false},
-      {:doctor, "~> 0.21", only: :dev, runtime: false},
+      {:doctor, "~> 0.23", only: :dev, runtime: false},
 
       # Code quality
-      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:credo, "~> 1.7.19", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
 
       # Testing
