@@ -1,14 +1,14 @@
 defmodule TermUI.MixProject do
   use Mix.Project
 
-  @version "1.0.0-rc"
-  @source_url "https://github.com/mikehostetler/term_ui"
+  @version "1.0.0-rc.1"
+  @source_url "https://github.com/pcharbon70/term_ui"
 
   def project do
     [
       app: :term_ui,
       version: @version,
-      elixir: "~> 1.15",
+      elixir: ">= 1.18.4 and < 2.0.0",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -83,9 +83,13 @@ defmodule TermUI.MixProject do
   defp package do
     [
       name: "term_ui",
+      maintainers: ["Pascal Charbonneau"],
       licenses: ["MIT"],
       links: %{
-        "GitHub" => @source_url
+        "Changelog" => "https://hexdocs.pm/term_ui/changelog.html",
+        "Documentation" => "https://hexdocs.pm/term_ui",
+        "GitHub" => @source_url,
+        "Issues" => @source_url <> "/issues"
       },
       files: ~w(
         lib
@@ -95,6 +99,7 @@ defmodule TermUI.MixProject do
         README.md
         LICENSE
         CHANGELOG.md
+        CONTRIBUTING.md
         usage-rules.md
       )
     ]

@@ -9,12 +9,15 @@ capabilities, and cleanup.
 
 ## Install
 
+TermUI requires Elixir 1.18.4 or later and Erlang/OTP 28 or later. CI tests
+Elixir 1.18.4, 1.19, and 1.20 on OTP 28, and Elixir 1.20 on OTP 29.
+
 Add the release candidate to `mix.exs`:
 
 ```elixir
 def deps do
   [
-    {:term_ui, "~> 1.0.0-rc"}
+    {:term_ui, "~> 1.0.0-rc.1"}
   ]
 end
 ```
@@ -146,7 +149,7 @@ candidate because its input was owned outside the backend contract.
 - [Markdown and diff viewers](guides/markdown-and-diffs.md)
 - [Removed and deferred features](guides/removed-and-deferred.md)
 - [Migration to 1.0](guides/migration-1.0.md)
-- [Counter example](https://github.com/mikehostetler/term_ui/tree/main/examples/iex_counter)
+- [Counter example](https://github.com/pcharbon70/term_ui/tree/develop/examples/iex_counter)
 
 ## License
 

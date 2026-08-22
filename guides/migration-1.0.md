@@ -1,11 +1,13 @@
-# Migration to TermUI 1.0
+# Migration to TermUI 1.0.0-rc.1
 
-TermUI 1.0 removes the pre-release component and render systems. It does not
-provide compatibility aliases.
+TermUI 1.0.0-rc.1 is a breaking redesign of the published 1.0.0-rc package.
+It removes the earlier release candidate's component and render systems. It
+does not provide compatibility aliases for systems that no longer match the
+runtime design.
 
 ## Public replacements
 
-| Before 1.0 | TermUI 1.0 |
+| 1.0.0-rc and earlier | 1.0.0-rc.1 |
 | --- | --- |
 | `TermUI.App` | `TermUI.run/2`, `TermUI.start_link/2`, or `TermUI.Runtime` |
 | `TermUI.Component` and `TermUI.StatefulComponent` | One `TermUI.Elm` application or a pure `TermUI.Widget` |

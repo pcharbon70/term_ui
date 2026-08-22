@@ -2,9 +2,15 @@ name: CI
 
 on:
   push:
-    branches: [main]
   pull_request:
-    branches: [main]
+    branches: [develop]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   MIX_ENV: test
@@ -13,25 +19,33 @@ jobs:
   test:
     name: Test (Elixir ${{ matrix.elixir }} / OTP ${{ matrix.otp }})
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     strategy:
+      fail-fast: false
       matrix:
         include:
+          - elixir: "1.18.4"
+            otp: "28.1"
           - elixir: "1.19"
-            otp: "28"
+            otp: "28.1"
+          - elixir: "1.20"
+            otp: "28.1"
+          - elixir: "1.20"
+            otp: "29.0"
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Setup Elixir
-        uses: erlef/setup-beam@v1
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
         with:
           elixir-version: ${{ matrix.elixir }}
           otp-version: ${{ matrix.otp }}
 
       - name: Cache dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
             deps
@@ -43,11 +57,93 @@ jobs:
       - name: Install dependencies
         run: mix deps.get
 
+      - name: Compile with warnings as errors
+        run: mix compile --warnings-as-errors
+
+      - name: Run tests
+        run: mix test --warnings-as-errors
+
+  quality:
+    name: Quality and package
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      MIX_ENV: dev
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup Elixir
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
+        with:
+          elixir-version: "1.19"
+          otp-version: "28.1"
+
+      - name: Cache dependencies and PLT
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            deps
+            _build
+          key: ${{ runner.os }}-quality-otp-28.1-elixir-1.19-${{ hashFiles('mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-quality-otp-28.1-elixir-1.19-
+
+      - name: Install dependencies
+        run: mix deps.get
+
       - name: Check formatting
         run: mix format --check-formatted
 
       - name: Compile with warnings as errors
         run: mix compile --warnings-as-errors
 
-      - name: Run tests
-        run: mix test
+      - name: Check for unused dependencies
+        run: mix deps.unlock --check-unused
+
+      - name: Check compile dependency cycles
+        run: mix xref graph --format cycles --fail-above 0
+
+      - name: Run Credo
+        run: mix credo --strict
+
+      - name: Run Dialyzer
+        run: mix dialyzer
+
+      - name: Build documentation
+        run: mix docs --warnings-as-errors
+
+      - name: Build Hex package
+        run: mix hex.build
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup Elixir
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
+        with:
+          elixir-version: "1.19"
+          otp-version: "28.1"
+
+      - name: Cache dependencies
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            deps
+            _build
+          key: ${{ runner.os }}-coverage-otp-28.1-elixir-1.19-${{ hashFiles('mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-coverage-otp-28.1-elixir-1.19-
+
+      - name: Install dependencies
+        run: mix deps.get
+
+      - name: Enforce coverage floor
+        run: mix coveralls
