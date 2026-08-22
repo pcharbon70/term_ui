@@ -20,30 +20,38 @@ defmodule TermUI.Backend.Manager do
           capabilities: map()
         }
 
+  @doc "Starts the serialized owner for one backend session."
   @spec start_link(pid(), Backend.spec(), keyword()) :: GenServer.on_start()
   def start_link(owner, spec, opts) when is_pid(owner) do
     GenServer.start_link(__MODULE__, {owner, spec, opts})
   end
 
+  @doc "Returns the selected backend, size, and capabilities."
   @spec info(pid()) :: info()
   def info(manager), do: GenServer.call(manager, :info)
 
+  @doc "Starts input and size polling after the runtime is ready."
   @spec activate(pid()) :: :ok
   def activate(manager), do: GenServer.call(manager, :activate)
 
+  @doc "Draws one complete frame through the selected backend."
   @spec draw(pid(), Frame.t()) :: :ok | {:error, term()}
   def draw(manager, frame), do: GenServer.call(manager, {:draw, frame})
 
+  @doc "Flushes pending backend output."
   @spec flush(pid()) :: :ok | {:error, term()}
   def flush(manager), do: GenServer.call(manager, :flush)
 
+  @doc "Runs one serialized clipboard operation."
   @spec clipboard(pid(), Operation.t()) :: :ok | {:error, term()}
   def clipboard(manager, %Operation{} = operation),
     do: GenServer.call(manager, {:clipboard, operation})
 
+  @doc "Updates the backend size after a resize event."
   @spec resize(pid(), Backend.size()) :: :ok | {:error, term()}
   def resize(manager, size), do: GenServer.call(manager, {:resize, size})
 
+  @doc "Closes the backend session and waits for cleanup."
   @spec close(pid(), term()) :: :ok
   def close(manager, reason) do
     GenServer.call(manager, {:close, reason}, 5_000)
@@ -52,6 +60,7 @@ defmodule TermUI.Backend.Manager do
   end
 
   @impl true
+  @doc false
   def init({owner, spec, opts}) do
     Process.flag(:trap_exit, true)
     opts = Keyword.put_new(opts, :runtime, owner)
@@ -82,6 +91,7 @@ defmodule TermUI.Backend.Manager do
   end
 
   @impl true
+  @doc false
   def handle_call(:info, _from, state) do
     {:reply, %{backend: state.backend, size: state.size, capabilities: state.capabilities}, state}
   end
@@ -135,6 +145,7 @@ defmodule TermUI.Backend.Manager do
   end
 
   @impl true
+  @doc false
   def handle_info(:poll_input, %{active?: true} = state) do
     case invoke_poll(state) do
       {:ok, event, backend_state} ->
@@ -186,6 +197,7 @@ defmodule TermUI.Backend.Manager do
   end
 
   @impl true
+  @doc false
   def terminate(reason, %{closed?: false} = state) do
     close_backend(state.backend, state.backend_state, reason)
     :ok

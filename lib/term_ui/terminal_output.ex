@@ -10,6 +10,7 @@ defmodule TermUI.TerminalOutput do
   @onlcr_key {__MODULE__, :onlcr_active}
   @tty_path ~c"/dev/tty"
 
+  @doc "Writes terminal data through the current group leader when output is enabled."
   @spec write(iodata()) :: :ok | {:error, term()}
   def write(data) do
     if enabled?() do
@@ -23,12 +24,14 @@ defmodule TermUI.TerminalOutput do
     kind, reason -> {:error, {kind, reason}}
   end
 
+  @doc "Enables line-feed translation for a terminal with output post-processing disabled."
   @spec enable_onlcr() :: :ok
   def enable_onlcr do
     :persistent_term.put(@onlcr_key, true)
     :ok
   end
 
+  @doc "Disables line-feed translation and clears cached terminal state."
   @spec disable_onlcr() :: :ok
   def disable_onlcr do
     :persistent_term.erase(@onlcr_key)
@@ -38,11 +41,13 @@ defmodule TermUI.TerminalOutput do
     _ -> :ok
   end
 
+  @doc "Returns true when line-feed translation is enabled."
   @spec onlcr?() :: boolean()
   def onlcr? do
     :persistent_term.get(@onlcr_key, false) == true
   end
 
+  @doc "Returns true when the current process can write terminal output."
   @spec enabled?() :: boolean()
   def enabled? do
     if Application.get_env(:term_ui, @suppress_key, false) do
@@ -52,6 +57,7 @@ defmodule TermUI.TerminalOutput do
     end
   end
 
+  @doc "Writes cleanup data with bounded fallbacks to the TTY or standard error."
   @spec write_to_tty(iodata()) :: :ok
   def write_to_tty(data) do
     if enabled?() do
@@ -65,6 +71,7 @@ defmodule TermUI.TerminalOutput do
     _, _ -> :ok
   end
 
+  @doc "Builds the ANSI sequence that restores enabled terminal modes."
   @spec cleanup_sequence(keyword()) :: [binary() | []]
   def cleanup_sequence(opts \\ []) do
     [
@@ -77,6 +84,7 @@ defmodule TermUI.TerminalOutput do
     ]
   end
 
+  @doc "Returns true when the host terminal needs a hard reset fallback."
   @spec needs_hard_reset?() :: boolean()
   def needs_hard_reset? do
     key = {__MODULE__, :needs_hard_reset}
@@ -97,12 +105,14 @@ defmodule TermUI.TerminalOutput do
       System.get_env("WSL_INTEROP") != nil
   end
 
+  @doc "Allows terminal output from the current process during controlled cleanup."
   @spec allow_current_process() :: true
   def allow_current_process do
     _previous = Process.put(@allow_key, true)
     true
   end
 
+  @doc "Removes the current process terminal-output allowance."
   @spec disallow_current_process() :: true | nil
   def disallow_current_process do
     Process.delete(@allow_key)

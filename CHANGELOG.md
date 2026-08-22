@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.0.0-rc.1] - 2026-08-22
-
 ### Added
 
 - Restored the general widget feature set as parent-owned pure widgets under
@@ -27,19 +25,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Process, stream, supervision, and cluster widgets now render data snapshots
   supplied by the parent application. They do not own effect processes.
+
+## [1.0.0-rc] - 2026-08-19
+
+### Changed
+
 - Replaced the component process system with one Elm application runtime.
 - Made `TermUI.Frame` the only application render value.
 - Moved terminal lifecycle, input, output, size, cursor, and capabilities into backends.
 - Split printable text from named and modified key events.
 - Replaced effect tuples with `TermUI.Command` data.
 - Replaced process widgets with parent-owned pure widgets.
-- Made synchronous runtime startup use an atomic process monitor so fast exits
-  preserve the application or backend result.
-- Made terminal cleanup state-aware and idempotent after partial setup.
-- Added CI for every push and pull requests to `develop`, with supported runtime,
-  quality, package, and coverage gates.
-- Set the package requirement to Elixir 1.18.4 or later and documented the
-  tested Elixir and OTP combinations.
 
 ### Removed
 
@@ -137,8 +133,7 @@ See `guides/migration-1.0.md` for the replacement map.
 - Developer guides (architecture, runtime, rendering, events, buffers, terminal, creating widgets)
 - Widget examples with READMEs
 
-[Unreleased]: https://github.com/pcharbon70/term_ui/compare/v1.0.0-rc.1...HEAD
-[1.0.0-rc.1]: https://github.com/pcharbon70/term_ui/compare/v1.0.0-rc...v1.0.0-rc.1
-[1.0.0-rc]: https://github.com/pcharbon70/term_ui/releases/tag/v1.0.0-rc
-[0.2.0]: https://github.com/pcharbon70/term_ui/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/pcharbon70/term_ui/releases/tag/v0.1.0
+[Unreleased]: https://github.com/mikehostetler/term_ui/compare/v1.0.0-rc...HEAD
+[1.0.0-rc]: https://github.com/mikehostetler/term_ui/compare/v0.2.0...v1.0.0-rc
+[0.2.0]: https://github.com/mikehostetler/term_ui/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/mikehostetler/term_ui/releases/tag/v0.1.0

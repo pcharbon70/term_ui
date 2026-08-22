@@ -9,6 +9,7 @@ defmodule TermUI.Backend.EventStream do
   @max_reads_per_poll 256
   @max_event_queue 100
 
+  @doc "Polls one backend input source and returns one parsed event or timeout result."
   @spec poll(map(), non_neg_integer(), (-> InputReader.result()), module()) ::
           {:ok, TermUI.Backend.event(), map()}
           | {:timeout, map()}
@@ -24,6 +25,7 @@ defmodule TermUI.Backend.EventStream do
     end
   end
 
+  @doc "Stops the input reader stored in backend state, when one exists."
   @spec stop(map()) :: :ok
   def stop(state), do: InputReader.stop(Map.get(state, :input_reader))
 

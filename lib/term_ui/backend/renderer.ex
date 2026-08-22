@@ -21,6 +21,7 @@ defmodule TermUI.Backend.Renderer do
                           Map.merge(bars, base)
                         )
 
+  @doc "Converts changed backend cells to a minimal ANSI output sequence."
   @spec render(
           [{TermUI.Backend.position(), TermUI.Backend.cell()}],
           :true_color | :color_256 | :color_16 | :monochrome,

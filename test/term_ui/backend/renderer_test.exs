@@ -68,4 +68,60 @@ defmodule TermUI.Backend.RendererTest do
 
     assert output == "\e[1;1H\e[0m+-\e[0m"
   end
+
+  test "renders every color mode and supported text attribute" do
+    attributes = [
+      :bold,
+      :dim,
+      :italic,
+      :underline,
+      :blink,
+      :reverse,
+      :hidden,
+      :strikethrough,
+      :unknown
+    ]
+
+    true_color =
+      Renderer.render(
+        [{{1, 1}, {"x", {1, 2, 3}, {4, 5, 6}, attributes}}],
+        :true_color,
+        :unicode
+      )
+      |> IO.iodata_to_binary()
+
+    assert true_color =~ "\e[38;2;1;2;3m"
+    assert true_color =~ "\e[48;2;4;5;6m"
+
+    color_256 =
+      Renderer.render(
+        [
+          {{1, 1}, {"x", 42, 43, []}},
+          {{2, 1}, {"y", {255, 0, 0}, {0, 255, 0}, []}}
+        ],
+        :color_256,
+        :unicode
+      )
+      |> IO.iodata_to_binary()
+
+    assert color_256 =~ "\e[38;5;42m"
+    assert color_256 =~ "\e[48;5;43m"
+
+    color_16 =
+      Renderer.render(
+        [{{1, 1}, {"x", {255, 0, 0}, {0, 0, 255}, []}}],
+        :color_16,
+        :unicode
+      )
+      |> IO.iodata_to_binary()
+
+    assert color_16 =~ "x"
+
+    monochrome =
+      Renderer.render([{{1, 1}, {"x", :red, :blue, []}}], :monochrome, :unicode)
+      |> IO.iodata_to_binary()
+
+    refute monochrome =~ "\e[31m"
+    assert Renderer.render([], :true_color, :unicode) |> IO.iodata_to_binary() == "\e[0m"
+  end
 end

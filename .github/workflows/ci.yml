@@ -1,149 +1,28 @@
 name: CI
 
 on:
-  push:
   pull_request:
-    branches: [develop]
-
-permissions:
-  contents: read
+  merge_group:
+  push:
+    branches:
+      - develop
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  MIX_ENV: test
+permissions:
+  actions: read
+  contents: read
 
 jobs:
-  test:
-    name: Test (Elixir ${{ matrix.elixir }} / OTP ${{ matrix.otp }})
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - elixir: "1.18.4"
-            otp: "28.1"
-          - elixir: "1.19"
-            otp: "28.1"
-          - elixir: "1.20"
-            otp: "28.1"
-          - elixir: "1.20"
-            otp: "29.0"
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-
-      - name: Setup Elixir
-        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
-        with:
-          elixir-version: ${{ matrix.elixir }}
-          otp-version: ${{ matrix.otp }}
-
-      - name: Cache dependencies
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
-        with:
-          path: |
-            deps
-            _build
-          key: ${{ runner.os }}-mix-${{ matrix.otp }}-${{ matrix.elixir }}-${{ hashFiles('**/mix.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-mix-${{ matrix.otp }}-${{ matrix.elixir }}-
-
-      - name: Install dependencies
-        run: mix deps.get
-
-      - name: Compile with warnings as errors
-        run: mix compile --warnings-as-errors
-
-      - name: Run tests
-        run: mix test --warnings-as-errors
-
-  quality:
-    name: Quality and package
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    env:
-      MIX_ENV: dev
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-
-      - name: Setup Elixir
-        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
-        with:
-          elixir-version: "1.19"
-          otp-version: "28.1"
-
-      - name: Cache dependencies and PLT
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
-        with:
-          path: |
-            deps
-            _build
-          key: ${{ runner.os }}-quality-otp-28.1-elixir-1.19-${{ hashFiles('mix.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-quality-otp-28.1-elixir-1.19-
-
-      - name: Install dependencies
-        run: mix deps.get
-
-      - name: Check formatting
-        run: mix format --check-formatted
-
-      - name: Compile with warnings as errors
-        run: mix compile --warnings-as-errors
-
-      - name: Check for unused dependencies
-        run: mix deps.unlock --check-unused
-
-      - name: Check compile dependency cycles
-        run: mix xref graph --format cycles --fail-above 0
-
-      - name: Run Credo
-        run: mix credo --strict
-
-      - name: Run Dialyzer
-        run: mix dialyzer
-
-      - name: Build documentation
-        run: mix docs --warnings-as-errors
-
-      - name: Build Hex package
-        run: mix hex.build
-
-  coverage:
-    name: Coverage
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-
-      - name: Setup Elixir
-        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
-        with:
-          elixir-version: "1.19"
-          otp-version: "28.1"
-
-      - name: Cache dependencies
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
-        with:
-          path: |
-            deps
-            _build
-          key: ${{ runner.os }}-coverage-otp-28.1-elixir-1.19-${{ hashFiles('mix.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-coverage-otp-28.1-elixir-1.19-
-
-      - name: Install dependencies
-        run: mix deps.get
-
-      - name: Enforce coverage floor
-        run: mix coveralls
+  ci:
+    name: CI
+    uses: agentjido/github-actions/.github/workflows/jido-ci.yml@v5
+    secrets: inherit
+    with:
+      quality_otp_version: "29"
+      quality_elixir_version: "1.20"
+      test_matrix: '[{"otp":"28","elixir":"1.18.4"},{"otp":"28","elixir":"1.19"},{"otp":"28","elixir":"1.20"},{"otp":"29","elixir":"1.20"}]'
+      docs_command: mix docs --warnings-as-errors -f html && mix doctor --raise
+      test_command: mix coveralls --warnings-as-errors

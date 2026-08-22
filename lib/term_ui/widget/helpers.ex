@@ -3,17 +3,21 @@ defmodule TermUI.Widget.Helpers do
 
   alias TermUI.{DisplayWidth, Frame, Style}
 
+  @doc "Builds a frame from widget rows and dimensions."
   @spec frame([Frame.row()], TermUI.Widget.dimensions(), keyword()) :: Frame.t()
   def frame(rows, {width, height}, opts \\ []) do
     Frame.from_rows(rows, width, height, opts)
   end
 
+  @doc "Clamps an integer between minimum and maximum values."
   @spec clamp(integer(), integer(), integer()) :: integer()
   def clamp(value, minimum, maximum), do: value |> max(minimum) |> min(maximum)
 
+  @doc "Returns the terminal display width of text."
   @spec text_width(iodata()) :: non_neg_integer()
   def text_width(text), do: max(DisplayWidth.width(IO.iodata_to_binary(text)), 0)
 
+  @doc "Fits and aligns text in a fixed display width."
   @spec align(iodata(), non_neg_integer(), :left | :center | :right) :: String.t()
   def align(_text, 0, _alignment), do: ""
 
@@ -30,6 +34,7 @@ defmodule TermUI.Widget.Helpers do
     |> Frame.fit(width)
   end
 
+  @doc "Adds a styled border and optional title around widget rows."
   @spec border([Frame.row()], TermUI.Widget.dimensions(), keyword()) :: [Frame.row()]
   def border(rows, dimensions, opts \\ [])
 
@@ -83,11 +88,13 @@ defmodule TermUI.Widget.Helpers do
 
   def border(rows, _dimensions, _opts), do: rows
 
+  @doc "Converts one frame row to a list of spans."
   @spec normalize_row(Frame.row()) :: [Frame.span()]
   def normalize_row(row) when is_binary(row), do: [row]
   def normalize_row(row) when is_list(row), do: row
   def normalize_row(other), do: [to_string(other)]
 
+  @doc "Clips one styled row to a display width."
   @spec fit_row(Frame.row(), non_neg_integer()) :: [Frame.span()]
   def fit_row(_row, 0), do: []
 
@@ -112,12 +119,15 @@ defmodule TermUI.Widget.Helpers do
     {:cont, {[rendered_span | rendered], used + visible_width}}
   end
 
+  @doc "Returns one bounded page from a list."
   @spec page([term()], non_neg_integer(), non_neg_integer()) :: [term()]
   def page(items, offset, height), do: Enum.slice(items, max(offset, 0), max(height, 0))
 
+  @doc "Returns the largest valid scroll offset."
   @spec max_scroll(non_neg_integer(), non_neg_integer()) :: non_neg_integer()
   def max_scroll(content_height, viewport_height), do: max(content_height - viewport_height, 0)
 
+  @doc "Moves and clamps a scroll offset."
   @spec scroll(non_neg_integer(), integer(), non_neg_integer(), non_neg_integer()) ::
           non_neg_integer()
   def scroll(offset, delta, content_height, viewport_height) do

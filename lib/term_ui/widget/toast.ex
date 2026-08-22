@@ -88,15 +88,18 @@ defmodule TermUI.Widget.Toast do
     @enforce_keys Zoi.Struct.enforce_keys(@schema)
     defstruct Zoi.Struct.struct_fields(@schema)
 
+    @doc "Creates an empty bounded toast manager."
     @spec new(keyword()) :: t()
     def new(opts \\ []), do: %__MODULE__{limit: max(Keyword.get(opts, :limit, 5), 1)}
 
+    @doc "Adds one toast and removes entries beyond the manager limit."
     @spec add(t(), iodata(), Toast.toast_type(), keyword()) :: t()
     def add(manager, message, type \\ :info, opts \\ []) do
       toast = Toast.init(Keyword.merge(opts, message: message, type: type))
       %{manager | toasts: Enum.take([toast | manager.toasts], manager.limit)}
     end
 
+    @doc "Advances all toast clocks and removes expired entries."
     @spec tick(t(), non_neg_integer()) :: t()
     def tick(manager, elapsed),
       do: %{

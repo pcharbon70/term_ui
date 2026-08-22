@@ -7,6 +7,9 @@ The runtime owns application state, command execution, frame timing, and
 shutdown. A backend owns terminal setup, input, output, size, cursor state,
 capabilities, and cleanup.
 
+Jido Console uses TermUI as its terminal runtime. TermUI does not depend on
+Jido, so it also remains useful as a general Elixir terminal package.
+
 ## Install
 
 TermUI requires Elixir 1.18.4 or later and Erlang/OTP 28 or later. CI tests
@@ -147,6 +150,8 @@ candidate because its input was owned outside the backend contract.
 - [Pure widgets](guides/widgets.md)
 - [Clipboard, selection, and mouse](guides/interaction.md)
 - [Markdown and diff viewers](guides/markdown-and-diffs.md)
+- [Advanced feature parity](guides/feature-parity.md)
+- [Package quality](guides/package-quality.md)
 - [Removed and deferred features](guides/removed-and-deferred.md)
 - [Migration to 1.0](guides/migration-1.0.md)
 - [Counter example](https://github.com/pcharbon70/term_ui/tree/develop/examples/iex_counter)

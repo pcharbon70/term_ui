@@ -5,16 +5,19 @@ defmodule TermUI.Backend.InputReader do
 
   @type result :: {:ok, binary()} | :eof | {:error, term()}
 
+  @doc "Starts a serialized reader for a blocking input function."
   @spec start_link((-> result())) :: GenServer.on_start()
   def start_link(read_fun) when is_function(read_fun, 0) do
     GenServer.start_link(__MODULE__, read_fun)
   end
 
+  @doc "Gets the next input result or returns `:timeout`."
   @spec take(pid(), non_neg_integer()) :: result() | :timeout
   def take(reader, timeout) do
     GenServer.call(reader, {:take, timeout}, timeout + 1_000)
   end
 
+  @doc "Stops an input reader. A `nil` reader is already stopped."
   @spec stop(pid() | nil) :: :ok
   def stop(nil), do: :ok
 
@@ -26,6 +29,7 @@ defmodule TermUI.Backend.InputReader do
   end
 
   @impl true
+  @doc false
   def init(read_fun) do
     owner = self()
     worker = spawn_link(fn -> read_loop(owner, read_fun) end)
@@ -33,6 +37,7 @@ defmodule TermUI.Backend.InputReader do
   end
 
   @impl true
+  @doc false
   def handle_call({:take, _timeout}, _from, %{result: result} = state) when not is_nil(result) do
     continue_reader(state.worker, result)
     {:reply, result, %{state | result: nil}}
@@ -47,6 +52,7 @@ defmodule TermUI.Backend.InputReader do
   end
 
   @impl true
+  @doc false
   def handle_info({:input_result, worker, result}, %{worker: worker, waiter: nil} = state) do
     {:noreply, %{state | result: result}}
   end
@@ -69,6 +75,7 @@ defmodule TermUI.Backend.InputReader do
   def handle_info({:take_timeout, _old_token}, state), do: {:noreply, state}
 
   @impl true
+  @doc false
   def terminate(_reason, state) do
     if Process.alive?(state.worker), do: Process.exit(state.worker, :kill)
     :ok

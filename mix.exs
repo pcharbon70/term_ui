@@ -20,9 +20,10 @@ defmodule TermUI.MixProject do
       source_url: @source_url,
       homepage_url: @source_url,
       docs: docs(),
+      aliases: aliases(),
 
       # Test coverage
-      test_coverage: [tool: ExCoveralls],
+      test_coverage: [tool: ExCoveralls, summary: [threshold: 80]],
 
       # Dialyzer
       dialyzer: [
@@ -67,6 +68,7 @@ defmodule TermUI.MixProject do
 
       # Documentation
       {:ex_doc, "~> 0.31", only: :dev, runtime: false},
+      {:doctor, "~> 0.21", only: :dev, runtime: false},
 
       # Code quality
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
@@ -76,7 +78,24 @@ defmodule TermUI.MixProject do
       {:excoveralls, "~> 0.18", only: :test},
 
       # LLM usage rules
-      {:usage_rules, "~> 0.1", only: :dev, runtime: false}
+      {:usage_rules, "~> 0.1", only: :dev, runtime: false},
+
+      # Release tooling
+      {:git_ops, "~> 2.9", only: :dev, runtime: false}
+    ]
+  end
+
+  defp aliases do
+    [
+      setup: ["deps.get"],
+      q: ["quality"],
+      quality: [
+        "format --check-formatted",
+        "compile --warnings-as-errors",
+        "credo --strict",
+        "dialyzer",
+        "doctor --raise"
+      ]
     ]
   end
 
@@ -88,8 +107,10 @@ defmodule TermUI.MixProject do
       links: %{
         "Changelog" => "https://hexdocs.pm/term_ui/changelog.html",
         "Documentation" => "https://hexdocs.pm/term_ui",
+        "Discord" => "https://jido.run/discord",
         "GitHub" => @source_url,
-        "Issues" => @source_url <> "/issues"
+        "Issues" => @source_url <> "/issues",
+        "Website" => "https://jido.run"
       },
       files: ~w(
         lib
@@ -113,6 +134,9 @@ defmodule TermUI.MixProject do
       extras: [
         "README.md",
         "CHANGELOG.md",
+        "CONTRIBUTING.md",
+        "guides/package-quality.md": [title: "Package Quality"],
+        "guides/feature-parity.md": [title: "Feature Parity"],
         "guides/architecture.md": [title: "Architecture"],
         "guides/backend.md": [title: "Backend Contract"],
         "guides/widgets.md": [title: "Pure Widgets"],
