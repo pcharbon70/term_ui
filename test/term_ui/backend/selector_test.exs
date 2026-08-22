@@ -131,9 +131,6 @@ defmodule TermUI.Backend.SelectorTest do
 
         {:tty, capabilities} ->
           assert is_map(capabilities)
-
-        other ->
-          flunk("Unexpected return value: #{inspect(other)}")
       end
     end
 
@@ -238,9 +235,6 @@ defmodule TermUI.Backend.SelectorTest do
 
         {:tty, capabilities} ->
           assert is_map(capabilities)
-
-        other ->
-          flunk("Unexpected result: #{inspect(other)}")
       end
     end
 
@@ -345,9 +339,6 @@ defmodule TermUI.Backend.SelectorTest do
         {rows, cols} ->
           assert is_integer(rows) and rows > 0
           assert is_integer(cols) and cols > 0
-
-        other ->
-          flunk("Unexpected dimensions value: #{inspect(other)}")
       end
     end
 

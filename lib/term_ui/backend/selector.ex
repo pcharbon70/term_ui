@@ -3,6 +3,10 @@ defmodule TermUI.Backend.Selector do
 
   require Logger
 
+  # OTP types start_interactive/1 as :ok, but it also returns runtime errors
+  # such as :already_started. This function must handle those results.
+  @dialyzer {:nowarn_function, attempt_raw_mode: 0}
+
   @typedoc """
   Result of backend selection.
 
@@ -18,7 +22,7 @@ defmodule TermUI.Backend.Selector do
   @typedoc """
   State returned when raw mode is successfully activated.
   """
-  @type raw_state :: %{raw_mode_started: boolean()}
+  @type raw_state :: %{raw_mode_started: true}
 
   @typedoc """
   Detected terminal capabilities for TTY mode.
@@ -221,20 +225,13 @@ defmodule TermUI.Backend.Selector do
   end
 
   # Detects if we're connected to a terminal
-  @dialyzer {:nowarn_function,
-             detect_terminal_presence: 0,
-             select: 0,
-             select: 1,
-             try_raw_mode: 0,
-             attempt_raw_mode: 0,
-             detect_capabilities: 0}
-  @spec detect_terminal_presence() :: term()
+  @spec detect_terminal_presence() :: boolean()
   defp detect_terminal_presence do
     case :io.getopts() do
-      {:ok, opts} ->
-        Keyword.get(opts, :terminal, false)
+      opts when is_list(opts) ->
+        Keyword.get(opts, :terminal, false) == true
 
-      _ ->
+      {:error, _reason} ->
         false
     end
   end

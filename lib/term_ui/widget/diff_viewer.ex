@@ -10,6 +10,7 @@ defmodule TermUI.Widget.DiffViewer do
 
   @behaviour TermUI.Widget
 
+  # Styled spans contain MapSet's opaque representation through Style.t().
   @dialyzer {:nowarn_function, split_cell: 4}
 
   alias TermUI.{Event, Frame, Style}

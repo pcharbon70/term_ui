@@ -78,9 +78,6 @@ defmodule TermUI.CharacterSet do
   - `:ascii` - ASCII fallback characters
   """
 
-  # Dialyzer: Functions return specific list types
-  @dialyzer {:nowarn_function, keys: 0}
-
   @type charset :: :unicode | :ascii
 
   @typedoc """
@@ -361,7 +358,7 @@ defmodule TermUI.CharacterSet do
       iex> :tl in TermUI.CharacterSet.keys()
       true
   """
-  @spec keys() :: [atom()]
+  @spec keys() :: nonempty_list(atom())
   def keys, do: @charset_keys
 
   # ----------------------------------------------------------------------------

@@ -51,16 +51,25 @@ defmodule TermUI.Test.DeterministicBackend do
   end
 
   @impl true
+  def poll_event(%{fail: :input} = state, _timeout), do: {:error, :input_failed, state}
+
   def poll_event(%{events: [event | rest]} = state, _timeout),
     do: {:ok, event, %{state | events: rest}}
 
   def poll_event(state, timeout) do
-    Process.sleep(min(timeout, 5))
-    {:timeout, state}
+    receive do
+    after
+      timeout -> {:timeout, state}
+    end
   end
 
   @impl true
-  def resize(state, size), do: {:ok, %{state | size: size}}
+  def resize(%{fail: :resize}, _size), do: {:error, :resize_failed}
+
+  def resize(state, size) do
+    send(state.owner, {:backend, :resize, size})
+    {:ok, %{state | size: size}}
+  end
 
   @impl true
   def shutdown(state, reason) do

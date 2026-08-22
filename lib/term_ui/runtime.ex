@@ -62,12 +62,9 @@ defmodule TermUI.Runtime do
   @spec run([option()]) :: :ok | {:error, term()}
   def run(opts) do
     {name, opts} = Keyword.pop(opts, :name)
-    start_options = if name, do: [name: name], else: []
 
-    case GenServer.start(__MODULE__, opts, start_options) do
-      {:ok, runtime} ->
-        reference = Process.monitor(runtime)
-
+    case start_monitor(name, opts) do
+      {:ok, {runtime, reference}} ->
         receive do
           {:DOWN, ^reference, :process, ^runtime, reason} when reason in [:normal, :shutdown] ->
             :ok
@@ -580,4 +577,14 @@ defmodule TermUI.Runtime do
       _other -> @default_render_interval
     end
   end
+
+  defp start_monitor(nil, opts), do: :gen_server.start_monitor(__MODULE__, opts, [])
+
+  defp start_monitor(name, opts) do
+    :gen_server.start_monitor(normalize_server_name(name), __MODULE__, opts, [])
+  end
+
+  defp normalize_server_name(name) when is_atom(name), do: {:local, name}
+  defp normalize_server_name({:global, _term} = name), do: name
+  defp normalize_server_name({:via, module, _term} = name) when is_atom(module), do: name
 end

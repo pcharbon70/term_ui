@@ -1,6 +1,10 @@
 defmodule TermUI.TerminalOutput do
   @moduledoc false
 
+  # The cleanup result is a fixed-length iolist. Dialyzer cannot express that
+  # shape without narrowing the public contract to terminal-specific literals.
+  @dialyzer {:nowarn_function, cleanup_sequence: 1}
+
   @suppress_key :suppress_terminal_output
   @allow_key :term_ui_allow_terminal_output
   @onlcr_key {__MODULE__, :onlcr_active}
@@ -50,16 +54,10 @@ defmodule TermUI.TerminalOutput do
 
   @spec write_to_tty(iodata()) :: :ok
   def write_to_tty(data) do
-    binary = IO.iodata_to_binary(data)
-
-    if write_to_tty_device(binary) do
-      :ok
+    if enabled?() do
+      write_enabled_to_tty(data)
     else
-      if write_to_stderr(binary) do
-        :ok
-      else
-        write(data)
-      end
+      :ok
     end
   rescue
     _ -> :ok
@@ -67,13 +65,16 @@ defmodule TermUI.TerminalOutput do
     _, _ -> :ok
   end
 
-  @spec cleanup_sequence() :: String.t()
-  def cleanup_sequence do
-    "\e[?1006l\e[?1003l\e[?1002l\e[?1000l" <>
-      "\e[?2004l\e[?1004l" <>
-      "\e[?25h" <>
-      "\e[0m" <>
-      "\e[?1049l"
+  @spec cleanup_sequence(keyword()) :: [binary() | []]
+  def cleanup_sequence(opts \\ []) do
+    [
+      if(Keyword.get(opts, :mouse, false), do: "\e[?1006l\e[?1003l\e[?1002l\e[?1000l", else: []),
+      if(Keyword.get(opts, :bracketed_paste, false), do: "\e[?2004l", else: []),
+      if(Keyword.get(opts, :focus_events, false), do: "\e[?1004l", else: []),
+      "\e[?25h",
+      "\e[0m",
+      if(Keyword.get(opts, :alternate_screen, false), do: "\e[?1049l", else: [])
+    ]
   end
 
   @spec needs_hard_reset?() :: boolean()
@@ -98,7 +99,8 @@ defmodule TermUI.TerminalOutput do
 
   @spec allow_current_process() :: true
   def allow_current_process do
-    Process.put(@allow_key, true)
+    _previous = Process.put(@allow_key, true)
+    true
   end
 
   @spec disallow_current_process() :: true | nil
@@ -143,6 +145,22 @@ defmodule TermUI.TerminalOutput do
     end
   rescue
     _ -> false
+  end
+
+  defp write_enabled_to_tty(data) do
+    binary = IO.iodata_to_binary(data)
+
+    case write(data) do
+      :ok ->
+        :ok
+
+      {:error, _reason} ->
+        cond do
+          write_to_tty_device(binary) -> :ok
+          write_to_stderr(binary) -> :ok
+          true -> :ok
+        end
+    end
   end
 
   defp write_to_stderr(binary) do

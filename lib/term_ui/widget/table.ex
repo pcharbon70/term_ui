@@ -7,6 +7,7 @@ defmodule TermUI.Widget.Table do
   alias TermUI.Widget.Helpers
   alias TermUI.Widget.Table.Column
 
+  # Styled table spans contain MapSet's opaque representation through Style.t().
   @dialyzer {:nowarn_function, view: 2, render_cells: 4}
 
   @type t :: %__MODULE__{

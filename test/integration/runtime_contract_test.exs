@@ -1,7 +1,7 @@
 defmodule TermUI.RuntimeContractTest do
   use ExUnit.Case, async: false
 
-  alias TermUI.{Command, Event, Frame, Runtime}
+  alias TermUI.{Clipboard, Command, Event, Frame, Runtime}
   alias TermUI.Test.DeterministicBackend
 
   setup do
@@ -78,6 +78,92 @@ defmodule TermUI.RuntimeContractTest do
       {state, [Command.send(state.owner, {:async_complete, result})]}
     end
 
+    def view(_state), do: Frame.from_rows(["async"], 20, 2)
+  end
+
+  defmodule EffectsApp do
+    use TermUI.Elm
+
+    def init(opts) do
+      owner = Keyword.fetch!(opts, :owner)
+
+      commands = [
+        Command.send(owner, :direct_send),
+        Command.message(:message),
+        Command.timer(0, :timer),
+        Clipboard.copy("copy", on_result: &{:clipboard, &1})
+      ]
+
+      {%{owner: owner}, commands}
+    end
+
+    def event_to_msg(_event, _state), do: :ignore
+
+    def update(message, state) do
+      {state, [Command.send(state.owner, {:effect, message})]}
+    end
+
+    def view(_state), do: Frame.from_rows(["effects"], 20, 2)
+  end
+
+  defmodule InvalidViewApp do
+    use TermUI.Elm
+
+    def event_to_msg(_event, _state), do: :ignore
+    def update(_message, state), do: state
+    def view(_state), do: :not_a_frame
+  end
+
+  defmodule InvalidEventApp do
+    use TermUI.Elm
+
+    def event_to_msg(_event, _state), do: :not_a_message
+    def update(_message, state), do: state
+    def view(_state), do: Frame.from_rows(["ready"], 20, 2)
+  end
+
+  defmodule InvalidCommandApp do
+    use TermUI.Elm
+
+    def init(_opts), do: {%{}, [:not_a_command]}
+    def event_to_msg(_event, _state), do: :ignore
+    def update(_message, state), do: state
+    def view(_state), do: Frame.from_rows(["unused"], 20, 2)
+  end
+
+  defmodule MapperCrashApp do
+    use TermUI.Elm
+
+    def init(_opts) do
+      command = Clipboard.copy("copy", on_result: fn _result -> raise "mapper failed" end)
+      {%{}, [command]}
+    end
+
+    def event_to_msg(_event, _state), do: :ignore
+    def update(_message, state), do: state
+    def view(_state), do: Frame.from_rows(["mapper"], 20, 2)
+  end
+
+  defmodule BlockingAsyncApp do
+    use TermUI.Elm
+
+    def init(opts) do
+      owner = Keyword.fetch!(opts, :owner)
+
+      command =
+        Command.async(fn ->
+          send(owner, {:async_worker, self()})
+
+          receive do
+            :finish -> :finished
+          end
+        end)
+
+      {%{}, [command]}
+    end
+
+    def event_to_msg(_event, _state), do: :ignore
+    def update(_message, state), do: state
     def view(_state), do: Frame.from_rows(["async"], 20, 2)
   end
 
@@ -249,6 +335,124 @@ defmodule TermUI.RuntimeContractTest do
                    500
 
     Runtime.shutdown(runtime)
+  end
+
+  test "message, send, timer, and clipboard commands stay serialized" do
+    assert {:ok, runtime} =
+             Runtime.start_link(
+               root: EffectsApp,
+               owner: self(),
+               backend: {DeterministicBackend, owner: self()}
+             )
+
+    assert_receive {:backend, :draw, _frame}, 500
+    assert_receive :direct_send, 500
+    assert_receive {:backend, :clipboard, %Clipboard.Operation{content: "copy"}}, 500
+    assert_receive {:effect, :message}, 500
+    assert_receive {:effect, :timer}, 500
+    assert_receive {:effect, {:clipboard, :ok}}, 500
+    Runtime.shutdown(runtime)
+  end
+
+  test "diagnostic calls and forced rendering expose the current runtime contract" do
+    assert {:ok, runtime} =
+             TermUI.start_link(Counter,
+               owner: self(),
+               backend: {DeterministicBackend, owner: self()},
+               render_interval: 1_000
+             )
+
+    assert_receive {:backend, :draw, _initial}, 500
+    assert :ok = Runtime.sync(runtime)
+    assert %{colors: :true_color, unicode: true} = Runtime.capabilities(runtime)
+    assert %{frames_rendered: 1, dimensions: {20, 6}} = Runtime.get_state(runtime)
+
+    Runtime.send_message(runtime, {:set, 9})
+    Runtime.force_render(runtime)
+    assert_receive {:backend, :draw, frame}, 500
+    assert Frame.row_text(frame, 1) == "count=9             "
+    Runtime.shutdown(runtime)
+  end
+
+  test "top-level run supports all GenServer name forms and preserves fast clean shutdown" do
+    registry = Module.concat(__MODULE__, NameRegistry)
+    start_supervised!({Registry, keys: :unique, name: registry})
+
+    names = [
+      :term_ui_named_contract_test,
+      {:global, {:term_ui_named_contract_test, make_ref()}},
+      {:via, Registry, {registry, :runtime}}
+    ]
+
+    for name <- names do
+      assert :ok =
+               TermUI.run(Counter,
+                 name: name,
+                 owner: self(),
+                 backend: {DeterministicBackend, owner: self(), events: [Event.text("q")]}
+               )
+
+      refute GenServer.whereis(name)
+    end
+  end
+
+  test "invalid applications fail before a backend is opened" do
+    assert {:error, {:invalid_option, :root, :missing}} = Runtime.run([])
+    assert {:error, {:application, :callbacks, {String, missing}}} = Runtime.run(root: String)
+    assert {:event_to_msg, 2} in missing
+    refute_receive {:backend, :init, _manager}
+  end
+
+  test "invalid application outputs fail with structured errors and cleanup" do
+    assert {:error, {:application, :commands, {:invalid_commands, [:not_a_command]}} = reason} =
+             Runtime.run(
+               root: InvalidCommandApp,
+               backend: {DeterministicBackend, owner: self()}
+             )
+
+    assert_receive {:backend, :shutdown, ^reason}, 500
+
+    assert {:error, {:application, :view, {:expected_frame, :not_a_frame}} = reason} =
+             Runtime.run(
+               root: InvalidViewApp,
+               backend: {DeterministicBackend, owner: self()}
+             )
+
+    assert_receive {:backend, :shutdown, ^reason}, 500
+
+    assert {:error, {:application, :event_to_msg, {:invalid_result, :not_a_message}} = reason} =
+             Runtime.run(
+               root: InvalidEventApp,
+               backend: {DeterministicBackend, owner: self(), events: [Event.key(:enter)]}
+             )
+
+    assert_receive {:backend, :shutdown, ^reason}, 500
+  end
+
+  test "a command result mapper failure is structured and cleans the backend" do
+    assert {:error,
+            {:application, :command_result,
+             {:error, %RuntimeError{message: "mapper failed"}, _stacktrace}} = reason} =
+             Runtime.run(
+               root: MapperCrashApp,
+               backend: {DeterministicBackend, owner: self()}
+             )
+
+    assert_receive {:backend, :shutdown, ^reason}, 500
+  end
+
+  test "shutdown terminates outstanding asynchronous work" do
+    assert {:ok, runtime} =
+             Runtime.start_link(
+               root: BlockingAsyncApp,
+               owner: self(),
+               backend: {DeterministicBackend, owner: self()}
+             )
+
+    assert_receive {:async_worker, worker}, 500
+    worker_ref = Process.monitor(worker)
+    Runtime.shutdown(runtime)
+    assert_receive {:DOWN, ^worker_ref, :process, ^worker, :killed}, 500
   end
 
   defp start_counter(opts) do

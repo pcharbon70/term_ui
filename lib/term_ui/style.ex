@@ -35,6 +35,10 @@ defmodule TermUI.Style do
       style = Style.get_variant(variants, :focused)
   """
 
+  # Dialyzer does not preserve MapSet's opaque type through generated struct
+  # defaults or empty MapSet replacements.
+  @dialyzer {:nowarn_function, new: 0, clear_attrs: 1, reset: 1}
+
   @type named_color ::
           :black
           | :red
@@ -135,10 +139,9 @@ defmodule TermUI.Style do
   @doc """
   Creates a new style with default values.
   """
-  @dialyzer {:nowarn_function, new: 0, clear_attrs: 1, reset: 1}
   @spec new() :: t()
   def new do
-    %__MODULE__{}
+    %__MODULE__{attrs: MapSet.new()}
   end
 
   @doc "Creates a style from options."

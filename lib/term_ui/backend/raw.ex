@@ -8,8 +8,6 @@ defmodule TermUI.Backend.Raw do
   alias TermUI.Terminal.SizeDetector
   alias TermUI.{TerminalOutput, TermUtils}
 
-  @all_mouse_off "\e[?1006l\e[?1003l\e[?1002l\e[?1000l"
-
   @type mouse_mode :: :none | :click | :drag | :all
   @type t :: %__MODULE__{
           size: TermUI.Backend.size(),
@@ -21,7 +19,8 @@ defmodule TermUI.Backend.Raw do
           input_reader: pid() | nil,
           last_frame: Frame.t() | nil,
           bracketed_paste: boolean(),
-          focus_events: boolean()
+          focus_events: boolean(),
+          raw_mode_started: boolean()
         }
 
   @schema Zoi.struct(__MODULE__, %{
@@ -34,7 +33,8 @@ defmodule TermUI.Backend.Raw do
             input_reader: Zoi.any() |> Zoi.default(nil),
             last_frame: Zoi.any() |> Zoi.default(nil),
             bracketed_paste: Zoi.boolean() |> Zoi.default(true),
-            focus_events: Zoi.boolean() |> Zoi.default(true)
+            focus_events: Zoi.boolean() |> Zoi.default(true),
+            raw_mode_started: Zoi.boolean() |> Zoi.default(false)
           })
 
   @enforce_keys Zoi.Struct.enforce_keys(@schema)
@@ -49,12 +49,17 @@ defmodule TermUI.Backend.Raw do
         alternate_screen: Keyword.get(opts, :alternate_screen, true),
         mouse_mode: Keyword.get(opts, :mouse_tracking, :none),
         bracketed_paste: Keyword.get(opts, :bracketed_paste, true),
-        focus_events: Keyword.get(opts, :focus_events, true)
+        focus_events: Keyword.get(opts, :focus_events, true),
+        raw_mode_started: Keyword.get(opts, :raw_mode_started, false)
       }
 
       case TerminalOutput.write(setup_sequence(state, Keyword.get(opts, :hide_cursor, true))) do
-        :ok -> {:ok, state}
-        {:error, reason} -> {:error, {:terminal_write_failed, reason}}
+        :ok ->
+          {:ok, state}
+
+        {:error, reason} ->
+          shutdown(state, {:init_failed, reason})
+          {:error, {:terminal_write_failed, reason}}
       end
     end
   end
@@ -63,15 +68,18 @@ defmodule TermUI.Backend.Raw do
   @spec shutdown(t(), term()) :: :ok
   def shutdown(state, _reason) do
     EventStream.stop(state)
-    TerminalOutput.write_to_tty(TerminalOutput.cleanup_sequence())
-    safe_write(@all_mouse_off)
-    if state.bracketed_paste, do: safe_write(ANSI.disable_bracketed_paste())
-    if state.focus_events, do: safe_write(ANSI.disable_focus_events())
-    safe_write(ANSI.cursor_show())
-    safe_write(ANSI.reset())
-    if state.alternate_screen, do: safe_write(ANSI.leave_alternate_screen())
+
+    TerminalOutput.write_to_tty(
+      TerminalOutput.cleanup_sequence(
+        mouse: state.mouse_mode != :none,
+        bracketed_paste: state.bracketed_paste,
+        focus_events: state.focus_events,
+        alternate_screen: state.alternate_screen
+      )
+    )
+
     drain_pending_input()
-    safe_cooked_mode()
+    if state.raw_mode_started, do: safe_cooked_mode()
     :ok
   end
 
@@ -188,11 +196,6 @@ defmodule TermUI.Backend.Raw do
       [byte] when is_integer(byte) -> {:ok, <<byte>>}
       other -> {:error, {:unexpected_io_return, other}}
     end
-  end
-
-  defp safe_write(data) do
-    _result = TerminalOutput.write(data)
-    :ok
   end
 
   defp safe_cooked_mode do

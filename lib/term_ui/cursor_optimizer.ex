@@ -1,11 +1,6 @@
 defmodule TermUI.CursorOptimizer do
   @moduledoc false
 
-  # Dialyzer: Functions return specific struct types or specific integers,
-  # but the public spec uses general types for API clarity.
-  @dialyzer {:nowarn_function,
-             new: 0, new: 2, max_position: 0, cost_cr: 0, cost_lf: 0, cost_home: 0}
-
   @type t :: %__MODULE__{
           row: pos_integer(),
           col: pos_integer(),
@@ -32,9 +27,9 @@ defmodule TermUI.CursorOptimizer do
   @doc """
   Creates a new cursor optimizer with cursor at position (1, 1).
   """
-  @spec new() :: t()
+  @spec new() :: %__MODULE__{row: 1, col: 1, bytes_saved: 0}
   def new do
-    %__MODULE__{}
+    %__MODULE__{row: 1, col: 1, bytes_saved: 0}
   end
 
   @doc """
@@ -121,7 +116,7 @@ defmodule TermUI.CursorOptimizer do
 
   Positions beyond this value may cause undefined behavior on some terminals.
   """
-  @spec max_position() :: pos_integer()
+  @spec max_position() :: 9999
   def max_position, do: @max_cursor_pos
 
   # Cost calculation functions
@@ -177,19 +172,19 @@ defmodule TermUI.CursorOptimizer do
   @doc """
   Calculates the byte cost of carriage return (move to column 1).
   """
-  @spec cost_cr() :: pos_integer()
+  @spec cost_cr() :: 1
   def cost_cr, do: 1
 
   @doc """
   Calculates the byte cost of newline (move down one row).
   """
-  @spec cost_lf() :: pos_integer()
+  @spec cost_lf() :: 1
   def cost_lf, do: 1
 
   @doc """
   Calculates the byte cost of home (move to 1,1).
   """
-  @spec cost_home() :: pos_integer()
+  @spec cost_home() :: 3
   def cost_home, do: 3
 
   # Optimal movement selection

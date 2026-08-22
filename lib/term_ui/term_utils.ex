@@ -55,10 +55,6 @@ defmodule TermUI.TermUtils do
   # Known-safe command locations (will be resolved at runtime)
   @allowed_commands ~w(stty test infocmp)
 
-  # Dialyzer: Functions return specific types
-  @dialyzer {:nowarn_function,
-             default_validate: 1, validate_stty_settings: 1, validate_stty_size: 1}
-
   # ===========================================================================
   # Public API
   # ===========================================================================
@@ -400,7 +396,8 @@ defmodule TermUI.TermUtils do
   # - Null bytes
   # - Excessively long output (>64KB)
   # - Shell metacharacters that might indicate injection
-  @spec default_validate(binary()) :: :ok | {:error, term()}
+  @spec default_validate(binary()) ::
+          :ok | {:error, :null_byte_detected | :output_too_large}
   defp default_validate(output) when is_binary(output) do
     cond do
       byte_size(output) > 64 * 1024 ->
@@ -425,7 +422,7 @@ defmodule TermUI.TermUtils do
   This is the output we later pass to stty for restoration, so we must validate
   it carefully to prevent command injection.
   """
-  @spec validate_stty_settings(binary()) :: :ok | {:error, term()}
+  @spec validate_stty_settings(binary()) :: :ok | {:error, :invalid_stty_settings}
   def validate_stty_settings(output) when is_binary(output) do
     # stty -g output should contain only safe characters
     # Allowed: alphanumeric, spaces, semicolons, colons, dashes, dots
@@ -444,7 +441,7 @@ defmodule TermUI.TermUtils do
 
   Stty size returns: "rows cols" (two integers)
   """
-  @spec validate_stty_size(binary()) :: :ok | {:error, term()}
+  @spec validate_stty_size(binary()) :: :ok | {:error, :invalid_size_format}
   def validate_stty_size(output) when is_binary(output) do
     case String.split(String.trim(output)) do
       [rows, cols] ->

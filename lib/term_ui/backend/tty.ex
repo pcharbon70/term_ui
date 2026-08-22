@@ -66,8 +66,12 @@ defmodule TermUI.Backend.TTY do
     }
 
     case TerminalOutput.write(setup_sequence(state)) do
-      :ok -> {:ok, state}
-      {:error, reason} -> {:error, {:terminal_write_failed, reason}}
+      :ok ->
+        {:ok, state}
+
+      {:error, reason} ->
+        shutdown(state, {:init_failed, reason})
+        {:error, {:terminal_write_failed, reason}}
     end
   end
 
@@ -76,15 +80,13 @@ defmodule TermUI.Backend.TTY do
   def shutdown(state, _reason) do
     EventStream.stop(state)
 
-    TerminalOutput.write_to_tty(TerminalOutput.cleanup_sequence())
-
-    safe_write([
-      if(state.bracketed_paste, do: ANSI.disable_bracketed_paste(), else: []),
-      if(state.focus_events, do: ANSI.disable_focus_events(), else: []),
-      ANSI.reset(),
-      ANSI.cursor_show(),
-      if(state.alternate_screen, do: ANSI.leave_alternate_screen(), else: [])
-    ])
+    TerminalOutput.write_to_tty(
+      TerminalOutput.cleanup_sequence(
+        bracketed_paste: state.bracketed_paste,
+        focus_events: state.focus_events,
+        alternate_screen: state.alternate_screen
+      )
+    )
 
     :ok
   end
@@ -214,10 +216,5 @@ defmodule TermUI.Backend.TTY do
       [byte] when is_integer(byte) -> {:ok, <<byte>>}
       other -> {:error, {:unexpected_io_return, other}}
     end
-  end
-
-  defp safe_write(data) do
-    _result = TerminalOutput.write(data)
-    :ok
   end
 end

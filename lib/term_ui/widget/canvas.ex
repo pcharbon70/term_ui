@@ -7,6 +7,7 @@ defmodule TermUI.Widget.Canvas do
 
   alias TermUI.{Cell, Frame, Style}
 
+  # Dialyzer loses the MapSet opaque type when the dot set becomes empty.
   @dialyzer {:nowarn_function, clear: 1}
 
   @braille_base 0x2800

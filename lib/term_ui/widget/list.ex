@@ -6,6 +6,7 @@ defmodule TermUI.Widget.List do
   alias TermUI.{Event, Style}
   alias TermUI.Widget.Helpers
 
+  # Dialyzer loses the MapSet opaque type when the selection becomes empty.
   @dialyzer {:nowarn_function, set_items: 2}
 
   @type item :: term()

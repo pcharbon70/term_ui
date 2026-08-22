@@ -11,6 +11,7 @@ defmodule TermUI.Markdown do
   alias TermUI.{DisplayWidth, Frame, Style}
   alias TermUI.Widget.Helpers
 
+  # Styles stored in MDEx node spans contain MapSet's opaque representation.
   @dialyzer {:nowarn_function, inline_node: 2}
 
   @extensions [table: true, strikethrough: true, tasklist: true, autolink: true]

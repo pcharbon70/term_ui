@@ -29,7 +29,9 @@ defmodule TermUI.Widget.CatalogTest do
     Sparkline,
     SplitPane,
     Stream,
+    StreamWidget,
     SupervisionTree,
+    SupervisionTreeViewer,
     Table,
     Tabs,
     TextArea,
@@ -39,6 +41,7 @@ defmodule TermUI.Widget.CatalogTest do
   }
 
   alias TermUI.Widget.Table.Column
+  alias TermUI.Widget.TextInput.Line
 
   test "the restored widget catalog renders only canonical frames" do
     modules_and_states = [
@@ -183,5 +186,23 @@ defmodule TermUI.Widget.CatalogTest do
       |> Toast.Manager.add("three")
 
     assert length(manager.toasts) == 2
+  end
+
+  test "retained widget compatibility names delegate the complete pure API" do
+    stream = StreamWidget.init(items: ["one"])
+    assert %Frame{} = StreamWidget.view(stream, {20, 3})
+    assert {%{paused: true}, [{:paused, true}]} = StreamWidget.update(Event.text(" "), stream)
+    assert %{items: ["one", "two"]} = StreamWidget.push(stream, "two")
+
+    node = TreeView.leaf(:root, "Root")
+    tree = SupervisionTreeViewer.init(nodes: [node])
+    assert %Frame{} = SupervisionTreeViewer.view(tree, {20, 3})
+    assert {_, _messages} = SupervisionTreeViewer.update(Event.key(:down), tree)
+    assert %{tree: %{nodes: []}} = SupervisionTreeViewer.set_nodes(tree, [])
+
+    line = Line.init(label: "Name")
+    assert %Frame{} = Line.view(line, {20, 2})
+    assert {line, [{:changed, "A"}]} = Line.update(Event.text("A"), line)
+    assert {^line, [{:submit, "A"}]} = Line.validate(line)
   end
 end

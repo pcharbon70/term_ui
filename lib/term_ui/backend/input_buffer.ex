@@ -18,9 +18,6 @@ defmodule TermUI.Backend.InputBuffer do
   # ETS table for tracking last warning times (created on first use)
   @warning_table :term_ui_input_buffer_warnings
 
-  # Dialyzer: Functions return specific types or constants
-  @dialyzer {:nowarn_function, max_size: 0, keep_size: 0, ensure_table_exists: 0}
-
   @doc """
   Returns the maximum buffer size allowed.
 
@@ -29,7 +26,7 @@ defmodule TermUI.Backend.InputBuffer do
       iex> TermUI.Backend.InputBuffer.max_size()
       1024
   """
-  @spec max_size() :: pos_integer()
+  @spec max_size() :: 1024
   def max_size, do: @max_buffer_size
 
   @doc """
@@ -40,7 +37,7 @@ defmodule TermUI.Backend.InputBuffer do
       iex> TermUI.Backend.InputBuffer.keep_size()
       256
   """
-  @spec keep_size() :: pos_integer()
+  @spec keep_size() :: 256
   def keep_size, do: @keep_size
 
   @doc """
@@ -363,7 +360,8 @@ defmodule TermUI.Backend.InputBuffer do
       :undefined ->
         # Create the table - it might race with another process
         try do
-          :ets.new(@warning_table, [:set, :public, :named_table])
+          _table = :ets.new(@warning_table, [:set, :public, :named_table])
+          :ok
         rescue
           ArgumentError ->
             # Table already exists (race condition), that's fine
