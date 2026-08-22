@@ -122,10 +122,28 @@ The supplied pure widgets include:
 System views accept data snapshots from the parent. They do not start polling
 processes or perform RPC.
 
+## Streaming and application UI state
+
+`TermUI.Stream.ProducerAdapter` is an optional bounded bridge for external
+token producers. It sends one batch at a time and waits for an explicit
+acknowledgement. The application applies each batch with
+`TermUI.Widget.Stream.push_many/2`. Stream state provides drop-oldest,
+drop-newest, and whole-batch reject policies with visible counters.
+
+`TermUI.Theme`, `TermUI.Focus`, and `TermUI.Shortcut` are pure values for
+themes, focus traversal, and timestamp-bounded key sequences. They have no
+registry or service process.
+
+`TermUI.Widget.Viewport` can expose geometry and render draggable local
+scrollbars. `TermUI.Widget.SplitPane` supports named multi-pane layouts,
+collapse state, keyboard resize, and local separator drag.
+
 ## Markdown and diffs
 
 `TermUI.Widget.MarkdownViewer` uses MDEx and supports CommonMark headings,
 emphasis, links, quotes, lists, tasks, code blocks, rules, and tables.
+Completed top-level blocks are parsed once. Only the unfinished streaming tail is
+reparsed as new fragments arrive.
 
 `TermUI.Widget.DiffViewer` accepts `:before` and `:after` text or a
 `:unified_diff`. It supports unified and side-by-side terminal views.

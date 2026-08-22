@@ -43,6 +43,15 @@ Widgets that show processes, supervision trees, streams, or cluster nodes only
 format snapshots. The parent application owns polling, subscriptions, RPC, and
 other effects.
 
+An external stream can use `TermUI.Stream.ProducerAdapter`. This adapter is not
+a widget owner. It bounds queued items and permits only one unacknowledged
+batch in the application mailbox. The application remains the only owner of
+the stream widget and applies each delivered batch in update order.
+
+Themes, focus traversal, shortcut sequences, viewport drag, and pane collapse
+are pure values stored by the application. TermUI does not register them or
+start a service for them.
+
 ## Data schemas
 
 All explicit production structs derive their fields and defaults from Zoi

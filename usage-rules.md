@@ -24,6 +24,11 @@ component, input, and `TermUI.Widgets` namespaces do not exist in 1.0.
 Use `TermUI.Widget.MarkdownViewer` for MDEx Markdown. Use
 `TermUI.Widget.DiffViewer` for unified or side-by-side text diffs. Supply
 process, stream, supervision, and cluster snapshots from the parent application.
+Use `TermUI.Stream.ProducerAdapter` only as a bounded bridge for an external
+producer. Acknowledge each batch after the application applies it.
+
+Store `TermUI.Theme`, `TermUI.Focus`, and `TermUI.Shortcut` values in the root
+application state. Do not create a global theme, focus, or shortcut registry.
 
 Use `TermUI.Selection` for Unicode grapheme ranges. Convert widget
 `{:copy, text}` messages to `TermUI.Clipboard.copy/2` commands. Do not write

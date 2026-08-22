@@ -22,17 +22,18 @@ These systems will not return in their old form:
 These features are not in the new package:
 
 - SSH backend support.
-- A high-level theme registry and automatic capability-based theme fallback.
+- A global theme registry.
 - A constraint layout solver, layout cache, and alignment objects.
-- A shared shortcut-sequence service and global focus traversal groups.
+- A shared shortcut service and global focus traversal groups.
 - Development hot reload, UI inspection, state inspection, and performance tools.
 - The component test harness, event simulator, and test renderer.
 - Dedicated Unix and Windows platform adapter modules.
 - The old set of one application for each widget. The counter is the retained
   general example.
 
-SSH can return only as a normal backend that owns its complete state. Layout
-and focus helpers can return as pure functions. These forms keep the core
+SSH can return only as a normal backend that owns its complete state.
+`TermUI.Theme`, `TermUI.Focus`, and `TermUI.Shortcut` now provide the safe pure
+forms. The global service forms remain removed. These values keep the core
 design unchanged.
 
 Clipboard, selection, and mouse support have returned in refined forms.
@@ -45,7 +46,7 @@ The widget names are present, but some old adapters and services are not:
 
 | Widget area | Current behavior | Removed behavior |
 | --- | --- | --- |
-| Stream | Bounded parent-supplied items | GenStage consumer and backpressure process |
+| Stream | Bounded batches, counters, overflow policies, and an optional acknowledged producer adapter | Widget-owned GenStage consumer |
 | Process, supervision, and cluster views | Parent-supplied snapshots | Process inspection, polling, distributed RPC, and monitoring processes |
 | Toast | Pure state with explicit `tick/2` | Timer process and global stack service |
 | Line input | Pure event-driven input | Blocking shell `IO.gets/1` adapter |
@@ -53,7 +54,7 @@ The widget names are present, but some old adapters and services are not:
 | Menu and context menu | Flat actions, separators, keyboard and mouse control, and an overlay position | Submenu processes and inline service variants |
 | Table | Scrolling, columns, and row selection | Built-in sorting service |
 | Form | Text, checkbox, select, and required-field validation | General validation framework and field processes |
-| Split pane and scrollbar | Pure state with local mouse drag and click behavior | Global mouse routing services |
+| Split pane and viewport | Pure multi-pane, collapse, geometry, scrollbar, and local drag state | Global mouse routing and persistence services |
 
 Applications can add these effects in their Elm update function. A reusable
 adapter belongs in TermUI only when it can stay pure or follow the backend and
