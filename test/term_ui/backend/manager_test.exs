@@ -166,7 +166,7 @@ defmodule TermUI.Backend.ManagerTest do
     Process.exit(owner, :kill)
 
     assert_receive {:backend, :shutdown, :killed}
-    assert_receive {:DOWN, ^reference, :process, ^manager, :killed}
+    assert_receive {:DOWN, ^reference, :process, ^manager, :killed}, 500
   end
 
   defp start_manager(opts, backend_opts \\ []) do

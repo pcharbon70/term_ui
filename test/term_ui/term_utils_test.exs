@@ -164,13 +164,11 @@ defmodule TermUI.TermUtilsTest do
           # Just verify the command format is accepted
           assert {:ok, _} = TermUtils.safe_stty([settings])
 
-        {:error, :command_not_found} ->
-          # stty not available - skip test
-          :skip
+        {:error, reason} when reason in [:command_not_found, :not_tty] ->
+          assert reason in [:command_not_found, :not_tty]
 
-        {:error, {:exit_code, _}} ->
-          # stty failed (no TTY) - skip but it's okay
-          :skip
+        {:error, {:exit_code, code}} ->
+          assert is_integer(code)
 
         {:error, reason} ->
           flunk("Unexpected error: #{inspect(reason)}")

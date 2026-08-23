@@ -11,7 +11,7 @@ defmodule TermUI.Runtime do
 
   alias TermUI.Backend
   alias TermUI.Backend.Manager, as: BackendManager
-  alias TermUI.{Command, Elm, Event, Frame}
+  alias TermUI.{Command, Elm, Event, Frame, LoggerControl}
 
   @default_render_interval 16
   @type option ::
@@ -19,6 +19,7 @@ defmodule TermUI.Runtime do
           | {:name, GenServer.name()}
           | {:backend, Backend.spec()}
           | {:backend_opts, keyword()}
+          | {:suppress_logger, boolean()}
           | {:render_interval, pos_integer()}
 
   @type state :: %{
@@ -26,6 +27,7 @@ defmodule TermUI.Runtime do
           app_state: term(),
           backend: module(),
           backend_manager: pid(),
+          logger_token: LoggerControl.token() | nil,
           capabilities: map(),
           dimensions: {pos_integer(), pos_integer()},
           render_interval: pos_integer(),
@@ -108,26 +110,14 @@ defmodule TermUI.Runtime do
   @impl true
   def init(opts) do
     Process.flag(:trap_exit, true)
+    logger_token = if suppress_logger?(opts), do: LoggerControl.suspend(), else: nil
 
-    with {:ok, app} <- fetch_app(opts),
-         {:ok, backend_manager} <-
-           BackendManager.start_link(
-             self(),
-             Keyword.get(opts, :backend, :auto),
-             Keyword.get(opts, :backend_opts, [])
-           ) do
-      backend_info = BackendManager.info(backend_manager)
+    case initialize(opts, logger_token) do
+      {:ok, state, commands} ->
+        {:ok, state, {:continue, {:start, commands}}}
 
-      case build_state(app, backend_manager, backend_info, opts) do
-        {:ok, state, commands} ->
-          {:ok, state, {:continue, {:start, commands}}}
-
-        {:error, reason} ->
-          BackendManager.close(backend_manager, reason)
-          {:stop, reason}
-      end
-    else
       {:error, reason} ->
+        LoggerControl.resume(logger_token)
         {:stop, reason}
     end
   end
@@ -254,7 +244,29 @@ defmodule TermUI.Runtime do
     stop_async_tasks(state)
     app_terminate(state.app, effective_reason(reason, state), state.app_state)
     BackendManager.close(state.backend_manager, effective_reason(reason, state))
+    LoggerControl.resume(state.logger_token)
     :ok
+  end
+
+  defp initialize(opts, logger_token) do
+    with {:ok, app} <- fetch_app(opts),
+         {:ok, backend_manager} <-
+           BackendManager.start_link(
+             self(),
+             Keyword.get(opts, :backend, :auto),
+             Keyword.get(opts, :backend_opts, [])
+           ) do
+      backend_info = BackendManager.info(backend_manager)
+
+      case build_state(app, backend_manager, backend_info, opts) do
+        {:ok, state, commands} ->
+          {:ok, Map.put(state, :logger_token, logger_token), commands}
+
+        {:error, reason} ->
+          BackendManager.close(backend_manager, reason)
+          {:error, reason}
+      end
+    end
   end
 
   defp fetch_app(opts) do
@@ -577,6 +589,21 @@ defmodule TermUI.Runtime do
       _other -> @default_render_interval
     end
   end
+
+  defp suppress_logger?(opts) do
+    case Keyword.fetch(opts, :suppress_logger) do
+      {:ok, value} when is_boolean(value) -> value
+      {:ok, _invalid} -> false
+      :error -> full_screen_backend?(Keyword.get(opts, :backend, :auto))
+    end
+  end
+
+  defp full_screen_backend?(backend)
+       when backend in [:auto, :raw, :tty, TermUI.Backend.Raw, TermUI.Backend.TTY],
+       do: true
+
+  defp full_screen_backend?({backend, _opts}), do: full_screen_backend?(backend)
+  defp full_screen_backend?(_backend), do: false
 
   defp start_monitor(nil, opts), do: :gen_server.start_monitor(__MODULE__, opts, [])
 

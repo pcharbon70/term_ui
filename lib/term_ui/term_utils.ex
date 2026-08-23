@@ -38,6 +38,7 @@ defmodule TermUI.TermUtils do
   @type reason ::
           :timeout
           | :command_not_found
+          | :not_tty
           | :invalid_arguments
           | :execution_failed
           | :output_validation_failed
@@ -74,6 +75,7 @@ defmodule TermUI.TermUtils do
   - `{:ok, output}` - Command succeeded with validated output
   - `{:error, :timeout}` - Command exceeded timeout
   - `{:error, :command_not_found}` - stty not found in PATH
+  - `{:error, :not_tty}` - the process has no controlling terminal
   - `{:error, :invalid_arguments}` - Arguments failed validation
   - `{:error, reason}` - Other execution error
 
