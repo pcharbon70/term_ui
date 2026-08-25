@@ -5,6 +5,7 @@ defmodule TermUI.Widget.MouseInteractionTest do
   alias TermUI.Widget
 
   alias TermUI.Widget.{
+    AlertDialog,
     CommandPalette,
     ContextMenu,
     Dialog,
@@ -13,13 +14,18 @@ defmodule TermUI.Widget.MouseInteractionTest do
     List,
     Menu,
     PickList,
+    ProcessMonitor,
     ScrollBar,
     SplitPane,
+    SupervisionTree,
+    SupervisionTreeViewer,
     Table,
     Tabs,
     TreeView,
     Viewport
   }
+
+  alias TermUI.Widget.TextInput.Line, as: TextInputLine
 
   alias TermUI.Widget.Table.Column
 
@@ -162,12 +168,60 @@ defmodule TermUI.Widget.MouseInteractionTest do
     assert :reverse in TermUI.Frame.cell(frame, 2, 4).attrs
   end
 
+  test "composite wrappers keep specialized mouse behavior" do
+    alert = AlertDialog.init(type: :confirm)
+
+    assert {_alert, [_message]} =
+             Widget.mouse(
+               AlertDialog,
+               Event.mouse(:release, :left, 10, 4),
+               alert,
+               {20, 6}
+             )
+
+    snapshot = %{pid: "<0.1.0>", memory: 10, reductions: 20, message_queue_len: 0}
+    monitor = ProcessMonitor.init(snapshots: [snapshot])
+
+    assert {_monitor, [{:selected, ^snapshot}]} =
+             Widget.mouse(
+               ProcessMonitor,
+               Event.mouse(:release, :left, 0, 1),
+               monitor,
+               {60, 3}
+             )
+
+    nodes = [TreeView.branch(:root, "Root", [TreeView.leaf(:child, "Child")])]
+
+    for {module, tree} <- [
+          {SupervisionTree, SupervisionTree.init(nodes: nodes)},
+          {SupervisionTreeViewer, SupervisionTreeViewer.init(nodes: nodes)}
+        ] do
+      assert {_tree, [{:expanded, :root}]} =
+               Widget.mouse(module, Event.mouse(:release, :left, 0, 0), tree, {20, 3})
+    end
+
+    input = TextInputLine.init(label: "Name", prompt: "> ", value: "abcd")
+
+    assert {input, []} =
+             Widget.mouse(
+               TextInputLine,
+               Event.mouse(:press, :left, 3, 1),
+               input,
+               {12, 2}
+             )
+
+    assert input.input.cursor == 1
+  end
+
   test "pick list clicks select visible results" do
     picker = PickList.init(items: ["one", "two", "three"])
     {picker, []} = Widget.mouse(PickList, Event.mouse(:press, :left, 0, 2), picker, {20, 4})
 
     assert {_picker, [{:picked, "two"}]} =
              Widget.mouse(PickList, Event.mouse(:release, :left, 0, 2), picker, {20, 4})
+
+    unicode = PickList.init(items: ["a"], prompt: "界", query: "a")
+    assert PickList.view(unicode, {10, 2}).cursor == {4, 1}
   end
 
   test "composed menus and palettes translate border coordinates" do

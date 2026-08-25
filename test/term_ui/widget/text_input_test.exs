@@ -27,6 +27,13 @@ defmodule TermUI.Widget.TextInputTest do
     assert state1.cursor == 3
   end
 
+  test "horizontal scrolling keeps the suffix before the cursor contiguous" do
+    state = TextInput.init(value: "a界b")
+
+    assert {"b  ", 2} = TextInput.row(state, 3)
+    assert {"  ", 1} = TextInput.row(TextInput.init(value: "a界"), 2)
+  end
+
   test "shift navigation selects graphemes and input replaces the selection" do
     state = TextInput.init(value: "a界🙂z")
     {state, []} = TextInput.update(Event.key(:left, modifiers: [:shift]), state)

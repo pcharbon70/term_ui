@@ -96,7 +96,9 @@ defmodule TermUI.Widget.PickList do
            [{prefix <> item_label(item), style}]
          end))
 
-    Helpers.frame(rows, dimensions, cursor: {String.length(state.prompt <> state.query) + 1, 1})
+    Helpers.frame(rows, dimensions,
+      cursor: {Helpers.text_width(state.prompt <> state.query) + 1, 1}
+    )
   end
 
   @doc "Returns the items that match the current query."

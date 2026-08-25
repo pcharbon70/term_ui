@@ -131,6 +131,15 @@ defmodule TermUI.RuntimeContractTest do
     def view(_state), do: Frame.from_rows(["unused"], 20, 2)
   end
 
+  defmodule InvalidCommandValueApp do
+    use TermUI.Elm
+
+    def init(_opts), do: {%{}, [%Command{kind: :send, value: :invalid}]}
+    def event_to_msg(_event, _state), do: :ignore
+    def update(_message, state), do: state
+    def view(_state), do: Frame.from_rows(["unused"], 20, 2)
+  end
+
   defmodule MapperCrashApp do
     use TermUI.Elm
 
@@ -165,6 +174,23 @@ defmodule TermUI.RuntimeContractTest do
     def event_to_msg(_event, _state), do: :ignore
     def update(_message, state), do: state
     def view(_state), do: Frame.from_rows(["async"], 20, 2)
+  end
+
+  defmodule BlockingTerminateApp do
+    use TermUI.Elm
+
+    def init(opts), do: %{owner: Keyword.fetch!(opts, :owner)}
+    def event_to_msg(_event, _state), do: :ignore
+    def update(_message, state), do: state
+    def view(_state), do: Frame.from_rows(["terminate"], 20, 2)
+
+    def terminate(_reason, state) do
+      send(state.owner, {:terminate_started, self()})
+
+      receive do
+        :release_terminate -> :ok
+      end
+    end
   end
 
   defmodule ResizableApp do
@@ -313,6 +339,35 @@ defmodule TermUI.RuntimeContractTest do
     assert_receive {:backend, :shutdown, :normal}, 500
   end
 
+  test "runtime dimensions stay within complete frame limits" do
+    events = [Event.resize(1_001, 501), Event.text("q")]
+
+    assert {:ok, _runtime} =
+             Runtime.start_link(
+               root: ResizableApp,
+               backend: {DeterministicBackend, owner: self(), size: {501, 1_001}, events: events}
+             )
+
+    assert_receive {:backend, :draw, %Frame{width: 1_000, height: 500}}, 500
+    assert_receive {:backend, :resize, {501, 1_001}}, 500
+    assert_receive {:backend, :draw, %Frame{width: 1_000, height: 500}}, 500
+    assert_receive {:backend, :shutdown, :normal}, 500
+  end
+
+  test "detected resize keeps the real backend size and clamps the application event" do
+    assert {:ok, runtime} =
+             Runtime.start_link(
+               root: ResizableApp,
+               backend: {DeterministicBackend, owner: self()}
+             )
+
+    assert_receive {:backend, :draw, %Frame{width: 20, height: 6}}, 500
+    send(runtime, {:backend_size, {501, 1_001}})
+    assert_receive {:backend, :resize, {501, 1_001}}, 500
+    assert_receive {:backend, :draw, %Frame{width: 1_000, height: 500}}, 500
+    Runtime.shutdown(runtime)
+  end
+
   test "async commands tag a bare return value as successful" do
     runtime = start_async_app(fn -> :completed end)
 
@@ -334,6 +389,13 @@ defmodule TermUI.RuntimeContractTest do
                     {:error, {:error, %RuntimeError{message: "async failed"}, _stacktrace}}},
                    500
 
+    Runtime.shutdown(runtime)
+  end
+
+  test "async commands map abnormal worker exits" do
+    runtime = start_async_app(fn -> Process.exit(self(), :kill) end)
+
+    assert_receive {:async_complete, {:error, {:exit, :killed, []}}}, 500
     Runtime.shutdown(runtime)
   end
 
@@ -412,6 +474,16 @@ defmodule TermUI.RuntimeContractTest do
 
     assert_receive {:backend, :shutdown, ^reason}, 500
 
+    malformed = %Command{kind: :send, value: :invalid}
+
+    assert {:error, {:application, :commands, {:invalid_commands, [^malformed]}} = reason} =
+             Runtime.run(
+               root: InvalidCommandValueApp,
+               backend: {DeterministicBackend, owner: self()}
+             )
+
+    assert_receive {:backend, :shutdown, ^reason}, 500
+
     assert {:error, {:application, :view, {:expected_frame, :not_a_frame}} = reason} =
              Runtime.run(
                root: InvalidViewApp,
@@ -450,9 +522,47 @@ defmodule TermUI.RuntimeContractTest do
              )
 
     assert_receive {:async_worker, worker}, 500
+    assert Process.alive?(worker)
     worker_ref = Process.monitor(worker)
     Runtime.shutdown(runtime)
     assert_receive {:DOWN, ^worker_ref, :process, ^worker, :killed}, 500
+  end
+
+  test "a forced runtime stop also terminates asynchronous work" do
+    assert {:ok, runtime} =
+             Runtime.start_link(
+               root: BlockingAsyncApp,
+               owner: self(),
+               backend: {DeterministicBackend, owner: self()}
+             )
+
+    assert_receive {:async_worker, worker}, 500
+    assert Process.alive?(worker)
+    worker_ref = Process.monitor(worker)
+    Process.exit(runtime, :kill)
+    assert_receive {:DOWN, ^worker_ref, :process, ^worker, :killed}, 500
+  end
+
+  test "backend cleanup completes before application termination can block" do
+    assert {:ok, runtime} =
+             Runtime.start_link(
+               root: BlockingTerminateApp,
+               owner: self(),
+               backend: {DeterministicBackend, owner: self()}
+             )
+
+    assert_receive {:backend, :draw, _frame}, 500
+    runtime_ref = Process.monitor(runtime)
+
+    try do
+      Runtime.shutdown(runtime)
+      assert_receive {:backend, :shutdown, :normal}, 500
+      assert_receive {:terminate_started, ^runtime}, 500
+    after
+      send(runtime, :release_terminate)
+    end
+
+    assert_receive {:DOWN, ^runtime_ref, :process, ^runtime, :normal}, 500
   end
 
   defp start_counter(opts) do

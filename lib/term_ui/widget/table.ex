@@ -142,7 +142,7 @@ defmodule TermUI.Widget.Table do
       separator = if index == length(widths) - 1, do: "", else: " │ "
 
       [
-        {Helpers.align(to_string(value || ""), cell_width, column.align), style},
+        {Helpers.align(display_value(value), cell_width, column.align), style},
         {separator, Style.new(fg: :bright_black)}
       ]
     end)
@@ -168,10 +168,31 @@ defmodule TermUI.Widget.Table do
     end)
   end
 
-  defp cell_value(row, key) when is_map(row), do: Map.get(row, key, Map.get(row, to_string(key)))
+  defp cell_value(row, key) when is_map(row) do
+    case Map.fetch(row, key) do
+      {:ok, value} -> value
+      :error -> string_key_value(row, key)
+    end
+  end
+
   defp cell_value(row, key) when is_list(row) and is_integer(key), do: Enum.at(row, key)
-  defp cell_value(row, key) when is_tuple(row) and is_integer(key), do: elem(row, key)
+
+  defp cell_value(row, key)
+       when is_tuple(row) and is_integer(key) and key >= 0 and key < tuple_size(row),
+       do: elem(row, key)
+
   defp cell_value(_row, _key), do: nil
+
+  defp string_key_value(row, key) when is_atom(key) or is_integer(key) or is_binary(key),
+    do: Map.get(row, to_string(key))
+
+  defp string_key_value(_row, _key), do: nil
+
+  defp display_value(nil), do: ""
+
+  defp display_value(value) do
+    if String.Chars.impl_for(value), do: to_string(value), else: inspect(value)
+  end
 
   defp normalize_column(%Column{} = column), do: column
   defp normalize_column({key, label}), do: Column.new(key, label)

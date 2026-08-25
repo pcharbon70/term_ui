@@ -21,6 +21,8 @@ defmodule TermUI.PublicContractTest do
     assert %Event.Mouse{action: :press, x: 2, y: 3} = Event.mouse(:press, :left, 2, 3)
     assert %Event.Resize{width: 80, height: 24} = Event.resize(80, 24)
     assert %Event.Focus{action: :gained} = Event.focus(:gained)
+
+    assert_raise FunctionClauseError, fn -> Event.resize("80", 24) end
   end
 
   test "Elm normalization keeps state and command lists explicit" do

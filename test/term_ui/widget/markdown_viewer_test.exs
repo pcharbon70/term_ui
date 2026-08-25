@@ -43,6 +43,19 @@ defmodule TermUI.Widget.MarkdownViewerTest do
     assert heading.fg == :cyan
   end
 
+  test "table cells keep left, center, and right alignment" do
+    markdown = """
+    | Left | Center | Right |
+    | :--- | :----: | ----: |
+    | a | b | c |
+    """
+
+    rows = Markdown.render(markdown, 31)
+    frame = Frame.from_rows(rows, 31, length(rows))
+
+    assert Frame.row_text(frame, 2) == "│a        │    b    │        c│"
+  end
+
   test "viewer scrolls, selects code, and emits copy data without side effects" do
     state = MarkdownViewer.init(content: @markdown, page_size: 3)
     assert %Frame{} = MarkdownViewer.view(state, {30, 5})

@@ -262,12 +262,14 @@ defmodule TermUI.Widget.TextInput do
     do: Enum.take(graphemes, count)
 
   defp visible_before_cursor(graphemes, width) do
-    Enum.reduce(Enum.reverse(graphemes), {[], 0}, fn grapheme, {visible, used} = acc ->
+    Enum.reduce_while(Enum.reverse(graphemes), {[], 0}, fn grapheme, {visible, used} ->
       grapheme_width = max(DisplayWidth.width(grapheme), 0)
 
-      if used + grapheme_width <= width,
-        do: {[grapheme | visible], used + grapheme_width},
-        else: acc
+      if used + grapheme_width <= width do
+        {:cont, {[grapheme | visible], used + grapheme_width}}
+      else
+        {:halt, {visible, used}}
+      end
     end)
   end
 

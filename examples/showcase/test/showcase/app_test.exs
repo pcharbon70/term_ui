@@ -47,6 +47,20 @@ defmodule Showcase.AppTest do
     assert state.page_states.inputs.notes.value =~ "TermUI"
   end
 
+  test "compact input layout shows the focused choice list" do
+    state = App.init(dimensions: {40, 12}, data_mode: :snapshot)
+    state = {:select_page, :inputs} |> App.update(state) |> state_from()
+
+    state = {:page_event, Event.key(:tab)} |> App.update(state) |> state_from()
+    state = {:page_event, Event.key(:tab)} |> App.update(state) |> state_from()
+
+    assert state.page_states.inputs.focus == :choices
+
+    frame = App.view(state)
+    text = Enum.map_join(1..frame.height, "\n", &Frame.row_text(frame, &1))
+    assert text =~ "Keyboard navigation"
+  end
+
   test "a live snapshot updates every data page" do
     {state, _commands} = App.init(dimensions: {90, 26})
     snapshot = SnapshotData.snapshot()

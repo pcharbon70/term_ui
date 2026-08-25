@@ -221,13 +221,14 @@ defmodule TermUI.Widget.DiffViewer do
   end
 
   defp parse_unified(diff, maximum) do
-    {rows, _old_number, _new_number} =
+    {rows, _old_number, _new_number, _hunk_remaining} =
       diff
       |> split_lines(maximum)
-      |> Enum.reduce({[], nil, nil}, fn line, {rows, old_number, new_number} ->
+      |> Enum.reduce({[], nil, nil, nil}, fn line,
+                                             {rows, old_number, new_number, hunk_remaining} ->
         cond do
           String.starts_with?(line, "@@") ->
-            {old_number, new_number} = hunk_numbers(line)
+            {old_number, new_number, hunk_remaining} = hunk_numbers(line)
 
             {rows ++
                [
@@ -239,9 +240,9 @@ defmodule TermUI.Widget.DiffViewer do
                    new_text: nil,
                    text: line
                  }
-               ], old_number, new_number}
+               ], old_number, new_number, hunk_remaining}
 
-          String.starts_with?(line, ["---", "+++"]) ->
+          is_nil(hunk_remaining) and unified_header?(line) ->
             {rows ++
                [
                  %{
@@ -252,7 +253,7 @@ defmodule TermUI.Widget.DiffViewer do
                    new_text: nil,
                    text: line
                  }
-               ], old_number, new_number}
+               ], old_number, new_number, nil}
 
           String.starts_with?(line, "+") ->
             row = %{
@@ -260,26 +261,38 @@ defmodule TermUI.Widget.DiffViewer do
               old_number: nil,
               new_number: new_number,
               old_text: nil,
-              new_text: String.trim_leading(line, "+"),
+              new_text: drop_marker(line),
               text: nil
             }
 
-            {rows ++ [row], old_number, increment(new_number)}
+            {rows ++ [row], old_number, increment(new_number), consume_hunk(hunk_remaining, 0, 1)}
 
           String.starts_with?(line, "-") ->
             row = %{
               kind: :removed,
               old_number: old_number,
               new_number: nil,
-              old_text: String.trim_leading(line, "-"),
+              old_text: drop_marker(line),
               new_text: nil,
               text: nil
             }
 
-            {rows ++ [row], increment(old_number), new_number}
+            {rows ++ [row], increment(old_number), new_number, consume_hunk(hunk_remaining, 1, 0)}
+
+          String.starts_with?(line, "\\") ->
+            row = %{
+              kind: :header,
+              old_number: nil,
+              new_number: nil,
+              old_text: nil,
+              new_text: nil,
+              text: line
+            }
+
+            {rows ++ [row], old_number, new_number, hunk_remaining}
 
           true ->
-            text = String.trim_leading(line, " ")
+            text = context_text(line)
 
             row = %{
               kind: :context,
@@ -290,11 +303,26 @@ defmodule TermUI.Widget.DiffViewer do
               text: nil
             }
 
-            {rows ++ [row], increment(old_number), increment(new_number)}
+            {rows ++ [row], increment(old_number), increment(new_number),
+             consume_hunk(hunk_remaining, 1, 1)}
         end
       end)
 
     rows
+  end
+
+  defp unified_header?(line),
+    do: String.starts_with?(line, ["--- ", "+++ ", "---\t", "+++\t"])
+
+  defp drop_marker(line), do: binary_part(line, 1, byte_size(line) - 1)
+  defp context_text(" " <> text), do: text
+  defp context_text(text), do: text
+
+  defp consume_hunk(nil, _old_count, _new_count), do: nil
+
+  defp consume_hunk({old_remaining, new_remaining}, old_count, new_count) do
+    remaining = {max(old_remaining - old_count, 0), max(new_remaining - new_count, 0)}
+    if remaining == {0, 0}, do: nil, else: remaining
   end
 
   defp unified_rows(state, width) do
@@ -436,12 +464,24 @@ defmodule TermUI.Widget.DiffViewer do
   defp increment(number), do: number + 1
 
   defp hunk_numbers(line) do
-    case Regex.run(~r/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/, line) do
-      [_all, old_number, new_number] ->
-        {String.to_integer(old_number), String.to_integer(new_number)}
+    pattern =
+      ~r/^@@ -(?<old_start>\d+)(?:,(?<old_count>\d+))? \+(?<new_start>\d+)(?:,(?<new_count>\d+))? @@/
+
+    case Regex.named_captures(pattern, line) do
+      %{
+        "old_start" => old_start,
+        "old_count" => old_count,
+        "new_start" => new_start,
+        "new_count" => new_count
+      } ->
+        {String.to_integer(old_start), String.to_integer(new_start),
+         {hunk_count(old_count), hunk_count(new_count)}}
 
       _match ->
-        {nil, nil}
+        {nil, nil, nil}
     end
   end
+
+  defp hunk_count(count) when count in [nil, ""], do: 1
+  defp hunk_count(count), do: String.to_integer(count)
 end

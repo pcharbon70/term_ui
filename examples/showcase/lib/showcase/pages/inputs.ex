@@ -128,12 +128,21 @@ defmodule Showcase.Pages.Inputs do
   end
 
   defp lower_frame(state, {width, height}, theme) do
-    action = action_frame(state, {max(width - 2, 1), max(height - 2, 1)})
+    if state.focus == :choices do
+      if height < 3 do
+        List.view(state.choices, {width, height})
+      else
+        choices = List.view(state.choices, {max(width - 2, 1), height - 2})
+        Layout.panel(choices, "Multi-select list", {width, height}, active: true, theme: theme)
+      end
+    else
+      action = action_frame(state, {max(width - 2, 1), max(height - 2, 1)})
 
-    Layout.panel(action, "Application result", {width, height},
-      active: state.focus == :submit,
-      theme: theme
-    )
+      Layout.panel(action, "Application result", {width, height},
+        active: state.focus == :submit,
+        theme: theme
+      )
+    end
   end
 
   defp action_frame(state, {width, height}) do

@@ -14,13 +14,13 @@ still contains some older v4 examples.
 | Package identity | README, Hex metadata, guides, and module docs describe the Elm runtime and its use by Jido Console. |
 | Repository files | `AGENTS.md`, `CHANGELOG.md`, `CONTRIBUTING.md`, `LICENSE`, `usage-rules.md`, examples, guides, and environment config files are present. |
 | Public data | Public runtime and widget structs use Zoi schemas. |
-| Quality command | `mix quality` runs format, warning-free compile, strict Credo, Dialyzer, and Doctor. |
+| Quality command | `mix quality` runs format, warning-free compile, xref cycle checks, strict Credo, Dialyzer, and Doctor. |
 | Tests and coverage | `mix coveralls` runs deterministic tests and enforces at least 80% line coverage without excluding production modules. |
 | CI | The v5 shared CI caller tests all supported Elixir lines on OTP 28 or 29. CI also checks audit, docs, package content, and unused dependencies. |
 | Dependency updates | Dependabot checks Mix and GitHub Actions dependencies each week with Conventional Commit titles. |
 | Releases | The v5 shared release caller uses `git_ops` for release preparation and Hex publication. |
 | Review | The v5 shared advisory review caller checks pull requests to `develop`. |
-| Examples | The runnable counter example is outside `lib/` and has its own Mix project. |
+| Examples | The runnable counter and showcase examples are outside `lib/` and have their own Mix projects. |
 | Worktree safety | The package does not auto-install Git hooks and does not store local worktree paths. |
 
 ## Documented exceptions

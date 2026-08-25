@@ -38,6 +38,12 @@ defmodule TermUI.Widget.AlertDialog do
   end
 
   @impl true
+  def mouse(event, state, dimensions) do
+    {dialog, messages} = Dialog.mouse(event, state.dialog, dimensions)
+    {%{state | dialog: dialog}, messages}
+  end
+
+  @impl true
   def view(state, dimensions), do: Dialog.view(state.dialog, dimensions)
 
   defp default_buttons(:confirm),

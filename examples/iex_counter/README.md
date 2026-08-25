@@ -1,6 +1,6 @@
 # Counter example
 
-This is the one supported TermUI example. It uses one Elm application, typed
+This is the smallest supported TermUI example. It uses one Elm application, typed
 events, data commands, and one `TermUI.Frame` render value.
 
 Run it with:

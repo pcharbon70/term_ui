@@ -29,6 +29,12 @@ defmodule TermUI.Widget.SupervisionTree do
   end
 
   @impl true
+  def mouse(event, state, dimensions) do
+    {tree, messages} = TreeView.mouse(event, state.tree, dimensions)
+    {%{state | tree: tree}, messages}
+  end
+
+  @impl true
   def view(state, dimensions), do: TreeView.view(state.tree, dimensions)
 
   @doc "Replaces the parent-supplied supervision snapshot."

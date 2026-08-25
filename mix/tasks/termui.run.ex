@@ -8,10 +8,10 @@ defmodule Mix.Tasks.Termui.Run do
 
   ## Examples
 
-  From a TermUI example directory:
+  When the Mix app name maps to its runnable module:
       mix termui.run
 
-  From any project with a TermUI app:
+  From any other project with a TermUI app:
       mix termui.run --module MyApp
 
   ## Options
@@ -21,7 +21,7 @@ defmodule Mix.Tasks.Termui.Run do
 
   ## How it works
 
-  1. Autodetects the module containing `run/0` from mix.exs app name
+  1. Autodetects the module containing `run/0` from the mix.exs app name
   2. Compiles the project
   3. Calls `Module.run()` to start the TUI application
 

@@ -140,7 +140,8 @@ defmodule TermUI.Event do
     def schema, do: @schema
 
     @doc false
-    def new(width, height, opts) when width > 0 and height > 0 do
+    def new(width, height, opts)
+        when is_integer(width) and width > 0 and is_integer(height) and height > 0 do
       %__MODULE__{
         width: width,
         height: height,

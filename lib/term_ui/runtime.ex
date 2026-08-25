@@ -37,6 +37,7 @@ defmodule TermUI.Runtime do
           stop_reason: term(),
           async_tasks: map(),
           async_monitors: map(),
+          async_links: MapSet.t(pid()),
           frames_rendered: non_neg_integer()
         }
 
@@ -174,8 +175,15 @@ defmodule TermUI.Runtime do
   def handle_info({:backend_event, event}, state), do: process_event(event, state)
 
   def handle_info({:backend_size, {rows, columns}}, state) do
-    event = Event.resize(columns, rows)
-    process_event(event, state)
+    case BackendManager.resize(state.backend_manager, {rows, columns}) do
+      :ok ->
+        {width, height} = Frame.clamp_dimensions({columns, rows})
+        state = %{state | dimensions: {width, height}, dirty: true}
+        dispatch_event(Event.resize(width, height), state)
+
+      {:error, stop_reason} ->
+        {:stop, stop_reason, %{state | stop_reason: stop_reason}}
+    end
   end
 
   def handle_info({:backend_failed, reason}, state) do
@@ -185,6 +193,14 @@ defmodule TermUI.Runtime do
   def handle_info({:EXIT, manager, reason}, %{backend_manager: manager} = state) do
     stop_reason = {:backend, state.backend, :manager, reason}
     {:stop, stop_reason, %{state | stop_reason: stop_reason}}
+  end
+
+  def handle_info({:EXIT, pid, _reason} = message, state) do
+    if MapSet.member?(state.async_links, pid) do
+      {:noreply, %{state | async_links: MapSet.delete(state.async_links, pid)}}
+    else
+      handle_application_info(message, state)
+    end
   end
 
   def handle_info({:app_message, message}, state), do: process_update(message, state)
@@ -216,13 +232,15 @@ defmodule TermUI.Runtime do
         handle_application_info({:DOWN, reference, :process, pid, reason}, state)
 
       token ->
-        state = drop_async_task(state, token, reference)
+        {task, tasks} = Map.pop(state.async_tasks, token)
 
-        if reason == :normal do
-          {:noreply, state}
-        else
-          process_update({:async_error, reason}, state)
-        end
+        state = %{
+          state
+          | async_tasks: tasks,
+            async_monitors: Map.delete(state.async_monitors, reference)
+        }
+
+        handle_async_exit(task, reason, state)
     end
   end
 
@@ -238,13 +256,23 @@ defmodule TermUI.Runtime do
     end
   end
 
+  defp handle_async_exit(_task, :normal, state), do: {:noreply, state}
+  defp handle_async_exit(nil, _reason, state), do: {:noreply, state}
+
+  defp handle_async_exit(%{mapper: mapper}, reason, state) do
+    case safe_apply_mapper(mapper, {:error, {:exit, reason, []}}) do
+      {:ok, message} -> process_update(message, state)
+      {:error, error} -> {:stop, error, %{state | stop_reason: error}}
+    end
+  end
+
   @impl true
   def terminate(reason, state) do
     _state = cancel_render(state)
     stop_async_tasks(state)
-    app_terminate(state.app, effective_reason(reason, state), state.app_state)
     BackendManager.close(state.backend_manager, effective_reason(reason, state))
     LoggerControl.resume(state.logger_token)
+    app_terminate(state.app, effective_reason(reason, state), state.app_state)
     :ok
   end
 
@@ -293,7 +321,8 @@ defmodule TermUI.Runtime do
   end
 
   defp build_state(app, backend_manager, backend_info, opts) do
-    app_opts = Keyword.put(opts, :dimensions, size_to_dimensions(backend_info.size))
+    dimensions = backend_info.size |> size_to_dimensions() |> Frame.clamp_dimensions()
+    app_opts = Keyword.put(opts, :dimensions, dimensions)
 
     with {:ok, app_state, commands} <- app_init(app, app_opts) do
       {:ok,
@@ -303,7 +332,7 @@ defmodule TermUI.Runtime do
          backend: backend_info.backend,
          backend_manager: backend_manager,
          capabilities: backend_info.capabilities,
-         dimensions: size_to_dimensions(backend_info.size),
+         dimensions: dimensions,
          render_interval: render_interval(opts),
          render_timer: nil,
          dirty: true,
@@ -311,6 +340,7 @@ defmodule TermUI.Runtime do
          stop_reason: :normal,
          async_tasks: %{},
          async_monitors: %{},
+         async_links: MapSet.new(),
          frames_rendered: 0
        }, commands}
     end
@@ -353,18 +383,37 @@ defmodule TermUI.Runtime do
   end
 
   defp validate_commands(commands, app_state) do
-    if Enum.all?(commands, &match?(%Command{}, &1)) do
+    if Enum.all?(commands, &valid_command?/1) do
       {:ok, app_state, commands}
     else
       {:error, {:application, :commands, {:invalid_commands, commands}}}
     end
   end
 
+  defp valid_command?(%Command{kind: :message}), do: true
+  defp valid_command?(%Command{kind: :send, value: {pid, _message}}), do: is_pid(pid)
+
+  defp valid_command?(%Command{kind: :timer, value: {milliseconds, _message}}),
+    do: is_integer(milliseconds) and milliseconds >= 0
+
+  defp valid_command?(%Command{kind: :async, value: {function, mapper}}),
+    do: is_function(function, 0) and is_function(mapper, 1)
+
+  defp valid_command?(%Command{
+         kind: :clipboard,
+         value: {%TermUI.Clipboard.Operation{}, mapper}
+       }),
+       do: is_function(mapper, 1)
+
+  defp valid_command?(%Command{kind: :shutdown}), do: true
+  defp valid_command?(_command), do: false
+
   defp process_event(%Event.Resize{width: width, height: height} = event, state) do
     case BackendManager.resize(state.backend_manager, {height, width}) do
       :ok ->
+        {width, height} = Frame.clamp_dimensions({width, height})
         state = %{state | dimensions: {width, height}, dirty: true}
-        dispatch_event(event, state)
+        dispatch_event(%{event | width: width, height: height}, state)
 
       {:error, stop_reason} ->
         {:stop, stop_reason, %{state | stop_reason: stop_reason}}
@@ -520,25 +569,29 @@ defmodule TermUI.Runtime do
     token = make_ref()
 
     {pid, monitor} =
-      spawn_monitor(fn ->
-        result =
-          try do
-            {:ok, function.()}
-          rescue
-            exception -> {:error, {:error, exception, __STACKTRACE__}}
-          catch
-            kind, reason -> {:error, {kind, reason, __STACKTRACE__}}
-          end
+      :erlang.spawn_opt(
+        fn ->
+          result =
+            try do
+              {:ok, function.()}
+            rescue
+              exception -> {:error, {:error, exception, __STACKTRACE__}}
+            catch
+              kind, reason -> {:error, {kind, reason, __STACKTRACE__}}
+            end
 
-        send(parent, {:async_result, token, result})
-      end)
+          send(parent, {:async_result, token, result})
+        end,
+        [:link, :monitor]
+      )
 
     task = %{pid: pid, monitor: monitor, mapper: mapper}
 
     %{
       state
       | async_tasks: Map.put(state.async_tasks, token, task),
-        async_monitors: Map.put(state.async_monitors, monitor, token)
+        async_monitors: Map.put(state.async_monitors, monitor, token),
+        async_links: MapSet.put(state.async_links, pid)
     }
   end
 
@@ -548,14 +601,6 @@ defmodule TermUI.Runtime do
     exception -> {:error, application_error(:command_result, :error, exception, __STACKTRACE__)}
   catch
     kind, reason -> {:error, application_error(:command_result, kind, reason, __STACKTRACE__)}
-  end
-
-  defp drop_async_task(state, token, monitor) do
-    %{
-      state
-      | async_tasks: Map.delete(state.async_tasks, token),
-        async_monitors: Map.delete(state.async_monitors, monitor)
-    }
   end
 
   defp stop_async_tasks(state) do

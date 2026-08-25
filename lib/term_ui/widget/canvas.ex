@@ -94,8 +94,11 @@ defmodule TermUI.Widget.Canvas do
       text
       |> IO.iodata_to_binary()
       |> String.graphemes()
-      |> Enum.with_index(x)
-      |> Enum.reduce(state, fn {char, column}, acc -> set_char(acc, column, y, char, style) end)
+      |> Enum.reduce({state, x}, fn char, {canvas, column} ->
+        cell = Style.to_cell(style || canvas.style, char)
+        {set_char(canvas, column, y, char, style), column + Cell.width(cell)}
+      end)
+      |> elem(0)
 
   @doc "Draws a character line with Bresenham's algorithm."
   @spec draw_line(t(), integer(), integer(), integer(), integer(), String.t()) :: t()

@@ -171,7 +171,13 @@ defmodule TermUI.Widget.SplitPane do
         frame
       else
         {pane_width, pane_height, column, row} = pane_geometry(state.direction, pane)
-        Frame.overlay(frame, resolve(pane.content, {pane_width, pane_height}), column, row)
+
+        child =
+          pane.content
+          |> resolve({pane_width, pane_height})
+          |> fit_frame({pane_width, pane_height})
+
+        Frame.overlay(frame, child, column, row)
       end
     end)
   end
@@ -384,6 +390,19 @@ defmodule TermUI.Widget.SplitPane do
 
   defp resolve(rows, {width, height}) when is_list(rows),
     do: Frame.from_rows(rows, width, height)
+
+  defp fit_frame(%Frame{width: width, height: height} = frame, {width, height}), do: frame
+
+  defp fit_frame(%Frame{} = frame, {width, height}) do
+    cursor = clipped_cursor(frame.cursor, {width, height})
+    Frame.new(width, height, cells: frame.cells, cursor: cursor)
+  end
+
+  defp clipped_cursor({column, row} = cursor, {width, height})
+       when column <= width and row <= height,
+       do: cursor
+
+  defp clipped_cursor(_cursor, _dimensions), do: nil
 
   defp normalize_panes(panes) do
     normalized =

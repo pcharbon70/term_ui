@@ -55,6 +55,12 @@ defmodule TermUI.Widget.ProcessMonitor do
   end
 
   @impl true
+  def mouse(event, state, dimensions) do
+    {table, messages} = Table.mouse(event, state.table, dimensions)
+    {%{state | table: table}, messages}
+  end
+
+  @impl true
   def view(state, dimensions), do: Table.view(state.table, dimensions)
 
   @doc "Replaces process snapshots supplied by the parent."

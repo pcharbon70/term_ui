@@ -342,8 +342,9 @@ defmodule TermUI.Widget.AdvancedBehaviorTest do
     assert {button, []} = Button.update(Event.mouse(:press, :left, 0, 0), button)
     assert button.pressed
     assert {button, [{:pressed, :go}]} = Button.update(Event.mouse(:release, :left, 0, 0), button)
-    assert {button, []} = Button.update(Event.focus(:lost), button)
-    refute button.focused
+    assert {^button, []} = Button.update(Event.focus(:lost), button)
+    assert button.focused
+    refute Button.focus(button, false).focused
 
     stream = Stream.init(items: Enum.to_list(1..8), page_size: 2, formatter: &inspect/1)
     assert {stream, [{:scrolled, 1}]} = Stream.update(Event.key(:down), stream)

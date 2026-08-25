@@ -88,6 +88,10 @@ defmodule TermUI.Terminal.EscapeParserTest do
       assert [%Event.Key{key: :enter}] = events
     end
 
+    test "parses line feed as enter" do
+      assert {[%Event.Key{key: :enter}], ""} = EscapeParser.parse(<<10>>)
+    end
+
     test "parses delete (0x7F)" do
       {events, remaining} = EscapeParser.parse(<<0x7F>>)
       assert remaining == <<>>
@@ -292,6 +296,15 @@ defmodule TermUI.Terminal.EscapeParserTest do
       assert :alt in modifiers
       refute :ctrl in modifiers
     end
+
+    test "rejects a non-numeric arrow modifier" do
+      assert {[
+                %Event.Key{key: :unknown},
+                %Event.Text{text: "A"},
+                %Event.Text{text: "q"}
+              ], ""} =
+               EscapeParser.parse("\e[1;xAq")
+    end
   end
 
   describe "parse/1 - UTF-8 characters" do
@@ -318,6 +331,30 @@ defmodule TermUI.Terminal.EscapeParserTest do
   end
 
   describe "parse/1 - incomplete sequences" do
+    test "keeps an incomplete UTF-8 character until its remaining bytes arrive" do
+      for {character, first_chunk} <- [
+            {"é", <<0xC3>>},
+            {"€", <<0xE2, 0x82>>},
+            {"😀", <<0xF0, 0x9F>>}
+          ] do
+        assert {[], ^first_chunk} = EscapeParser.parse(first_chunk)
+
+        remaining =
+          binary_part(
+            character,
+            byte_size(first_chunk),
+            byte_size(character) - byte_size(first_chunk)
+          )
+
+        assert {[%Event.Text{text: ^character}], ""} =
+                 EscapeParser.parse(first_chunk <> remaining)
+      end
+    end
+
+    test "drops an invalid UTF-8 lead byte without dropping later text" do
+      assert {[%Event.Text{text: "a"}], ""} = EscapeParser.parse(<<0xC3, ?a>>)
+    end
+
     test "returns partial escape sequence" do
       {events, remaining} = EscapeParser.parse("\e")
       assert events == []

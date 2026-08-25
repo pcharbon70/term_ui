@@ -56,8 +56,8 @@ defmodule TermUI.Terminal.EscapeParser do
     parse_bytes(rest, [event | events])
   end
 
-  # Enter / Ctrl+M
-  defp parse_bytes(<<13, rest::binary>>, events) do
+  # Enter / Ctrl+J or Ctrl+M
+  defp parse_bytes(<<char, rest::binary>>, events) when char in [10, 13] do
     event = Event.key(:enter)
     parse_bytes(rest, [event | events])
   end
@@ -83,49 +83,33 @@ defmodule TermUI.Terminal.EscapeParser do
     parse_bytes(rest, [event | events])
   end
 
-  # UTF-8 multi-byte sequences (2-byte)
-  defp parse_bytes(<<0b110::3, _::5, 0b10::2, _::6, _rest::binary>> = input, events) do
-    case input do
-      <<char::utf8, rest::binary>> ->
-        char_str = <<char::utf8>>
-        event = Event.text(char_str)
-        parse_bytes(rest, [event | events])
+  # UTF-8 multi-byte sequences
+  defp parse_bytes(<<lead, _rest::binary>> = input, events) when lead in 0xC2..0xDF,
+    do: parse_utf8(input, 2, events)
 
-      _ ->
-        # Incomplete UTF-8
-        {Enum.reverse(events), input}
-    end
-  end
+  defp parse_bytes(<<lead, _rest::binary>> = input, events) when lead in 0xE0..0xEF,
+    do: parse_utf8(input, 3, events)
 
-  # UTF-8 multi-byte sequences (3-byte)
-  defp parse_bytes(<<0b1110::4, _::4, _rest::binary>> = input, events) do
-    case input do
-      <<char::utf8, rest::binary>> ->
-        char_str = <<char::utf8>>
-        event = Event.text(char_str)
-        parse_bytes(rest, [event | events])
-
-      _ ->
-        {Enum.reverse(events), input}
-    end
-  end
-
-  # UTF-8 multi-byte sequences (4-byte)
-  defp parse_bytes(<<0b11110::5, _::3, _rest::binary>> = input, events) do
-    case input do
-      <<char::utf8, rest::binary>> ->
-        char_str = <<char::utf8>>
-        event = Event.text(char_str)
-        parse_bytes(rest, [event | events])
-
-      _ ->
-        {Enum.reverse(events), input}
-    end
-  end
+  defp parse_bytes(<<lead, _rest::binary>> = input, events) when lead in 0xF0..0xF4,
+    do: parse_utf8(input, 4, events)
 
   # Unknown byte - skip it
   defp parse_bytes(<<_char, rest::binary>>, events) do
     parse_bytes(rest, events)
+  end
+
+  defp parse_utf8(input, expected_bytes, events) when byte_size(input) < expected_bytes,
+    do: {Enum.reverse(events), input}
+
+  defp parse_utf8(input, expected_bytes, events) do
+    <<character::binary-size(expected_bytes), rest::binary>> = input
+
+    if String.valid?(character) do
+      parse_bytes(rest, [Event.text(character) | events])
+    else
+      <<_invalid_lead, rest::binary>> = input
+      parse_bytes(rest, events)
+    end
   end
 
   # Parse escape sequences
@@ -237,7 +221,7 @@ defmodule TermUI.Terminal.EscapeParser do
 
   # Modified arrow keys with modifiers: ESC [ 1 ; modifier A/B/C/D
   defp parse_csi_sequence(<<"1;", modifier, dir, rest::binary>>)
-       when dir in [?A, ?B, ?C, ?D] do
+       when modifier in ?0..?9 and dir in [?A, ?B, ?C, ?D] do
     key =
       case dir do
         ?A -> :up

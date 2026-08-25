@@ -11,7 +11,6 @@ defmodule TermUI.Markdown do
   alias TermUI.{DisplayWidth, Frame, Style}
   alias TermUI.Markdown.Document
   alias TermUI.Markdown.Parser
-  alias TermUI.Widget.Helpers
 
   # Styles stored in MDEx node spans contain MapSet's opaque representation.
   @dialyzer {:nowarn_function, inline_node: 2}
@@ -234,7 +233,7 @@ defmodule TermUI.Markdown do
         |> Enum.flat_map(fn {%MDEx.TableCell{nodes: nodes}, index} ->
           alignment = Enum.at(alignments, index, :left) |> normalize_alignment()
           text = nodes |> inline(@plain) |> plain_text()
-          [{"│", @rule}, {Helpers.align(text, column_width, alignment), style}]
+          [{"│", @rule}, {align(text, column_width, alignment), style}]
         end)
         |> Kernel.++([{"│", @rule}])
       end)
@@ -251,6 +250,19 @@ defmodule TermUI.Markdown do
     do: render_nodes_without_spacing(nodes, width, focused, line_index)
 
   defp render_block(_node, _width, _focused, _index), do: {[], []}
+
+  defp align(text, width, alignment) do
+    text = Frame.fit(text, width)
+    content = String.trim_trailing(text)
+    room = max(width - DisplayWidth.width(content), 0)
+
+    case alignment do
+      :right -> String.duplicate(" ", room) <> content
+      :center -> String.duplicate(" ", div(room, 2)) <> content
+      :left -> text
+    end
+    |> Frame.fit(width)
+  end
 
   defp prefix_list_line(line, 0, marker), do: [{marker, @bullet} | line]
 

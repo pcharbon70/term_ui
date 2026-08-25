@@ -4,6 +4,14 @@ defmodule TermUI.Widget.SplitPaneTest do
   alias TermUI.{Event, Frame}
   alias TermUI.Widget.SplitPane
 
+  defmodule OversizedWidget do
+    @behaviour TermUI.Widget
+
+    def init(_opts), do: nil
+    def update(_event, state), do: {state, []}
+    def view(_state, _dimensions), do: Frame.from_rows(["ABCDEFGHIJ"], 10, 2)
+  end
+
   test "named multi-pane layout allocates exact space and preserves collapse state" do
     state =
       SplitPane.init(
@@ -85,5 +93,22 @@ defmodule TermUI.Widget.SplitPaneTest do
     assert_raise ArgumentError, fn ->
       SplitPane.init(panes: [same: "one", same: "two"])
     end
+  end
+
+  test "pane content is clipped before it is composed" do
+    oversized = Frame.from_rows(["ABCDEFGHIJ"], 10, 2)
+
+    for content <- [oversized, fn _dimensions -> oversized end, {OversizedWidget, nil}] do
+      state = SplitPane.init(first: content, second: "R", ratio: 0.5)
+      separator = state |> SplitPane.layout({10, 2}) |> Map.fetch!(:separators) |> hd()
+      frame = SplitPane.view(state, {10, 2})
+
+      assert Frame.cell(frame, 1, separator.position + 1).char == "│"
+      assert Frame.cell(frame, 1, separator.position + 2).char == "R"
+    end
+
+    oversized_cursor = Frame.from_rows(["ABCDEFGHIJ", "cursor"], 10, 2, cursor: {10, 2})
+    state = SplitPane.init(first: oversized_cursor, second: "R", ratio: 0.5)
+    assert SplitPane.view(state, {10, 2}).cursor == nil
   end
 end

@@ -61,11 +61,6 @@ defmodule TermUI.Widget.Button do
   def update(%Event.Mouse{action: :release, button: :left}, state),
     do: press(%{state | pressed: false})
 
-  def update(%Event.Focus{action: :gained}, state), do: {%{state | focused: true}, []}
-
-  def update(%Event.Focus{action: :lost}, state),
-    do: {%{state | focused: false, pressed: false}, []}
-
   def update(_event, state), do: {state, []}
 
   @impl true

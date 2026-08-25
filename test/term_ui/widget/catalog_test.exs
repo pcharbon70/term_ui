@@ -167,6 +167,18 @@ defmodule TermUI.Widget.CatalogTest do
     assert Canvas.braille_resolution(canvas) == {16, 12}
   end
 
+  test "canvas text advances by terminal columns" do
+    canvas = Canvas.init(width: 4, height: 1) |> Canvas.draw_text(0, 0, "界a")
+    frame = Canvas.view(canvas, {4, 1})
+
+    assert Frame.cell(frame, 1, 1).char == "界"
+    assert Frame.cell(frame, 1, 2).wide_placeholder
+    assert Frame.cell(frame, 1, 3).char == "a"
+
+    clipped = Canvas.init(width: 2, height: 1) |> Canvas.draw_text(0, 0, "界a")
+    assert Frame.row_text(Canvas.view(clipped, {2, 1}), 1) == "界"
+  end
+
   test "bounded log, stream, and toast data stays pure" do
     logs =
       LogViewer.init(limit: 2)

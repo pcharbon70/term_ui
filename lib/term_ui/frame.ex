@@ -52,6 +52,12 @@ defmodule TermUI.Frame do
     }
   end
 
+  @doc false
+  @spec clamp_dimensions({pos_integer(), pos_integer()}) :: {pos_integer(), pos_integer()}
+  def clamp_dimensions({width, height})
+      when is_integer(width) and width > 0 and is_integer(height) and height > 0,
+      do: {min(width, @max_columns), min(height, @max_rows)}
+
   @doc "Builds a frame from plain rows or styled spans."
   @spec from_rows([row()], pos_integer(), pos_integer(), keyword()) :: t()
   def from_rows(rows, width, height, opts \\ []) when is_list(rows) do

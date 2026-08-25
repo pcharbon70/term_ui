@@ -5,6 +5,7 @@ defmodule TermUI.Widget.SupervisionTreeViewer do
 
   defdelegate init(opts), to: TermUI.Widget.SupervisionTree
   defdelegate update(event, state), to: TermUI.Widget.SupervisionTree
+  defdelegate mouse(event, state, dimensions), to: TermUI.Widget.SupervisionTree
   defdelegate view(state, dimensions), to: TermUI.Widget.SupervisionTree
   defdelegate set_nodes(state, nodes), to: TermUI.Widget.SupervisionTree
 end

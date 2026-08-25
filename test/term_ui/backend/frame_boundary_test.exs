@@ -115,6 +115,21 @@ defmodule TermUI.Backend.FrameBoundaryTest do
     end)
   end
 
+  test "TTY normalizes line feed as Enter" do
+    capture_io("\n", fn ->
+      {:ok, state} =
+        TTY.init(
+          size: {2, 8},
+          alternate_screen: false,
+          bracketed_paste: false,
+          focus_events: false
+        )
+
+      assert {:ok, %Event.Key{key: :enter}, state} = TTY.poll_event(state, 10)
+      TTY.shutdown(state, :normal)
+    end)
+  end
+
   test "Raw resize clears stale terminal content" do
     output =
       capture_io(fn ->

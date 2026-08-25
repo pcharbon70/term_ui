@@ -56,5 +56,4 @@ jobs:
       hex_dry_run: ${{ inputs.hex_dry_run || false }}
       skip_tests: ${{ inputs.skip_tests || false }}
       version_override: ${{ inputs.version_override || '' }}
-    secrets:
-      HEX_API_KEY: ${{ secrets.HEX_API_KEY }}
+    secrets: inherit
