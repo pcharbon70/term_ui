@@ -14,7 +14,7 @@ defmodule Showcase.Pages.Content do
   def init do
     %{
       active: :markdown,
-      tick: 0,
+      refreshes: 0,
       markdown: MarkdownViewer.init(content: markdown(), page_size: 18),
       diff:
         DiffViewer.init(
@@ -26,7 +26,7 @@ defmodule Showcase.Pages.Content do
         ),
       stream:
         Stream.init(
-          items: ["0001 runtime started", "0002 backend ready", "0003 first frame drawn"],
+          items: ["Waiting for the first live BEAM snapshot"],
           limit: 40,
           page_size: 18
         )
@@ -36,12 +36,6 @@ defmodule Showcase.Pages.Content do
   @impl true
   def update(%Event.Text{text: "]"}, state), do: {move_view(state, 1), []}
   def update(%Event.Text{text: "["}, state), do: {move_view(state, -1), []}
-
-  def update(:tick, state) do
-    tick = state.tick + 1
-    stream = Stream.push(state.stream, "#{pad(tick + 3)} processed frame #{tick}")
-    {%{state | tick: tick, stream: stream}, []}
-  end
 
   def update(event, %{active: :markdown} = state) do
     {widget, messages} = MarkdownViewer.update(event, state.markdown)
@@ -83,6 +77,19 @@ defmodule Showcase.Pages.Content do
   @impl true
   def help, do: "[ and ] change the content widget. Arrows scroll. Tab focuses Markdown code."
 
+  @doc false
+  def set_snapshot(state, snapshot) do
+    refreshes = state.refreshes + 1
+    system = snapshot.system
+
+    entry =
+      "#{pad(refreshes)} #{format_time(snapshot.collected_at)} " <>
+        "#{system.process_count} processes, #{format_bytes(system.memory.total)}, " <>
+        "run queue #{system.run_queue}"
+
+    %{state | refreshes: refreshes, stream: Stream.push(state.stream, entry)}
+  end
+
   defp move_view(state, delta) do
     index = Enum.find_index(@views, &(&1 == state.active)) || 0
     next = rem(index + delta + length(@views), length(@views))
@@ -90,6 +97,15 @@ defmodule Showcase.Pages.Content do
   end
 
   defp pad(value), do: value |> Integer.to_string() |> String.pad_leading(4, "0")
+
+  defp format_time(seconds) do
+    seconds
+    |> DateTime.from_unix!()
+    |> Calendar.strftime("%H:%M:%S")
+  end
+
+  defp format_bytes(bytes) when bytes < 1_048_576, do: "#{Float.round(bytes / 1_024, 1)} KB"
+  defp format_bytes(bytes), do: "#{Float.round(bytes / 1_048_576, 1)} MB"
 
   defp markdown do
     """

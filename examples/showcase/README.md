@@ -20,14 +20,25 @@ The application also works from IEx:
 Showcase.App.run()
 ```
 
+Live mode is the default. For fixed output in a test or documentation session,
+use:
+
+```elixir
+Showcase.App.run(data_mode: :snapshot)
+```
+
 ## Controls
 
-- F1 through F5 select the main pages.
-- F9 changes the showcase theme.
-- F10 or Escape stops the application and restores the terminal.
-- Ctrl+N and Ctrl+P select the next or previous page.
+- Escape opens the command menu. Press 1 through 5 to select a page.
+- In the command menu, N and P select the next or previous page, R refreshes
+  data, T changes the theme, and Q stops the application.
+- Ctrl+N and Ctrl+P select the next or previous page without opening the menu.
+- Ctrl+Left and Ctrl+Right also select pages when the terminal sends those
+  key combinations.
+- Ctrl+R requests an immediate live refresh.
 - Ctrl+T changes the showcase theme.
-- Ctrl+Q stops the application and restores the terminal.
+- Ctrl+Q stops the application and restores the terminal without opening the
+  menu.
 - Tab changes focus on pages with multiple controls.
 - The footer and page status show local controls.
 
@@ -35,9 +46,9 @@ Showcase.App.run()
 
 ### Overview
 
-Shows live gauges, progress, sparklines, bars, and a selectable table. A
-deterministic timer changes application state. Rendering does not collect data
-or perform effects.
+Shows gauges, progress, sparklines, bars, and a selectable table driven by live
+BEAM memory, process, scheduler, and run-queue values. Rendering does not
+collect data or perform effects.
 
 ### Inputs
 
@@ -48,14 +59,16 @@ widget.
 ### Content
 
 Shows Markdown, diff, and bounded stream widgets. Use `[` and `]` to change the
-active widget. The Markdown sample includes a copyable code block. The parent
-converts its copy message to serialized clipboard command data.
+active widget. The stream records each live BEAM refresh. The Markdown sample
+includes a copyable code block. The parent converts its copy message to
+serialized clipboard command data.
 
 ### BEAM
 
-Shows process, supervision-tree, and cluster widgets. All values are fixed
-snapshots supplied by the parent. The widgets do not inspect processes, monitor
-nodes, or perform RPC.
+Shows process, runtime-tree, and cluster widgets. `Showcase.LiveData` collects
+local process details, runtime links, and local or connected-node values. The
+parent supplies each result to the pure widgets. The widgets do not inspect
+processes, monitor nodes, or perform RPC.
 
 ### Architecture
 
@@ -65,8 +78,8 @@ running TermUI application.
 ## Structure
 
 `Showcase.App` is the only Elm application. It owns global state, every page
-state, timers, clipboard commands, terminal dimensions, and final frame
-composition.
+state, timers, asynchronous collection commands, clipboard commands, terminal
+dimensions, and final frame composition.
 
 Each module in `Showcase.Pages` is a pure page adapter:
 
@@ -75,8 +88,9 @@ Each module in `Showcase.Pages` is a pure page adapter:
 frame = Page.view(page_state, dimensions, theme)
 ```
 
-A page does not start a process or a nested runtime. `Showcase.Layout` contains
-only frame composition helpers.
+A page does not start a process or a nested runtime. `Showcase.LiveData`
+collects external values inside a runtime-managed asynchronous command.
+`Showcase.Layout` contains only frame composition helpers.
 
 ## Tests
 
@@ -84,7 +98,7 @@ only frame composition helpers.
 mix test
 ```
 
-The tests render every page at normal and compact terminal sizes. They also
-check state ownership, input routing, timers, and clipboard command output. CI
-compiles and tests this standalone Mix application so the documentation cannot
-silently drift from the public API.
+The tests use explicit snapshot mode and render every page at normal and compact
+terminal sizes. They also check live collection, state ownership, input routing,
+timers, and clipboard command output. CI compiles and tests this standalone Mix
+application so the documentation cannot silently drift from the public API.

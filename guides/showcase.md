@@ -18,13 +18,17 @@ mix run run.exs
 See the [showcase source and full control
 list](https://github.com/pcharbon70/term_ui/tree/develop/examples/showcase).
 
+Press Escape and then 1 through 5 to select a page. This command menu does not
+depend on terminal function-key settings.
+
 ## What it demonstrates
 
-- The Overview page composes gauges, progress, a sparkline, bars, and a table.
+- The Overview page composes live BEAM gauges, progress, a sparkline, bars, and
+  a process table.
 - The Inputs page routes events to parent-owned text, list, and button state.
-- The Content page shows Markdown, diff, bounded streams, and clipboard command
-  output.
-- The BEAM page renders parent-supplied process, supervision, and cluster
+- The Content page shows Markdown, diff, a live refresh stream, and clipboard
+  command output.
+- The BEAM page renders live parent-supplied process, runtime-link, and cluster
   snapshots.
 - The Architecture page explains the active application, frame, and backend
   seams.
@@ -32,8 +36,8 @@ list](https://github.com/pcharbon70/term_ui/tree/develop/examples/showcase).
 ## Application structure
 
 `Showcase.App` is the only Elm application. It owns global state, all page and
-widget state, timers, clipboard commands, terminal dimensions, and final frame
-composition.
+widget state, timers, asynchronous collection commands, clipboard commands,
+terminal dimensions, and final frame composition.
 
 Each page is a pure adapter:
 
@@ -42,9 +46,12 @@ Each page is a pure adapter:
 frame = Page.view(page_state, dimensions, theme)
 ```
 
-A page does not start a process or nested runtime. Sample metrics and BEAM data
-are deterministic values. A real application can replace them with command or
-adapter output without changing the widgets.
+A page does not start a process or nested runtime. `Showcase.LiveData` collects
+VM metrics, process details, runtime links, and connected-node data in a
+runtime-managed asynchronous command. The command result updates parent-owned
+widget state. The widgets do not perform process inspection or RPC.
 
-The showcase has its own tests. CI renders every page at normal and compact
-sizes and checks input routing, timers, and clipboard command output.
+Use `Showcase.App.run(data_mode: :snapshot)` when deterministic output is
+required. The showcase tests use this mode. CI renders every page at normal and
+compact sizes and checks live collection, input routing, timers, and clipboard
+command output.

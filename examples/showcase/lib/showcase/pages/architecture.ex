@@ -10,7 +10,6 @@ defmodule Showcase.Pages.Architecture do
   def init, do: MarkdownViewer.init(content: document(), page_size: 20)
 
   @impl true
-  def update(:tick, state), do: {state, []}
   def update(event, state), do: MarkdownViewer.update(event, state)
 
   @impl true
@@ -42,7 +41,8 @@ defmodule Showcase.Pages.Architecture do
     ```
 
     Widget messages return to the parent. Clipboard writes become command data.
-    Timers update application state before the next render.
+    A timer requests live data through `Command.async/2`. The command result
+    updates application state before the next render.
 
     ## One frame boundary
 
@@ -56,9 +56,10 @@ defmodule Showcase.Pages.Architecture do
 
     ## External data
 
-    The BEAM page uses fixed process, supervision, and cluster snapshots. In a
-    real application, commands or adapters collect that data. The widgets only
-    format the values that their parent supplies.
+    `Showcase.LiveData` collects local processes, runtime links, VM metrics, and
+    connected-node values outside update and view. The BEAM widgets only format
+    the snapshots that their parent supplies. Snapshot mode keeps tests and
+    documentation output deterministic.
     """
   end
 end

@@ -37,8 +37,6 @@ defmodule Showcase.Pages.Inputs do
     {move_focus(state, delta), []}
   end
 
-  def update(:tick, state), do: {state, []}
-
   def update(event, state) do
     {state, messages} = update_focused(state, event)
     {apply_messages(state, messages), messages}

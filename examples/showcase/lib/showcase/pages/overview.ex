@@ -11,14 +11,14 @@ defmodule Showcase.Pages.Overview do
   @impl true
   def init do
     %{
-      tick: 0,
-      cpu: Gauge.init(label: "CPU", value: 38),
-      memory: Gauge.init(label: "Memory", value: 61),
-      jobs: Progress.init(label: "Jobs", value: 42),
+      refreshes: 0,
+      run_queue: Gauge.init(label: "Run queue", value: 0, max: 1),
+      processes: Gauge.init(label: "Processes", value: 0, max: 1),
+      schedulers: Progress.init(label: "Schedulers", value: 0, max: 1),
       history:
         Sparkline.init(
-          label: "Load",
-          values: [28, 35, 31, 42, 48, 44, 53, 49, 57, 52],
+          label: "Run queue history",
+          values: [0],
           min: 0,
           max: 100,
           style: Style.new(fg: :cyan)
@@ -26,38 +26,18 @@ defmodule Showcase.Pages.Overview do
       bars:
         BarChart.init(
           data: [
-            %{label: "API", value: 74, color: :cyan},
-            %{label: "Jobs", value: 51, color: :green},
-            %{label: "Cache", value: 33, color: :yellow}
+            %{label: "Processes", value: 0, color: :cyan},
+            %{label: "Binaries", value: 0, color: :green},
+            %{label: "ETS", value: 0, color: :yellow}
           ],
           min: 0,
           max: 100
         ),
-      table: Table.init(columns: columns(), rows: process_rows(0), page_size: 8)
+      table: Table.init(columns: columns(), rows: [], page_size: 8)
     }
   end
 
   @impl true
-  def update(:tick, state) do
-    tick = state.tick + 1
-    cpu = wave(tick, 48, 31, 5)
-    memory = wave(tick, 62, 17, 8)
-    jobs = rem(tick * 7, 101)
-
-    next = %{
-      state
-      | tick: tick,
-        cpu: Gauge.set_value(state.cpu, cpu),
-        memory: Gauge.set_value(state.memory, memory),
-        jobs: Progress.set_value(state.jobs, jobs),
-        history: Sparkline.push(state.history, cpu, 80),
-        bars: %{state.bars | data: service_bars(tick)},
-        table: Table.set_rows(state.table, process_rows(tick))
-    }
-
-    {next, []}
-  end
-
   def update(event, state) do
     {table, messages} = Table.update(event, state.table)
     {%{state | table: table}, messages}
@@ -73,7 +53,31 @@ defmodule Showcase.Pages.Overview do
   end
 
   @impl true
-  def help, do: "Live pure widgets. Use Up and Down to move in the process table."
+  def help, do: "Live BEAM data. Use Up and Down to move in the process table."
+
+  @doc false
+  def set_snapshot(state, %{system: system, processes: processes}) do
+    load = system.run_queue_load
+
+    %{
+      state
+      | refreshes: state.refreshes + 1,
+        run_queue: %{state.run_queue | value: system.run_queue, maximum: system.schedulers_online},
+        processes: %{
+          state.processes
+          | value: system.process_count,
+            maximum: system.process_limit
+        },
+        schedulers: %{
+          state.schedulers
+          | value: system.schedulers_online,
+            maximum: system.schedulers
+        },
+        history: Sparkline.push(state.history, load, 80),
+        bars: %{state.bars | data: memory_bars(system.memory)},
+        table: Table.set_rows(state.table, process_rows(processes))
+    }
+  end
 
   defp wide_view(state, {width, height}, theme) do
     {left_width, right_width} = Layout.split_widths(width)
@@ -122,9 +126,17 @@ defmodule Showcase.Pages.Overview do
 
   defp metrics_frame(state, {width, height}) do
     Frame.new(max(width, 1), max(height, 1))
-    |> Frame.overlay(Gauge.view(state.cpu, {max(width, 1), 1}), 1, 1)
-    |> Frame.overlay(Gauge.view(state.memory, {max(width, 1), 1}), 1, min(2, max(height, 1)))
-    |> Frame.overlay(Progress.view(state.jobs, {max(width, 1), 1}), 1, min(3, max(height, 1)))
+    |> Frame.overlay(Gauge.view(state.run_queue, {max(width, 1), 1}), 1, 1)
+    |> Frame.overlay(
+      Gauge.view(state.processes, {max(width, 1), 1}),
+      1,
+      min(2, max(height, 1))
+    )
+    |> Frame.overlay(
+      Progress.view(state.schedulers, {max(width, 1), 1}),
+      1,
+      min(3, max(height, 1))
+    )
   end
 
   defp trends_frame(state, {width, height}) do
@@ -146,24 +158,30 @@ defmodule Showcase.Pages.Overview do
     ]
   end
 
-  defp process_rows(tick) do
+  defp process_rows(processes) do
+    Enum.map(processes, fn process ->
+      %{
+        name: process.name,
+        memory: format_bytes(process.memory),
+        queue: process.message_queue_len,
+        status: to_string(process.status)
+      }
+    end)
+  end
+
+  defp memory_bars(memory) do
+    total = max(Map.get(memory, :total, 0), 1)
+
     [
-      %{name: "term_ui", memory: "12.4 MB", queue: rem(tick, 4), status: "running"},
-      %{name: "assistant", memory: "48.1 MB", queue: rem(tick + 2, 7), status: "working"},
-      %{name: "telemetry", memory: "5.7 MB", queue: 0, status: "idle"},
-      %{name: "publisher", memory: "9.3 MB", queue: rem(tick + 1, 3), status: "running"}
+      %{label: "Processes", value: percentage(memory, :processes, total), color: :cyan},
+      %{label: "Binaries", value: percentage(memory, :binary, total), color: :green},
+      %{label: "ETS", value: percentage(memory, :ets, total), color: :yellow}
     ]
   end
 
-  defp service_bars(tick) do
-    [
-      %{label: "API", value: wave(tick, 68, 20, 5), color: :cyan},
-      %{label: "Jobs", value: wave(tick, 48, 28, 7), color: :green},
-      %{label: "Cache", value: wave(tick, 35, 15, 4), color: :yellow}
-    ]
-  end
+  defp percentage(memory, key, total), do: round(Map.get(memory, key, 0) * 100 / total)
 
-  defp wave(tick, center, amplitude, period) do
-    center + round(:math.sin(tick / period) * amplitude)
-  end
+  defp format_bytes(bytes) when bytes < 1_024, do: "#{bytes} B"
+  defp format_bytes(bytes) when bytes < 1_048_576, do: "#{Float.round(bytes / 1_024, 1)} KB"
+  defp format_bytes(bytes), do: "#{Float.round(bytes / 1_048_576, 1)} MB"
 end

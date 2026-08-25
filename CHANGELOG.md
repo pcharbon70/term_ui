@@ -9,8 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Added a tested interactive showcase for live widgets, input, rich content,
-  BEAM snapshots, and the TermUI architecture.
+- Added a tested interactive showcase for live BEAM data, widgets, input, rich
+  content, portable control-key navigation, and the TermUI architecture.
 - Added complete raw control-byte input on OTP 28 and OTP 29. A small native
   terminal layer now passes Ctrl+O, Ctrl+C, Ctrl+S, and Ctrl+Q to applications
   and restores the original terminal flags during shutdown.

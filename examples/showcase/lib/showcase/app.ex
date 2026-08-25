@@ -3,11 +3,12 @@ defmodule Showcase.App do
 
   use TermUI.Elm
 
-  alias TermUI.Event.{Key, Resize}
+  alias TermUI.Event.{Key, Resize, Text}
   alias TermUI.{Clipboard, Command, Frame, Style}
+  alias Showcase.{LiveData, SnapshotData}
   alias Showcase.Pages.{Architecture, Beam, Content, Inputs, Overview}
 
-  @tick_interval 500
+  @refresh_interval 1_000
   @pages [
     {:overview, "Overview", Overview},
     {:inputs, "Inputs", Inputs},
@@ -18,35 +19,60 @@ defmodule Showcase.App do
 
   @impl true
   def init(opts) do
+    data_mode = Keyword.get(opts, :data_mode, :live)
+
+    unless data_mode in [:live, :snapshot] do
+      raise ArgumentError, "data_mode must be :live or :snapshot"
+    end
+
     page_states = Map.new(@pages, fn {id, _label, module} -> {id, module.init()} end)
 
     state = %{
+      command_mode: false,
+      data_mode: data_mode,
       dimensions: Keyword.fetch!(opts, :dimensions),
+      last_snapshot: nil,
       page: :overview,
       page_states: page_states,
+      refreshing: data_mode == :live,
       theme: :dark,
-      status: "F1-F5 select a page"
+      status: "Press Escape, then 1 through 5, to select a page"
     }
 
-    {state, [Command.timer(@tick_interval, :tick)]}
+    case data_mode do
+      :live -> {state, [collect_command(self()), refresh_timer()]}
+      :snapshot -> state |> apply_snapshot(SnapshotData.snapshot()) |> snapshot_status()
+    end
   end
 
   @impl true
   def event_to_msg(%Resize{width: width, height: height}, _state),
     do: {:msg, {:resize, width, height}}
 
-  def event_to_msg(%Key{key: key}, _state) when key in [:f1, :f2, :f3, :f4, :f5],
-    do: {:msg, {:select_page, page_for_key(key)}}
+  def event_to_msg(%Key{key: :escape}, _state), do: {:msg, :toggle_command_mode}
 
-  def event_to_msg(%Key{key: :f9}, _state), do: {:msg, :toggle_theme}
-  def event_to_msg(%Key{key: key}, _state) when key in [:f10, :escape], do: {:msg, :quit}
+  def event_to_msg(%Text{text: key}, %{command_mode: true})
+      when key in ["1", "2", "3", "4", "5", "n", "p", "q", "r", "t"],
+      do: {:msg, {:command_key, key}}
+
+  def event_to_msg(%Key{key: key}, %{command_mode: true}) when key in [:left, :right],
+    do: {:msg, {:command_key, key}}
 
   def event_to_msg(%Key{key: key, modifiers: modifiers} = event, _state)
-      when key in ["n", "p", "q", "t"] do
+      when key in [:left, :right] do
+    if :ctrl in modifiers,
+      do: {:msg, arrow_message(key)},
+      else: {:msg, {:page_event, event}}
+  end
+
+  def event_to_msg(%Key{key: key, modifiers: modifiers} = event, _state)
+      when key in ["n", "p", "q", "r", "t"] do
     if :ctrl in modifiers,
       do: {:msg, control_message(key)},
       else: {:msg, {:page_event, event}}
   end
+
+  def event_to_msg(_event, %{command_mode: true}), do: {:msg, :close_command_mode}
 
   def event_to_msg(event, _state), do: {:msg, {:page_event, event}}
 
@@ -59,10 +85,14 @@ defmodule Showcase.App do
   def update(:previous_page, state), do: move_page(state, -1)
   def update(:toggle_theme, state), do: toggle_theme(state)
   def update(:quit, state), do: {state, [Command.shutdown()]}
+  def update(:refresh, state), do: request_refresh(state)
+  def update(:toggle_command_mode, state), do: toggle_command_mode(state)
+  def update(:close_command_mode, state), do: close_command_mode(state)
+  def update({:command_key, key}, state), do: apply_command_key(state, key)
 
-  def update(:tick, state) do
-    {state, _messages} = update_current_page(state, :tick)
-    {state, [Command.timer(@tick_interval, :tick)]}
+  def update(:refresh_timer, state) do
+    {state, commands} = request_refresh(state)
+    {state, commands ++ [refresh_timer()]}
   end
 
   def update({:page_event, event}, state) do
@@ -74,6 +104,16 @@ defmodule Showcase.App do
 
   def update({:clipboard_result, {:error, reason}}, state),
     do: %{state | status: "Clipboard error: #{inspect(reason)}"}
+
+  def update({:live_snapshot, {:ok, snapshot}}, state) do
+    state
+    |> apply_snapshot(snapshot)
+    |> Map.put(:refreshing, false)
+    |> live_status()
+  end
+
+  def update({:live_snapshot, {:error, reason}}, state),
+    do: %{state | refreshing: false, status: "Live refresh failed: #{inspect(reason)}"}
 
   @impl true
   def view(%{dimensions: {width, height}} = state) do
@@ -91,9 +131,9 @@ defmodule Showcase.App do
         )
 
       Frame.new(width, height)
-      |> Frame.put_row(1, header_row(label, state.theme))
+      |> Frame.put_row(1, header_row(label, state.data_mode, state.theme))
       |> Frame.put_row(2, page_row(state.page, state.theme))
-      |> Frame.put_row(height, footer_row(state.status, width))
+      |> Frame.put_row(height, footer_row(state, width))
       |> Frame.overlay(content, 1, 3)
     end
   end
@@ -118,6 +158,9 @@ defmodule Showcase.App do
         {:copy, text}, {commands, _status} ->
           {[Clipboard.copy(text) | commands], "Copy requested"}
 
+        :refresh_requested, {commands, _status} ->
+          {[Command.message(:refresh) | commands], "Refresh requested"}
+
         message, {commands, _status} ->
           {commands, format_message(message)}
       end)
@@ -131,8 +174,11 @@ defmodule Showcase.App do
 
   defp select_page(state, page) do
     case Enum.find(@pages, fn {id, _label, _module} -> id == page end) do
-      nil -> state
-      {_id, label, module} -> %{state | page: page, status: label <> ": " <> module.help()}
+      nil ->
+        state
+
+      {_id, label, module} ->
+        %{state | command_mode: false, page: page, status: label <> ": " <> module.help()}
     end
   end
 
@@ -145,13 +191,14 @@ defmodule Showcase.App do
 
   defp toggle_theme(state) do
     theme = if state.theme == :dark, do: :light, else: :dark
-    %{state | theme: theme, status: "Theme: #{theme}"}
+    %{state | command_mode: false, theme: theme, status: "Theme: #{theme}"}
   end
 
-  defp header_row(label, theme) do
+  defp header_row(label, data_mode, theme) do
     [
       {" TermUI Showcase ", header_style(theme)},
-      {" " <> label, Style.new(fg: accent(theme), attrs: [:bold])}
+      {" #{label} · #{data_mode |> Atom.to_string() |> String.upcase()}",
+       Style.new(fg: accent(theme), attrs: [:bold])}
     ]
   end
 
@@ -164,12 +211,17 @@ defmodule Showcase.App do
           do: Style.new(fg: :black, bg: accent(theme), attrs: [:bold]),
           else: Style.new(fg: :bright_black)
 
-      [{" F#{index} #{label} ", style}, " "]
+      [{" #{index} #{label} ", style}, " "]
     end)
   end
 
-  defp footer_row(status, width) do
-    controls = "F1-F5 page  F9 theme  F10/Esc quit"
+  defp footer_row(%{command_mode: true}, width) do
+    menu = "Choose 1-5 page  N/P next  R refresh  T theme  Q quit  Esc close"
+    [{Frame.fit(menu, width), Style.new(fg: :black, bg: :cyan, attrs: [:bold])}]
+  end
+
+  defp footer_row(%{status: status}, width) do
+    controls = "Esc menu  Ctrl+N/P page  Ctrl+R refresh  Ctrl+Q quit"
     available = max(width - String.length(controls) - 1, 0)
 
     [
@@ -183,16 +235,90 @@ defmodule Showcase.App do
   defp accent(:light), do: :blue
   defp accent(:dark), do: :cyan
 
-  defp page_for_key(:f1), do: :overview
-  defp page_for_key(:f2), do: :inputs
-  defp page_for_key(:f3), do: :content
-  defp page_for_key(:f4), do: :beam
-  defp page_for_key(:f5), do: :architecture
-
   defp control_message("n"), do: :next_page
   defp control_message("p"), do: :previous_page
   defp control_message("q"), do: :quit
+  defp control_message("r"), do: :refresh
   defp control_message("t"), do: :toggle_theme
+
+  defp arrow_message(:left), do: :previous_page
+  defp arrow_message(:right), do: :next_page
+
+  defp toggle_command_mode(%{command_mode: false} = state) do
+    %{
+      state
+      | command_mode: true,
+        status: "Choose 1-5 page, N/P next, R refresh, T theme, or Q quit"
+    }
+  end
+
+  defp toggle_command_mode(state), do: close_command_mode(state)
+
+  defp close_command_mode(state),
+    do: %{state | command_mode: false, status: "Command menu closed"}
+
+  defp apply_command_key(state, key) do
+    state = %{state | command_mode: false}
+
+    case command_message(key) do
+      :refresh -> request_refresh(state)
+      message -> update(message, state)
+    end
+  end
+
+  defp command_message("1"), do: {:select_page, :overview}
+  defp command_message("2"), do: {:select_page, :inputs}
+  defp command_message("3"), do: {:select_page, :content}
+  defp command_message("4"), do: {:select_page, :beam}
+  defp command_message("5"), do: {:select_page, :architecture}
+  defp command_message("n"), do: :next_page
+  defp command_message("p"), do: :previous_page
+  defp command_message("q"), do: :quit
+  defp command_message("r"), do: :refresh
+  defp command_message("t"), do: :toggle_theme
+  defp command_message(:left), do: :previous_page
+  defp command_message(:right), do: :next_page
+
+  defp request_refresh(%{data_mode: :live, refreshing: false} = state),
+    do:
+      {%{state | refreshing: true, status: "Collecting live BEAM data"},
+       [collect_command(self())]}
+
+  defp request_refresh(%{data_mode: :live} = state), do: {state, []}
+
+  defp request_refresh(%{data_mode: :snapshot} = state) do
+    state = state |> apply_snapshot(SnapshotData.snapshot()) |> snapshot_status()
+    {state, []}
+  end
+
+  defp apply_snapshot(state, snapshot) do
+    page_states =
+      state.page_states
+      |> Map.update!(:overview, &Overview.set_snapshot(&1, snapshot))
+      |> Map.update!(:content, &Content.set_snapshot(&1, snapshot))
+      |> Map.update!(:beam, &Beam.set_snapshot(&1, snapshot))
+
+    %{state | last_snapshot: snapshot, page_states: page_states}
+  end
+
+  defp live_status(state) do
+    system = state.last_snapshot.system
+
+    %{
+      state
+      | status:
+          "Live: #{system.process_count} processes, run queue #{system.run_queue}, " <>
+            "#{length(state.last_snapshot.cluster)} nodes"
+    }
+  end
+
+  defp snapshot_status(state), do: %{state | status: "Fixed snapshot mode for tests and docs"}
+
+  defp collect_command(runtime) do
+    Command.async(fn -> LiveData.collect(runtime) end, &{:live_snapshot, &1})
+  end
+
+  defp refresh_timer, do: Command.timer(@refresh_interval, :refresh_timer)
 
   defp format_message({kind, value}) when kind in [:changed, :submit, :selected, :picked],
     do: "#{kind}: #{inspect(value, limit: 3)}"
