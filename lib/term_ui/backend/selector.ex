@@ -3,6 +3,8 @@ defmodule TermUI.Backend.Selector do
 
   require Logger
 
+  alias TermUI.Terminal.RawMode
+
   # OTP types start_interactive/1 as :ok, but it also returns runtime errors
   # such as :already_started. This function must handle those results.
   @dialyzer {:nowarn_function, attempt_raw_mode: 0}
@@ -22,7 +24,10 @@ defmodule TermUI.Backend.Selector do
   @typedoc """
   State returned when raw mode is successfully activated.
   """
-  @type raw_state :: %{raw_mode_started: true}
+  @type raw_state :: %{
+          raw_mode_started: true,
+          raw_mode_session: RawMode.session()
+        }
 
   @typedoc """
   Detected terminal capabilities for TTY mode.
@@ -114,20 +119,14 @@ defmodule TermUI.Backend.Selector do
   @doc false
   @spec attempt_raw_mode() :: {:raw, raw_state()} | {:tty, capabilities()}
   def attempt_raw_mode do
-    case :shell.start_interactive({:noshell, :raw}) do
-      :ok ->
-        # Raw mode successfully activated
-        {:raw, %{raw_mode_started: true}}
+    case RawMode.enter() do
+      {:ok, session} ->
+        {:raw, %{raw_mode_started: true, raw_mode_session: session}}
 
       {:error, :already_started} ->
-        # A shell is already running, fall back to TTY mode
         {:tty, detect_capabilities()}
 
       {:error, reason} ->
-        # Defensive programming: handle unexpected errors from :shell.start_interactive/1.
-        # While OTP 28 documentation only specifies :ok and {:error, :already_started},
-        # we gracefully handle other error conditions for forward compatibility and
-        # robustness. The error reason is preserved in the capabilities map for debugging.
         {:tty, Map.put(detect_capabilities(), :raw_mode_error, reason)}
     end
   end

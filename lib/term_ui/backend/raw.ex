@@ -5,8 +5,10 @@ defmodule TermUI.Backend.Raw do
 
   alias TermUI.{ANSI, Clipboard, Frame}
   alias TermUI.Backend.{EventStream, Renderer}
-  alias TermUI.Terminal.SizeDetector
+  alias TermUI.Terminal.{RawMode, SizeDetector}
   alias TermUI.{TerminalOutput, TermUtils}
+
+  require Logger
 
   @type mouse_mode :: :none | :click | :drag | :all
   @type t :: %__MODULE__{
@@ -20,7 +22,8 @@ defmodule TermUI.Backend.Raw do
           last_frame: Frame.t() | nil,
           bracketed_paste: boolean(),
           focus_events: boolean(),
-          raw_mode_started: boolean()
+          raw_mode_started: boolean(),
+          raw_mode_session: RawMode.session() | nil
         }
 
   @schema Zoi.struct(__MODULE__, %{
@@ -34,7 +37,8 @@ defmodule TermUI.Backend.Raw do
             last_frame: Zoi.any() |> Zoi.default(nil),
             bracketed_paste: Zoi.boolean() |> Zoi.default(true),
             focus_events: Zoi.boolean() |> Zoi.default(true),
-            raw_mode_started: Zoi.boolean() |> Zoi.default(false)
+            raw_mode_started: Zoi.boolean() |> Zoi.default(false),
+            raw_mode_session: Zoi.any() |> Zoi.default(nil)
           })
 
   @enforce_keys Zoi.Struct.enforce_keys(@schema)
@@ -50,7 +54,8 @@ defmodule TermUI.Backend.Raw do
         mouse_mode: Keyword.get(opts, :mouse_tracking, :none),
         bracketed_paste: Keyword.get(opts, :bracketed_paste, true),
         focus_events: Keyword.get(opts, :focus_events, true),
-        raw_mode_started: Keyword.get(opts, :raw_mode_started, false)
+        raw_mode_started: Keyword.get(opts, :raw_mode_started, false),
+        raw_mode_session: Keyword.get(opts, :raw_mode_session)
       }
 
       case TerminalOutput.write(setup_sequence(state, Keyword.get(opts, :hide_cursor, true))) do
@@ -58,7 +63,7 @@ defmodule TermUI.Backend.Raw do
           {:ok, state}
 
         {:error, reason} ->
-          shutdown(state, {:init_failed, reason})
+          cleanup_terminal(state)
           {:error, {:terminal_write_failed, reason}}
       end
     end
@@ -68,18 +73,9 @@ defmodule TermUI.Backend.Raw do
   @spec shutdown(t(), term()) :: :ok
   def shutdown(state, _reason) do
     EventStream.stop(state)
-
-    TerminalOutput.write_to_tty(
-      TerminalOutput.cleanup_sequence(
-        mouse: state.mouse_mode != :none,
-        bracketed_paste: state.bracketed_paste,
-        focus_events: state.focus_events,
-        alternate_screen: state.alternate_screen
-      )
-    )
-
+    cleanup_terminal(state)
     drain_pending_input()
-    if state.raw_mode_started, do: safe_cooked_mode()
+    restore_raw_mode(state)
     :ok
   end
 
@@ -188,6 +184,17 @@ defmodule TermUI.Backend.Raw do
   defp mouse_mode_to_ansi(:drag), do: :button
   defp mouse_mode_to_ansi(:all), do: :all
 
+  defp cleanup_terminal(state) do
+    TerminalOutput.write_to_tty(
+      TerminalOutput.cleanup_sequence(
+        mouse: state.mouse_mode != :none,
+        bracketed_paste: state.bracketed_paste,
+        focus_events: state.focus_events,
+        alternate_screen: state.alternate_screen
+      )
+    )
+  end
+
   defp read_one_byte do
     case IO.getn("", 1) do
       :eof -> :eof
@@ -198,7 +205,20 @@ defmodule TermUI.Backend.Raw do
     end
   end
 
-  defp safe_cooked_mode do
+  defp restore_raw_mode(%{raw_mode_session: session}) when not is_nil(session) do
+    case RawMode.exit(session) do
+      :ok ->
+        :ok
+
+      {:error, reason} ->
+        Logger.warning("TermUI: Raw mode restoration failed: #{inspect(reason)}")
+    end
+  end
+
+  defp restore_raw_mode(%{raw_mode_started: true}), do: restore_legacy_raw_mode()
+  defp restore_raw_mode(_state), do: :ok
+
+  defp restore_legacy_raw_mode do
     _result = :shell.start_interactive({:noshell, :cooked})
     :ok
   rescue

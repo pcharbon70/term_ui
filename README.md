@@ -26,7 +26,9 @@ end
 ```
 
 TermUI uses MDEx to parse Markdown for terminal display. It uses Zoi schemas
-as the source for production struct fields and defaults.
+as the source for production struct fields and defaults. TermUI also builds a
+small C NIF for complete control-key input on OTP 28 and OTP 29. Source builds
+must have a platform C compiler and build tool (`make`, or `nmake` on Windows).
 
 ## Application contract
 

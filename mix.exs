@@ -12,6 +12,9 @@ defmodule TermUI.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       elixirc_paths: elixirc_paths(Mix.env()),
+      compilers: [:elixir_make] ++ Mix.compilers(),
+      make_targets: ["all"],
+      make_clean: ["clean"],
 
       # Hex package
       name: "TermUI",
@@ -66,6 +69,9 @@ defmodule TermUI.MixProject do
       # Public data schemas and struct definitions
       {:zoi, "~> 0.18.7"},
 
+      # Native terminal control for OTP 28 and OTP 29
+      {:elixir_make, "~> 0.9", runtime: false},
+
       # Documentation
       {:ex_doc, "~> 0.31", only: :dev, runtime: false},
       {:doctor, "~> 0.23", only: :dev, runtime: false},
@@ -113,9 +119,12 @@ defmodule TermUI.MixProject do
         "Website" => "https://jido.run"
       },
       files: ~w(
+        c_src
         lib
         mix/tasks
         guides
+        Makefile
+        Makefile.win
         mix.exs
         README.md
         LICENSE

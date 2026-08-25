@@ -7,7 +7,7 @@ defmodule TermUI.Backend.Manager do
   alias TermUI.Backend.{Raw, Selector, TTY}
   alias TermUI.Clipboard.Operation
   alias TermUI.Frame
-  alias TermUI.Terminal.SizeDetector
+  alias TermUI.Terminal.{RawMode, SizeDetector}
 
   @input_poll_timeout 10
   @fast_size_poll_interval 200
@@ -208,7 +208,9 @@ defmodule TermUI.Backend.Manager do
   defp open_backend(:auto, opts) do
     case Selector.select() do
       {:raw, raw_opts} ->
-        start_backend(Raw, Keyword.merge(opts, Map.to_list(raw_opts)), raw?: true)
+        start_backend(Raw, Keyword.merge(opts, Map.to_list(raw_opts)),
+          raw_mode_session: raw_opts.raw_mode_session
+        )
 
       {:tty, capabilities} ->
         start_backend(TTY, Keyword.put(opts, :capabilities, capabilities))
@@ -218,7 +220,9 @@ defmodule TermUI.Backend.Manager do
   defp open_backend(:raw, opts) do
     case Selector.attempt_raw_mode() do
       {:raw, raw_opts} ->
-        start_backend(Raw, Keyword.merge(opts, Map.to_list(raw_opts)), raw?: true)
+        start_backend(Raw, Keyword.merge(opts, Map.to_list(raw_opts)),
+          raw_mode_session: raw_opts.raw_mode_session
+        )
 
       {:tty, capabilities} ->
         {:error,
@@ -422,17 +426,17 @@ defmodule TermUI.Backend.Manager do
   end
 
   defp maybe_restore_raw(opts) do
-    if Keyword.get(opts, :raw?, false) do
-      try do
-        _result = :shell.start_interactive({:noshell, :cooked})
+    case Keyword.get(opts, :raw_mode_session) do
+      nil ->
         :ok
-      rescue
-        _exception -> :ok
-      catch
-        _kind, _reason -> :ok
-      end
-    else
-      :ok
+
+      session ->
+        _result = RawMode.exit(session)
+        :ok
     end
+  rescue
+    _exception -> :ok
+  catch
+    _kind, _reason -> :ok
   end
 end

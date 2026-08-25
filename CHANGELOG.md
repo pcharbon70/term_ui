@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added complete raw control-byte input on OTP 28 and OTP 29. A small native
+  terminal layer now passes Ctrl+O, Ctrl+C, Ctrl+S, and Ctrl+Q to applications
+  and restores the original terminal flags during shutdown.
 - Restored the general widget feature set as parent-owned pure widgets under
   `TermUI.Widget`.
 - Added an MDEx Markdown renderer and scrollable Markdown viewer.

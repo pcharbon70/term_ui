@@ -278,7 +278,7 @@ defmodule TermUI.Backend.SelectorTest do
     test "raw state contains raw_mode_started boolean" do
       # When raw mode succeeds, state should have this key
       # Test the expected structure
-      expected_keys = [:raw_mode_started]
+      expected_keys = [:raw_mode_started, :raw_mode_session]
 
       case Selector.try_raw_mode() do
         {:raw, state} ->
