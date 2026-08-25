@@ -174,6 +174,8 @@ candidate because its input was owned outside the backend contract.
 - [Package quality](guides/package-quality.md)
 - [Removed and deferred features](guides/removed-and-deferred.md)
 - [Migration to 1.0](guides/migration-1.0.md)
+- [Interactive showcase](guides/showcase.md)
+- [Runnable showcase application](examples/showcase/README.md)
 - [Counter example](https://github.com/pcharbon70/term_ui/tree/develop/examples/iex_counter)
 
 ## License

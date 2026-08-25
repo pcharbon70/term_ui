@@ -26,3 +26,16 @@ jobs:
       test_matrix: '[{"otp":"28","elixir":"1.18.4"},{"otp":"28","elixir":"1.19"},{"otp":"28","elixir":"1.20"},{"otp":"29","elixir":"1.20"}]'
       docs_command: mix docs --warnings-as-errors -f html && mix doctor --raise
       test_command: mix coveralls --warnings-as-errors
+
+  showcase:
+    name: Showcase
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: "29"
+          elixir-version: "1.20"
+      - name: Compile and test showcase
+        working-directory: examples/showcase
+        run: mix do deps.get, test

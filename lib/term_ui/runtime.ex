@@ -27,7 +27,7 @@ defmodule TermUI.Runtime do
           app_state: term(),
           backend: module(),
           backend_manager: pid(),
-          logger_token: LoggerControl.token() | nil,
+          logger_token: {reference(), pid()} | nil,
           capabilities: map(),
           dimensions: {pos_integer(), pos_integer()},
           render_interval: pos_integer(),

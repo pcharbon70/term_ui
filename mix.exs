@@ -123,6 +123,11 @@ defmodule TermUI.MixProject do
         lib
         mix/tasks
         guides
+        examples/showcase/README.md
+        examples/showcase/lib
+        examples/showcase/mix.exs
+        examples/showcase/mix.lock
+        examples/showcase/run.exs
         Makefile
         Makefile.win
         mix.exs
@@ -149,6 +154,7 @@ defmodule TermUI.MixProject do
         "guides/architecture.md": [title: "Architecture"],
         "guides/backend.md": [title: "Backend Contract"],
         "guides/widgets.md": [title: "Pure Widgets"],
+        "guides/showcase.md": [title: "Interactive Showcase"],
         "guides/interaction.md": [title: "Clipboard, Selection, and Mouse"],
         "guides/markdown-and-diffs.md": [title: "Markdown and Diffs"],
         "guides/removed-and-deferred.md": [title: "Removed and Deferred Features"],
