@@ -274,7 +274,7 @@ defmodule TermUI.TermUtils do
     end
   catch
     :exit, {:timeout, _} ->
-      # Task was killed due to timeout
+      _result = Task.shutdown(task, :brutal_kill)
       Logger.warning("TermUtils: Command '#{command}' timed out after #{timeout}ms")
       {:error, :timeout}
   end

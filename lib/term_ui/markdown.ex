@@ -10,12 +10,12 @@ defmodule TermUI.Markdown do
 
   alias TermUI.{DisplayWidth, Frame, Style}
   alias TermUI.Markdown.Document
+  alias TermUI.Markdown.Parser
   alias TermUI.Widget.Helpers
 
   # Styles stored in MDEx node spans contain MapSet's opaque representation.
   @dialyzer {:nowarn_function, inline_node: 2}
 
-  @extensions [table: true, strikethrough: true, tasklist: true, autolink: true]
   @plain Style.new()
   @heading1 Style.new(fg: :cyan, attrs: [:bold, :underline])
   @heading2 Style.new(fg: :cyan, attrs: [:bold])
@@ -52,8 +52,7 @@ defmodule TermUI.Markdown do
 
   @doc "Parses Markdown with the supported CommonMark extensions."
   @spec parse(String.t()) :: {:ok, MDEx.Document.t()} | {:error, term()}
-  def parse(markdown) when is_binary(markdown),
-    do: MDEx.parse_document(markdown, extension: @extensions)
+  defdelegate parse(markdown), to: Parser
 
   @doc "Renders Markdown to styled terminal rows."
   @spec render(String.t() | Document.t(), pos_integer(), keyword()) :: [styled_line()]

@@ -8,6 +8,8 @@ defmodule TermUI.Markdown.Document do
   byte limit removes old source, the retained tail is rebuilt once.
   """
 
+  alias TermUI.Markdown.Parser
+
   @type segment :: %{source: String.t(), nodes: [struct()]}
   @type t :: %__MODULE__{
           content: String.t(),
@@ -76,7 +78,7 @@ defmodule TermUI.Markdown.Document do
     do: Enum.reduce(document.segments, 0, &(byte_size(&1.source) + &2))
 
   defp parse_complete(existing, buffer) do
-    case TermUI.Markdown.parse(buffer) do
+    case Parser.parse(buffer) do
       {:ok, %MDEx.Document{nodes: nodes}} when length(nodes) > 1 ->
         pending_node = List.last(nodes)
 

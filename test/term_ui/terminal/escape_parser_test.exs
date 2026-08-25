@@ -336,10 +336,35 @@ defmodule TermUI.Terminal.EscapeParserTest do
       assert remaining == "\e[1;"
     end
 
+    test "returns a partial X10 mouse prefix until its payload is complete" do
+      {events, remaining} = EscapeParser.parse("\e[M")
+
+      assert events == []
+      assert remaining == "\e[M"
+      assert EscapeParser.partial_sequence?(remaining)
+
+      assert {[%Event.Mouse{action: :release, button: nil}], ""} =
+               EscapeParser.parse(remaining <> "#!!")
+    end
+
     test "returns partial SS3 sequence" do
       {events, remaining} = EscapeParser.parse("\eO")
       assert events == []
       assert remaining == "\eO"
+    end
+
+    test "consumes an unsupported complete CSI sequence without emitting its parameters as text" do
+      {events, remaining} = EscapeParser.parse("\e[1;2Hx")
+
+      assert [%Event.Key{key: :unknown}, %Event.Text{text: "x"}] = events
+      assert remaining == ""
+    end
+
+    test "consumes a private CSI sequence without emitting its parameters as text" do
+      {events, remaining} = EscapeParser.parse("\e[?25h")
+
+      assert [%Event.Key{key: :unknown}] = events
+      assert remaining == ""
     end
   end
 
@@ -446,6 +471,23 @@ defmodule TermUI.Terminal.EscapeParserTest do
 
       assert [%TermUI.Event.Mouse{action: :press, button: :left, x: 0, y: 0}] = events
       assert remaining == ""
+    end
+
+    test "parses an X10 button release without inventing a button" do
+      {events, remaining} = EscapeParser.parse("\e[M#!!")
+
+      assert [%TermUI.Event.Mouse{action: :release, button: nil, x: 0, y: 0}] = events
+      assert remaining == ""
+    end
+  end
+
+  describe "parse/1 - SGR mouse input" do
+    test "preserves the released mouse button" do
+      {middle_events, ""} = EscapeParser.parse("\e[<1;5;6m")
+      {right_events, ""} = EscapeParser.parse("\e[<2;7;8m")
+
+      assert [%Event.Mouse{action: :release, button: :middle, x: 4, y: 5}] = middle_events
+      assert [%Event.Mouse{action: :release, button: :right, x: 6, y: 7}] = right_events
     end
   end
 end

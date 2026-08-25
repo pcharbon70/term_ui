@@ -178,9 +178,12 @@ defmodule TermUI.Terminal.EscapeParser do
   defp parse_csi_sequence(<<"O", rest::binary>>), do: {:ok, Event.focus(:lost), rest}
 
   # X10 mouse events: ESC [ M Cb Cx Cy. Each value has an offset of 32.
+  defp parse_csi_sequence(<<"M", rest::binary>>) when byte_size(rest) < 3,
+    do: :incomplete
+
   defp parse_csi_sequence(<<"M", cb, cx, cy, rest::binary>>)
        when cb >= 32 and cx >= 33 and cy >= 33 do
-    event = decode_mouse_event(cb - 32, cx - 32, cy - 32, :press)
+    event = decode_mouse_event(cb - 32, cx - 32, cy - 32, :x10)
     {:ok, event, rest}
   end
 
@@ -260,16 +263,24 @@ defmodule TermUI.Terminal.EscapeParser do
     parse_sgr_mouse(rest)
   end
 
-  # Incomplete CSI sequence - need more bytes
+  # Consume an unsupported CSI sequence through its final byte. Returning the
+  # original input here would parse its parameters as ordinary text.
   defp parse_csi_sequence(input) do
-    # Check if we have a partial number sequence
-    if partial_csi?(input) do
-      :incomplete
-    else
-      # Unknown sequence, skip it
-      {:ok, Event.key(:unknown), input}
+    case consume_unknown_csi(input) do
+      {:ok, rest} -> {:ok, Event.key(:unknown), rest}
+      :incomplete -> :incomplete
     end
   end
+
+  defp consume_unknown_csi(<<>>), do: :incomplete
+
+  defp consume_unknown_csi(<<final, rest::binary>>) when final in 0x40..0x7E,
+    do: {:ok, rest}
+
+  defp consume_unknown_csi(<<byte, rest::binary>>) when byte in 0x20..0x3F,
+    do: consume_unknown_csi(rest)
+
+  defp consume_unknown_csi(<<_invalid, rest::binary>>), do: {:ok, rest}
 
   # SS3 sequence parsing (ESC O)
   defp parse_ss3_sequence(<<>>) do
@@ -329,16 +340,9 @@ defmodule TermUI.Terminal.EscapeParser do
     {:ok, acc, :release, rest}
   end
 
-  defp find_mouse_terminator(<<char, rest::binary>>, acc) when char in [?0..?9, ?;] do
+  defp find_mouse_terminator(<<char, rest::binary>>, acc)
+       when char in ?0..?9 or char == ?; do
     find_mouse_terminator(rest, <<acc::binary, char>>)
-  end
-
-  defp find_mouse_terminator(<<char, rest::binary>>, acc) when char >= ?0 and char <= ?9 do
-    find_mouse_terminator(rest, <<acc::binary, char>>)
-  end
-
-  defp find_mouse_terminator(<<";", rest::binary>>, acc) do
-    find_mouse_terminator(rest, <<acc::binary, ";">>)
   end
 
   defp find_mouse_terminator(_input, _acc), do: :incomplete
@@ -374,17 +378,23 @@ defmodule TermUI.Terminal.EscapeParser do
   end
 
   defp determine_mouse_action(cb, button_code, terminator) do
-    is_scroll = (cb &&& 64) != 0
-    is_motion = (cb &&& 32) != 0
-
     cond do
-      is_scroll and button_code == 0 -> {:scroll_up, nil}
-      is_scroll and button_code == 1 -> {:scroll_down, nil}
-      is_motion and terminator == :press -> {:drag, decode_button(button_code)}
-      terminator == :release -> {:release, :left}
-      true -> {:press, decode_button(button_code)}
+      (cb &&& 64) != 0 -> scroll_action(button_code)
+      (cb &&& 32) != 0 -> motion_action(button_code)
+      true -> button_action(button_code, terminator)
     end
   end
+
+  defp scroll_action(0), do: {:scroll_up, nil}
+  defp scroll_action(1), do: {:scroll_down, nil}
+  defp scroll_action(button_code), do: {:press, decode_button(button_code)}
+
+  defp motion_action(3), do: {:move, nil}
+  defp motion_action(button_code), do: {:drag, decode_button(button_code)}
+
+  defp button_action(button_code, :release), do: {:release, decode_button(button_code)}
+  defp button_action(3, :x10), do: {:release, nil}
+  defp button_action(button_code, _terminator), do: {:press, decode_button(button_code)}
 
   defp extract_mouse_modifiers(cb) do
     []
@@ -402,13 +412,7 @@ defmodule TermUI.Terminal.EscapeParser do
   defp decode_button(2), do: :right
   defp decode_button(_), do: nil
 
-  # Check if input looks like a partial CSI sequence
-  defp partial_csi?(input) do
-    # CSI sequences end with a letter or ~
-    # If we only have numbers and ; so far, it's partial
-    # Also handle SGR mouse sequences that start with <
-    String.match?(input, ~r/^[\d;]*$/) or String.match?(input, ~r/^<[\d;]*$/)
-  end
+  defp partial_csi?(input), do: consume_unknown_csi(input) == :incomplete
 
   # Decode modifier byte (2=shift, 3=alt, 4=shift+alt, 5=ctrl, etc.)
   # Returns a list of modifiers like [:shift, :alt, :ctrl]
@@ -430,6 +434,7 @@ defmodule TermUI.Terminal.EscapeParser do
   @spec partial_sequence?(binary()) :: boolean()
   def partial_sequence?(<<@escape>>), do: true
   def partial_sequence?(<<@escape, "[">>), do: true
+  def partial_sequence?(<<@escape, "[M", rest::binary>>) when byte_size(rest) < 3, do: true
   def partial_sequence?(<<@escape, "[200~", _rest::binary>>), do: true
   def partial_sequence?(<<@escape, "[", rest::binary>>), do: partial_csi?(rest)
   def partial_sequence?(<<@escape, "O">>), do: true

@@ -67,9 +67,10 @@ defmodule TermUI.Frame do
   @spec put_row(t(), pos_integer(), row()) :: t()
   def put_row(%__MODULE__{} = frame, row, content) when row >= 1 and row <= frame.height do
     spans = normalize_spans(content)
+    cells = clear_row(frame.cells, row)
 
     {cells, _column} =
-      Enum.reduce(spans, {frame.cells, 1}, fn {text, style}, {cells, column} ->
+      Enum.reduce(spans, {cells, 1}, fn {text, style}, {cells, column} ->
         write_text(cells, frame.width, row, column, IO.iodata_to_binary(text), style)
       end)
 
@@ -82,7 +83,7 @@ defmodule TermUI.Frame do
   @spec put_cell(t(), pos_integer(), pos_integer(), Cell.t()) :: t()
   def put_cell(%__MODULE__{} = frame, row, column, %Cell{} = cell)
       when row >= 1 and row <= frame.height and column >= 1 and column <= frame.width do
-    cells = put_sparse(frame.cells, {row, column}, normalize_cell(cell))
+    cells = put_bounded_cell(frame.cells, row, column, normalize_cell(cell), frame.width)
     %{frame | cells: cells}
   end
 
@@ -245,21 +246,22 @@ defmodule TermUI.Frame do
           {:halt, {cells, column}}
 
         cell_width == 2 ->
-          cells = put_sparse(cells, {row, column}, cell)
-          cells = put_sparse(cells, {row, column + 1}, Cell.wide_placeholder(cell))
+          cells = put_bounded_cell(cells, row, column, cell, width)
           {:cont, {cells, column + 2}}
 
         true ->
-          {:cont, {put_sparse(cells, {row, column}, cell), column + 1}}
+          {:cont, {put_bounded_cell(cells, row, column, cell, width), column + 1}}
       end
     end)
   end
 
   defp normalize_cells(cells, width, height) when is_map(cells) do
-    Enum.reduce(cells, %{}, fn
+    cells
+    |> Enum.sort_by(&elem(&1, 0))
+    |> Enum.reduce(%{}, fn
       {{row, column}, %Cell{} = cell}, acc
       when row >= 1 and row <= height and column >= 1 and column <= width ->
-        put_sparse(acc, {row, column}, normalize_cell(cell))
+        put_bounded_cell(acc, row, column, normalize_cell(cell), width)
 
       _entry, acc ->
         acc
@@ -279,13 +281,70 @@ defmodule TermUI.Frame do
     if Cell.empty?(cell), do: Map.delete(cells, position), else: Map.put(cells, position, cell)
   end
 
+  defp put_bounded_cell(cells, row, column, %Cell{wide_placeholder: true}, _width) do
+    case Map.get(cells, {row, column - 1}) do
+      %Cell{width: 2, wide_placeholder: false} = primary ->
+        put_sparse(cells, {row, column}, Cell.wide_placeholder(primary))
+
+      _other ->
+        Map.delete(cells, {row, column})
+    end
+  end
+
+  defp put_bounded_cell(cells, row, column, %Cell{width: 2} = cell, width) do
+    cells = clear_cell_footprint(cells, row, column)
+
+    if column < width do
+      cells
+      |> clear_cell_footprint(row, column + 1)
+      |> put_sparse({row, column}, cell)
+      |> put_sparse({row, column + 1}, Cell.wide_placeholder(cell))
+    else
+      cells
+    end
+  end
+
+  defp put_bounded_cell(cells, row, column, %Cell{} = cell, _width) do
+    cells
+    |> clear_cell_footprint(row, column)
+    |> put_sparse({row, column}, cell)
+  end
+
+  defp clear_cell_footprint(cells, row, column) do
+    target = Map.get(cells, {row, column})
+    previous = Map.get(cells, {row, column - 1})
+    target_wide? = wide_primary?(target)
+    previous_wide? = wide_primary?(previous)
+
+    positions =
+      [{row, column}]
+      |> maybe_add_position(target_wide?, {row, column + 1})
+      |> maybe_add_position(previous_wide?, {row, column - 1})
+
+    Map.drop(cells, positions)
+  end
+
+  defp wide_primary?(%Cell{width: 2, wide_placeholder: false}), do: true
+  defp wide_primary?(_cell), do: false
+
+  defp maybe_add_position(positions, true, position), do: [position | positions]
+  defp maybe_add_position(positions, false, _position), do: positions
+
+  defp clear_row(cells, row) do
+    Map.reject(cells, fn {{cell_row, _column}, _cell} -> cell_row == row end)
+  end
+
   defp clear_region(frame, column, row, width, height) do
     positions =
       for target_row <- row..min(row + height - 1, frame.height),
           target_column <- column..min(column + width - 1, frame.width),
           do: {target_row, target_column}
 
-    cells = Enum.reduce(positions, frame.cells, &Map.delete(&2, &1))
+    cells =
+      Enum.reduce(positions, frame.cells, fn {target_row, target_column}, cells ->
+        clear_cell_footprint(cells, target_row, target_column)
+      end)
+
     %{frame | cells: cells}
   end
 

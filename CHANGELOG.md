@@ -28,6 +28,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Process, stream, supervision, and cluster widgets now render data snapshots
   supplied by the parent application. They do not own effect processes.
+- Markdown rendering and incremental documents now share one internal parser
+  dependency, which removes their cross-reference cycle.
+
+### Fixed
+
+- Unsupported terminal control sequences no longer emit their parameter bytes
+  as application text.
+- Frame mutations preserve wide-grapheme pairs and cannot place a wide
+  grapheme past the frame boundary.
+- Timed-out terminal command tasks are now stopped.
+- SGR mouse releases retain their button, and X10 releases are no longer
+  reported as presses.
 
 ## [1.0.0-rc] - 2026-08-19
 

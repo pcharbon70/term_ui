@@ -66,6 +66,21 @@ defmodule TermUI.TermUtilsTest do
       assert {:error, :command_not_allowed} = TermUtils.safe_command("rm", ["-rf", "/"])
       assert {:error, :command_not_allowed} = TermUtils.safe_command("cat", ["/etc/passwd"])
     end
+
+    test "stops the command task after a timeout" do
+      owner = self()
+
+      validate = fn _output ->
+        send(owner, {:validator, self()})
+        Process.sleep(:infinity)
+      end
+
+      assert {:error, :timeout} =
+               TermUtils.safe_test(["-n", "term_ui"], timeout: 250, validate: validate)
+
+      assert_receive {:validator, validator}
+      refute Process.alive?(validator)
+    end
   end
 
   describe "validate_stty_settings/1" do

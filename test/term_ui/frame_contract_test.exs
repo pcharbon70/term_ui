@@ -54,4 +54,46 @@ defmodule TermUI.FrameContractTest do
     assert Frame.row_text(frame, 2) == "x界x"
     assert frame.cursor == {2, 2}
   end
+
+  test "replaces both columns when one half of a wide cell is overwritten" do
+    wide = Frame.from_rows(["界"], 2, 1)
+
+    primary_replaced = Frame.put_cell(wide, 1, 1, Cell.new("a"))
+    placeholder_replaced = Frame.put_cell(wide, 1, 2, Cell.new("b"))
+
+    assert Frame.row_text(primary_replaced, 1) == "a "
+    assert Frame.cells(primary_replaced) == [{{1, 1}, {"a", :default, :default, []}}]
+    assert Frame.diff(wide, primary_replaced) == clear_wide_changes("a")
+
+    assert Frame.row_text(placeholder_replaced, 1) == " b"
+    assert Frame.cells(placeholder_replaced) == [{{1, 2}, {"b", :default, :default, []}}]
+  end
+
+  test "adds a placeholder for a wide cell and rejects a wide cell at the last column" do
+    frame = Frame.new(2, 1)
+    wide = Frame.put_cell(frame, 1, 1, Cell.new("界"))
+    clipped = Frame.put_cell(frame, 1, 2, Cell.new("界"))
+
+    assert %Cell{char: "界", width: 2} = Frame.cell(wide, 1, 1)
+    assert %Cell{wide_placeholder: true} = Frame.cell(wide, 1, 2)
+    assert Frame.row_text(wide, 1) == "界"
+    assert Frame.cells(clipped) == []
+  end
+
+  test "put_row clears old wide-cell data and overlay clears an intersecting wide cell" do
+    wide = Frame.from_rows(["界"], 2, 1)
+
+    assert wide |> Frame.put_row(1, "a") |> Frame.row_text(1) == "a "
+
+    overlaid = Frame.overlay(wide, Frame.new(1, 1), 2, 1)
+    assert Frame.row_text(overlaid, 1) == "  "
+    assert Frame.cells(overlaid) == []
+  end
+
+  defp clear_wide_changes(replacement) do
+    [
+      {{1, 1}, {replacement, :default, :default, []}},
+      {{1, 2}, {" ", :default, :default, []}}
+    ]
+  end
 end
