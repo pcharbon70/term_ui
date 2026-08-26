@@ -91,6 +91,8 @@ defmodule TermUI.Backend.Selector do
 
   require Logger
 
+  alias TermUI.Platform
+
   @typedoc """
   Result of backend selection.
 
@@ -198,21 +200,22 @@ defmodule TermUI.Backend.Selector do
   @doc false
   @spec attempt_raw_mode() :: {:raw, raw_state()} | {:tty, capabilities()}
   def attempt_raw_mode do
-    case :shell.start_interactive({:noshell, :raw}) do
-      :ok ->
-        # Raw mode successfully activated
-        {:raw, %{raw_mode_started: true}}
+    if Platform.native_raw_mode_supported?() do
+      case :shell.start_interactive({:noshell, :raw}) do
+        :ok ->
+          # Raw mode successfully activated
+          {:raw, %{raw_mode_started: true}}
 
-      {:error, :already_started} ->
-        # A shell is already running, fall back to TTY mode
-        {:tty, detect_capabilities()}
+        {:error, :already_started} ->
+          # A shell is already running, fall back to TTY mode
+          {:tty, detect_capabilities()}
 
-      {:error, reason} ->
-        # Defensive programming: handle unexpected errors from :shell.start_interactive/1.
-        # While OTP 28 documentation only specifies :ok and {:error, :already_started},
-        # we gracefully handle other error conditions for forward compatibility and
-        # robustness. The error reason is preserved in the capabilities map for debugging.
-        {:tty, Map.put(detect_capabilities(), :raw_mode_error, reason)}
+        {:error, reason} ->
+          # Preserve unexpected failures in the capabilities map for debugging.
+          {:tty, Map.put(detect_capabilities(), :raw_mode_error, reason)}
+      end
+    else
+      {:tty, detect_capabilities()}
     end
   end
 

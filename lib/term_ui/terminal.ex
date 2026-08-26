@@ -11,6 +11,7 @@ defmodule TermUI.Terminal do
   require Logger
 
   alias TermUI.ANSI
+  alias TermUI.Platform
   alias TermUI.Terminal.SizeDetector
   alias TermUI.Terminal.State
   alias TermUI.TerminalOutput
@@ -207,30 +208,7 @@ defmodule TermUI.Terminal do
     check_previous_crash()
     create_ets_table()
 
-    # Check if raw mode is already active (e.g., activated by Backend.Selector)
-    # We detect this by checking if :shell.start_interactive returns {:error, :already_started}
-    raw_mode_active =
-      try do
-        case :shell.start_interactive({:noshell, :raw}) do
-          :ok ->
-            # Raw mode was just activated, disable it and re-enable via Terminal API
-            # to ensure consistent state management
-            do_disable_raw_mode(nil)
-            :ets.insert(@ets_table, {:raw_mode_active, false})
-            false
-
-          {:error, :already_started} ->
-            # Shell is already in raw mode (activated by Selector or externally)
-            # Mark as active in our state
-            :ets.insert(@ets_table, {:raw_mode_active, true})
-            true
-
-          {:error, _reason} ->
-            false
-        end
-      rescue
-        _ -> false
-      end
+    raw_mode_active = detect_prestarted_raw_mode()
 
     state =
       if raw_mode_active do
@@ -443,42 +421,56 @@ defmodule TermUI.Terminal do
 
   # Private functions
 
+  # Backend.Selector may activate native raw mode before this process starts.
+  # Pre-OTP 28 versions expose :shell.start_interactive/1 but do not implement
+  # the native raw/cooked contract, so they must remain on the TTY path.
+  defp detect_prestarted_raw_mode do
+    if Platform.native_raw_mode_supported?() do
+      try do
+        case :shell.start_interactive({:noshell, :raw}) do
+          :ok ->
+            do_disable_raw_mode(nil)
+            :ets.insert(@ets_table, {:raw_mode_active, false})
+            false
+
+          {:error, :already_started} ->
+            :ets.insert(@ets_table, {:raw_mode_active, true})
+            true
+        end
+      rescue
+        _ -> false
+      end
+    else
+      :ets.insert(@ets_table, {:raw_mode_active, false})
+      false
+    end
+  end
+
   defp do_enable_raw_mode do
     if terminal?() do
       # Save original terminal settings first
       original_settings = save_terminal_settings()
 
       try do
-        # OTP 28 raw mode activation
-        # This sets character-at-a-time mode with no echo
-        case :shell.start_interactive({:noshell, :raw}) do
-          :ok ->
-            # Apply additional stty settings to ensure full raw mode
-            # This guarantees echo is disabled and input is unbuffered
-            apply_stty_raw_settings()
-            {:ok, original_settings}
-
-          {:error, reason} ->
-            # Try stty fallback
-            case apply_stty_raw_settings() do
-              :ok ->
-                {:ok, original_settings}
-
-              {:error, _stty_reason} ->
-                {:error, reason}
-            end
-        end
-      rescue
-        _e in UndefinedFunctionError ->
-          # Not OTP 28+, use stty fallback
-          case apply_stty_raw_settings() do
+        if Platform.native_raw_mode_supported?() do
+          # OTP 28 raw mode activation sets character-at-a-time mode with no echo.
+          case :shell.start_interactive({:noshell, :raw}) do
             :ok ->
+              apply_stty_raw_settings()
               {:ok, original_settings}
 
             {:error, reason} ->
-              {:error,
-               {:otp_version, "OTP 28+ required and stty fallback failed: #{inspect(reason)}"}}
+              case apply_stty_raw_settings() do
+                :ok -> {:ok, original_settings}
+                {:error, _stty_reason} -> {:error, reason}
+              end
           end
+        else
+          enable_raw_mode_with_stty(original_settings)
+        end
+      rescue
+        _e in UndefinedFunctionError ->
+          enable_raw_mode_with_stty(original_settings)
 
         e ->
           {:error, {:raw_mode_failed, Exception.message(e)}}
@@ -488,6 +480,16 @@ defmodule TermUI.Terminal do
       end
     else
       {:error, :not_a_terminal}
+    end
+  end
+
+  defp enable_raw_mode_with_stty(original_settings) do
+    case apply_stty_raw_settings() do
+      :ok ->
+        {:ok, original_settings}
+
+      {:error, reason} ->
+        {:error, {:otp_version, "OTP 28+ required and stty fallback failed: #{inspect(reason)}"}}
     end
   end
 
@@ -525,6 +527,8 @@ defmodule TermUI.Terminal do
   end
 
   defp do_disable_raw_mode(original_settings) do
+    _ = ensure_cooked_mode()
+
     # First try to restore original settings if we have them
     if is_binary(original_settings) and original_settings != "" do
       restore_terminal_settings(original_settings)
@@ -620,7 +624,9 @@ defmodule TermUI.Terminal do
   end
 
   defp ensure_cooked_mode do
-    :shell.start_interactive({:noshell, :cooked})
+    if Platform.native_raw_mode_supported?() do
+      :shell.start_interactive({:noshell, :cooked})
+    end
   rescue
     _ -> :ok
   catch

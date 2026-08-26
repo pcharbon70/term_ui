@@ -297,6 +297,12 @@ defmodule TermUI.Backend.SelectorTest do
       # attempt_raw_mode is exported (doc false) to allow testing the core logic
       assert function_exported?(Selector, :attempt_raw_mode, 0)
     end
+
+    test "selects TTY without touching native shell mode before OTP 28" do
+      if TermUI.Platform.otp_release() < 28 do
+        assert {:tty, _capabilities} = Selector.attempt_raw_mode()
+      end
+    end
   end
 
   describe "raw mode state format" do

@@ -145,6 +145,7 @@ defmodule TermUI.Backend.Raw do
 
   alias TermUI.ANSI
   alias TermUI.Backend.InputBuffer
+  alias TermUI.Platform
   alias TermUI.Renderer.CursorOptimizer
   alias TermUI.Terminal.SizeDetector
   alias TermUI.TerminalOutput
@@ -1518,25 +1519,45 @@ defmodule TermUI.Backend.Raw do
   end
 
   # Drains pending input bytes (e.g. mouse events buffered during shutdown).
-  # Sets stty to non-blocking, reads and discards pending bytes, then restores.
+  # Sets /dev/tty to non-blocking, reads and discards pending bytes, then
+  # restores it. Reading :stdio here can block under pre-OTP 28 I/O servers
+  # when stdin is captured or redirected, even after stty fails.
   defp drain_pending_input do
-    # Set non-blocking read: min 0 chars, timeout 0.1s
-    _ = TermUtils.safe_stty(["min", "0", "time", "1"])
+    case TermUtils.safe_stty(["min", "0", "time", "1"]) do
+      {:ok, _output} ->
+        try do
+          drain_tty_input()
+        after
+          _ = TermUtils.safe_stty(["min", "1", "time", "0"])
+        end
 
-    drain_input_loop(0, 20)
-
-    # Restore blocking read
-    _ = TermUtils.safe_stty(["min", "1", "time", "0"])
+      {:error, _reason} ->
+        :ok
+    end
   rescue
     _ -> :ok
   end
 
-  defp drain_input_loop(iteration, max) when iteration >= max, do: :ok
+  defp drain_tty_input do
+    case File.open("/dev/tty", [:read, :binary]) do
+      {:ok, tty} ->
+        try do
+          drain_input_loop(tty, 0, 20)
+        after
+          File.close(tty)
+        end
 
-  defp drain_input_loop(iteration, max) do
-    case IO.read(:stdio, 64) do
+      {:error, _reason} ->
+        :ok
+    end
+  end
+
+  defp drain_input_loop(_tty, iteration, max) when iteration >= max, do: :ok
+
+  defp drain_input_loop(tty, iteration, max) do
+    case IO.binread(tty, 64) do
       data when is_binary(data) and byte_size(data) > 0 ->
-        drain_input_loop(iteration + 1, max)
+        drain_input_loop(tty, iteration + 1, max)
 
       _ ->
         :ok
@@ -1556,10 +1577,11 @@ defmodule TermUI.Backend.Raw do
 
   # Error-safe cooked mode restoration
   defp safe_cooked_mode do
-    :shell.start_interactive({:noshell, :cooked})
+    if Platform.native_raw_mode_supported?() do
+      :shell.start_interactive({:noshell, :cooked})
+    end
   rescue
     e in UndefinedFunctionError ->
-      # :shell.start_interactive/1 not available (pre-OTP 28)
       Logger.warning(
         "Cooked mode restoration not available (OTP 28+ required): #{Exception.message(e)}"
       )

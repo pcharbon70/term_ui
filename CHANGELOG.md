@@ -45,6 +45,8 @@ rendering, constraint-based layouts, and the complete widget set.
 - Background-color bleeding and overlay rendering artifacts.
 - Elixir 1.18 regular-expression compilation.
 - Safe `stty` execution when no controlling terminal is available.
+- Pre-OTP 28 systems now stay on the TTY/`stty` path instead of invoking the
+  OTP 28 native raw/cooked shell-mode contract.
 - Order-dependent tests, singleton cache lifecycles, documentation links, and
   static-analysis contracts required for a reproducible release build.
 

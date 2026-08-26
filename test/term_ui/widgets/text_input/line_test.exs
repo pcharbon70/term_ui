@@ -531,10 +531,7 @@ defmodule TermUI.Widgets.TextInput.LineTest do
     test "read/1 returns :eof when stream ends" do
       {:ok, state} = Line.init(Line.new(prompt: "> "))
 
-      # CaptureIO doesn't directly support EOF simulation, so we verify
-      # the behavior through LineReader which returns :eof
-      # We test this by verifying the return type specification
-      assert {:eof, _state} = Line.read(state)
+      assert {:eof, _state} = with_eof(fn -> Line.read(state) end)
     end
 
     test "read/1 with validator returns :eof when stream ends" do
@@ -544,22 +541,19 @@ defmodule TermUI.Widgets.TextInput.LineTest do
 
       {:ok, state} = Line.init(Line.new(validator: validator))
 
-      # Verify EOF return type with validator
-      assert {:eof, _state} = Line.read(state)
+      assert {:eof, _state} = with_eof(fn -> Line.read(state) end)
     end
 
     test "handle_focus/1 returns :cancelled on EOF" do
       {:ok, state} = Line.init(Line.new(prompt: "> "))
 
-      # When EOF occurs during handle_focus, it returns :cancelled
-      # (distinct from :eof in direct read/1 calls)
-      assert {:cancelled, _state} = Line.handle_focus(state)
+      assert {:cancelled, _state} = with_eof(fn -> Line.handle_focus(state) end)
     end
 
     test "cancelled state has focused set to false" do
       {:ok, state} = Line.init(Line.new(prompt: "> "))
 
-      {:cancelled, result_state} = Line.handle_focus(state)
+      {:cancelled, result_state} = with_eof(fn -> Line.handle_focus(state) end)
 
       refute result_state.focused
     end
@@ -569,7 +563,7 @@ defmodule TermUI.Widgets.TextInput.LineTest do
       on_blur = fn state -> send(test_pid, {:blurred, state.value}) end
       {:ok, state} = Line.init(Line.new(prompt: "> ", on_blur: on_blur))
 
-      {:cancelled, _result_state} = Line.handle_focus(state)
+      {:cancelled, _result_state} = with_eof(fn -> Line.handle_focus(state) end)
 
       assert_receive {:blurred, ""}
     end
@@ -579,7 +573,7 @@ defmodule TermUI.Widgets.TextInput.LineTest do
 
       {:ok, state} = Line.init(Line.new(validator: validator))
 
-      assert {:cancelled, _state} = Line.handle_focus(state)
+      assert {:cancelled, _state} = with_eof(fn -> Line.handle_focus(state) end)
     end
   end
 
@@ -724,5 +718,16 @@ defmodule TermUI.Widgets.TextInput.LineTest do
       # Value should remain unchanged on validation error
       assert new_state.value == "original"
     end
+  end
+
+  defp with_eof(read) do
+    reference = make_ref()
+
+    capture_io([input: "", capture_prompt: false], fn ->
+      send(self(), {reference, read.()})
+    end)
+
+    assert_receive {^reference, result}
+    result
   end
 end

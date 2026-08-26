@@ -13,6 +13,25 @@ defmodule TermUI.Platform do
   @type platform :: :linux | :macos | :windows | :freebsd | :unknown
   @type version :: {non_neg_integer(), non_neg_integer(), non_neg_integer()} | nil
 
+  @native_raw_mode_otp 28
+
+  @doc "Returns the current major Erlang/OTP release."
+  @spec otp_release() :: non_neg_integer()
+  def otp_release do
+    :otp_release
+    |> :erlang.system_info()
+    |> to_string()
+    |> Integer.parse()
+    |> case do
+      {release, _suffix} -> release
+      :error -> 0
+    end
+  end
+
+  @doc "Returns whether OTP provides TermUI's native Raw backend contract."
+  @spec native_raw_mode_supported?() :: boolean()
+  def native_raw_mode_supported?, do: otp_release() >= @native_raw_mode_otp
+
   @doc """
   Returns the current platform identifier.
 

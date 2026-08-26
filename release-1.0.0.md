@@ -59,11 +59,12 @@ terminal and rendering reports:
 | [#10](https://github.com/pcharbon70/term_ui/issues/10) Docker/GLIBC deployment | Deferred as deployment documentation/tooling rather than a core release defect. |
 | [#9](https://github.com/pcharbon70/term_ui/issues/9) Claude integration discussion | Non-blocking discussion. |
 
-Local automated validation has passed the full test suite across multiple
-seeds, warnings-as-errors compilation, formatting, Credo under the repository's
-current policy, Dialyzer, documentation, dependency checks, Hex retirement
-and vulnerability audits, package-content inspection, and compilation of every
-example. The CI
+Local automated validation has passed the full test suite on both the minimum
+Elixir 1.15/OTP 26 TTY toolchain and the current Elixir 1.19/OTP 28 Raw-capable
+toolchain, warnings-as-errors compilation, formatting, Credo under the
+repository's current policy, Dialyzer, documentation, dependency checks, Hex
+retirement and vulnerability audits, package-content inspection, and
+compilation of every example. The CI
 workflow now exercises the minimum TTY-compatible Elixir/OTP pair, the current
 Raw-compatible pair, quality/package checks, and every example on `main`,
 `develop`, and `release/**`.

@@ -3,6 +3,16 @@ defmodule TermUI.PlatformTest do
 
   alias TermUI.Platform
 
+  describe "OTP capabilities" do
+    test "reports a numeric OTP release" do
+      assert Platform.otp_release() >= 1
+    end
+
+    test "native raw mode requires OTP 28 or later" do
+      assert Platform.native_raw_mode_supported?() == Platform.otp_release() >= 28
+    end
+  end
+
   describe "platform/0" do
     test "returns a valid platform atom" do
       platform = Platform.platform()
