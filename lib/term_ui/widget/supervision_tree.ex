@@ -6,11 +6,7 @@ defmodule TermUI.Widget.SupervisionTree do
   alias TermUI.Widget.TreeView
 
   @type t :: %__MODULE__{tree: TreeView.t()}
-  @schema Zoi.struct(__MODULE__, %{
-            tree: Zoi.struct(TreeView) |> Zoi.default(%TreeView{})
-          })
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  defstruct tree: %TreeView{}
 
   @impl true
   def init(opts),

@@ -28,26 +28,19 @@ defmodule TermUI.Backend.TTY do
           focus_events: boolean()
         }
 
-  @schema Zoi.struct(__MODULE__, %{
-            size: Zoi.tuple({Zoi.integer(), Zoi.integer()}) |> Zoi.default({24, 80}),
-            capabilities: Zoi.map() |> Zoi.default(%{}),
-            line_mode: Zoi.enum([:full_redraw, :incremental]) |> Zoi.default(:full_redraw),
-            character_set: Zoi.enum([:unicode, :ascii]) |> Zoi.default(:unicode),
-            color_mode:
-              Zoi.enum([:true_color, :color_256, :color_16, :monochrome])
-              |> Zoi.default(:true_color),
-            alternate_screen: Zoi.boolean() |> Zoi.default(false),
-            input_buffer: Zoi.string() |> Zoi.default(""),
-            event_queue: Zoi.array() |> Zoi.default([]),
-            paste_state: Zoi.any() |> Zoi.default(nil),
-            input_reader: Zoi.any() |> Zoi.default(nil),
-            rendered_frame: Zoi.any() |> Zoi.default(nil),
-            bracketed_paste: Zoi.boolean() |> Zoi.default(true),
-            focus_events: Zoi.boolean() |> Zoi.default(true)
-          })
-
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  defstruct size: {24, 80},
+            capabilities: %{},
+            line_mode: :full_redraw,
+            character_set: :unicode,
+            color_mode: :true_color,
+            alternate_screen: false,
+            input_buffer: "",
+            event_queue: [],
+            paste_state: nil,
+            input_reader: nil,
+            rendered_frame: nil,
+            bracketed_paste: true,
+            focus_events: true
 
   @impl true
   @spec init(keyword()) :: {:ok, t()} | {:error, term()}

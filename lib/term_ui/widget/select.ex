@@ -30,27 +30,22 @@ defmodule TermUI.Widget.Select do
           disabled_style: Style.t()
         }
 
-  @schema Zoi.struct(__MODULE__, %{
-            id: Zoi.any() |> Zoi.default(nil),
-            options: Zoi.array() |> Zoi.default([]),
-            selected: Zoi.any() |> Zoi.default(nil),
-            cursor: Zoi.integer() |> Zoi.non_negative() |> Zoi.default(0),
-            offset: Zoi.integer() |> Zoi.non_negative() |> Zoi.default(0),
-            page_size: Zoi.integer() |> Zoi.positive() |> Zoi.default(6),
-            open: Zoi.boolean() |> Zoi.default(false),
-            focused: Zoi.boolean() |> Zoi.default(false),
-            disabled: Zoi.boolean() |> Zoi.default(false),
-            placeholder: Zoi.string() |> Zoi.default("Select…"),
-            open_icon: Zoi.string() |> Zoi.default("▲"),
-            closed_icon: Zoi.string() |> Zoi.default("▼"),
-            style: Zoi.struct(Style) |> Zoi.default(%Style{}),
-            focus_style: Zoi.struct(Style) |> Zoi.default(%Style{attrs: MapSet.new([:reverse])}),
-            selected_style: Zoi.struct(Style) |> Zoi.default(%Style{fg: :cyan}),
-            disabled_style: Zoi.struct(Style) |> Zoi.default(%Style{fg: :bright_black})
-          })
-
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  defstruct id: nil,
+            options: [],
+            selected: nil,
+            cursor: 0,
+            offset: 0,
+            page_size: 6,
+            open: false,
+            focused: false,
+            disabled: false,
+            placeholder: "Select…",
+            open_icon: "▲",
+            closed_icon: "▼",
+            style: %Style{},
+            focus_style: %Style{attrs: MapSet.new([:reverse])},
+            selected_style: %Style{fg: :cyan},
+            disabled_style: %Style{fg: :bright_black}
 
   @doc "Creates one select option."
   @spec option(term(), iodata(), keyword()) :: option()

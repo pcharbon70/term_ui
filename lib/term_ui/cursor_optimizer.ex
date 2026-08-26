@@ -7,14 +7,9 @@ defmodule TermUI.CursorOptimizer do
           bytes_saved: non_neg_integer()
         }
 
-  @schema Zoi.struct(__MODULE__, %{
-            row: Zoi.integer() |> Zoi.positive() |> Zoi.default(1),
-            col: Zoi.integer() |> Zoi.positive() |> Zoi.default(1),
-            bytes_saved: Zoi.integer() |> Zoi.non_negative() |> Zoi.default(0)
-          })
-
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  defstruct row: 1,
+            col: 1,
+            bytes_saved: 0
 
   # Cost threshold for using spaces instead of cursor right
   @space_threshold 3

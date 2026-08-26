@@ -35,19 +35,13 @@ defmodule TermUI.Widget.DiffViewer do
           context: non_neg_integer()
         }
 
-  @schema Zoi.struct(__MODULE__, %{
-            rows: Zoi.array() |> Zoi.default([]),
-            mode: Zoi.enum([:unified, :split]) |> Zoi.default(:unified),
-            scroll:
-              Zoi.union([Zoi.integer() |> Zoi.non_negative(), Zoi.literal(:end)])
-              |> Zoi.default(0),
-            page_size: Zoi.integer() |> Zoi.positive() |> Zoi.default(20),
-            old_label: Zoi.string() |> Zoi.default("before"),
-            new_label: Zoi.string() |> Zoi.default("after"),
-            context: Zoi.integer() |> Zoi.non_negative() |> Zoi.default(3)
-          })
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  defstruct rows: [],
+            mode: :unified,
+            scroll: 0,
+            page_size: 20,
+            old_label: "before",
+            new_label: "after",
+            context: 3
 
   @impl true
   def init(opts) do

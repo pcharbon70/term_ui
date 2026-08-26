@@ -14,15 +14,11 @@ defmodule TermUI.Widget.ScrollBar do
           dragging: boolean()
         }
 
-  @schema Zoi.struct(__MODULE__, %{
-            orientation: Zoi.enum([:vertical, :horizontal]) |> Zoi.default(:vertical),
-            content_size: Zoi.integer() |> Zoi.non_negative() |> Zoi.default(0),
-            viewport_size: Zoi.integer() |> Zoi.non_negative() |> Zoi.default(0),
-            offset: Zoi.integer() |> Zoi.non_negative() |> Zoi.default(0),
-            dragging: Zoi.boolean() |> Zoi.default(false)
-          })
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  defstruct orientation: :vertical,
+            content_size: 0,
+            viewport_size: 0,
+            offset: 0,
+            dragging: false
 
   @impl true
   def init(opts) do

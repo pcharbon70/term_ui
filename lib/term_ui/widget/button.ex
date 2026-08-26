@@ -20,23 +20,17 @@ defmodule TermUI.Widget.Button do
           disabled_style: Style.t()
         }
 
-  @schema Zoi.struct(__MODULE__, %{
-            id: Zoi.any() |> Zoi.default(nil),
-            label: Zoi.string() |> Zoi.default("Button"),
-            prefix: Zoi.string() |> Zoi.default(""),
-            suffix: Zoi.string() |> Zoi.default(""),
-            focused: Zoi.boolean() |> Zoi.default(false),
-            pressed: Zoi.boolean() |> Zoi.default(false),
-            disabled: Zoi.boolean() |> Zoi.default(false),
-            message: Zoi.any() |> Zoi.default(nil),
-            style: Zoi.struct(Style) |> Zoi.default(%Style{}),
-            focus_style:
-              Zoi.struct(Style)
-              |> Zoi.default(%Style{fg: :cyan, attrs: MapSet.new([:bold])}),
-            disabled_style: Zoi.struct(Style) |> Zoi.default(%Style{fg: :bright_black})
-          })
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  defstruct id: nil,
+            label: "Button",
+            prefix: "",
+            suffix: "",
+            focused: false,
+            pressed: false,
+            disabled: false,
+            message: nil,
+            style: %Style{},
+            focus_style: %Style{fg: :cyan, attrs: MapSet.new([:bold])},
+            disabled_style: %Style{fg: :bright_black}
 
   @impl true
   def init(opts) do

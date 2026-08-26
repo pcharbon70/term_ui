@@ -14,15 +14,11 @@ defmodule TermUI.Widget.Block do
           border_style: Style.t()
         }
 
-  @schema Zoi.struct(__MODULE__, %{
-            rows: Zoi.array() |> Zoi.default([]),
-            title: Zoi.any() |> Zoi.default(nil),
-            padding: Zoi.integer() |> Zoi.non_negative() |> Zoi.default(0),
-            style: Zoi.struct(Style) |> Zoi.default(%Style{}),
-            border_style: Zoi.struct(Style) |> Zoi.default(%Style{fg: :bright_black})
-          })
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  defstruct rows: [],
+            title: nil,
+            padding: 0,
+            style: %Style{},
+            border_style: %Style{fg: :bright_black}
 
   @impl true
   def init(opts) do

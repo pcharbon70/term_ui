@@ -16,14 +16,9 @@ defmodule TermUI.Theme do
           values: map()
         }
 
-  @schema Zoi.struct(__MODULE__, %{
-            name: Zoi.any() |> Zoi.default(:default),
-            styles: Zoi.map() |> Zoi.default(%{}),
-            values: Zoi.map() |> Zoi.default(%{})
-          })
-
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  defstruct name: :default,
+            styles: %{},
+            values: %{}
 
   @doc "Creates a pure theme value."
   @spec new(keyword()) :: t()

@@ -22,16 +22,12 @@ defmodule TermUI.Widget.TreeView do
           page_size: pos_integer()
         }
 
-  @schema Zoi.struct(__MODULE__, %{
-            nodes: Zoi.array() |> Zoi.default([]),
-            cursor: Zoi.integer() |> Zoi.non_negative() |> Zoi.default(0),
-            offset: Zoi.integer() |> Zoi.non_negative() |> Zoi.default(0),
-            expanded: Zoi.map_set() |> Zoi.default(MapSet.new()),
-            selected: Zoi.map_set() |> Zoi.default(MapSet.new()),
-            page_size: Zoi.integer() |> Zoi.positive() |> Zoi.default(10)
-          })
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  defstruct nodes: [],
+            cursor: 0,
+            offset: 0,
+            expanded: MapSet.new(),
+            selected: MapSet.new(),
+            page_size: 10
 
   @doc "Creates a tree leaf."
   @spec leaf(term(), iodata(), keyword()) :: tree_node()

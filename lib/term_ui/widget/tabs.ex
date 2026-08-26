@@ -21,14 +21,10 @@ defmodule TermUI.Widget.Tabs do
           focused: non_neg_integer(),
           alignment: :left | :center | :right
         }
-  @schema Zoi.struct(__MODULE__, %{
-            tabs: Zoi.array() |> Zoi.default([]),
-            selected: Zoi.integer() |> Zoi.non_negative() |> Zoi.default(0),
-            focused: Zoi.integer() |> Zoi.non_negative() |> Zoi.default(0),
-            alignment: Zoi.enum([:left, :center, :right]) |> Zoi.default(:left)
-          })
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  defstruct tabs: [],
+            selected: 0,
+            focused: 0,
+            alignment: :left
 
   @impl true
   def init(opts) do

@@ -28,16 +28,12 @@ defmodule TermUI.Widget.Menu do
           orientation: :vertical | :horizontal,
           variant: :plain | :line | :filled
         }
-  @schema Zoi.struct(__MODULE__, %{
-            items: Zoi.array() |> Zoi.default([]),
-            cursor: Zoi.integer() |> Zoi.non_negative() |> Zoi.default(0),
-            title: Zoi.any() |> Zoi.default(nil),
-            visible: Zoi.boolean() |> Zoi.default(true),
-            orientation: Zoi.enum([:vertical, :horizontal]) |> Zoi.default(:vertical),
-            variant: Zoi.enum([:plain, :line, :filled]) |> Zoi.default(:plain)
-          })
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  defstruct items: [],
+            cursor: 0,
+            title: nil,
+            visible: true,
+            orientation: :vertical,
+            variant: :plain
 
   @doc "Creates one menu action."
   @spec action(term(), iodata(), keyword()) :: item()

@@ -15,13 +15,9 @@ defmodule TermUI.Widget.ClusterDashboard do
           optional(:uptime) => term()
         }
   @type t :: %__MODULE__{nodes: [snapshot()], tabs: Tabs.t(), table: Table.t()}
-  @schema Zoi.struct(__MODULE__, %{
-            nodes: Zoi.array() |> Zoi.default([]),
-            tabs: Zoi.struct(Tabs) |> Zoi.default(%Tabs{}),
-            table: Zoi.struct(Table) |> Zoi.default(%Table{})
-          })
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  defstruct nodes: [],
+            tabs: %Tabs{},
+            table: %Table{}
 
   @impl true
   def init(opts) do

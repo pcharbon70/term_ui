@@ -34,9 +34,10 @@ Use `TermUI.Selection` for Unicode grapheme ranges. Convert widget
 `{:copy, text}` messages to `TermUI.Clipboard.copy/2` commands. Do not write
 OSC 52 data directly from an application or widget.
 
-TermUI production structs derive fields and defaults from Zoi schemas. Public
-terminal data types expose `schema/0` for explicit validation. Do not validate
-each cell or each widget update in a render loop.
+Use the public Zoi schemas when untrusted data enters a TermUI boundary.
+Boundary data types expose `schema/0`. Private runtime and widget structs do
+not have schemas. Do not validate each cell mutation or widget update in a
+render loop.
 
 For tests, inject a module that implements `TermUI.Backend`. Assert on the
 `TermUI.Frame` values passed to `draw/2`.

@@ -19,16 +19,11 @@ defmodule TermUI.Markdown.Document do
           parsed_segments: non_neg_integer()
         }
 
-  @schema Zoi.struct(__MODULE__, %{
-            content: Zoi.string() |> Zoi.default(""),
-            segments: Zoi.array() |> Zoi.default([]),
-            pending: Zoi.string() |> Zoi.default(""),
-            content_limit: Zoi.integer() |> Zoi.positive() |> Zoi.default(2_000_000),
-            parsed_segments: Zoi.integer() |> Zoi.non_negative() |> Zoi.default(0)
-          })
-
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  defstruct content: "",
+            segments: [],
+            pending: "",
+            content_limit: 2_000_000,
+            parsed_segments: 0
 
   @doc "Creates a bounded incremental document from source text."
   @spec new(String.t(), keyword()) :: t()

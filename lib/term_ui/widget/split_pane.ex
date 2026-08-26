@@ -51,26 +51,19 @@ defmodule TermUI.Widget.SplitPane do
           keyboard_resize: boolean()
         }
 
-  @schema Zoi.struct(__MODULE__, %{
-            first: Zoi.any() |> Zoi.default([]),
-            second: Zoi.any() |> Zoi.default([]),
-            direction: Zoi.enum([:horizontal, :vertical]) |> Zoi.default(:horizontal),
-            ratio: Zoi.number() |> Zoi.gte(0.1) |> Zoi.lte(0.9) |> Zoi.default(0.5),
-            dragging: Zoi.boolean() |> Zoi.default(false),
-            panes: Zoi.array() |> Zoi.default([]),
-            ratios: Zoi.array(Zoi.number()) |> Zoi.default([]),
-            collapsed: Zoi.array() |> Zoi.default([]),
-            drag_separator:
-              Zoi.union([Zoi.integer() |> Zoi.non_negative(), Zoi.literal(nil)])
-              |> Zoi.default(nil),
-            focused_separator: Zoi.integer() |> Zoi.non_negative() |> Zoi.default(0),
-            min_size: Zoi.integer() |> Zoi.positive() |> Zoi.default(1),
-            legacy: Zoi.boolean() |> Zoi.default(true),
-            keyboard_resize: Zoi.boolean() |> Zoi.default(false)
-          })
-
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  defstruct first: [],
+            second: [],
+            direction: :horizontal,
+            ratio: 0.5,
+            dragging: false,
+            panes: [],
+            ratios: [],
+            collapsed: [],
+            drag_separator: nil,
+            focused_separator: 0,
+            min_size: 1,
+            legacy: true,
+            keyboard_resize: false
 
   @impl true
   def init(opts) do

@@ -29,15 +29,11 @@ defmodule TermUI.Widget.Canvas do
           dots: MapSet.t({non_neg_integer(), non_neg_integer()}),
           style: Style.t()
         }
-  @schema Zoi.struct(__MODULE__, %{
-            width: Zoi.integer() |> Zoi.positive() |> Zoi.default(1),
-            height: Zoi.integer() |> Zoi.positive() |> Zoi.default(1),
-            cells: Zoi.map() |> Zoi.default(%{}),
-            dots: Zoi.map_set() |> Zoi.default(MapSet.new()),
-            style: Zoi.struct(Style) |> Zoi.default(%Style{})
-          })
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  defstruct width: 1,
+            height: 1,
+            cells: %{},
+            dots: MapSet.new(),
+            style: %Style{}
 
   @impl true
   def init(opts),

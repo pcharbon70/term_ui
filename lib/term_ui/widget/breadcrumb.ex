@@ -16,18 +16,12 @@ defmodule TermUI.Widget.Breadcrumb do
           separator_style: Style.t()
         }
 
-  @schema Zoi.struct(__MODULE__, %{
-            items: Zoi.array() |> Zoi.default([]),
-            separator: Zoi.string() |> Zoi.default("/"),
-            ellipsis: Zoi.string() |> Zoi.default("…"),
-            style: Zoi.struct(Style) |> Zoi.default(%Style{}),
-            current_style:
-              Zoi.struct(Style) |> Zoi.default(%Style{fg: :cyan, attrs: MapSet.new([:bold])}),
-            separator_style: Zoi.struct(Style) |> Zoi.default(%Style{fg: :bright_black})
-          })
-
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  defstruct items: [],
+            separator: "/",
+            ellipsis: "…",
+            style: %Style{},
+            current_style: %Style{fg: :cyan, attrs: MapSet.new([:bold])},
+            separator_style: %Style{fg: :bright_black}
 
   @doc "Creates one breadcrumb item."
   @spec item(iodata(), keyword()) :: item()

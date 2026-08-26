@@ -17,14 +17,10 @@ defmodule TermUI.Widget.BarChart do
           maximum: number() | nil,
           show_values: boolean()
         }
-  @schema Zoi.struct(__MODULE__, %{
-            data: Zoi.array() |> Zoi.default([]),
-            minimum: Zoi.any() |> Zoi.default(nil),
-            maximum: Zoi.any() |> Zoi.default(nil),
-            show_values: Zoi.boolean() |> Zoi.default(true)
-          })
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  defstruct data: [],
+            minimum: nil,
+            maximum: nil,
+            show_values: true
 
   @impl true
   def init(opts),

@@ -12,14 +12,10 @@ defmodule TermUI.Widget.Label do
           wrap: boolean(),
           style: Style.t()
         }
-  @schema Zoi.struct(__MODULE__, %{
-            text: Zoi.string() |> Zoi.default(""),
-            align: Zoi.enum([:left, :center, :right]) |> Zoi.default(:left),
-            wrap: Zoi.boolean() |> Zoi.default(true),
-            style: Zoi.struct(Style) |> Zoi.default(%Style{})
-          })
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  defstruct text: "",
+            align: :left,
+            wrap: true,
+            style: %Style{}
 
   @impl true
   def init(opts) do

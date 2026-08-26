@@ -23,22 +23,16 @@ defmodule TermUI.Widget.List do
           selected_style: Style.t()
         }
 
-  @schema Zoi.struct(__MODULE__, %{
-            items: Zoi.array() |> Zoi.default([]),
-            cursor: Zoi.integer() |> Zoi.non_negative() |> Zoi.default(0),
-            offset: Zoi.integer() |> Zoi.non_negative() |> Zoi.default(0),
-            selected: Zoi.map_set() |> Zoi.default(MapSet.new()),
-            mode: Zoi.enum([:single, :multiple]) |> Zoi.default(:single),
-            page_size: Zoi.integer() |> Zoi.positive() |> Zoi.default(10),
-            marker: Zoi.string() |> Zoi.default("> "),
-            style: Zoi.struct(Style) |> Zoi.default(%Style{}),
-            cursor_style:
-              Zoi.struct(Style)
-              |> Zoi.default(%Style{fg: :cyan, attrs: MapSet.new([:bold])}),
-            selected_style: Zoi.struct(Style) |> Zoi.default(%Style{fg: :green})
-          })
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  defstruct items: [],
+            cursor: 0,
+            offset: 0,
+            selected: MapSet.new(),
+            mode: :single,
+            page_size: 10,
+            marker: "> ",
+            style: %Style{},
+            cursor_style: %Style{fg: :cyan, attrs: MapSet.new([:bold])},
+            selected_style: %Style{fg: :green}
 
   @impl true
   def init(opts) do

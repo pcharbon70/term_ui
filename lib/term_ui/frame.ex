@@ -25,12 +25,17 @@ defmodule TermUI.Frame do
           cursor: cursor()
         }
 
+  @coordinate_schema Zoi.integer() |> Zoi.positive()
+  @position_schema Zoi.tuple({@coordinate_schema, @coordinate_schema})
+  @cursor_schema Zoi.union([@position_schema, Zoi.literal(nil)])
+
   @schema Zoi.struct(__MODULE__, %{
-            width: Zoi.integer() |> Zoi.positive(),
-            height: Zoi.integer() |> Zoi.positive(),
-            cells: Zoi.map() |> Zoi.default(%{}),
-            cursor: Zoi.any() |> Zoi.default(nil)
+            width: @coordinate_schema |> Zoi.lte(@max_columns),
+            height: @coordinate_schema |> Zoi.lte(@max_rows),
+            cells: Zoi.map(@position_schema, Cell.schema()) |> Zoi.default(%{}),
+            cursor: @cursor_schema |> Zoi.default(nil)
           })
+          |> Zoi.refine({__MODULE__, :validate_schema, []})
 
   @enforce_keys Zoi.Struct.enforce_keys(@schema)
   defstruct Zoi.Struct.struct_fields(@schema)
@@ -38,6 +43,25 @@ defmodule TermUI.Frame do
   @doc "Returns the Zoi schema for complete terminal frames."
   @spec schema() :: Zoi.schema()
   def schema, do: @schema
+
+  @doc false
+  @spec validate_schema(t(), keyword()) :: :ok | {:error, String.t()}
+  def validate_schema(%__MODULE__{} = frame, _opts) do
+    cursor_in_bounds? =
+      case frame.cursor do
+        nil -> true
+        {column, row} -> column <= frame.width and row <= frame.height
+      end
+
+    cells_in_bounds? =
+      Enum.all?(frame.cells, fn {{row, column}, _cell} ->
+        row <= frame.height and column <= frame.width
+      end)
+
+    if cursor_in_bounds? and cells_in_bounds?,
+      do: :ok,
+      else: {:error, "frame cursor and cells must be inside the frame dimensions"}
+  end
 
   @doc "Creates an empty frame."
   @spec new(pos_integer(), pos_integer(), keyword()) :: t()

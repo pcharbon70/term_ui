@@ -26,23 +26,18 @@ defmodule TermUI.Backend.Raw do
           raw_mode_session: RawMode.session() | nil
         }
 
-  @schema Zoi.struct(__MODULE__, %{
-            size: Zoi.tuple({Zoi.integer(), Zoi.integer()}) |> Zoi.default({24, 80}),
-            alternate_screen: Zoi.boolean() |> Zoi.default(true),
-            mouse_mode: Zoi.enum([:none, :click, :drag, :all]) |> Zoi.default(:none),
-            input_buffer: Zoi.string() |> Zoi.default(""),
-            event_queue: Zoi.array() |> Zoi.default([]),
-            paste_state: Zoi.any() |> Zoi.default(nil),
-            input_reader: Zoi.any() |> Zoi.default(nil),
-            last_frame: Zoi.any() |> Zoi.default(nil),
-            bracketed_paste: Zoi.boolean() |> Zoi.default(true),
-            focus_events: Zoi.boolean() |> Zoi.default(true),
-            raw_mode_started: Zoi.boolean() |> Zoi.default(false),
-            raw_mode_session: Zoi.any() |> Zoi.default(nil)
-          })
-
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  defstruct size: {24, 80},
+            alternate_screen: true,
+            mouse_mode: :none,
+            input_buffer: "",
+            event_queue: [],
+            paste_state: nil,
+            input_reader: nil,
+            last_frame: nil,
+            bracketed_paste: true,
+            focus_events: true,
+            raw_mode_started: false,
+            raw_mode_session: nil
 
   @impl true
   @spec init(keyword()) :: {:ok, t()} | {:error, term()}

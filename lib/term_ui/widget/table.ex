@@ -19,16 +19,12 @@ defmodule TermUI.Widget.Table do
           show_header: boolean()
         }
 
-  @schema Zoi.struct(__MODULE__, %{
-            columns: Zoi.array(Zoi.struct(Column)) |> Zoi.default([]),
-            rows: Zoi.array() |> Zoi.default([]),
-            cursor: Zoi.integer() |> Zoi.non_negative() |> Zoi.default(0),
-            offset: Zoi.integer() |> Zoi.non_negative() |> Zoi.default(0),
-            page_size: Zoi.integer() |> Zoi.positive() |> Zoi.default(10),
-            show_header: Zoi.boolean() |> Zoi.default(true)
-          })
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  defstruct columns: [],
+            rows: [],
+            cursor: 0,
+            offset: 0,
+            page_size: 10,
+            show_header: true
 
   @impl true
   def init(opts) do

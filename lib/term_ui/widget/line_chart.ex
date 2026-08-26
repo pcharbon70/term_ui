@@ -11,14 +11,10 @@ defmodule TermUI.Widget.LineChart do
           minimum: number() | nil,
           maximum: number() | nil
         }
-  @schema Zoi.struct(__MODULE__, %{
-            series: Zoi.array() |> Zoi.default([]),
-            colors: Zoi.array(Zoi.atom()) |> Zoi.default([:cyan, :green, :yellow, :magenta]),
-            minimum: Zoi.any() |> Zoi.default(nil),
-            maximum: Zoi.any() |> Zoi.default(nil)
-          })
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  defstruct series: [],
+            colors: [:cyan, :green, :yellow, :magenta],
+            minimum: nil,
+            maximum: nil
 
   @impl true
   def init(opts) do

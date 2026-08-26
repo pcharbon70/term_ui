@@ -22,25 +22,23 @@ defmodule TermUI.Stream.ProducerAdapter do
 
   @overflows [:drop_oldest, :drop_newest, :reject]
 
-  @schema Zoi.struct(__MODULE__, %{
-            consumer: Zoi.any(),
-            consumer_monitor: Zoi.any(),
-            tag: Zoi.atom() |> Zoi.default(:term_ui_stream),
-            limit: Zoi.integer() |> Zoi.positive() |> Zoi.default(1_000),
-            batch_size: Zoi.integer() |> Zoi.positive() |> Zoi.default(25),
-            overflow: Zoi.enum(@overflows) |> Zoi.default(:drop_oldest),
-            buffer: Zoi.array() |> Zoi.default([]),
-            in_flight: Zoi.any() |> Zoi.default(nil),
-            in_flight_count: Zoi.integer() |> Zoi.non_negative() |> Zoi.default(0),
-            paused: Zoi.boolean() |> Zoi.default(false),
-            received_count: Zoi.integer() |> Zoi.non_negative() |> Zoi.default(0),
-            dropped_count: Zoi.integer() |> Zoi.non_negative() |> Zoi.default(0),
-            rejected_count: Zoi.integer() |> Zoi.non_negative() |> Zoi.default(0),
-            producers: Zoi.map() |> Zoi.default(%{})
-          })
-
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  @enforce_keys [:consumer, :consumer_monitor]
+  defstruct [
+    :consumer,
+    :consumer_monitor,
+    tag: :term_ui_stream,
+    limit: 1_000,
+    batch_size: 25,
+    overflow: :drop_oldest,
+    buffer: [],
+    in_flight: nil,
+    in_flight_count: 0,
+    paused: false,
+    received_count: 0,
+    dropped_count: 0,
+    rejected_count: 0,
+    producers: %{}
+  ]
 
   @doc "Starts a producer adapter linked to the caller."
   @spec start_link(keyword()) :: GenServer.on_start()

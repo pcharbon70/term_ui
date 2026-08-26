@@ -15,18 +15,12 @@ defmodule TermUI.Widget.Toast do
           duration: pos_integer() | :infinity,
           elapsed: non_neg_integer()
         }
-  @schema Zoi.struct(__MODULE__, %{
-            id: Zoi.any() |> Zoi.default(nil),
-            message: Zoi.string() |> Zoi.default(""),
-            type: Zoi.enum([:info, :success, :warning, :error]) |> Zoi.default(:info),
-            visible: Zoi.boolean() |> Zoi.default(true),
-            duration:
-              Zoi.union([Zoi.integer() |> Zoi.positive(), Zoi.literal(:infinity)])
-              |> Zoi.default(5_000),
-            elapsed: Zoi.integer() |> Zoi.non_negative() |> Zoi.default(0)
-          })
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  defstruct id: nil,
+            message: "",
+            type: :info,
+            visible: true,
+            duration: 5_000,
+            elapsed: 0
 
   @impl true
   def init(opts),
@@ -81,12 +75,8 @@ defmodule TermUI.Widget.Toast do
     alias TermUI.Widget.Toast
 
     @type t :: %__MODULE__{toasts: [Toast.t()], limit: pos_integer()}
-    @schema Zoi.struct(__MODULE__, %{
-              toasts: Zoi.array(Zoi.struct(Toast)) |> Zoi.default([]),
-              limit: Zoi.integer() |> Zoi.positive() |> Zoi.default(5)
-            })
-    @enforce_keys Zoi.Struct.enforce_keys(@schema)
-    defstruct Zoi.Struct.struct_fields(@schema)
+    defstruct toasts: [],
+              limit: 5
 
     @doc "Creates an empty bounded toast manager."
     @spec new(keyword()) :: t()

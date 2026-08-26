@@ -13,7 +13,7 @@ still contains some older v4 examples.
 | --- | --- |
 | Package identity | README, Hex metadata, guides, and module docs describe the Elm runtime and its use by Jido Console. |
 | Repository files | `AGENTS.md`, `CHANGELOG.md`, `CONTRIBUTING.md`, `LICENSE`, `usage-rules.md`, examples, guides, and environment config files are present. |
-| Public data | Public runtime and widget structs use Zoi schemas. |
+| Public data | Public boundary values use Zoi schemas. Private runtime and widget state uses plain structs. |
 | Quality command | `mix quality` runs format, warning-free compile, xref cycle checks, strict Credo, Dialyzer, and Doctor. |
 | Tests and coverage | `mix coveralls` runs deterministic tests and enforces at least 90% line coverage without excluding production modules. |
 | CI | The v5 shared CI caller tests all supported Elixir lines on OTP 28 or 29. CI also checks audit, docs, package content, and unused dependencies. |

@@ -19,16 +19,12 @@ defmodule TermUI.Widget.LogViewer do
           filter: String.t() | nil,
           page_size: pos_integer()
         }
-  @schema Zoi.struct(__MODULE__, %{
-            entries: Zoi.array() |> Zoi.default([]),
-            limit: Zoi.integer() |> Zoi.positive() |> Zoi.default(10_000),
-            offset: Zoi.integer() |> Zoi.non_negative() |> Zoi.default(0),
-            follow: Zoi.boolean() |> Zoi.default(true),
-            filter: Zoi.any() |> Zoi.default(nil),
-            page_size: Zoi.integer() |> Zoi.positive() |> Zoi.default(20)
-          })
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  defstruct entries: [],
+            limit: 10_000,
+            offset: 0,
+            follow: true,
+            filter: nil,
+            page_size: 20
 
   @impl true
   def init(opts) do

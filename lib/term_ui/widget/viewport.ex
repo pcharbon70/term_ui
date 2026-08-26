@@ -35,17 +35,13 @@ defmodule TermUI.Widget.Viewport do
           visible_rows: Range.t() | nil
         }
 
-  @schema Zoi.struct(__MODULE__, %{
-            rows: Zoi.array() |> Zoi.default([]),
-            scroll_x: Zoi.integer() |> Zoi.non_negative() |> Zoi.default(0),
-            scroll_y: Zoi.integer() |> Zoi.non_negative() |> Zoi.default(0),
-            page_size: Zoi.integer() |> Zoi.positive() |> Zoi.default(10),
-            follow_end: Zoi.boolean() |> Zoi.default(false),
-            scrollbars: Zoi.enum([:none, :vertical, :horizontal, :both]) |> Zoi.default(:none),
-            dragging: Zoi.enum([:vertical, :horizontal, nil]) |> Zoi.default(nil)
-          })
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  defstruct rows: [],
+            scroll_x: 0,
+            scroll_y: 0,
+            page_size: 10,
+            follow_end: false,
+            scrollbars: :none,
+            dragging: nil
 
   @impl true
   def init(opts) do

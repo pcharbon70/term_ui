@@ -16,16 +16,11 @@ defmodule TermUI.Focus do
           active: boolean()
         }
 
-  @schema Zoi.struct(__MODULE__, %{
-            order: Zoi.array() |> Zoi.default([]),
-            current: Zoi.any() |> Zoi.default(nil),
-            disabled: Zoi.array() |> Zoi.default([]),
-            wrap: Zoi.boolean() |> Zoi.default(true),
-            active: Zoi.boolean() |> Zoi.default(true)
-          })
-
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  defstruct order: [],
+            current: nil,
+            disabled: [],
+            wrap: true,
+            active: true
 
   @doc "Creates focus state from ids or `%{id: id, disabled: boolean}` entries."
   @spec new(Enumerable.t(), keyword()) :: t()

@@ -14,16 +14,11 @@ defmodule TermUI.Widget.Spinner do
           style: Style.t()
         }
 
-  @schema Zoi.struct(__MODULE__, %{
-            frames: Zoi.array(Zoi.string()) |> Zoi.default([]),
-            phase: Zoi.integer() |> Zoi.non_negative() |> Zoi.default(0),
-            label: Zoi.string() |> Zoi.default(""),
-            character_set: Zoi.enum([:unicode, :ascii]) |> Zoi.default(:unicode),
-            style: Zoi.struct(Style) |> Zoi.default(%Style{})
-          })
-
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  defstruct frames: [],
+            phase: 0,
+            label: "",
+            character_set: :unicode,
+            style: %Style{}
 
   @impl true
   def init(opts) do

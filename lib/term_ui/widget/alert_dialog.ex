@@ -7,12 +7,8 @@ defmodule TermUI.Widget.AlertDialog do
 
   @type alert_type :: :info | :warning | :error | :confirm
   @type t :: %__MODULE__{type: alert_type(), dialog: Dialog.t()}
-  @schema Zoi.struct(__MODULE__, %{
-            type: Zoi.enum([:info, :warning, :error, :confirm]) |> Zoi.default(:info),
-            dialog: Zoi.struct(Dialog) |> Zoi.default(%Dialog{})
-          })
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  defstruct type: :info,
+            dialog: %Dialog{}
 
   @impl true
   def init(opts) do

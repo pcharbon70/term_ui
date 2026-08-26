@@ -21,16 +21,11 @@ defmodule TermUI.Shortcut do
 
   @named_keys ~w(backspace tab enter escape up down left right home end page_up page_down insert delete space)a
 
-  @schema Zoi.struct(__MODULE__, %{
-            bindings: Zoi.array() |> Zoi.default([]),
-            pending: Zoi.array() |> Zoi.default([]),
-            timeout_ms: Zoi.integer() |> Zoi.positive() |> Zoi.default(1_000),
-            last_timestamp: Zoi.any() |> Zoi.default(nil),
-            enabled: Zoi.boolean() |> Zoi.default(true)
-          })
-
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  defstruct bindings: [],
+            pending: [],
+            timeout_ms: 1_000,
+            last_timestamp: nil,
+            enabled: true
 
   @doc "Creates shortcut routing state from `{shortcut, message}` bindings."
   @spec new(Enumerable.t(), keyword()) :: t()

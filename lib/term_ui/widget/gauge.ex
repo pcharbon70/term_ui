@@ -14,16 +14,12 @@ defmodule TermUI.Widget.Gauge do
           orientation: :horizontal | :vertical,
           zones: [{number(), atom()}]
         }
-  @schema Zoi.struct(__MODULE__, %{
-            value: Zoi.number() |> Zoi.default(0),
-            minimum: Zoi.number() |> Zoi.default(0),
-            maximum: Zoi.number() |> Zoi.default(100),
-            label: Zoi.any() |> Zoi.default(nil),
-            orientation: Zoi.enum([:horizontal, :vertical]) |> Zoi.default(:horizontal),
-            zones: Zoi.array() |> Zoi.default([{0.8, :red}, {0.6, :yellow}, {0.0, :green}])
-          })
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  defstruct value: 0,
+            minimum: 0,
+            maximum: 100,
+            label: nil,
+            orientation: :horizontal,
+            zones: [{0.8, :red}, {0.6, :yellow}, {0.0, :green}]
 
   @impl true
   def init(opts),

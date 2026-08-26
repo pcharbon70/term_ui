@@ -20,16 +20,12 @@ defmodule TermUI.Widget.Dialog do
           visible: boolean(),
           dismiss_message: term()
         }
-  @schema Zoi.struct(__MODULE__, %{
-            title: Zoi.string() |> Zoi.default(""),
-            content: Zoi.array() |> Zoi.default([]),
-            buttons: Zoi.array() |> Zoi.default([]),
-            focused: Zoi.integer() |> Zoi.non_negative() |> Zoi.default(0),
-            visible: Zoi.boolean() |> Zoi.default(true),
-            dismiss_message: Zoi.any() |> Zoi.default(:dismissed)
-          })
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  defstruct title: "",
+            content: [],
+            buttons: [],
+            focused: 0,
+            visible: true,
+            dismiss_message: :dismissed
 
   @impl true
   def init(opts) do

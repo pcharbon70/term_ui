@@ -6,16 +6,8 @@ defmodule TermUI.Widget.ContextMenu do
   alias TermUI.Widget.Menu
 
   @type t :: %__MODULE__{menu: Menu.t(), position: {non_neg_integer(), non_neg_integer()}}
-  @schema Zoi.struct(__MODULE__, %{
-            menu: Zoi.struct(Menu) |> Zoi.default(%Menu{}),
-            position:
-              Zoi.tuple(
-                {Zoi.integer() |> Zoi.non_negative(), Zoi.integer() |> Zoi.non_negative()}
-              )
-              |> Zoi.default({0, 0})
-          })
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  defstruct menu: %Menu{},
+            position: {0, 0}
 
   defdelegate action(id, label, opts \\ []), to: Menu
   defdelegate separator(), to: Menu

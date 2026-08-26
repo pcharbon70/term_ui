@@ -14,15 +14,11 @@ defmodule TermUI.Widget.PickList do
           prompt: String.t()
         }
 
-  @schema Zoi.struct(__MODULE__, %{
-            items: Zoi.array() |> Zoi.default([]),
-            query: Zoi.string() |> Zoi.default(""),
-            cursor: Zoi.integer() |> Zoi.non_negative() |> Zoi.default(0),
-            page_size: Zoi.integer() |> Zoi.positive() |> Zoi.default(8),
-            prompt: Zoi.string() |> Zoi.default("Filter: ")
-          })
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  defstruct items: [],
+            query: "",
+            cursor: 0,
+            page_size: 8,
+            prompt: "Filter: "
 
   @impl true
   def init(opts) do

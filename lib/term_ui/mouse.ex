@@ -43,17 +43,12 @@ defmodule TermUI.Mouse.Tracker do
           drag_threshold: non_neg_integer()
         }
 
-  @schema Zoi.struct(__MODULE__, %{
-            button_down: Zoi.enum([:left, :middle, :right, nil]) |> Zoi.default(nil),
-            press_position: Zoi.any() |> Zoi.default(nil),
-            last_position: Zoi.any() |> Zoi.default(nil),
-            dragging: Zoi.boolean() |> Zoi.default(false),
-            hovered: Zoi.any() |> Zoi.default(nil),
-            drag_threshold: Zoi.integer() |> Zoi.non_negative() |> Zoi.default(1)
-          })
-
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  defstruct button_down: nil,
+            press_position: nil,
+            last_position: nil,
+            dragging: false,
+            hovered: nil,
+            drag_threshold: 1
 
   @doc "Creates tracker state. The drag threshold is measured in terminal cells."
   @spec new(keyword()) :: t()
@@ -179,8 +174,8 @@ defmodule TermUI.Mouse do
       y: y,
       width: width,
       height: height,
-      z_index: Keyword.get(opts, :z_index, 0),
-      metadata: Keyword.get(opts, :metadata, %{})
+      z_index: region_z_index!(opts),
+      metadata: region_metadata!(opts)
     }
   end
 
@@ -265,5 +260,19 @@ defmodule TermUI.Mouse do
         true -> current
       end
     end)
+  end
+
+  defp region_z_index!(opts) do
+    case Keyword.get(opts, :z_index, 0) do
+      z_index when is_integer(z_index) -> z_index
+      _other -> raise ArgumentError, "mouse region z_index must be an integer"
+    end
+  end
+
+  defp region_metadata!(opts) do
+    case Keyword.get(opts, :metadata, %{}) do
+      metadata when is_map(metadata) -> metadata
+      _other -> raise ArgumentError, "mouse region metadata must be a map"
+    end
   end
 end

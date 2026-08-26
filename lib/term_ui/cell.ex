@@ -31,7 +31,7 @@ defmodule TermUI.Cell do
   # defstruct defaults.
   @dialyzer {:nowarn_function, empty: 0}
 
-  @type color :: :default | atom() | 0..255 | {0..255, 0..255, 0..255}
+  @type color :: TermUI.Style.named_color() | 0..255 | {0..255, 0..255, 0..255}
 
   @type attribute ::
           :bold | :dim | :italic | :underline | :blink | :reverse | :hidden | :strikethrough
@@ -44,22 +44,6 @@ defmodule TermUI.Cell do
           width: 0 | 1 | 2,
           wide_placeholder: boolean()
         }
-
-  @schema Zoi.struct(__MODULE__, %{
-            char: Zoi.string() |> Zoi.default(" "),
-            fg: Zoi.any() |> Zoi.default(:default),
-            bg: Zoi.any() |> Zoi.default(:default),
-            attrs: Zoi.map_set(Zoi.atom()) |> Zoi.default(MapSet.new()),
-            width: Zoi.enum([0, 1, 2]) |> Zoi.default(1),
-            wide_placeholder: Zoi.boolean() |> Zoi.default(false)
-          })
-
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
-
-  @doc "Returns the Zoi schema for terminal cells."
-  @spec schema() :: Zoi.schema()
-  def schema, do: @schema
 
   @valid_attributes [:bold, :dim, :italic, :underline, :blink, :reverse, :hidden, :strikethrough]
 
@@ -81,6 +65,51 @@ defmodule TermUI.Cell do
     :bright_cyan,
     :bright_white
   ]
+
+  @color_channel Zoi.integer() |> Zoi.gte(0) |> Zoi.lte(255)
+  @color_schema Zoi.union([
+                  Zoi.enum([:default | @named_colors]),
+                  @color_channel,
+                  Zoi.tuple({@color_channel, @color_channel, @color_channel})
+                ])
+
+  @schema Zoi.struct(__MODULE__, %{
+            char: Zoi.string() |> Zoi.default(" "),
+            fg: @color_schema |> Zoi.default(:default),
+            bg: @color_schema |> Zoi.default(:default),
+            attrs:
+              Zoi.map_set(Zoi.enum(@valid_attributes))
+              |> Zoi.default(MapSet.new()),
+            width: Zoi.enum([0, 1, 2]) |> Zoi.default(1),
+            wide_placeholder: Zoi.boolean() |> Zoi.default(false)
+          })
+          |> Zoi.refine({__MODULE__, :validate_schema, []})
+
+  @enforce_keys Zoi.Struct.enforce_keys(@schema)
+  defstruct Zoi.Struct.struct_fields(@schema)
+
+  @doc "Returns the Zoi schema for terminal cells."
+  @spec schema() :: Zoi.schema()
+  def schema, do: @schema
+
+  @doc false
+  @spec validate_schema(t(), keyword()) :: :ok | {:error, String.t()}
+  def validate_schema(%__MODULE__{char: "", width: 0, wide_placeholder: true}, _opts), do: :ok
+
+  def validate_schema(%__MODULE__{char: char, width: width, wide_placeholder: false}, _opts) do
+    case String.graphemes(char) do
+      [_grapheme] ->
+        if width in [1, 2] and width == calculate_width(char),
+          do: :ok,
+          else: {:error, "cell character, width, and placeholder fields are inconsistent"}
+
+      _other ->
+        {:error, "cell character, width, and placeholder fields are inconsistent"}
+    end
+  end
+
+  def validate_schema(%__MODULE__{}, _opts),
+    do: {:error, "cell character, width, and placeholder fields are inconsistent"}
 
   @doc """
   Creates a new cell with the given character and optional styling.

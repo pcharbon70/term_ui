@@ -66,7 +66,7 @@ defmodule TermUI.MixProject do
       # Markdown parsing
       {:mdex, "~> 0.13.5"},
 
-      # Public data schemas and struct definitions
+      # Public boundary data schemas and struct definitions
       {:zoi, "~> 0.18.7"},
 
       # Native terminal control for OTP 28 and OTP 29

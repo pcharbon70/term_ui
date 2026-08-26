@@ -16,19 +16,13 @@ defmodule TermUI.Widget.MarkdownViewer do
           document: Document.t()
         }
 
-  @schema Zoi.struct(__MODULE__, %{
-            content: Zoi.string() |> Zoi.default(""),
-            scroll:
-              Zoi.union([Zoi.integer() |> Zoi.non_negative(), Zoi.literal(:end)])
-              |> Zoi.default(0),
-            page_size: Zoi.integer() |> Zoi.positive() |> Zoi.default(20),
-            elements: Zoi.array() |> Zoi.default([]),
-            focused: Zoi.integer() |> Zoi.non_negative() |> Zoi.default(0),
-            content_limit: Zoi.integer() |> Zoi.positive() |> Zoi.default(2_000_000),
-            document: Zoi.struct(Document) |> Zoi.default(%Document{})
-          })
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  defstruct content: "",
+            scroll: 0,
+            page_size: 20,
+            elements: [],
+            focused: 0,
+            content_limit: 2_000_000,
+            document: %Document{}
 
   @impl true
   def init(opts) do

@@ -14,15 +14,11 @@ defmodule TermUI.Widget.Sparkline do
           style: Style.t(),
           label: String.t() | nil
         }
-  @schema Zoi.struct(__MODULE__, %{
-            values: Zoi.array(Zoi.number()) |> Zoi.default([]),
-            minimum: Zoi.any() |> Zoi.default(nil),
-            maximum: Zoi.any() |> Zoi.default(nil),
-            style: Zoi.struct(Style) |> Zoi.default(%Style{fg: :cyan}),
-            label: Zoi.any() |> Zoi.default(nil)
-          })
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  defstruct values: [],
+            minimum: nil,
+            maximum: nil,
+            style: %Style{fg: :cyan},
+            label: nil
 
   @impl true
   def init(opts),

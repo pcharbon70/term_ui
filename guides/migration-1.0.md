@@ -26,9 +26,10 @@ The widget feature set is available under the singular namespace. For example,
 `TermUI.Widgets.MarkdownViewer` becomes `TermUI.Widget.MarkdownViewer`.
 Widgets now return `TermUI.Frame` and never require a component PID.
 
-Production structs now derive their fields and defaults from Zoi schemas.
-Direct struct update syntax still works. Use the public `schema/0` functions
-when data enters TermUI from an external source.
+Public boundary structs derive their fields and defaults from Zoi schemas.
+Private runtime and widget state uses plain structs. Direct struct update
+syntax still works. Use the public `schema/0` functions when untrusted data
+enters TermUI from an external source.
 
 ## Required application changes
 

@@ -54,15 +54,22 @@ start a service for them.
 
 ## Data schemas
 
-All explicit production structs derive their fields and defaults from Zoi
-schemas. This rule prevents differences between a schema, a type, and a
-`defstruct` declaration.
+Zoi schemas define public data that can cross an application, runtime,
+backend, or configuration boundary. The schema is the source of the struct
+fields, defaults, and enforced keys for these boundary values.
 
-TermUI does not parse every frame or widget state through Zoi. Frame creation,
-cell updates, and widget updates are hot paths. Constructors and guards keep
-these paths small. `TermUI.Cell`, `TermUI.Style`, `TermUI.Frame`,
-`TermUI.Event`, `TermUI.Command`, and `TermUI.Widget.Table.Column` expose a
-`schema/0` function when an application needs explicit boundary validation.
+`TermUI.Cell`, `TermUI.Style`, `TermUI.Frame`, `TermUI.Event`,
+`TermUI.Command`, `TermUI.Clipboard.Operation`, `TermUI.Mouse.Region`,
+`TermUI.Selection`, and `TermUI.Widget.Table.Column` expose `schema/0` for
+explicit validation. Frame and command schemas also validate their nested
+boundary data.
+
+Private backend state, parser state, stream delivery state, and parent-owned
+widget state use plain structs. They are not serialization or trust
+boundaries, so a Zoi schema adds no useful contract. TermUI does not parse each
+frame mutation or widget update through Zoi. Constructors and guards keep
+these hot paths small. Applications must parse untrusted external data before
+they use it as a boundary value.
 
 ## Frame
 

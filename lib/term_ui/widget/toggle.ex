@@ -20,22 +20,17 @@ defmodule TermUI.Widget.Toggle do
           disabled_style: Style.t()
         }
 
-  @schema Zoi.struct(__MODULE__, %{
-            id: Zoi.any() |> Zoi.default(nil),
-            label: Zoi.string() |> Zoi.default(""),
-            checked: Zoi.boolean() |> Zoi.default(false),
-            focused: Zoi.boolean() |> Zoi.default(false),
-            disabled: Zoi.boolean() |> Zoi.default(false),
-            on_text: Zoi.string() |> Zoi.default("ON"),
-            off_text: Zoi.string() |> Zoi.default("OFF"),
-            style: Zoi.struct(Style) |> Zoi.default(%Style{}),
-            on_style: Zoi.struct(Style) |> Zoi.default(%Style{fg: :green}),
-            focus_style: Zoi.struct(Style) |> Zoi.default(%Style{attrs: MapSet.new([:reverse])}),
-            disabled_style: Zoi.struct(Style) |> Zoi.default(%Style{fg: :bright_black})
-          })
-
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  defstruct id: nil,
+            label: "",
+            checked: false,
+            focused: false,
+            disabled: false,
+            on_text: "ON",
+            off_text: "OFF",
+            style: %Style{},
+            on_style: %Style{fg: :green},
+            focus_style: %Style{attrs: MapSet.new([:reverse])},
+            disabled_style: %Style{fg: :bright_black}
 
   @impl true
   def init(opts) do

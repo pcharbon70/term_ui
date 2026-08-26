@@ -13,15 +13,11 @@ defmodule TermUI.Widget.LineInput do
           validator: (String.t() -> :ok | {:error, String.t()}) | nil,
           error: String.t() | nil
         }
-  @schema Zoi.struct(__MODULE__, %{
-            label: Zoi.any() |> Zoi.default(nil),
-            prompt: Zoi.string() |> Zoi.default("> "),
-            input: Zoi.struct(TextInput) |> Zoi.default(%TextInput{}),
-            validator: Zoi.any() |> Zoi.default(nil),
-            error: Zoi.any() |> Zoi.default(nil)
-          })
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  defstruct label: nil,
+            prompt: "> ",
+            input: %TextInput{},
+            validator: nil,
+            error: nil
 
   @impl true
   def init(opts),

@@ -26,11 +26,12 @@ defmodule TermUI.Widget.Table.Column do
   @doc "Creates a column definition."
   @spec new(term(), iodata(), keyword()) :: t()
   def new(key, label, opts \\ []) do
-    %__MODULE__{
+    @schema
+    |> Zoi.parse!(%__MODULE__{
       key: key,
       label: IO.iodata_to_binary(label),
       width: Keyword.get(opts, :width, :auto),
       align: Keyword.get(opts, :align, :left)
-    }
+    })
   end
 end

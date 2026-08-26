@@ -23,8 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added an MDEx Markdown renderer and scrollable Markdown viewer.
 - Added unified and side-by-side terminal diff views.
 - Added frame overlay composition for widget frames.
-- Added Zoi schemas as the source for all production struct fields and defaults.
-- Added public schemas for cells, styles, frames, events, commands, and table columns.
+- Added Zoi schemas for public boundary data, including cells, styles, frames,
+  events, commands, clipboard operations, mouse regions, selections, and table
+  columns.
 - Added bounded clipboard commands that run through the serialized backend owner.
 - Added pure Unicode grapheme selection for single-line and multiline text input.
 - Added pure mouse regions, local-coordinate routing, hover state, and drag tracking.
@@ -32,6 +33,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Private backend, parser, stream, and widget state now uses plain structs.
+  Zoi remains at public data boundaries instead of defining every struct.
+- Boundary schemas now validate colors, cell invariants, frame bounds, nested
+  cells, and command payloads.
 - Process, stream, supervision, and cluster widgets now render data snapshots
   supplied by the parent application. They do not own effect processes.
 - Markdown rendering and incremental documents now share one internal parser

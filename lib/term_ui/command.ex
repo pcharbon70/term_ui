@@ -29,13 +29,40 @@ defmodule TermUI.Command do
           | clipboard_command()
           | shutdown_command()
 
-  @schema Zoi.struct(__MODULE__, %{
-            kind: Zoi.enum([:message, :send, :timer, :async, :clipboard, :shutdown]),
-            value: Zoi.any()
-          })
+  @struct_schema Zoi.struct(__MODULE__, %{
+                   kind: Zoi.enum([:message, :send, :timer, :async, :clipboard, :shutdown]),
+                   value: Zoi.any()
+                 })
 
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  @enforce_keys Zoi.Struct.enforce_keys(@struct_schema)
+  defstruct Zoi.Struct.struct_fields(@struct_schema)
+
+  @schema Zoi.union([
+            Zoi.struct(__MODULE__, %{
+              kind: Zoi.literal(:message),
+              value: Zoi.any()
+            }),
+            Zoi.struct(__MODULE__, %{
+              kind: Zoi.literal(:send),
+              value: Zoi.tuple({Zoi.pid(), Zoi.any()})
+            }),
+            Zoi.struct(__MODULE__, %{
+              kind: Zoi.literal(:timer),
+              value: Zoi.tuple({Zoi.integer() |> Zoi.non_negative(), Zoi.any()})
+            }),
+            Zoi.struct(__MODULE__, %{
+              kind: Zoi.literal(:async),
+              value: Zoi.tuple({Zoi.function(arity: 0), Zoi.function(arity: 1)})
+            }),
+            Zoi.struct(__MODULE__, %{
+              kind: Zoi.literal(:clipboard),
+              value: Zoi.tuple({TermUI.Clipboard.Operation.schema(), Zoi.function(arity: 1)})
+            }),
+            Zoi.struct(__MODULE__, %{
+              kind: Zoi.literal(:shutdown),
+              value: Zoi.any()
+            })
+          ])
 
   @doc "Returns the Zoi schema for runtime commands."
   @spec schema() :: Zoi.schema()

@@ -33,20 +33,16 @@ defmodule TermUI.Widget.Stream do
 
   @overflows [:drop_oldest, :drop_newest, :reject]
 
-  @schema Zoi.struct(__MODULE__, %{
-            items: Zoi.array() |> Zoi.default([]),
-            limit: Zoi.integer() |> Zoi.positive() |> Zoi.default(1_000),
-            paused: Zoi.boolean() |> Zoi.default(false),
-            offset: Zoi.integer() |> Zoi.non_negative() |> Zoi.default(0),
-            page_size: Zoi.integer() |> Zoi.positive() |> Zoi.default(20),
-            formatter: Zoi.function() |> Zoi.default(&__MODULE__.default_format/1),
-            overflow: Zoi.enum(@overflows) |> Zoi.default(:drop_oldest),
-            received_count: Zoi.integer() |> Zoi.non_negative() |> Zoi.default(0),
-            dropped_count: Zoi.integer() |> Zoi.non_negative() |> Zoi.default(0),
-            rejected_count: Zoi.integer() |> Zoi.non_negative() |> Zoi.default(0)
-          })
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  defstruct items: [],
+            limit: 1_000,
+            paused: false,
+            offset: 0,
+            page_size: 20,
+            formatter: &__MODULE__.default_format/1,
+            overflow: :drop_oldest,
+            received_count: 0,
+            dropped_count: 0,
+            rejected_count: 0
 
   @impl true
   def init(opts) do

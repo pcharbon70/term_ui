@@ -16,17 +16,13 @@ defmodule TermUI.Widget.Progress do
           phase: non_neg_integer()
         }
 
-  @schema Zoi.struct(__MODULE__, %{
-            value: Zoi.number() |> Zoi.default(0),
-            minimum: Zoi.number() |> Zoi.default(0),
-            maximum: Zoi.number() |> Zoi.default(100),
-            label: Zoi.any() |> Zoi.default(nil),
-            show_percent: Zoi.boolean() |> Zoi.default(true),
-            indeterminate: Zoi.boolean() |> Zoi.default(false),
-            phase: Zoi.integer() |> Zoi.non_negative() |> Zoi.default(0)
-          })
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  defstruct value: 0,
+            minimum: 0,
+            maximum: 100,
+            label: nil,
+            show_percent: true,
+            indeterminate: false,
+            phase: 0
 
   @impl true
   def init(opts) do

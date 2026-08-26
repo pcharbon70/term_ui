@@ -25,20 +25,12 @@ defmodule TermUI.Widget.TextArea do
           selection: Selection.t(),
           selection_style: Style.t()
         }
-  @schema Zoi.struct(__MODULE__, %{
-            value: Zoi.string() |> Zoi.default(""),
-            cursor: Zoi.integer() |> Zoi.non_negative() |> Zoi.default(0),
-            placeholder: Zoi.string() |> Zoi.default(""),
-            max_length:
-              Zoi.union([Zoi.integer() |> Zoi.positive(), Zoi.literal(:infinity)])
-              |> Zoi.default(:infinity),
-            selection: Zoi.struct(Selection) |> Zoi.default(%Selection{}),
-            selection_style:
-              Zoi.struct(Style)
-              |> Zoi.default(%Style{attrs: MapSet.new([:reverse])})
-          })
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  defstruct value: "",
+            cursor: 0,
+            placeholder: "",
+            max_length: :infinity,
+            selection: %Selection{},
+            selection_style: %Style{attrs: MapSet.new([:reverse])}
 
   @impl true
   def init(opts) do

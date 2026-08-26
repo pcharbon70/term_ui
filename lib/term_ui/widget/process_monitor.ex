@@ -20,14 +20,10 @@ defmodule TermUI.Widget.ProcessMonitor do
           sort: atom(),
           descending: boolean()
         }
-  @schema Zoi.struct(__MODULE__, %{
-            snapshots: Zoi.array() |> Zoi.default([]),
-            table: Zoi.struct(Table) |> Zoi.default(%Table{}),
-            sort: Zoi.atom() |> Zoi.default(:memory),
-            descending: Zoi.boolean() |> Zoi.default(true)
-          })
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  defstruct snapshots: [],
+            table: %Table{},
+            sort: :memory,
+            descending: true
 
   @impl true
   def init(opts) do

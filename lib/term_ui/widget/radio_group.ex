@@ -28,25 +28,20 @@ defmodule TermUI.Widget.RadioGroup do
           disabled_style: Style.t()
         }
 
-  @schema Zoi.struct(__MODULE__, %{
-            id: Zoi.any() |> Zoi.default(nil),
-            options: Zoi.array() |> Zoi.default([]),
-            selected: Zoi.any() |> Zoi.default(nil),
-            cursor: Zoi.integer() |> Zoi.non_negative() |> Zoi.default(0),
-            orientation: Zoi.enum([:vertical, :horizontal]) |> Zoi.default(:vertical),
-            focused: Zoi.boolean() |> Zoi.default(false),
-            disabled: Zoi.boolean() |> Zoi.default(false),
-            selected_icon: Zoi.string() |> Zoi.default("●"),
-            unselected_icon: Zoi.string() |> Zoi.default("○"),
-            show_brackets: Zoi.boolean() |> Zoi.default(true),
-            style: Zoi.struct(Style) |> Zoi.default(%Style{}),
-            selected_style: Zoi.struct(Style) |> Zoi.default(%Style{fg: :green}),
-            focus_style: Zoi.struct(Style) |> Zoi.default(%Style{attrs: MapSet.new([:reverse])}),
-            disabled_style: Zoi.struct(Style) |> Zoi.default(%Style{fg: :bright_black})
-          })
-
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  defstruct id: nil,
+            options: [],
+            selected: nil,
+            cursor: 0,
+            orientation: :vertical,
+            focused: false,
+            disabled: false,
+            selected_icon: "●",
+            unselected_icon: "○",
+            show_brackets: true,
+            style: %Style{},
+            selected_style: %Style{fg: :green},
+            focus_style: %Style{attrs: MapSet.new([:reverse])},
+            disabled_style: %Style{fg: :bright_black}
 
   @doc "Creates one radio option."
   @spec option(term(), iodata(), keyword()) :: option()

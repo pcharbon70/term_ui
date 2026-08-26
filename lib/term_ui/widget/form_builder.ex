@@ -20,15 +20,11 @@ defmodule TermUI.Widget.FormBuilder do
           errors: map(),
           submit_label: String.t()
         }
-  @schema Zoi.struct(__MODULE__, %{
-            fields: Zoi.array() |> Zoi.default([]),
-            values: Zoi.map() |> Zoi.default(%{}),
-            active: Zoi.integer() |> Zoi.non_negative() |> Zoi.default(0),
-            errors: Zoi.map() |> Zoi.default(%{}),
-            submit_label: Zoi.string() |> Zoi.default("Submit")
-          })
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  defstruct fields: [],
+            values: %{},
+            active: 0,
+            errors: %{},
+            submit_label: "Submit"
 
   @impl true
   def init(opts) do

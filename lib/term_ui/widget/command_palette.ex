@@ -7,13 +7,9 @@ defmodule TermUI.Widget.CommandPalette do
   alias TermUI.Widget.{Dialog, PickList}
 
   @type t :: %__MODULE__{picker: PickList.t(), title: String.t(), visible: boolean()}
-  @schema Zoi.struct(__MODULE__, %{
-            picker: Zoi.struct(PickList) |> Zoi.default(%PickList{}),
-            title: Zoi.string() |> Zoi.default("Commands"),
-            visible: Zoi.boolean() |> Zoi.default(false)
-          })
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  defstruct picker: %PickList{},
+            title: "Commands",
+            visible: false
 
   @impl true
   def init(opts) do
