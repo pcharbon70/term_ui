@@ -527,4 +527,66 @@ defmodule TermUI.Terminal.EscapeParserTest do
       assert [%Event.Mouse{action: :release, button: :right, x: 6, y: 7}] = right_events
     end
   end
+
+  test "parses the complete CSI function-key range and stray paste terminator" do
+    cases = [
+      {"12~", :f2},
+      {"13~", :f3},
+      {"14~", :f4},
+      {"17~", :f6},
+      {"18~", :f7},
+      {"19~", :f8},
+      {"20~", :f9},
+      {"21~", :f10},
+      {"23~", :f11},
+      {"201~", :unknown}
+    ]
+
+    for {sequence, key} <- cases do
+      assert {[%Event.Key{key: ^key}], ""} = EscapeParser.parse("\e[" <> sequence)
+    end
+  end
+
+  test "parses SS3 navigation and consumes unsupported complete SS3 input" do
+    for {sequence, key} <- [
+          {"A", :up},
+          {"B", :down},
+          {"C", :right},
+          {"D", :left},
+          {"H", :home},
+          {"F", :end}
+        ] do
+      assert {[%Event.Key{key: ^key}], ""} = EscapeParser.parse("\eO" <> sequence)
+    end
+
+    assert {[], "\eOX"} = EscapeParser.parse("\eOX")
+  end
+
+  test "mouse parsing covers scroll, motion, release, modifiers, and unknown buttons" do
+    cases = [
+      {"\e[<64;2;3M", :scroll_up, nil},
+      {"\e[<65;2;3M", :scroll_down, nil},
+      {"\e[<66;2;3M", :press, :right},
+      {"\e[<67;2;3M", :press, nil},
+      {"\e[<35;2;3M", :move, nil},
+      {"\e[<32;2;3M", :drag, :left},
+      {"\e[<7;2;3M", :press, nil}
+    ]
+
+    for {input, action, button} <- cases do
+      assert {[%Event.Mouse{action: ^action, button: ^button, x: 1, y: 2}], ""} =
+               EscapeParser.parse(input)
+    end
+
+    assert {[%Event.Mouse{modifiers: modifiers}], ""} = EscapeParser.parse("\e[<28;2;3M")
+    assert Enum.sort(modifiers) == [:alt, :ctrl, :shift]
+    assert {[], "\e[<0;1"} = EscapeParser.parse("\e[<0;1")
+  end
+
+  test "invalid escape and CSI bytes are consumed without losing later text" do
+    assert {[], "\e\0x"} = EscapeParser.parse("\e\0x")
+
+    assert {[%Event.Key{key: :unknown}, %Event.Text{text: "x"}], ""} =
+             EscapeParser.parse("\e[\0x")
+  end
 end

@@ -177,4 +177,52 @@ defmodule TermUI.Widget.MarkdownViewerTest do
     rendered = state |> MarkdownViewer.view({30, 8}) |> Frame.row_text(5)
     assert rendered =~ "selected"
   end
+
+  test "renderer preserves heading hierarchy, rules, ordered lists, and rich inline content" do
+    markdown = """
+    ## Secondary
+
+    ### Tertiary
+
+    ---
+
+    3. first
+    4. second
+
+    ~~removed~~ ![diagram](diagram.png)
+    """
+
+    assert Markdown.available?()
+
+    rows = Markdown.render(markdown, 40)
+    frame = Frame.from_rows(rows, 40, length(rows))
+    text = Enum.map_join(1..frame.height, "\n", &Frame.row_text(frame, &1))
+
+    assert text =~ "Secondary"
+    assert text =~ "Tertiary"
+    assert text =~ String.duplicate("─", 40)
+    assert text =~ "3. first"
+    assert text =~ "4. second"
+    assert text =~ "removed [image: diagram]"
+  end
+
+  test "unlabelled code blocks expose stable focus metadata" do
+    markdown = "```\nplain\n```"
+    assert [%{id: id, language: nil, content: "plain\n"}] = Markdown.code_blocks(markdown)
+
+    result = Markdown.render_with_elements(markdown, 24, focused_element_id: id)
+    frame = Frame.from_rows(result.lines, 24, result.content_height)
+
+    assert Frame.row_text(frame, 1) =~ "selected"
+    assert Frame.row_text(frame, 2) =~ "plain"
+  end
+
+  test "bounded documents remove incomplete UTF-8 prefixes safely" do
+    assert Document.new("A🙂B", content_limit: 3).content == "B"
+    assert Document.new("🙂", content_limit: 1).content == ""
+
+    document = Document.new("old", content_limit: 4) |> Document.replace("new value")
+    assert document.content == "alue"
+    assert String.valid?(document.content)
+  end
 end

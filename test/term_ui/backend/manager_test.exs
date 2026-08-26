@@ -18,6 +18,101 @@ defmodule TermUI.Backend.ManagerTest do
     defdelegate shutdown(state, reason), to: DeterministicBackend
   end
 
+  defmodule ExercisingBackend do
+    @behaviour TermUI.Backend
+
+    def init(opts) do
+      owner = Keyword.fetch!(opts, :owner)
+      mode = Keyword.get(opts, :mode, :ok)
+
+      case mode do
+        :init_error ->
+          {:error, :no_terminal}
+
+        :init_invalid ->
+          :invalid
+
+        :init_raise ->
+          raise "init failed"
+
+        :init_throw ->
+          throw(:init_failed)
+
+        _ ->
+          reader = input_reader(mode)
+
+          send(owner, {:exercising_backend, :init, self(), reader})
+          {:ok, %{owner: owner, mode: mode, size: {4, 12}, input_reader: reader, draws: 0}}
+      end
+    end
+
+    def size(%{mode: :size_error}), do: {:error, :unavailable}
+    def size(%{mode: :size_invalid}), do: {:ok, {0, 12}}
+    def size(%{mode: :size_other}), do: :invalid
+    def size(%{mode: :size_raise}), do: raise("size failed")
+    def size(%{mode: :size_throw}), do: throw(:size_failed)
+    def size(state), do: {:ok, state.size}
+
+    def capabilities(%{mode: :capabilities_invalid}), do: :invalid
+    def capabilities(%{mode: :capabilities_raise}), do: raise("capabilities failed")
+    def capabilities(%{mode: :capabilities_throw}), do: throw(:capabilities_failed)
+    def capabilities(_state), do: %{colors: :color_16, unicode: true}
+
+    def draw(state, _frame), do: state_callback(state, :draw)
+    def flush(state), do: state_callback(state, :flush)
+
+    def resize(state, size) do
+      case state_callback(state, :resize) do
+        {:ok, next} -> {:ok, %{next | size: size}}
+        error -> error
+      end
+    end
+
+    def poll_event(%{mode: :poll_invalid}, _timeout), do: :invalid
+    def poll_event(%{mode: :poll_raise}, _timeout), do: raise("poll failed")
+    def poll_event(%{mode: :poll_throw}, _timeout), do: throw(:poll_failed)
+    def poll_event(state, _timeout), do: {:timeout, state}
+
+    def refresh_size(%{mode: :refresh_changed} = state),
+      do: {:ok, {8, 30}, %{state | size: {8, 30}}}
+
+    def refresh_size(%{mode: :refresh_error}), do: {:error, :unavailable}
+    def refresh_size(%{mode: :refresh_invalid}), do: :invalid
+    def refresh_size(%{mode: :refresh_raise}), do: raise("refresh failed")
+    def refresh_size(%{mode: :refresh_throw}), do: throw(:refresh_failed)
+    def refresh_size(state), do: {:ok, state.size, state}
+
+    def shutdown(%{owner: owner, mode: :shutdown_raise}, reason) do
+      send(owner, {:exercising_backend, :shutdown, reason})
+      raise "shutdown failed"
+    end
+
+    def shutdown(%{owner: owner, mode: :shutdown_throw}, reason) do
+      send(owner, {:exercising_backend, :shutdown, reason})
+      throw(:shutdown_failed)
+    end
+
+    def shutdown(state, reason) do
+      send(state.owner, {:exercising_backend, :shutdown, reason})
+      :ok
+    end
+
+    defp input_reader(:reader), do: spawn_link(fn -> Process.sleep(:infinity) end)
+    defp input_reader(_mode), do: nil
+
+    defp state_callback(%{mode: mode}, stage) when mode == {:invalid, stage}, do: :invalid
+    defp state_callback(%{mode: mode}, stage) when mode == {:error, stage}, do: {:error, :failed}
+    defp state_callback(%{mode: mode}, stage) when mode == {:raise, stage}, do: raise("failed")
+    defp state_callback(%{mode: mode}, stage) when mode == {:throw, stage}, do: throw(:failed)
+
+    defp state_callback(state, :draw) do
+      send(state.owner, {:exercising_backend, :draw})
+      {:ok, %{state | draws: state.draws + 1}}
+    end
+
+    defp state_callback(state, _stage), do: {:ok, state}
+  end
+
   test "accepts a custom size poll interval" do
     manager = start_manager(size_poll_interval: 75)
 
@@ -169,6 +264,135 @@ defmodule TermUI.Backend.ManagerTest do
     assert_receive {:DOWN, ^reference, :process, ^manager, :killed}, 500
   end
 
+  test "activate is idempotent and inactive polling messages are ignored" do
+    manager = start_exercising_manager(:ok, size_poll_interval: :disabled)
+    send(manager, :poll_input)
+    send(manager, :poll_size)
+    assert %{active?: false} = :sys.get_state(manager)
+
+    assert :ok = Manager.activate(manager)
+    assert :ok = Manager.activate(manager)
+    assert %{active?: true} = :sys.get_state(manager)
+    assert :ok = Manager.close(manager, :normal)
+    assert :ok = Manager.close(manager, :already_closed)
+  end
+
+  test "size polling reports changes and preserves state after failures" do
+    changed = start_exercising_manager(:refresh_changed, size_poll_interval: 50)
+    assert :ok = Manager.activate(changed)
+    send(changed, :poll_size)
+    assert_receive {:backend_size, {8, 30}}, 200
+    assert %{size: {8, 30}} = Manager.info(changed)
+    assert :ok = Manager.close(changed, :normal)
+
+    for mode <- [:refresh_error, :refresh_invalid, :refresh_raise, :refresh_throw] do
+      manager = start_exercising_manager(mode, size_poll_interval: 50)
+      assert :ok = Manager.activate(manager)
+      send(manager, :poll_size)
+      Process.sleep(5)
+      assert %{size: {4, 12}} = Manager.info(manager)
+      assert :ok = Manager.close(manager, :normal)
+    end
+  end
+
+  test "an active backend reports linked input reader exits" do
+    manager = start_exercising_manager(:reader, size_poll_interval: :disabled)
+    assert :ok = Manager.activate(manager)
+    reader = :sys.get_state(manager).backend_state.input_reader
+    Process.exit(reader, :input_closed)
+
+    assert_receive {:backend_failed,
+                    {:backend, ExercisingBackend, :input, {:reader_exit, :input_closed}}},
+                   200
+
+    assert %{active?: false} = :sys.get_state(manager)
+    assert :ok = Manager.close(manager, :normal)
+  end
+
+  test "invalid and crashing input callbacks stop input with structured errors" do
+    expectations = [
+      poll_invalid: {:invalid_result, :invalid},
+      poll_raise: %RuntimeError{message: "poll failed"},
+      poll_throw: {:throw, :poll_failed}
+    ]
+
+    for {mode, expected} <- expectations do
+      manager = start_exercising_manager(mode, size_poll_interval: :disabled)
+      assert :ok = Manager.activate(manager)
+      assert_receive {:backend_failed, {:backend, ExercisingBackend, :input, ^expected}}, 200
+      assert %{active?: false} = :sys.get_state(manager)
+      assert :ok = Manager.close(manager, :normal)
+    end
+  end
+
+  test "state callbacks normalize invalid, error, raised, and thrown results" do
+    frame = Frame.from_rows(["ok"], 12, 4)
+
+    for stage <- [:draw, :flush, :resize], kind <- [:invalid, :error, :raise, :throw] do
+      manager = start_exercising_manager({kind, stage}, size_poll_interval: :disabled)
+
+      result =
+        case stage do
+          :draw -> Manager.draw(manager, frame)
+          :flush -> Manager.flush(manager)
+          :resize -> Manager.resize(manager, {5, 14})
+        end
+
+      assert {:error, {:backend, ExercisingBackend, ^stage, _reason}} = result
+      assert :ok = Manager.close(manager, :normal)
+    end
+  end
+
+  test "backend startup validates init, size, and capability callbacks and cleans opened sessions" do
+    init_modes = [:init_error, :init_invalid, :init_raise, :init_throw]
+
+    opened_modes = [
+      :size_error,
+      :size_invalid,
+      :size_other,
+      :size_raise,
+      :size_throw,
+      :capabilities_invalid,
+      :capabilities_raise,
+      :capabilities_throw
+    ]
+
+    previous = Process.flag(:trap_exit, true)
+
+    try do
+      for mode <- init_modes do
+        assert {:error, _reason} =
+                 Manager.start_link(
+                   self(),
+                   {ExercisingBackend, owner: self(), mode: mode},
+                   size_poll_interval: :disabled
+                 )
+      end
+
+      for mode <- opened_modes do
+        assert {:error, reason} =
+                 Manager.start_link(
+                   self(),
+                   {ExercisingBackend, owner: self(), mode: mode},
+                   size_poll_interval: :disabled
+                 )
+
+        assert_receive {:exercising_backend, :init, _manager, _reader}
+        assert_receive {:exercising_backend, :shutdown, ^reason}
+      end
+    after
+      Process.flag(:trap_exit, previous)
+    end
+  end
+
+  test "cleanup contains raised and thrown shutdown failures" do
+    for mode <- [:shutdown_raise, :shutdown_throw] do
+      manager = start_exercising_manager(mode, size_poll_interval: :disabled)
+      assert :ok = Manager.close(manager, :test_complete)
+      assert_receive {:exercising_backend, :shutdown, :test_complete}
+    end
+  end
+
   defp start_manager(opts, backend_opts \\ []) do
     assert {:ok, manager} =
              Manager.start_link(
@@ -178,6 +402,18 @@ defmodule TermUI.Backend.ManagerTest do
              )
 
     assert_receive {:backend, :init, ^manager}
+    manager
+  end
+
+  defp start_exercising_manager(mode, opts) do
+    assert {:ok, manager} =
+             Manager.start_link(
+               self(),
+               {ExercisingBackend, owner: self(), mode: mode},
+               opts
+             )
+
+    assert_receive {:exercising_backend, :init, ^manager, _reader}
     manager
   end
 end

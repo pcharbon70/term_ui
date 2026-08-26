@@ -39,4 +39,22 @@ defmodule TermUI.SelectionTest do
     refute Selection.contains?(selection, 5)
     refute selection |> Selection.clear() |> Selection.active?()
   end
+
+  test "inactive, empty, and punctuation selections use bounded defaults" do
+    assert Zoi.parse(Selection.schema(), Selection.new()) == {:ok, Selection.new()}
+
+    selection = Selection.extend(Selection.new(), 2)
+    assert Selection.range(selection) == {2, 2}
+
+    empty = Selection.new()
+    assert Selection.length(empty) == 0
+    assert Selection.extract(empty, "text") == ""
+    assert Selection.select_word(empty, "", 3) == Selection.start(empty, 0)
+
+    punctuation = Selection.select_word(empty, "word... next", 5)
+    assert Selection.extract(punctuation, "word... next") == "..."
+
+    line = Selection.select_line(empty, "one line", 4)
+    assert Selection.range(line) == {0, 8}
+  end
 end

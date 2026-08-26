@@ -268,7 +268,7 @@ defmodule TermUI.Widget.TextArea do
 
     case Enum.find_index(Enum.reverse(before), &(&1 == "\n")) do
       nil -> 0
-      distance -> state.cursor - distance - 1
+      distance -> state.cursor - distance
     end
   end
 

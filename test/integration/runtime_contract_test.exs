@@ -210,6 +210,61 @@ defmodule TermUI.RuntimeContractTest do
       do: Frame.from_rows(["#{width}x#{height}"], width, height)
   end
 
+  defmodule LifecycleApp do
+    @behaviour TermUI.Elm
+
+    def init(opts) do
+      mode = Keyword.get(opts, :mode, :ok)
+      owner = Keyword.get(opts, :owner)
+
+      case mode do
+        :init_throw -> throw(:init_failed)
+        :init_exit -> exit(:init_failed)
+        {:init_shutdown, reason} -> {%{mode: mode, owner: owner}, [Command.shutdown(reason)]}
+        {:init_command, command} -> {%{mode: mode, owner: owner}, [command]}
+        _ -> %{mode: mode, owner: owner}
+      end
+    end
+
+    def event_to_msg(_event, %{mode: :event_ignore}), do: :ignore
+    def event_to_msg(_event, %{mode: :event_raise}), do: raise("event failed")
+    def event_to_msg(_event, %{mode: :event_throw}), do: throw(:event_failed)
+    def event_to_msg(_event, _state), do: {:msg, :event}
+
+    def update(_message, %{mode: :update_throw}), do: throw(:update_failed)
+    def update(_message, %{mode: :update_exit}), do: exit(:update_failed)
+    def update(:shutdown, state), do: {state, [Command.shutdown(state.mode)]}
+    def update(_message, state), do: state
+
+    def handle_info(_message, %{mode: :info_raise}), do: raise("info failed")
+    def handle_info(_message, %{mode: :info_throw}), do: throw(:info_failed)
+    def handle_info(_message, %{mode: :info_exit}), do: exit(:info_failed)
+    def handle_info(_message, state), do: state
+
+    def view(%{mode: :view_raise}), do: raise("view failed")
+    def view(%{mode: :view_throw}), do: throw(:view_failed)
+    def view(%{mode: :view_exit}), do: exit(:view_failed)
+    def view(_state), do: Frame.from_rows(["lifecycle"], 20, 2)
+
+    def terminate(reason, %{owner: owner, mode: mode}) do
+      if owner, do: send(owner, {:lifecycle_terminated, reason})
+
+      case mode do
+        :terminate_raise -> raise "terminate failed"
+        :terminate_throw -> throw(:terminate_failed)
+        _ -> :ok
+      end
+    end
+  end
+
+  defmodule BareApp do
+    @behaviour TermUI.Elm
+
+    def event_to_msg(_event, _state), do: :ignore
+    def update(_message, state), do: state
+    def view(_state), do: Frame.from_rows(["bare"], 20, 2)
+  end
+
   test "an injected backend receives normalized input and the final meaningful frame" do
     events = [Event.key(:up), Event.text("q")]
 
@@ -563,6 +618,263 @@ defmodule TermUI.RuntimeContractTest do
     end
 
     assert_receive {:DOWN, ^runtime_ref, :process, ^runtime, :normal}, 500
+  end
+
+  test "child spec, invalid root values, missing modules, and fallback options are validated" do
+    assert %{id: :named_runtime, restart: :transient, shutdown: 5_000} =
+             Runtime.child_spec(name: :named_runtime, root: Counter)
+
+    assert {:error, {:invalid_option, :root, "not a module"}} =
+             Runtime.run(root: "not a module")
+
+    missing = Module.concat(__MODULE__, MissingApplication)
+    assert {:error, {:application, :load, {^missing, :nofile}}} = Runtime.run(root: missing)
+
+    assert {:ok, runtime} =
+             Runtime.start_link(
+               root: BareApp,
+               render_interval: 0,
+               suppress_logger: :invalid,
+               backend: {DeterministicBackend, owner: self()}
+             )
+
+    assert_receive {:backend, :draw, _frame}, 500
+    assert Runtime.get_state(runtime).render_interval == 16
+    Runtime.shutdown(runtime)
+  end
+
+  test "init shutdown commands render once and normalize public stop reasons" do
+    reasons = [
+      :shutdown,
+      :custom,
+      {:backend, :test, :stage, :failed},
+      {:application, :test, :failed}
+    ]
+
+    for reason <- reasons do
+      result =
+        Runtime.run(
+          root: LifecycleApp,
+          mode: {:init_shutdown, reason},
+          owner: self(),
+          backend: {DeterministicBackend, owner: self()}
+        )
+
+      expected =
+        case reason do
+          :shutdown -> :ok
+          {:backend, _, _, _} -> {:error, reason}
+          {:application, _, _} -> {:error, reason}
+          other -> {:error, {:shutdown, other}}
+        end
+
+      assert result == expected
+      assert_receive {:backend, :draw, _frame}, 500
+      assert_receive {:backend, :shutdown, _shutdown_reason}, 500
+    end
+  end
+
+  test "thrown and exited initialization failures retain their failure kind" do
+    for {mode, kind} <- [init_throw: :throw, init_exit: :exit] do
+      assert {:error, {:application, :init, {^kind, :init_failed, _stacktrace}} = reason} =
+               Runtime.run(
+                 root: LifecycleApp,
+                 mode: mode,
+                 backend: {DeterministicBackend, owner: self()}
+               )
+
+      assert_receive {:backend, :shutdown, ^reason}, 500
+    end
+  end
+
+  test "event, update, info, and view callback failures retain raised, thrown, and exit forms" do
+    callback_modes = [
+      {:event_raise, :event_to_msg, :error},
+      {:event_throw, :event_to_msg, :throw},
+      {:update_throw, :update, :throw},
+      {:update_exit, :update, :exit},
+      {:info_raise, :handle_info, :error},
+      {:info_throw, :handle_info, :throw},
+      {:info_exit, :handle_info, :exit},
+      {:view_raise, :view, :error},
+      {:view_throw, :view, :throw},
+      {:view_exit, :view, :exit}
+    ]
+
+    for {mode, stage, kind} <- callback_modes do
+      events = if stage in [:event_to_msg, :update], do: [Event.key(:enter)], else: []
+
+      assert {:ok, runtime} =
+               Runtime.start_link(
+                 root: LifecycleApp,
+                 mode: mode,
+                 backend: {DeterministicBackend, owner: self(), events: events}
+               )
+
+      reference = Process.monitor(runtime)
+
+      if stage == :handle_info do
+        assert_receive {:backend, :draw, _frame}, 500
+        send(runtime, :application_info)
+      end
+
+      assert_receive {:DOWN, ^reference, :process, ^runtime,
+                      {:application, ^stage, {^kind, _reason, _stacktrace}}},
+                     500
+    end
+  end
+
+  test "ignored events and applications without handle_info stay alive" do
+    assert {:ok, ignored} =
+             Runtime.start_link(
+               root: LifecycleApp,
+               mode: :event_ignore,
+               backend: {DeterministicBackend, owner: self(), events: [Event.key(:enter)]}
+             )
+
+    assert_receive {:backend, :draw, _frame}, 500
+    assert :ok = Runtime.sync(ignored)
+    Runtime.shutdown(ignored)
+
+    assert {:ok, bare} =
+             Runtime.start_link(
+               root: BareApp,
+               backend: {DeterministicBackend, owner: self()}
+             )
+
+    assert_receive {:backend, :draw, _frame}, 500
+    send(bare, :unknown_info)
+    assert :ok = Runtime.sync(bare)
+    Runtime.shutdown(bare)
+  end
+
+  test "invalid command values are rejected for every command kind" do
+    invalid_commands = [
+      %Command{kind: :timer, value: {-1, :message}},
+      %Command{kind: :async, value: {:not_a_function, &Function.identity/1}},
+      %Command{kind: :clipboard, value: {Clipboard.operation("x"), :not_a_function}},
+      %Command{kind: :unknown, value: nil}
+    ]
+
+    for command <- invalid_commands do
+      assert {:error, {:application, :commands, {:invalid_commands, [^command]}} = reason} =
+               Runtime.run(
+                 root: LifecycleApp,
+                 mode: {:init_command, command},
+                 backend: {DeterministicBackend, owner: self()}
+               )
+
+      assert_receive {:backend, :shutdown, ^reason}, 500
+    end
+  end
+
+  test "stale render and async messages do not change application state" do
+    {:ok, runtime} = start_counter(render_interval: 1_000)
+    assert_receive {:backend, :draw, _frame}, 500
+    before = Runtime.get_state(runtime)
+    send(runtime, {:render, make_ref()})
+    send(runtime, {:async_result, make_ref(), {:ok, :stale}})
+    assert :ok = Runtime.sync(runtime)
+    after_state = Runtime.get_state(runtime)
+    assert after_state.app_state == before.app_state
+    assert after_state.frames_rendered == before.frames_rendered
+    Runtime.shutdown(runtime)
+  end
+
+  test "detected resize failures stop the runtime with the backend reason" do
+    assert {:ok, runtime} =
+             Runtime.start_link(
+               root: ResizableApp,
+               backend: {DeterministicBackend, owner: self(), fail: :resize}
+             )
+
+    assert_receive {:backend, :draw, _frame}, 500
+    reference = Process.monitor(runtime)
+    send(runtime, {:backend_size, {8, 30}})
+
+    assert_receive {:DOWN, ^reference, :process, ^runtime,
+                    {:backend, DeterministicBackend, :resize, :resize_failed}},
+                   500
+  end
+
+  test "render and final-render failures after startup stop and clean the runtime" do
+    for trigger <- [:force, :shutdown] do
+      {:ok, runtime} = start_counter(render_interval: 1_000)
+      assert_receive {:backend, :draw, _frame}, 500
+      manager = Runtime.get_state(runtime).backend_manager
+
+      :sys.replace_state(manager, fn state ->
+        put_in(state, [:backend_state, :fail], :draw)
+      end)
+
+      Runtime.send_message(runtime, {:set, 2})
+
+      case trigger do
+        :force -> Runtime.force_render(runtime)
+        :shutdown -> Runtime.shutdown(runtime)
+      end
+
+      reference = Process.monitor(runtime)
+
+      assert_receive {:DOWN, ^reference, :process, ^runtime,
+                      {:backend, DeterministicBackend, :draw, :draw_failed}},
+                     500
+    end
+  end
+
+  test "backend failures and manager exits stop the runtime" do
+    {:ok, runtime} = start_counter(render_interval: 1_000)
+    assert_receive {:backend, :draw, _frame}, 500
+    reference = Process.monitor(runtime)
+    send(runtime, {:backend_failed, :input_closed})
+    assert_receive {:DOWN, ^reference, :process, ^runtime, {:shutdown, :input_closed}}, 500
+
+    {:ok, runtime} = start_counter(render_interval: 1_000)
+    assert_receive {:backend, :draw, _frame}, 500
+    manager = Runtime.get_state(runtime).backend_manager
+    reference = Process.monitor(runtime)
+    Process.exit(manager, :kill)
+
+    assert_receive {:DOWN, ^reference, :process, ^runtime,
+                    {:backend, DeterministicBackend, :manager, :killed}},
+                   500
+  end
+
+  test "thrown async work and mapper failures are delivered or structured" do
+    runtime = start_async_app(fn -> throw(:async_failed) end)
+    assert_receive {:async_complete, {:error, {:throw, :async_failed, _stacktrace}}}, 500
+    Runtime.shutdown(runtime)
+
+    command = Command.async(fn -> :ok end, fn _result -> throw(:mapper_failed) end)
+
+    assert {:error,
+            {:application, :command_result, {:throw, :mapper_failed, _stacktrace}} = reason} =
+             Runtime.run(
+               root: LifecycleApp,
+               mode: {:init_command, command},
+               backend: {DeterministicBackend, owner: self()}
+             )
+
+    assert_receive {:backend, :shutdown, ^reason}, 500
+  end
+
+  test "application terminate failures do not prevent backend cleanup" do
+    for mode <- [:terminate_raise, :terminate_throw] do
+      {:ok, runtime} =
+        Runtime.start_link(
+          root: LifecycleApp,
+          mode: mode,
+          owner: self(),
+          backend: {DeterministicBackend, owner: self()}
+        )
+
+      assert_receive {:backend, :draw, _frame}, 500
+      reference = Process.monitor(runtime)
+      Runtime.shutdown(runtime)
+      assert_receive {:backend, :shutdown, :normal}, 500
+      assert_receive {:lifecycle_terminated, :normal}, 500
+      assert_receive {:DOWN, ^reference, :process, ^runtime, :normal}, 500
+    end
   end
 
   defp start_counter(opts) do

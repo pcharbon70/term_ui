@@ -26,7 +26,7 @@ defmodule TermUI.MixProject do
       aliases: aliases(),
 
       # Test coverage
-      test_coverage: [tool: ExCoveralls, summary: [threshold: 80]],
+      test_coverage: [tool: ExCoveralls, summary: [threshold: 90]],
 
       # Dialyzer
       dialyzer: [

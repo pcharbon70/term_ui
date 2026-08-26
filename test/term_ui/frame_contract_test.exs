@@ -90,6 +90,65 @@ defmodule TermUI.FrameContractTest do
     assert Frame.cells(overlaid) == []
   end
 
+  test "out-of-bounds writes and reads preserve the frame" do
+    frame = Frame.from_rows(["abc"], 3, 1)
+
+    assert Frame.put_row(frame, 0, "no") == frame
+    assert Frame.put_row(frame, 2, "no") == frame
+    assert Frame.put_cell(frame, 0, 1, Cell.new("x")) == frame
+    assert Frame.put_cell(frame, 1, 4, Cell.new("x")) == frame
+    assert Frame.row_text(frame, 0) == ""
+    assert Frame.row_text(frame, 2) == ""
+    assert Frame.fit("ignored", 0) == ""
+  end
+
+  test "row and cell normalization accepts public input forms" do
+    frame =
+      Frame.new(4, 2,
+        cells: [
+          {1, 1, Cell.new("a")},
+          {{1, 2}, Cell.new("b")},
+          {{9, 9}, Cell.new("z")}
+        ],
+        cursor: :invalid
+      )
+
+    assert Frame.row_text(frame, 1) == "ab  "
+    assert frame.cursor == nil
+
+    frame = Frame.put_row(frame, 2, 123)
+    assert Frame.row_text(frame, 2) == "123 "
+
+    frame = Frame.put_rows(frame, 1, ["x", "y", "ignored"])
+    assert Frame.row_text(frame, 1) == "x   "
+    assert Frame.row_text(frame, 2) == "y   "
+  end
+
+  test "diff omits unchanged cells and wide placeholders" do
+    previous = Frame.from_rows(["界x"], 4, 1)
+    current = Frame.from_rows(["界 "], 4, 1)
+
+    assert Frame.diff(previous, previous) == []
+    assert Frame.diff(previous, current) == [{{1, 3}, {" ", :default, :default, []}}]
+  end
+
+  test "wide placeholders without a primary cell are discarded" do
+    placeholder = Cell.new(" ") |> Cell.wide_placeholder()
+    frame = Frame.new(3, 1, cells: %{{1, 2} => placeholder})
+
+    assert frame.cells == %{}
+  end
+
+  test "wrap starts a new row at display-width boundaries" do
+    assert Frame.wrap("ab界c", 3) == ["ab", "界c"]
+    assert Frame.wrap("", 3) == [""]
+  end
+
+  test "invalid dimensions raise with the public bounds" do
+    assert_raise ArgumentError, ~r/frame dimensions must be within/, fn -> Frame.new(0, 1) end
+    assert_raise ArgumentError, ~r/frame dimensions must be within/, fn -> Frame.new(1_001, 1) end
+  end
+
   defp clear_wide_changes(replacement) do
     [
       {{1, 1}, {replacement, :default, :default, []}},

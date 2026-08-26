@@ -109,4 +109,44 @@ defmodule TermUI.RoutingAndThemeTest do
     assert_raise ArgumentError, fn -> Shortcut.new([{"hyper+s", :save}]) end
     assert_raise ArgumentError, fn -> Theme.new(styles: %{bad: :not_a_style}) end
   end
+
+  test "shortcut fallback restarts a sequence from the current stroke" do
+    shortcuts = Shortcut.new([{["g", "g"], :top}, {"x", :single}, {["x", "y"], :xy}])
+    assert {shortcuts, []} = Shortcut.route(Event.text("g", timestamp: 10), shortcuts)
+    assert {_shortcuts, [:single]} = Shortcut.route(Event.text("x", timestamp: 20), shortcuts)
+
+    shortcuts = Shortcut.new([{["g", "g"], :top}, {["x", "y"], :xy}])
+    assert {shortcuts, []} = Shortcut.route(Event.text("g", timestamp: 30), shortcuts)
+    assert {shortcuts, []} = Shortcut.route(Event.text("x", timestamp: 40), shortcuts)
+    assert length(shortcuts.pending) == 1
+    assert {_shortcuts, [:xy]} = Shortcut.route(Event.text("y", timestamp: 50), shortcuts)
+  end
+
+  test "shortcut normalization accepts maps and all documented modifier names" do
+    bindings = [
+      %{sequence: %{key: "Enter", modifiers: [:meta]}, message: :mapped},
+      {{"x", [:super]}, :super_x},
+      {"alt+shift+meta+super+X", :all_modifiers}
+    ]
+
+    shortcuts = Shortcut.new(bindings)
+
+    assert {_state, [:mapped]} =
+             Shortcut.route(Event.key(:enter, modifiers: [:meta]), shortcuts)
+
+    assert {_state, [:super_x]} = Shortcut.route(Event.key("x", modifiers: [:super]), shortcuts)
+
+    assert Shortcut.key("alt+shift+meta+super+X") == %{
+             key: "X",
+             modifiers: [:alt, :meta, :shift, :super]
+           }
+
+    assert_raise ArgumentError, ~r/shortcut bindings must contain/, fn -> Shortcut.new([:bad]) end
+  end
+
+  test "zero timestamps do not expire an active shortcut sequence" do
+    shortcuts = Shortcut.new([{["g", "g"], :top}], timeout: 1)
+    assert {shortcuts, []} = Shortcut.route(Event.text("g", timestamp: 10), shortcuts)
+    assert {_shortcuts, [:top]} = Shortcut.route(Event.text("g", timestamp: 0), shortcuts)
+  end
 end

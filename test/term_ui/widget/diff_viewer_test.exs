@@ -84,4 +84,60 @@ defmodule TermUI.Widget.DiffViewerTest do
     assert Enum.any?(state.rows, &(&1.kind == :removed and &1.old_text == "-- literal"))
     assert Enum.any?(state.rows, &(&1.kind == :added and &1.new_text == "++ literal"))
   end
+
+  test "navigation, wheel input, unified mode, and fallback input update scroll state" do
+    state = DiffViewer.init(before: Enum.join(1..20, "\n"), after: "", page_size: 4)
+
+    {state, [{:scrolled, 1}]} = DiffViewer.update(Event.key(:down), state)
+    {state, [{:scrolled, 0}]} = DiffViewer.update(Event.key(:up), state)
+    {state, [{:scrolled, 4}]} = DiffViewer.update(Event.key(:page_down), state)
+    {state, [{:scrolled, 0}]} = DiffViewer.update(Event.key(:page_up), state)
+
+    {state, [{:scrolled, 3}]} =
+      DiffViewer.update(Event.mouse(:scroll_down, nil, 0, 0), state)
+
+    {state, [{:scrolled, 0}]} = DiffViewer.update(Event.mouse(:scroll_up, nil, 0, 0), state)
+    {state, []} = DiffViewer.update(Event.key(:end), state)
+    assert state.scroll == :end
+    assert %Frame{} = DiffViewer.view(state, {20, 3})
+    {state, [{:scrolled, scroll}]} = DiffViewer.update(Event.key(:up), state)
+    assert scroll >= 0
+    {state, []} = DiffViewer.update(Event.key(:home), state)
+    assert state.scroll == 0
+    {state, [{:mode, :unified}]} = DiffViewer.update(Event.text("u"), state)
+    assert state.mode == :unified
+    assert {^state, []} = DiffViewer.update(Event.focus(:gained), state)
+  end
+
+  test "comparison represents unpaired additions and removals and resets replaced text" do
+    removed = DiffViewer.compare("one\ntwo", "one")
+    assert Enum.any?(removed, &(&1.kind == :removed and &1.old_text == "two"))
+
+    added = DiffViewer.compare("one", "one\ntwo\nthree")
+    assert Enum.any?(added, &(&1.kind == :added and &1.new_text == "three"))
+
+    state = DiffViewer.init(before: "old", after: "new")
+    state = DiffViewer.set_texts(%{state | scroll: 5}, "", "added", 1)
+    assert state.scroll == 0
+    assert length(state.rows) == 1
+  end
+
+  test "unified parsing handles missing hunk counts, marker headers, and malformed hunks" do
+    diff = """
+    metadata
+    @@ -2 +4 @@
+    -old
+    +new
+    \\ No newline at end of file
+    @@ malformed @@
+     context
+    """
+
+    state = DiffViewer.init(unified_diff: diff, context: 0)
+    assert Enum.any?(state.rows, &(&1.kind == :removed and &1.old_number == 2))
+    assert Enum.any?(state.rows, &(&1.kind == :added and &1.new_number == 4))
+    assert Enum.any?(state.rows, &(&1.kind == :header and &1.text =~ "No newline"))
+    assert Enum.any?(state.rows, &(&1.kind == :hunk and &1.text == "@@ malformed @@"))
+    assert %Frame{} = DiffViewer.view(%{state | mode: :split}, {7, 8})
+  end
 end

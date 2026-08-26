@@ -146,13 +146,18 @@ defmodule TermUI.Widget.List do
   end
 
   defp toggle(state) do
-    selected =
-      if MapSet.member?(state.selected, state.cursor),
-        do: MapSet.delete(state.selected, state.cursor),
-        else: MapSet.put(state.selected, state.cursor)
+    case current(state) do
+      nil ->
+        {state, []}
 
-    item = current(state)
-    {%{state | selected: selected}, if(item, do: [{:toggled, item}], else: [])}
+      item ->
+        selected =
+          if MapSet.member?(state.selected, state.cursor),
+            do: MapSet.delete(state.selected, state.cursor),
+            else: MapSet.put(state.selected, state.cursor)
+
+        {%{state | selected: selected}, [{:toggled, item}]}
+    end
   end
 
   defp normalize_cursor(state),

@@ -51,7 +51,28 @@ defmodule TermUI.Terminal.SizeDetectorTest do
     System.put_env("COLUMNS", "111")
 
     assert {:ok, {37, 111}} = SizeDetector.auto_detect()
+    assert {:ok, {37, 111}} = SizeDetector.detect()
   end
+
+  test "direct IO and stty detection return only documented results" do
+    assert_documented_result(SizeDetector.detect_from_io(), [
+      :io_detection_failed,
+      :io_not_available
+    ])
+
+    assert_documented_result(SizeDetector.detect_from_stty(), [
+      :stty_failed,
+      :stty_timeout,
+      :stty_parse_failed
+    ])
+  end
+
+  defp assert_documented_result({:ok, {rows, columns}}, _errors) do
+    assert rows in 1..SizeDetector.max_dimension()
+    assert columns in 1..SizeDetector.max_dimension()
+  end
+
+  defp assert_documented_result({:error, reason}, errors), do: assert(reason in errors)
 
   defp restore_env(key, nil), do: System.delete_env(key)
   defp restore_env(key, value), do: System.put_env(key, value)

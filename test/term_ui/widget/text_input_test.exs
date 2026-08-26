@@ -82,4 +82,66 @@ defmodule TermUI.Widget.TextInputTest do
     assert {_button, [{:pressed, :save}]} =
              Widget.mouse(Button, Event.mouse(:release, :left, 1, 0), button, {10, 1})
   end
+
+  test "navigation covers both boundaries and selection collapse" do
+    state = TextInput.init(value: "a界🙂z")
+    {home, []} = TextInput.update(Event.key(:home), state)
+    assert home.cursor == 0
+    {right, []} = TextInput.update(Event.key(:right), home)
+    assert right.cursor == 1
+    {finish, []} = TextInput.update(Event.key(:end), right)
+    assert finish.cursor == 4
+
+    {selected, []} = TextInput.update(Event.key(:left, modifiers: [:shift]), finish)
+    {left, []} = TextInput.update(Event.key(:left), selected)
+    assert left.cursor == 3
+    {selected, []} = TextInput.update(Event.key(:right, modifiers: [:shift]), left)
+    {right, []} = TextInput.update(Event.key(:right), selected)
+    assert right.cursor == 4
+  end
+
+  test "delete handles the cursor, the end, and an active selection" do
+    start = %{TextInput.init(value: "abc") | cursor: 0}
+    assert {deleted, [{:changed, "bc"}]} = TextInput.update(Event.key(:delete), start)
+    assert deleted.cursor == 0
+
+    finish = TextInput.init(value: "abc")
+    assert {^finish, []} = TextInput.update(Event.key(:delete), finish)
+
+    {selected, []} = TextInput.update(Event.key(:left, modifiers: [:shift]), finish)
+
+    assert {selected_deleted, [{:changed, "ab"}]} =
+             TextInput.update(Event.key(:delete), selected)
+
+    refute Selection.active?(selected_deleted.selection)
+  end
+
+  test "non-control keys and fallback mouse events do not edit" do
+    state = TextInput.init(value: "abc")
+
+    assert {^state, []} = TextInput.update(Event.key("a"), state)
+    assert {^state, []} = TextInput.update(Event.key("c"), state)
+    assert {^state, []} = TextInput.update(Event.key("x"), state)
+    assert {^state, []} = TextInput.update(Event.focus(:gained), state)
+    assert {^state, []} = TextInput.mouse(Event.focus(:lost), state, {5, 1})
+  end
+
+  test "mouse shift, drag without a prior press, and wide-cell halves choose positions" do
+    state = TextInput.init(value: "a界b")
+    {state, []} = TextInput.mouse(Event.mouse(:press, :left, 0, 0), state, {6, 1})
+
+    {shifted, []} =
+      TextInput.mouse(
+        Event.mouse(:press, :left, 3, 0, modifiers: [:shift]),
+        state,
+        {6, 1}
+      )
+
+    assert Selection.extract(shifted.selection, shifted.value) == "a界"
+
+    fresh = TextInput.init(value: "a界b")
+    {dragged, []} = TextInput.mouse(Event.mouse(:drag, :left, 2, 0), fresh, {6, 1})
+    assert dragged.cursor == 2
+    assert Selection.active?(dragged.selection)
+  end
 end
