@@ -64,7 +64,7 @@ defmodule TermUI.CharacterSetTest do
     test "all characters are strings" do
       chars = CharacterSet.get(:unicode)
       # These keys are lists, not single strings
-      list_keys = [:bar_levels, :sparkline_levels]
+      list_keys = [:bar_levels, :sparkline_levels, :spinner_frames]
 
       for key <- CharacterSet.keys() do
         value = Map.get(chars, key)
@@ -136,7 +136,7 @@ defmodule TermUI.CharacterSetTest do
     test "all characters are strings" do
       chars = CharacterSet.get(:ascii)
       # These keys are lists, not single strings
-      list_keys = [:bar_levels, :sparkline_levels]
+      list_keys = [:bar_levels, :sparkline_levels, :spinner_frames]
 
       for key <- CharacterSet.keys() do
         value = Map.get(chars, key)
@@ -366,7 +366,7 @@ defmodule TermUI.CharacterSetTest do
     test "ASCII characters are all printable" do
       chars = CharacterSet.get(:ascii)
       # These keys are lists, not single strings
-      list_keys = [:bar_levels, :sparkline_levels]
+      list_keys = [:bar_levels, :sparkline_levels, :spinner_frames]
 
       for key <- CharacterSet.keys() do
         value = Map.get(chars, key)

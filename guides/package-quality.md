@@ -15,7 +15,7 @@ still contains some older v4 examples.
 | Repository files | `AGENTS.md`, `CHANGELOG.md`, `CONTRIBUTING.md`, `LICENSE`, `usage-rules.md`, examples, guides, and environment config files are present. |
 | Public data | Public runtime and widget structs use Zoi schemas. |
 | Quality command | `mix quality` runs format, warning-free compile, xref cycle checks, strict Credo, Dialyzer, and Doctor. |
-| Tests and coverage | `mix coveralls` runs deterministic tests and enforces at least 80% line coverage without excluding production modules. |
+| Tests and coverage | `mix coveralls` runs deterministic tests and enforces at least 90% line coverage without excluding production modules. |
 | CI | The v5 shared CI caller tests all supported Elixir lines on OTP 28 or 29. CI also checks audit, docs, package content, and unused dependencies. |
 | Dependency updates | Dependabot checks Mix and GitHub Actions dependencies each week with Conventional Commit titles. |
 | Releases | The v5 shared release caller uses `git_ops` for release preparation and Hex publication. |

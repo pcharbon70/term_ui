@@ -8,17 +8,35 @@ defmodule TermUI.Backend.Renderer do
   @ascii_chars TermUI.CharacterSet.get(:ascii)
 
   @unicode_to_ascii_map (
-                          keys = TermUI.CharacterSet.keys() -- [:bar_levels]
+                          list_keys = [:bar_levels, :sparkline_levels, :spinner_frames]
+                          keys = TermUI.CharacterSet.keys() -- list_keys
 
                           base =
                             Map.new(keys, fn key -> {@unicode_chars[key], @ascii_chars[key]} end)
 
-                          bars =
-                            @unicode_chars.bar_levels
-                            |> Enum.zip(Stream.cycle(@ascii_chars.bar_levels))
-                            |> Map.new()
+                          levels =
+                            [:bar_levels, :sparkline_levels]
+                            |> Enum.flat_map(fn key ->
+                              unicode_levels = @unicode_chars[key]
+                              ascii_levels = @ascii_chars[key]
+                              unicode_max = max(length(unicode_levels) - 1, 1)
+                              ascii_max = max(length(ascii_levels) - 1, 0)
 
-                          Map.merge(bars, base)
+                              unicode_levels
+                              |> Enum.with_index()
+                              |> Enum.map(fn {character, index} ->
+                                ascii_index = round(index * ascii_max / unicode_max)
+                                {character, Enum.at(ascii_levels, ascii_index)}
+                              end)
+                            end)
+
+                          spinner_frames =
+                            Enum.zip(
+                              @unicode_chars.spinner_frames,
+                              Stream.cycle(@ascii_chars.spinner_frames)
+                            )
+
+                          Map.new(levels ++ spinner_frames ++ Map.to_list(base))
                         )
 
   @doc "Converts changed backend cells to a minimal ANSI output sequence."

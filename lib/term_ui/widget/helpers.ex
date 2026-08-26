@@ -1,12 +1,36 @@
 defmodule TermUI.Widget.Helpers do
   @moduledoc false
 
-  alias TermUI.{DisplayWidth, Frame, Style}
+  alias TermUI.{DisplayWidth, Frame, Layout, Style}
 
   @doc "Builds a frame from widget rows and dimensions."
   @spec frame([Frame.row()], TermUI.Widget.dimensions(), keyword()) :: Frame.t()
   def frame(rows, {width, height}, opts \\ []) do
     Frame.from_rows(rows, width, height, opts)
+  end
+
+  @doc "Renders a frame, widget state pair, or pure renderer function."
+  @spec render(TermUI.Widget.renderable(), TermUI.Widget.dimensions()) :: Frame.t()
+  def render(%Frame{} = frame, _dimensions), do: frame
+
+  def render({module, state}, dimensions) when is_atom(module),
+    do: TermUI.Widget.view(module, state, dimensions)
+
+  def render(renderer, dimensions) when is_function(renderer, 1) do
+    case renderer.(dimensions) do
+      %Frame{} = frame -> frame
+      other -> raise ArgumentError, "renderer returned #{inspect(other)}, expected TermUI.Frame"
+    end
+  end
+
+  @doc "Renders and clips child content inside a frame rectangle."
+  @spec compose(Frame.t(), Layout.rect(), TermUI.Widget.renderable()) :: Frame.t()
+  def compose(%Frame{} = base, rect, child) do
+    case Layout.dimensions(rect) do
+      {0, _height} -> base
+      {_width, 0} -> base
+      dimensions -> Layout.place(base, render(child, dimensions), rect)
+    end
   end
 
   @doc "Clamps an integer between minimum and maximum values."

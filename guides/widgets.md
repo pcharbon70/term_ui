@@ -36,24 +36,30 @@ that message to `TermUI.Clipboard.copy/2` in the parent application. See the
 ## Selection and data entry
 
 - `TermUI.Widget.Button`
+- `TermUI.Widget.Checkbox`
 - `TermUI.Widget.List`
 - `TermUI.Widget.PickList`
 - `TermUI.Widget.Menu`
 - `TermUI.Widget.ContextMenu`
 - `TermUI.Widget.CommandPalette`
+- `TermUI.Widget.RadioGroup`
+- `TermUI.Widget.Select`
 - `TermUI.Widget.Tabs`
 - `TermUI.Widget.Table`
+- `TermUI.Widget.Toggle`
 - `TermUI.Widget.TreeView`
 - `TermUI.Widget.FormBuilder`
 
 ## Layout and feedback
 
 - `TermUI.Widget.Block`
+- `TermUI.Widget.Breadcrumb`
 - `TermUI.Widget.Dialog`
 - `TermUI.Widget.AlertDialog`
 - `TermUI.Widget.SplitPane`
 - `TermUI.Widget.Viewport`
 - `TermUI.Widget.ScrollBar`
+- `TermUI.Widget.Spinner`
 - `TermUI.Widget.Toast`
 
 ## Visualization and snapshots
@@ -71,6 +77,45 @@ that message to `TermUI.Clipboard.copy/2` in the parent application. See the
 Snapshot widgets do not call `Process.list/0`, monitor nodes, perform RPC, or
 subscribe to streams. The parent performs those effects and supplies bounded
 data with each widget's setter function.
+
+## Controls and messages
+
+Checkboxes and toggles emit `{:changed, id, checked}`. Radio groups and select
+controls emit `{:selected, id, value}`. Disabled options do not receive focus
+and do not emit messages.
+
+A select control renders its option list in its own frame while it is open.
+Give it more than one row when the option list must be visible.
+
+A spinner does not start a timer. The parent calls
+`TermUI.Widget.Spinner.tick/1` from its timer update.
+
+## Layout and composition
+
+`TermUI.Layout` allocates zero-based rectangles. Fixed tracks use an integer.
+Flexible tracks use `:fill` or `{:weight, value}`.
+
+```elixir
+root = TermUI.Layout.new({80, 24})
+[nav, main] = TermUI.Layout.row(root, [24, :fill], gap: 1)
+
+frame =
+  TermUI.Frame.new(80, 24)
+  |> TermUI.Layout.place(nav_frame, nav)
+  |> TermUI.Layout.place(main_frame, main)
+```
+
+Use `column/3` for vertical tracks. Use `grid/3` for equal grid cells. The
+`:columns` and optional `:rows` values keep the configured grid tracks even
+when the grid has fewer items.
+`Block.compose/3`, `Dialog.compose/3`, and `Tabs.compose/3` can render a frame,
+a `{widget_module, widget_state}` pair, or a one-argument renderer function.
+
+Buttons accept `:prefix` and `:suffix` decorations. List items, menu actions,
+tree nodes, and tabs can include icons. Lists, menus, and tabs can show
+shortcuts. Menus support vertical and horizontal orientation. Tabs support
+left, center, and right alignment. Tabs, menus, radio groups, selects, trees,
+and dialogs skip disabled choices during keyboard navigation.
 
 ## Bounded streams
 

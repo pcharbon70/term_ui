@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added a tested interactive showcase for live widgets, input, rich content,
   BEAM snapshots, and the TermUI architecture.
+- Added pure checkbox, toggle, radio group, select, spinner, and breadcrumb
+  widgets, with a Controls page in the showcase.
+- Added pure row, column, fixed-grid, inset, placement, and mouse-region layout
+  helpers.
 - Added complete raw control-byte input on OTP 28 and OTP 29. A small native
   terminal layer now passes Ctrl+O, Ctrl+C, Ctrl+S, and Ctrl+Q to applications
   and restores the original terminal flags during shutdown.
@@ -32,6 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   supplied by the parent application. They do not own effect processes.
 - Markdown rendering and incremental documents now share one internal parser
   dependency, which removes their cross-reference cycle.
+- Buttons, lists, menus, tabs, trees, blocks, and dialogs now support richer
+  decoration, disabled-item navigation, and child-frame composition.
 
 ### Fixed
 

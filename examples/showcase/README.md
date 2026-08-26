@@ -1,6 +1,6 @@
 # Interactive showcase
 
-This application is an executable catalog of TermUI widgets and architecture.
+This application is a representative executable demo of TermUI widgets and architecture.
 It uses only the public Elm application, widget, frame, event, command, and
 clipboard contracts.
 
@@ -29,7 +29,7 @@ Showcase.App.run(data_mode: :snapshot)
 
 ## Controls
 
-- Escape opens the command menu. Press 1 through 5 to select a page.
+- Escape opens the command menu. Press 1 through 6 to select a page.
 - In the command menu, N and P select the next or previous page, R refreshes
   data, T changes the theme, and Q stops the application.
 - Ctrl+N and Ctrl+P select the next or previous page without opening the menu.
@@ -74,6 +74,12 @@ processes, monitor nodes, or perform RPC.
 
 Explains the application, widget, frame, and backend ownership seams inside the
 running TermUI application.
+
+### Controls
+
+Shows checkbox, toggle, radio group, select, spinner, and breadcrumb widgets.
+The application owns all Controls page state. Its existing refresh timer
+advances the pure spinner state.
 
 ## Structure
 

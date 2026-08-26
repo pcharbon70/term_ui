@@ -3,7 +3,7 @@ defmodule TermUI.Widget.List do
 
   @behaviour TermUI.Widget
 
-  alias TermUI.{Event, Style}
+  alias TermUI.{Event, Frame, Style}
   alias TermUI.Widget.Helpers
 
   # Dialyzer loses the MapSet opaque type when the selection becomes empty.
@@ -89,14 +89,14 @@ defmodule TermUI.Widget.List do
   def mouse(event, state, _dimensions), do: update(event, state)
 
   @impl true
-  def view(state, {_width, height} = dimensions) do
+  def view(state, {width, height} = dimensions) do
     offset = visible_offset(state.cursor, state.offset, height)
 
     rows =
       state.items
       |> Enum.slice(offset, height)
       |> Enum.with_index(offset)
-      |> Enum.map(&render_item(&1, state))
+      |> Enum.map(&render_item(&1, state, width))
 
     Helpers.frame(rows, dimensions)
   end
@@ -110,16 +110,19 @@ defmodule TermUI.Widget.List do
   @spec current(t()) :: item() | nil
   def current(state), do: Enum.at(state.items, state.cursor)
 
-  defp render_item({item, index}, state) do
+  defp render_item({item, index}, state, width) do
     cursor? = index == state.cursor
     selected? = MapSet.member?(state.selected, index)
 
     prefix =
-      if cursor?, do: state.marker, else: String.duplicate(" ", String.length(state.marker))
+      if cursor?, do: state.marker, else: String.duplicate(" ", Helpers.text_width(state.marker))
 
     check = selection_mark(state.mode, selected?)
     style = item_style(state, cursor?, selected?)
-    [{prefix <> check <> item_label(item), style}]
+    {label, icon, shortcut} = item_display(item)
+    icon = if icon == "", do: "", else: icon <> " "
+    text = prefix <> check <> icon <> label
+    [{with_shortcut(text, shortcut, width), style}]
   end
 
   defp selection_mark(:multiple, true), do: "[x] "
@@ -170,7 +173,23 @@ defmodule TermUI.Widget.List do
 
   defp visible_offset(_cursor, offset, _height), do: offset
 
-  defp item_label(%{label: label}), do: to_string(label)
-  defp item_label({_id, label}), do: to_string(label)
-  defp item_label(item), do: to_string(item)
+  defp item_display(%{label: label} = item) do
+    icon = item |> Map.get(:icon, "") |> to_string()
+    shortcut = Map.get(item, :shortcut, Map.get(item, :hotkey))
+    {to_string(label), icon, shortcut && to_string(shortcut)}
+  end
+
+  defp item_display({_id, label}), do: {to_string(label), "", nil}
+  defp item_display(item), do: {to_string(item), "", nil}
+
+  defp with_shortcut(text, nil, _width), do: text
+
+  defp with_shortcut(text, shortcut, width) do
+    shortcut_width = Helpers.text_width(shortcut)
+    label_width = max(width - shortcut_width - 1, 0)
+
+    if label_width == 0,
+      do: Frame.fit(shortcut, width),
+      else: Frame.fit(text, label_width) <> " " <> shortcut
+  end
 end

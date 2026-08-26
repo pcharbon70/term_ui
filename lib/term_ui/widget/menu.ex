@@ -1,5 +1,10 @@
 defmodule TermUI.Widget.Menu do
-  @moduledoc "A pure keyboard menu with actions, separators, and disabled items."
+  @moduledoc """
+  A pure keyboard menu with actions, separators, and disabled items.
+
+  The `:variant` option changes the selected-item style. Use `:plain`, `:line`,
+  or `:filled`.
+  """
 
   @behaviour TermUI.Widget
 
@@ -11,6 +16,7 @@ defmodule TermUI.Widget.Menu do
           required(:label) => String.t(),
           optional(:disabled) => boolean(),
           optional(:separator) => boolean(),
+          optional(:icon) => String.t() | nil,
           optional(:shortcut) => String.t() | nil,
           optional(:message) => term()
         }
@@ -18,13 +24,17 @@ defmodule TermUI.Widget.Menu do
           items: [item()],
           cursor: non_neg_integer(),
           title: String.t() | nil,
-          visible: boolean()
+          visible: boolean(),
+          orientation: :vertical | :horizontal,
+          variant: :plain | :line | :filled
         }
   @schema Zoi.struct(__MODULE__, %{
             items: Zoi.array() |> Zoi.default([]),
             cursor: Zoi.integer() |> Zoi.non_negative() |> Zoi.default(0),
             title: Zoi.any() |> Zoi.default(nil),
-            visible: Zoi.boolean() |> Zoi.default(true)
+            visible: Zoi.boolean() |> Zoi.default(true),
+            orientation: Zoi.enum([:vertical, :horizontal]) |> Zoi.default(:vertical),
+            variant: Zoi.enum([:plain, :line, :filled]) |> Zoi.default(:plain)
           })
   @enforce_keys Zoi.Struct.enforce_keys(@schema)
   defstruct Zoi.Struct.struct_fields(@schema)
@@ -37,7 +47,11 @@ defmodule TermUI.Widget.Menu do
       label: IO.iodata_to_binary(label),
       disabled: Keyword.get(opts, :disabled, false),
       separator: false,
-      shortcut: Keyword.get(opts, :shortcut),
+      icon: Keyword.get(opts, :icon),
+      shortcut:
+        opts
+        |> Keyword.get(:shortcut, Keyword.get(opts, :hotkey))
+        |> normalize_decoration(),
       message: Keyword.get(opts, :message, {:selected, id})
     }
   end
@@ -45,7 +59,15 @@ defmodule TermUI.Widget.Menu do
   @doc "Creates one separator."
   @spec separator() :: item()
   def separator,
-    do: %{id: make_ref(), label: "", disabled: true, separator: true, shortcut: nil, message: nil}
+    do: %{
+      id: make_ref(),
+      label: "",
+      disabled: true,
+      separator: true,
+      icon: nil,
+      shortcut: nil,
+      message: nil
+    }
 
   @impl true
   def init(opts) do
@@ -55,14 +77,16 @@ defmodule TermUI.Widget.Menu do
       items: items,
       cursor: first_enabled(items),
       title: Keyword.get(opts, :title),
-      visible: Keyword.get(opts, :visible, true)
+      visible: Keyword.get(opts, :visible, true),
+      orientation: Keyword.get(opts, :orientation, :vertical),
+      variant: Keyword.get(opts, :variant, :plain)
     }
   end
 
   @impl true
   def update(_event, %{visible: false} = state), do: {state, []}
-  def update(%Event.Key{key: :up}, state), do: move(state, -1)
-  def update(%Event.Key{key: :down}, state), do: move(state, 1)
+  def update(%Event.Key{key: key}, state) when key in [:up, :left], do: move(state, -1)
+  def update(%Event.Key{key: key}, state) when key in [:down, :right], do: move(state, 1)
 
   def update(%Event.Key{key: :home}, state),
     do: {%{state | cursor: first_enabled(state.items)}, []}
@@ -76,12 +100,13 @@ defmodule TermUI.Widget.Menu do
   @impl true
   def mouse(_event, %{visible: false} = state, _dimensions), do: {state, []}
 
-  def mouse(%Event.Mouse{action: action, button: :left, y: y}, state, {width, height})
+  def mouse(%Event.Mouse{action: action, button: :left, x: x, y: y}, state, {width, height})
       when action in [:press, :release] do
     border_offset = if width > 1 and height > 1, do: 1, else: 0
-    index = y - border_offset
 
-    item = if index >= 0, do: Enum.at(state.items, index)
+    index = menu_item_at(state, {x, y}, {width, height}, border_offset)
+
+    item = if is_integer(index) and index >= 0, do: Enum.at(state.items, index)
 
     if enabled?(item) do
       state = %{state | cursor: index}
@@ -97,24 +122,43 @@ defmodule TermUI.Widget.Menu do
   def view(%{visible: false}, dimensions), do: Helpers.frame([], dimensions)
 
   def view(state, {width, height} = dimensions) do
-    cursor_style = Style.new(attrs: [:reverse])
+    cursor_style = cursor_style(state.variant)
     disabled_style = Style.new(fg: :bright_black)
     separator_style = Style.new(fg: :bright_black)
     inner_width = max(width - 2, 1)
 
     rows =
-      state.items
-      |> Enum.with_index()
-      |> Enum.map(
-        &render_item(
-          &1,
-          inner_width,
-          state.cursor,
-          cursor_style,
-          disabled_style,
-          separator_style
-        )
-      )
+      case state.orientation do
+        :vertical ->
+          state.items
+          |> Enum.with_index()
+          |> Enum.map(
+            &render_vertical_item(
+              &1,
+              inner_width,
+              state.cursor,
+              cursor_style,
+              disabled_style,
+              separator_style
+            )
+          )
+
+        :horizontal ->
+          [
+            state.items
+            |> Enum.with_index()
+            |> Enum.flat_map(
+              &render_horizontal_item(
+                &1,
+                state.cursor,
+                cursor_style,
+                disabled_style,
+                separator_style
+              )
+            )
+            |> Enum.drop(-1)
+          ]
+      end
 
     rows = Helpers.border(rows, dimensions, title: state.title)
     Helpers.frame(Enum.take(rows, height), dimensions)
@@ -132,13 +176,28 @@ defmodule TermUI.Widget.Menu do
   @spec current(t()) :: item() | nil
   def current(state), do: Enum.at(state.items, state.cursor)
 
-  defp render_item({%{separator: true}, _index}, width, _cursor, _cursor_style, _disabled, style),
-    do: [{String.duplicate("─", width), style}]
+  defp render_vertical_item(
+         {%{separator: true}, _index},
+         width,
+         _cursor,
+         _cursor_style,
+         _disabled,
+         style
+       ),
+       do: [{String.duplicate("─", width), style}]
 
-  defp render_item({item, index}, width, cursor, cursor_style, disabled_style, _separator) do
+  defp render_vertical_item(
+         {item, index},
+         width,
+         cursor,
+         cursor_style,
+         disabled_style,
+         _separator
+       ) do
     shortcut = if item.shortcut, do: " " <> item.shortcut, else: ""
-    label_width = max(width - String.length(shortcut) - 2, 1)
-    text = "  " <> Helpers.align(item.label, label_width, :left) <> shortcut
+    prefix = item_prefix(item)
+    label_width = max(width - Helpers.text_width(shortcut) - Helpers.text_width(prefix), 1)
+    text = prefix <> Helpers.align(item.label, label_width, :left) <> shortcut
 
     style =
       cond do
@@ -148,6 +207,32 @@ defmodule TermUI.Widget.Menu do
       end
 
     [{text, style}]
+  end
+
+  defp render_horizontal_item(
+         {%{separator: true}, _index},
+         _cursor,
+         _cursor_style,
+         _disabled,
+         style
+       ),
+       do: [{"│", style}, " "]
+
+  defp render_horizontal_item(
+         {item, index},
+         cursor,
+         cursor_style,
+         disabled_style,
+         _separator
+       ) do
+    style =
+      cond do
+        item.disabled -> disabled_style
+        index == cursor -> cursor_style
+        true -> Style.new()
+      end
+
+    [{horizontal_item_text(item), style}, "  "]
   end
 
   defp activate(state) do
@@ -193,4 +278,73 @@ defmodule TermUI.Widget.Menu do
 
   defp normalize_item({id, label}), do: action(id, label)
   defp normalize_item(label), do: action(label, label)
+
+  defp item_prefix(item) do
+    case Map.get(item, :icon) do
+      nil -> "  "
+      "" -> "  "
+      icon -> " " <> to_string(icon) <> " "
+    end
+  end
+
+  defp horizontal_item_text(%{separator: true}), do: "│"
+
+  defp horizontal_item_text(item) do
+    icon = if Map.get(item, :icon) in [nil, ""], do: "", else: to_string(item.icon) <> " "
+    shortcut = if item.shortcut, do: " " <> item.shortcut, else: ""
+    " " <> icon <> item.label <> shortcut <> " "
+  end
+
+  defp horizontal_item_at(items, x) when x >= 0 do
+    items
+    |> Enum.with_index()
+    |> Enum.reduce_while({:after, 0}, fn {item, index}, {:after, start} ->
+      finish = start + Helpers.text_width(horizontal_item_text(item))
+
+      if x >= start and x < finish,
+        do: {:halt, {:found, index}},
+        else: {:cont, {:after, finish + horizontal_item_gap(item)}}
+    end)
+    |> case do
+      {:found, index} -> index
+      _other -> nil
+    end
+  end
+
+  defp horizontal_item_at(_items, _x), do: nil
+
+  defp horizontal_item_gap(%{separator: true}), do: 1
+  defp horizontal_item_gap(_item), do: 2
+
+  defp menu_item_at(
+         %{orientation: :vertical},
+         {x, y},
+         {width, height},
+         border_offset
+       ) do
+    index = y - border_offset
+
+    if x >= border_offset and x < width - border_offset and index >= 0 and
+         y < height - border_offset,
+       do: index
+  end
+
+  defp menu_item_at(
+         %{orientation: :horizontal, items: items},
+         {x, y},
+         {width, height},
+         border_offset
+       ) do
+    if y == border_offset and x >= border_offset and x < width - border_offset and
+         y < height - border_offset,
+       do: horizontal_item_at(items, x - border_offset)
+  end
+
+  defp cursor_style(:plain), do: Style.new(attrs: [:reverse])
+  defp cursor_style(:line), do: Style.new(fg: :cyan, attrs: [:bold, :underline])
+  defp cursor_style(:filled), do: Style.new(fg: :black, bg: :cyan, attrs: [:bold])
+
+  defp normalize_decoration(nil), do: nil
+  defp normalize_decoration(value) when is_list(value), do: IO.iodata_to_binary(value)
+  defp normalize_decoration(value), do: to_string(value)
 end

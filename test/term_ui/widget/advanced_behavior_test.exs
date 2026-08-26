@@ -242,7 +242,7 @@ defmodule TermUI.Widget.AdvancedBehaviorTest do
         ]
       )
 
-    assert {^dialog, []} = Dialog.update(Event.key(:enter), dialog)
+    assert {^dialog, [:accepted]} = Dialog.update(Event.key(:enter), dialog)
     assert {dialog, []} = Dialog.update(Event.key(:right), dialog)
     assert {_dialog, [:accepted]} = Dialog.update(Event.text(" "), dialog)
     assert %Frame{} = Dialog.view(dialog, {24, 6})
@@ -402,7 +402,8 @@ defmodule TermUI.Widget.AdvancedBehaviorTest do
     assert {^tabs, []} = Tabs.mouse(Event.mouse(:release, :left, 99, 0), tabs, {12, 3})
 
     assert {tabs, _} = Tabs.update(Event.key(:right), tabs)
-    assert {^tabs, []} = Tabs.update(Event.key(:enter), tabs)
+    assert {tabs, [{:selected, :rows}]} = Tabs.update(Event.key(:enter), tabs)
+    assert Tabs.selected(tabs).id == :rows
     tabs = Tabs.select(tabs, :rows)
     assert Tabs.selected(tabs).id == :rows
     assert %Frame{} = Tabs.view(tabs, {12, 3})

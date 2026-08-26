@@ -73,6 +73,7 @@ defmodule Showcase.AppTest do
     assert state.page_states.content.refreshes == 1
     assert state.page_states.beam.processes.snapshots == snapshot.processes
     assert state.page_states.beam.cluster.nodes == snapshot.cluster
+    assert state.page_states.controls.spinner.phase == 1
   end
 
   test "the refresh timer starts collection without overlapping work" do
@@ -110,6 +111,9 @@ defmodule Showcase.AppTest do
     assert state.page == :beam
     refute state.command_mode
 
+    state = App.update({:command_key, "6"}, state)
+    assert state.page == :controls
+
     assert {:msg, :next_page} =
              App.event_to_msg(Event.key("n", modifiers: [:ctrl]), %{})
 
@@ -139,6 +143,18 @@ defmodule Showcase.AppTest do
     assert Enum.any?(snapshot.cluster, &(&1.node == node()))
     assert [%{id: :runtime, children: children}] = snapshot.runtime_tree
     assert is_list(children)
+  end
+
+  test "the controls page owns and updates new widget state" do
+    state = App.init(dimensions: {90, 26}, data_mode: :snapshot)
+    state = {:select_page, :controls} |> App.update(state) |> state_from()
+
+    state = {:page_event, Event.key(:space)} |> App.update(state) |> state_from()
+    refute state.page_states.controls.checkbox.checked
+
+    state = {:page_event, Event.key(:tab)} |> App.update(state) |> state_from()
+    state = {:page_event, Event.key(:space)} |> App.update(state) |> state_from()
+    refute state.page_states.controls.toggle.checked
   end
 
   defp state_from({state, _commands}), do: state

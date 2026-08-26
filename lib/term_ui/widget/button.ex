@@ -9,6 +9,8 @@ defmodule TermUI.Widget.Button do
   @type t :: %__MODULE__{
           id: term(),
           label: String.t(),
+          prefix: String.t(),
+          suffix: String.t(),
           focused: boolean(),
           pressed: boolean(),
           disabled: boolean(),
@@ -21,6 +23,8 @@ defmodule TermUI.Widget.Button do
   @schema Zoi.struct(__MODULE__, %{
             id: Zoi.any() |> Zoi.default(nil),
             label: Zoi.string() |> Zoi.default("Button"),
+            prefix: Zoi.string() |> Zoi.default(""),
+            suffix: Zoi.string() |> Zoi.default(""),
             focused: Zoi.boolean() |> Zoi.default(false),
             pressed: Zoi.boolean() |> Zoi.default(false),
             disabled: Zoi.boolean() |> Zoi.default(false),
@@ -41,6 +45,8 @@ defmodule TermUI.Widget.Button do
     %__MODULE__{
       id: id,
       label: opts |> Keyword.get(:label, "Button") |> to_string(),
+      prefix: opts |> Keyword.get(:prefix, "") |> to_string(),
+      suffix: opts |> Keyword.get(:suffix, "") |> to_string(),
       focused: Keyword.get(opts, :focused, false),
       disabled: Keyword.get(opts, :disabled, false),
       message: Keyword.get(opts, :message, {:pressed, id}),
@@ -75,9 +81,10 @@ defmodule TermUI.Widget.Button do
     marker = if state.pressed, do: "<", else: "["
     end_marker = if state.pressed, do: ">", else: "]"
 
-    row = [
-      {Helpers.align(marker <> " " <> state.label <> " " <> end_marker, width, :center), style}
-    ]
+    label =
+      [state.prefix, state.label, state.suffix] |> Enum.reject(&(&1 == "")) |> Enum.join(" ")
+
+    row = [{Helpers.align(marker <> " " <> label <> " " <> end_marker, width, :center), style}]
 
     Helpers.frame([row], dimensions)
   end

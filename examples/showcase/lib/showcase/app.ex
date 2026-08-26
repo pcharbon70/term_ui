@@ -6,7 +6,7 @@ defmodule Showcase.App do
   alias TermUI.Event.{Key, Resize, Text}
   alias TermUI.{Clipboard, Command, Frame, Style}
   alias Showcase.{LiveData, SnapshotData}
-  alias Showcase.Pages.{Architecture, Beam, Content, Inputs, Overview}
+  alias Showcase.Pages.{Architecture, Beam, Content, Controls, Inputs, Overview}
 
   @refresh_interval 1_000
   @pages [
@@ -14,7 +14,8 @@ defmodule Showcase.App do
     {:inputs, "Inputs", Inputs},
     {:content, "Content", Content},
     {:beam, "BEAM", Beam},
-    {:architecture, "Architecture", Architecture}
+    {:architecture, "Architecture", Architecture},
+    {:controls, "Controls", Controls}
   ]
 
   @impl true
@@ -36,7 +37,7 @@ defmodule Showcase.App do
       page_states: page_states,
       refreshing: data_mode == :live,
       theme: :dark,
-      status: "Press Escape, then 1 through 5, to select a page"
+      status: "Press Escape, then 1 through 6, to select a page"
     }
 
     case data_mode do
@@ -52,7 +53,7 @@ defmodule Showcase.App do
   def event_to_msg(%Key{key: :escape}, _state), do: {:msg, :toggle_command_mode}
 
   def event_to_msg(%Text{text: key}, %{command_mode: true})
-      when key in ["1", "2", "3", "4", "5", "n", "p", "q", "r", "t"],
+      when key in ["1", "2", "3", "4", "5", "6", "n", "p", "q", "r", "t"],
       do: {:msg, {:command_key, key}}
 
   def event_to_msg(%Key{key: key}, %{command_mode: true}) when key in [:left, :right],
@@ -216,7 +217,7 @@ defmodule Showcase.App do
   end
 
   defp footer_row(%{command_mode: true}, width) do
-    menu = "Choose 1-5 page  N/P next  R refresh  T theme  Q quit  Esc close"
+    menu = "Choose 1-6 page  N/P next  R refresh  T theme  Q quit  Esc close"
     [{Frame.fit(menu, width), Style.new(fg: :black, bg: :cyan, attrs: [:bold])}]
   end
 
@@ -248,7 +249,7 @@ defmodule Showcase.App do
     %{
       state
       | command_mode: true,
-        status: "Choose 1-5 page, N/P next, R refresh, T theme, or Q quit"
+        status: "Choose 1-6 page, N/P next, R refresh, T theme, or Q quit"
     }
   end
 
@@ -271,6 +272,7 @@ defmodule Showcase.App do
   defp command_message("3"), do: {:select_page, :content}
   defp command_message("4"), do: {:select_page, :beam}
   defp command_message("5"), do: {:select_page, :architecture}
+  defp command_message("6"), do: {:select_page, :controls}
   defp command_message("n"), do: :next_page
   defp command_message("p"), do: :previous_page
   defp command_message("q"), do: :quit
@@ -297,6 +299,7 @@ defmodule Showcase.App do
       |> Map.update!(:overview, &Overview.set_snapshot(&1, snapshot))
       |> Map.update!(:content, &Content.set_snapshot(&1, snapshot))
       |> Map.update!(:beam, &Beam.set_snapshot(&1, snapshot))
+      |> Map.update!(:controls, &Controls.tick/1)
 
     %{state | last_snapshot: snapshot, page_states: page_states}
   end

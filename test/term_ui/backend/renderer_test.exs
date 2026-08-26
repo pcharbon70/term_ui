@@ -69,6 +69,19 @@ defmodule TermUI.Backend.RendererTest do
     assert output == "\e[1;1H\e[0m+-\e[0m"
   end
 
+  test "maps Unicode spinner and sparkline level lists to ASCII" do
+    output =
+      [
+        {{1, 1}, {"⣾", :default, :default, []}},
+        {{1, 2}, {"▁", :default, :default, []}},
+        {{1, 3}, {"▇", :default, :default, []}}
+      ]
+      |> Renderer.render(:true_color, :ascii)
+      |> IO.iodata_to_binary()
+
+    assert output == "\e[1;1H\e[0m|_=\e[0m"
+  end
+
   test "renders every color mode and supported text attribute" do
     attributes = [
       :bold,

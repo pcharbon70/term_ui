@@ -3,7 +3,7 @@ defmodule TermUI.Widget.Dialog do
 
   @behaviour TermUI.Widget
 
-  alias TermUI.{Event, Frame, Style}
+  alias TermUI.{Event, Frame, Layout, Style}
   alias TermUI.Widget.Helpers
 
   @type button :: %{
@@ -33,11 +33,14 @@ defmodule TermUI.Widget.Dialog do
 
   @impl true
   def init(opts) do
+    buttons = opts |> Keyword.get(:buttons, []) |> Enum.map(&normalize_button/1)
+    requested_focus = max(Keyword.get(opts, :focused, 0), 0)
+
     %__MODULE__{
       title: opts |> Keyword.get(:title, "") |> to_string(),
       content: normalize_content(Keyword.get(opts, :content, "")),
-      buttons: opts |> Keyword.get(:buttons, []) |> Enum.map(&normalize_button/1),
-      focused: max(Keyword.get(opts, :focused, 0), 0),
+      buttons: buttons,
+      focused: enabled_focus(buttons, requested_focus),
       visible: Keyword.get(opts, :visible, true),
       dismiss_message: Keyword.get(opts, :dismiss_message, :dismissed)
     }
@@ -59,7 +62,7 @@ defmodule TermUI.Widget.Dialog do
   def mouse(_event, %{visible: false} = state, _dimensions), do: {state, []}
 
   def mouse(%Event.Mouse{action: action, button: :left, x: x, y: y}, state, {width, height})
-      when action in [:press, :release] do
+      when action in [:press, :release] and width > 2 and height >= 3 do
     if y == height - 2 do
       case button_at(state.buttons, x - 1, width - 2) do
         nil ->
@@ -83,13 +86,20 @@ defmodule TermUI.Widget.Dialog do
     body_height = max(height - 3, 0)
     button_style = Style.new(fg: :bright_black)
     focused_style = Style.new(fg: :black, bg: :cyan, attrs: [:bold])
+    disabled_style = Style.new(fg: :bright_black, attrs: [:dim])
 
     button_row =
       state.buttons
       |> Enum.with_index()
       |> Enum.flat_map(fn {button, index} ->
-        style = if index == state.focused, do: focused_style, else: button_style
-        [{"[ " <> button.label <> " ]", style}, " "]
+        style =
+          cond do
+            button.disabled -> disabled_style
+            index == state.focused -> focused_style
+            true -> button_style
+          end
+
+        [{button_text(button), style}, " "]
       end)
 
     rows =
@@ -108,11 +118,37 @@ defmodule TermUI.Widget.Dialog do
   @spec hide(t()) :: t()
   def hide(state), do: %{state | visible: false}
 
+  @doc "Returns the zero-based rectangle available to child content."
+  @spec content_rect(t(), TermUI.Widget.dimensions()) :: Layout.rect()
+  def content_rect(_state, {width, height}) when width > 1 and height > 1,
+    do: {1, 1, max(width - 2, 0), max(height - 3, 0)}
+
+  def content_rect(_state, {width, height}), do: {0, 0, width, max(height - 1, 0)}
+
+  @doc "Renders and clips pure child content inside the dialog body."
+  @spec compose(t(), TermUI.Widget.dimensions(), TermUI.Widget.renderable()) :: Frame.t()
+  def compose(%{visible: false} = state, dimensions, _child), do: view(state, dimensions)
+
+  def compose(state, dimensions, child) do
+    Helpers.compose(view(state, dimensions), content_rect(state, dimensions), child)
+  end
+
   defp move(%{buttons: []} = state, _delta), do: {state, []}
 
   defp move(state, delta) do
-    count = length(state.buttons)
-    {%{state | focused: rem(state.focused + delta + count, count)}, []}
+    indices = enabled_indices(state.buttons)
+
+    case indices do
+      [] ->
+        {state, []}
+
+      _indices ->
+        position =
+          Enum.find_index(indices, &(&1 == state.focused)) || if(delta < 0, do: 0, else: -1)
+
+        next = Enum.at(indices, rem(position + delta + length(indices), length(indices)))
+        {%{state | focused: next}, []}
+    end
   end
 
   defp activate(state) do
@@ -130,15 +166,15 @@ defmodule TermUI.Widget.Dialog do
     buttons
     |> Enum.with_index()
     |> Enum.reduce_while({:after, 0}, fn {button, index}, {:after, start} ->
-      finish = start + Helpers.text_width("[ " <> button.label <> " ]") + 1
+      finish = start + Helpers.text_width(button_text(button))
 
-      if x < finish,
-        do: {:halt, {:found, index}},
-        else: {:cont, {:after, finish}}
+      if x >= start and x < finish,
+        do: {:halt, if(button.disabled, do: :none, else: {:found, index})},
+        else: {:cont, {:after, finish + 1}}
     end)
     |> case do
       {:found, index} -> index
-      {:after, _finish} -> nil
+      _other -> nil
     end
   end
 
@@ -160,4 +196,24 @@ defmodule TermUI.Widget.Dialog do
 
   defp normalize_button({id, label}),
     do: %{id: id, label: to_string(label), message: {:selected, id}, disabled: false}
+
+  defp button_text(button), do: "[ " <> button.label <> " ]"
+
+  defp enabled_focus(buttons, requested) do
+    requested = Helpers.clamp(requested, 0, max(length(buttons) - 1, 0))
+
+    if enabled?(Enum.at(buttons, requested)),
+      do: requested,
+      else: List.first(enabled_indices(buttons)) || 0
+  end
+
+  defp enabled_indices(buttons) do
+    buttons
+    |> Enum.with_index()
+    |> Enum.filter(fn {button, _index} -> enabled?(button) end)
+    |> Enum.map(&elem(&1, 1))
+  end
+
+  defp enabled?(%{disabled: false}), do: true
+  defp enabled?(_button), do: false
 end

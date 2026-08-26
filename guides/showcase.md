@@ -1,8 +1,8 @@
 # Interactive showcase
 
-The TermUI showcase is an executable catalog for the public application,
-widget, frame, event, command, and clipboard contracts. It also explains the
-ownership rules from inside a running terminal application.
+The TermUI showcase is a representative executable demo of the public
+application, widget, frame, event, command, and clipboard contracts. It also
+explains the ownership rules from inside a running terminal application.
 
 ## Run the application
 
@@ -18,7 +18,7 @@ mix run run.exs
 See the [showcase source and full control
 list](https://github.com/pcharbon70/term_ui/tree/develop/examples/showcase).
 
-Press Escape and then 1 through 5 to select a page. This command menu does not
+Press Escape and then 1 through 6 to select a page. This command menu does not
 depend on terminal function-key settings.
 
 ## What it demonstrates
@@ -32,6 +32,8 @@ depend on terminal function-key settings.
   snapshots.
 - The Architecture page explains the active application, frame, and backend
   seams.
+- The Controls page shows checkbox, toggle, radio group, select, spinner, and
+  breadcrumb widgets with parent-owned state.
 
 ## Application structure
 

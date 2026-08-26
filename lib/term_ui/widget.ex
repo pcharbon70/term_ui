@@ -24,6 +24,8 @@ defmodule TermUI.Widget do
   @type state :: term()
   @type message :: term()
   @type dimensions :: {width :: pos_integer(), height :: pos_integer()}
+  @type renderable ::
+          TermUI.Frame.t() | {module(), state()} | (dimensions() -> TermUI.Frame.t())
 
   @callback init(keyword()) :: state()
   @callback update(Event.t(), state()) :: {state(), [message()]}

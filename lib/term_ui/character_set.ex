@@ -39,6 +39,7 @@ defmodule TermUI.CharacterSet do
   - `bar_empty` - Empty/light block for unfilled progress
   - `bar_levels` - List of characters for fractional progress (8 levels Unicode, 5 ASCII)
   - `sparkline_levels` - List of vertical bar characters for sparklines
+  - `spinner_frames` - List of animation frames for spinners
 
   ### Indicators
   - `check` - Check mark for success/selected
@@ -135,6 +136,7 @@ defmodule TermUI.CharacterSet do
           info: String.t(),
           warning: String.t(),
           loading: String.t(),
+          spinner_frames: [String.t()],
           # Misc
           ellipsis: String.t(),
           dot: String.t()
@@ -194,6 +196,7 @@ defmodule TermUI.CharacterSet do
     info: "ℹ",
     warning: "⚠",
     loading: "⟳",
+    spinner_frames: ["⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷"],
     # Misc
     ellipsis: "…",
     dot: "•"
@@ -252,6 +255,7 @@ defmodule TermUI.CharacterSet do
     info: "i",
     warning: "!",
     loading: "*",
+    spinner_frames: ["|", "/", "-", "\\"],
     # Misc (ASCII)
     ellipsis: "...",
     dot: "*"

@@ -115,14 +115,18 @@ The supplied pure widgets include:
 
 - Text: label, single-line input, validated line input, multiline text area,
   Markdown viewer, log viewer, stream view, and diff viewer.
-- Selection: button, list, pick list, menu, context menu, command palette,
-  tabs, table, tree view, and forms.
-- Layout: block, dialog, alert dialog, split pane, viewport, scrollbar, and toast.
+- Selection: button, checkbox, toggle, radio group, select, list, pick list,
+  menu, context menu, command palette, tabs, table, tree view, and forms.
+- Layout and feedback: block, breadcrumb, dialog, alert dialog, split pane,
+  viewport, scrollbar, spinner, and toast.
 - Data views: progress, gauge, sparkline, bar chart, line chart, canvas,
   process snapshots, supervision trees, and cluster snapshots.
 
 System views accept data snapshots from the parent. They do not start polling
 processes or perform RPC.
+
+`TermUI.Layout` supplies pure row, column, and fixed-grid rectangle allocation.
+The parent renders child frames and places them in these zero-based rectangles.
 
 ## Streaming and application UI state
 
