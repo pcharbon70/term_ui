@@ -62,7 +62,8 @@ terminal and rendering reports:
 Local automated validation has passed the full test suite across multiple
 seeds, warnings-as-errors compilation, formatting, Credo under the repository's
 current policy, Dialyzer, documentation, dependency checks, Hex retirement
-audit, package-content inspection, and compilation of every example. The CI
+and vulnerability audits, package-content inspection, and compilation of every
+example. The CI
 workflow now exercises the minimum TTY-compatible Elixir/OTP pair, the current
 Raw-compatible pair, quality/package checks, and every example on `main`,
 `develop`, and `release/**`.
@@ -323,6 +324,7 @@ mix dialyzer
 mix docs --warnings-as-errors
 mix deps.unlock --check-unused
 mix hex.audit
+mix deps.audit
 mix hex.publish --dry-run
 ```
 
@@ -358,7 +360,7 @@ Release gate:
 - [ ] All required automated tests pass with zero failures.
 - [ ] Credo and Dialyzer pass under the agreed policy.
 - [ ] Documentation builds without warnings.
-- [ ] Dependency and Hex audits pass.
+- [ ] Dependency vulnerability, lockfile, and Hex retirement audits pass.
 - [ ] Every supported example compiles.
 - [ ] Manual terminal verification passes.
 - [ ] `mix hex.publish --dry-run` passes.

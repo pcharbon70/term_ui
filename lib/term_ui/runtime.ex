@@ -1382,36 +1382,7 @@ defmodule TermUI.Runtime do
   defp diff_row_cells([], [], _row, _col, acc), do: acc
 
   defp diff_row_cells([cur | cur_rest], [prev | prev_rest], row, col, acc) do
-    acc =
-      if Cell.equal?(cur, prev) do
-        # Identical — skip
-        acc
-      else
-        # Cells differ — check what to emit
-        cur_displayable = displayable_cell?(cur)
-        prev_displayable = displayable_cell?(prev)
-
-        acc =
-          if cur_displayable do
-            # New content to draw
-            cell_to_backend_tuple(cur, row, col) ++ acc
-          else
-            acc
-          end
-
-        if prev_displayable and not cur_displayable do
-          # Previous had content, current is empty — need to clear
-          [{{row, col}, {" ", :default, :default, []}} | acc]
-        else
-          if prev_displayable and cur_displayable and
-               prev.bg != nil and prev.bg != :default and cur.char == " " do
-            # Previous had colored bg, current is space — clear to remove bg
-            [{{row, col}, {" ", :default, :default, []}} | acc]
-          else
-            acc
-          end
-        end
-      end
+    acc = diff_cell(cur, prev, row, col, acc)
 
     diff_row_cells(cur_rest, prev_rest, row, col + 1, acc)
   end
@@ -1438,6 +1409,41 @@ defmodule TermUI.Runtime do
 
     diff_row_cells([], prev_rest, row, col + 1, acc)
   end
+
+  defp diff_cell(cur, prev, row, col, acc) do
+    if Cell.equal?(cur, prev) do
+      acc
+    else
+      cur_displayable = displayable_cell?(cur)
+      prev_displayable = displayable_cell?(prev)
+
+      acc
+      |> add_current_cell(cur, row, col, cur_displayable)
+      |> clear_previous_cell(prev, cur, row, col, prev_displayable, cur_displayable)
+    end
+  end
+
+  defp add_current_cell(acc, cur, row, col, true) do
+    cell_to_backend_tuple(cur, row, col) ++ acc
+  end
+
+  defp add_current_cell(acc, _cur, _row, _col, false), do: acc
+
+  defp clear_previous_cell(acc, prev, cur, row, col, prev_displayable, cur_displayable) do
+    if clear_previous_cell?(prev, cur, prev_displayable, cur_displayable) do
+      [{{row, col}, {" ", :default, :default, []}} | acc]
+    else
+      acc
+    end
+  end
+
+  defp clear_previous_cell?(_prev, _cur, true, false), do: true
+
+  defp clear_previous_cell?(prev, cur, true, true) do
+    prev.bg != nil and prev.bg != :default and cur.char == " "
+  end
+
+  defp clear_previous_cell?(_prev, _cur, _prev_displayable, _cur_displayable), do: false
 
   defp displayable_cell?(%Cell{} = cell) do
     cell.char != " " or (cell.bg != nil and cell.bg != :default)

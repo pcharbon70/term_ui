@@ -26,6 +26,9 @@ rendering, constraint-based layouts, and the complete widget set.
 - Moved input polling outside the runtime process.
 - Added terminal-output run coalescing and linear-time buffer diffing.
 - Improved Markdown rendering and example consistency.
+- Upgraded MDEx to a security-maintained release and removed an unused
+  development dependency that pinned vulnerable HTTP client packages.
+- Added dependency-vulnerability auditing to release CI.
 
 ### Fixed
 

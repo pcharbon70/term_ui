@@ -65,8 +65,10 @@ defmodule TermUI.MixProject do
       # Code quality
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
+      {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false},
 
       # Testing
+      {:castore, "~> 1.0", only: :test},
       {:excoveralls, "~> 0.18", only: :test},
       {:stream_data, "~> 1.0", only: :test},
 
@@ -74,14 +76,11 @@ defmodule TermUI.MixProject do
       {:gen_stage, "~> 1.2"},
 
       # Markdown processing
-      {:mdex, "~> 0.10"},
+      {:mdex, "~> 0.13.2"},
 
       # Syntax highlighting for code blocks
       {:makeup, "~> 1.1"},
-      {:makeup_elixir, "~> 1.0"},
-
-      # LLM usage rules
-      {:usage_rules, "~> 0.1", only: :dev, runtime: false}
+      {:makeup_elixir, "~> 1.0"}
     ]
   end
 

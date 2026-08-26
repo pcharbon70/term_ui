@@ -1364,7 +1364,6 @@ defmodule TermUI.Backend.Raw do
   @spec emit_partial_escape(t(), binary()) :: {:ok, TermUI.Backend.event(), t()}
   defp emit_partial_escape(state, buffer) do
     alias TermUI.Event
-    alias TermUI.Terminal.EscapeParser
 
     # Handle known partial sequences
     case buffer do
