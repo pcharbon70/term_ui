@@ -67,12 +67,12 @@ retirement and vulnerability audits, package-content inspection, and
 compilation of every example. The CI
 workflow now exercises the minimum TTY-compatible Elixir/OTP pair, the current
 Raw-compatible pair, quality/package checks, and every example on `main`,
-`develop`, and `release/**`.
+`develop`, and `release/**`. All four jobs passed for release commit `efe9032`
+in [GitHub Actions run 32999802298](https://github.com/pcharbon70/term_ui/actions/runs/32999802298).
 
 The following gates still require maintainer or platform access and are not
 represented as complete by the local work:
 
-- GitHub CI must run successfully after the release branch is pushed.
 - Raw, TTY, IEx, SSH, resize, cleanup, macOS, WSL/ConPTY, and applicable
   Windows behavior need the manual terminal sign-off listed below.
 - Branch protection and required checks need maintainer approval and repository
