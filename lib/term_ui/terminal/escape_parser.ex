@@ -161,6 +161,13 @@ defmodule TermUI.Terminal.EscapeParser do
     parse_ss3_sequence(rest)
   end
 
+  # Alt+Backspace. macOS terminals commonly encode Option+Delete as ESC DEL,
+  # while some terminal profiles use ESC BS. Consume both forms immediately
+  # instead of leaving them in the partial-sequence buffer indefinitely.
+  defp parse_escape_sequence(<<char, rest::binary>>) when char in [8, @delete] do
+    {:ok, Event.key(:backspace, modifiers: [:alt]), rest}
+  end
+
   # Alt+key (ESC followed by printable character)
   defp parse_escape_sequence(<<char, rest::binary>>) when char in 32..126 do
     char_str = <<char>>

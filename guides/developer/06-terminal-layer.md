@@ -436,9 +436,10 @@ end
 
 ### Windows
 
-- ConPTY for modern terminals
-- Different escape sequence support
-- Windows Terminal provides full ANSI support
+- Windows Terminal and ConPTY can display ANSI escape sequences
+- `TermUI.Platform.Windows` is currently a capability stub
+- Native console-mode setup, raw input, and resize events require a future NIF or port
+- WSL uses the Unix terminal path and should be validated separately
 
 ```elixir
 defp platform do

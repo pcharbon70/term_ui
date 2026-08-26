@@ -124,7 +124,7 @@ See [Getting Started: Backends](02-getting-started.md#understanding-backends-raw
 ## Requirements
 
 - Elixir 1.15+
-- OTP 28+
+- OTP 26+ for TTY mode; OTP 28+ for native raw mode
 - A terminal emulator with ANSI support
 
 ## Next Steps

@@ -67,7 +67,7 @@ end
 
 - Integrates with OTP's terminal handling
 - Works in raw mode
-- Cross-platform (Unix/Windows)
+- Uses OTP IO on supported Unix terminals; native Windows input remains experimental
 - Non-blocking when data available
 
 ## Escape Parser

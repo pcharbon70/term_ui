@@ -13,7 +13,7 @@ TermUI has two types of widgets:
 
 ### Gauge
 
-> **Example:** See [`examples/gauge/`](../../examples/gauge/) for a complete demonstration.
+> **Example:** See [`examples/gauge/`](https://github.com/pcharbon70/term_ui/tree/main/examples/gauge/) for a complete demonstration.
 
 Displays a value as a progress bar with optional color zones.
 
@@ -62,7 +62,7 @@ Gauge.render(
 
 ### Sparkline
 
-> **Example:** See [`examples/sparkline/`](../../examples/sparkline/) for a complete demonstration.
+> **Example:** See [`examples/sparkline/`](https://github.com/pcharbon70/term_ui/tree/main/examples/sparkline/) for a complete demonstration.
 
 Compact inline graph showing trends.
 
@@ -117,7 +117,7 @@ node = Widget.render(widget_state, %{width: 80, height: 24})
 
 ### Table
 
-> **Example:** See [`examples/table/`](../../examples/table/) for a complete demonstration.
+> **Example:** See [`examples/table/`](https://github.com/pcharbon70/term_ui/tree/main/examples/table/) for a complete demonstration.
 
 Scrollable data table with selection and sorting.
 
@@ -177,7 +177,7 @@ end
 
 ### Menu
 
-> **Example:** See [`examples/menu/`](../../examples/menu/) for a complete demonstration.
+> **Example:** See [`examples/menu/`](https://github.com/pcharbon70/term_ui/tree/main/examples/menu/) for a complete demonstration.
 
 Hierarchical menu with submenus and keyboard navigation.
 
@@ -227,7 +227,7 @@ Menu.render(menu_state, %{width: 30, height: 20})
 
 ### TextInput
 
-> **Example:** See [`examples/text_input/`](../../examples/text_input/) for a complete demonstration.
+> **Example:** See [`examples/text_input/`](https://github.com/pcharbon70/term_ui/tree/main/examples/text_input/) for a complete demonstration.
 
 Single-line and multi-line text input with cursor movement.
 
@@ -297,7 +297,7 @@ state = TextInput.clear(state)
 
 ### Dialog
 
-> **Example:** See [`examples/dialog/`](../../examples/dialog/) for a complete demonstration.
+> **Example:** See [`examples/dialog/`](https://github.com/pcharbon70/term_ui/tree/main/examples/dialog/) for a complete demonstration.
 
 Modal dialog with buttons.
 
@@ -341,7 +341,7 @@ Dialog.render(dialog_state, %{width: 80, height: 24})
 
 ### PickList
 
-> **Example:** See [`examples/pick_list/`](../../examples/pick_list/) for a complete demonstration.
+> **Example:** See [`examples/pick_list/`](https://github.com/pcharbon70/term_ui/tree/main/examples/pick_list/) for a complete demonstration.
 
 Modal selection dialog with type-ahead filtering.
 

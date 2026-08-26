@@ -135,6 +135,11 @@ defmodule TermUI.Backend.SSHTest do
       assert output =~ "\e[H"
     end
 
+    test "disables autowrap on init" do
+      {_state, device} = init_ssh()
+      assert device_output(device) =~ "\e[?7l"
+    end
+
     test "enables mouse tracking when requested" do
       {state, device} = init_ssh(mouse_tracking: :click)
       assert state.mouse_mode == :click
@@ -185,6 +190,12 @@ defmodule TermUI.Backend.SSHTest do
       SSH.shutdown(state)
       {_input, output} = StringIO.contents(device)
       assert output =~ "\e[?1000l"
+    end
+
+    test "restores autowrap on shutdown" do
+      {state, device} = init_ssh()
+      SSH.shutdown(state)
+      assert device_output(device) =~ "\e[?7h"
     end
 
     test "handles closed device gracefully" do
@@ -396,6 +407,32 @@ defmodule TermUI.Backend.SSHTest do
       assert output =~ "i"
     end
 
+    test "moves the cursor across a gap between cells" do
+      {state, _device} = init_ssh()
+      {:ok, device} = StringIO.open("")
+      state = %{state | device: device}
+
+      cells = [
+        {{1, 1}, {"A", :default, :default, []}},
+        {{1, 3}, {"B", :default, :default, []}}
+      ]
+
+      {:ok, _state} = SSH.draw_cells(state, cells)
+
+      assert device_output(device) =~ "\e[1;3H"
+    end
+
+    test "tracks display width for wide graphemes" do
+      {state, _device} = init_ssh()
+      {:ok, device} = StringIO.open("")
+      state = %{state | device: device}
+
+      {:ok, state} =
+        SSH.draw_cells(state, [{{1, 1}, {"界", :default, :default, []}}])
+
+      assert state.cursor_position == {1, 3}
+    end
+
     test "emits SGR for colored text" do
       {state, _device} = init_ssh()
       {:ok, device} = StringIO.open("")
@@ -462,6 +499,18 @@ defmodule TermUI.Backend.SSHTest do
       {:ok, _state} = SSH.draw_cells(state, cells)
 
       output = device_output(device)
+      assert output =~ " "
+    end
+
+    test "sanitizes control characters" do
+      {state, _device} = init_ssh()
+      {:ok, device} = StringIO.open("")
+      state = %{state | device: device}
+
+      {:ok, _state} = SSH.draw_cells(state, [{{1, 1}, {"\n", :default, :default, []}}])
+
+      output = device_output(device)
+      refute output =~ "\n"
       assert output =~ " "
     end
   end

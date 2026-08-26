@@ -53,22 +53,33 @@ defmodule TermUI.Widgets.AsciiFallbackTest do
     end
 
     # Save original config
-    original = Application.get_env(:term_ui, :character_set)
+    original = Application.fetch_env(:term_ui, :character_set)
+    original_runtime = :persistent_term.get(:term_ui_character_set, :not_set)
 
     # Set ASCII mode for these tests
+    :persistent_term.erase(:term_ui_character_set)
     Application.put_env(:term_ui, :character_set, :ascii)
 
     on_exit(fn ->
       # Restore original config
-      if original do
-        Application.put_env(:term_ui, :character_set, original)
-      else
-        Application.delete_env(:term_ui, :character_set)
-      end
+      restore_character_set_config(original)
+      restore_runtime_character_set(original_runtime)
     end)
 
     :ok
   end
+
+  defp restore_character_set_config({:ok, value}),
+    do: Application.put_env(:term_ui, :character_set, value)
+
+  defp restore_character_set_config(:error),
+    do: Application.delete_env(:term_ui, :character_set)
+
+  defp restore_runtime_character_set(:not_set),
+    do: :persistent_term.erase(:term_ui_character_set)
+
+  defp restore_runtime_character_set(value),
+    do: :persistent_term.put(:term_ui_character_set, value)
 
   describe "CharacterSet ASCII mode" do
     test "current/0 returns :ascii when configured" do

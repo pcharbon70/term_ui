@@ -34,6 +34,7 @@ defmodule TermUI.Component.RenderNode do
       ])
   """
 
+  alias TermUI.Layout.Constraint
   alias TermUI.Renderer.Cell
   alias TermUI.Renderer.Style
 
@@ -42,12 +43,13 @@ defmodule TermUI.Component.RenderNode do
   @typedoc "A cell with position information for the :cells node type"
   @type positioned_cell :: %{x: non_neg_integer(), y: non_neg_integer(), cell: Cell.t()}
   @type direction :: :vertical | :horizontal
+  @type stack_child :: t() | {t(), Constraint.t()}
 
   @type t :: %__MODULE__{
           type: node_type(),
           content: String.t() | nil,
           style: Style.t() | nil,
-          children: [t()],
+          children: [stack_child()],
           direction: direction() | nil,
           width: non_neg_integer() | :auto | nil,
           height: non_neg_integer() | :auto | nil,
@@ -140,7 +142,7 @@ defmodule TermUI.Component.RenderNode do
       iex> RenderNode.stack(:horizontal, [RenderNode.text("Left"), RenderNode.text("Right")])
       %RenderNode{type: :stack, direction: :horizontal, children: [...]}
   """
-  @spec stack(direction(), [t()], keyword()) :: t()
+  @spec stack(direction(), [stack_child()], keyword()) :: t()
   def stack(direction, children, opts \\ [])
       when direction in [:vertical, :horizontal] and is_list(children) do
     %__MODULE__{

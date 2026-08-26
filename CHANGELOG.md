@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-08-26
+
+TermUI 1.0 establishes the pre-rewrite architecture as the stable release line,
+including the Raw, TTY, and SSH backends, the Elm-style runtime, differential
+rendering, constraint-based layouts, and the complete widget set.
+
+### Added
+
+- SSH backend support for remote terminal sessions.
+- Bracketed-paste parsing into dedicated paste events.
+- Root startup commands and table refresh APIs.
+- Cross-platform terminal testing checklists.
+
+### Changed
+
+- Improved raw terminal output, resilience, and cleanup.
+- Moved input polling outside the runtime process.
+- Added terminal-output run coalescing and linear-time buffer diffing.
+- Improved Markdown rendering and example consistency.
+
+### Fixed
+
+- Constraint tuples in horizontal and vertical stacks now allocate and clip
+  children as documented.
+- macOS Option+Delete no longer stalls the escape-sequence buffer and performs
+  word deletion in text inputs.
+- Concurrent SSH runtimes now use isolated render buffers and avoid mutating
+  local terminal global state.
+- Terminal resize rendering and shutdown races.
+- ANSI style restoration after reset operations.
+- WSL/ConPTY and IEx terminal cleanup behavior.
+- Shift+Tab parsing across CSI variants.
+- Background-color bleeding and overlay rendering artifacts.
+- Elixir 1.18 regular-expression compilation.
+- Safe `stty` execution when no controlling terminal is available.
+- Order-dependent tests, singleton cache lifecycles, documentation links, and
+  static-analysis contracts required for a reproducible release build.
+
+### Known limitations
+
+- Native Windows console support is experimental. TermUI 1.0 does not configure
+  Win32 console modes or implement native raw input and resize handling; use WSL
+  where practical and validate the chosen terminal environment.
+- A resume or external terminal redraw may require `TermUI.Runtime.force_render/1`.
+
 ## [0.2.0] - 2024-12-01
 
 ### Added
@@ -95,6 +140,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Developer guides (architecture, runtime, rendering, events, buffers, terminal, creating widgets)
 - Widget examples with READMEs
 
-[Unreleased]: https://github.com/pcharbon70/term_ui/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/pcharbon70/term_ui/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/pcharbon70/term_ui/compare/v1.0.0-rc...v1.0.0
 [0.2.0]: https://github.com/pcharbon70/term_ui/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/pcharbon70/term_ui/releases/tag/v0.1.0

@@ -73,16 +73,31 @@ defmodule TermUI.Widget.TextInput do
     {:ok, %{state | cursor: String.length(state.value)}}
   end
 
-  def handle_event(%Event.Key{key: :backspace}, state) do
-    if state.cursor > 0 do
-      {before, after_cursor} = String.split_at(state.value, state.cursor)
-      new_value = String.slice(before, 0..-2//1) <> after_cursor
-      new_cursor = state.cursor - 1
+  def handle_event(%Event.Key{key: :backspace, modifiers: modifiers}, state) do
+    cond do
+      :alt in modifiers and state.cursor > 0 ->
+        {before, after_cursor} = String.split_at(state.value, state.cursor)
 
-      {:ok, %{state | value: new_value, cursor: new_cursor},
-       [{:send, self(), {:changed, new_value}}]}
-    else
-      {:ok, state}
+        remaining =
+          before
+          |> String.replace(~r/\s+\z/u, "")
+          |> String.replace(~r/\S+\z/u, "")
+
+        new_value = remaining <> after_cursor
+
+        {:ok, %{state | value: new_value, cursor: String.length(remaining)},
+         [{:send, self(), {:changed, new_value}}]}
+
+      state.cursor > 0 ->
+        {before, after_cursor} = String.split_at(state.value, state.cursor)
+        new_value = String.slice(before, 0..-2//1) <> after_cursor
+        new_cursor = state.cursor - 1
+
+        {:ok, %{state | value: new_value, cursor: new_cursor},
+         [{:send, self(), {:changed, new_value}}]}
+
+      true ->
+        {:ok, state}
     end
   end
 

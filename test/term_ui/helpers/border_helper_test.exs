@@ -1,7 +1,22 @@
 defmodule TermUI.Helpers.BorderHelperTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias TermUI.Helpers.BorderHelper
+
+  setup do
+    original_config = Application.fetch_env(:term_ui, :character_set)
+    original_runtime = :persistent_term.get(:term_ui_character_set, :not_set)
+
+    Application.put_env(:term_ui, :character_set, :unicode)
+    :persistent_term.erase(:term_ui_character_set)
+
+    on_exit(fn ->
+      restore_character_set_config(original_config)
+      restore_runtime_character_set(original_runtime)
+    end)
+
+    :ok
+  end
 
   describe "horizontal_line/1" do
     test "creates line of specified width" do
@@ -189,4 +204,16 @@ defmodule TermUI.Helpers.BorderHelperTest do
       assert row == "││"
     end
   end
+
+  defp restore_character_set_config({:ok, value}),
+    do: Application.put_env(:term_ui, :character_set, value)
+
+  defp restore_character_set_config(:error),
+    do: Application.delete_env(:term_ui, :character_set)
+
+  defp restore_runtime_character_set(:not_set),
+    do: :persistent_term.erase(:term_ui_character_set)
+
+  defp restore_runtime_character_set(value),
+    do: :persistent_term.put(:term_ui_character_set, value)
 end

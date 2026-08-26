@@ -1,6 +1,5 @@
 defmodule TermUI.RuntimeTest do
   use ExUnit.Case, async: false
-  import ExUnit.CaptureLog
 
   alias TermUI.Event
   alias TermUI.Runtime
@@ -461,13 +460,13 @@ defmodule TermUI.RuntimeTest do
     end
 
     test "stores backend mode in persistent_term" do
-      {:ok, runtime} = start_test_runtime(root: Counter)
+      {:ok, _runtime} = start_test_runtime(root: Counter)
 
       assert Runtime.backend_mode() == :skip
     end
 
     test "stores capabilities in persistent_term" do
-      {:ok, runtime} = start_test_runtime(root: Counter)
+      {:ok, _runtime} = start_test_runtime(root: Counter)
 
       # skip_terminal mode doesn't set capabilities
       assert Runtime.capabilities() == nil

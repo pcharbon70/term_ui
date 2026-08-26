@@ -218,9 +218,15 @@ defmodule TermUI.Widgets.TextInput do
     end
   end
 
-  # Backspace
-  def handle_event(%Event.Key{key: :backspace}, state) do
-    state = delete_backward(state)
+  # Backspace; Alt+Backspace / Option+Delete deletes the preceding word.
+  def handle_event(%Event.Key{key: :backspace, modifiers: modifiers}, state) do
+    state =
+      if :alt in modifiers do
+        delete_word_backward(state)
+      else
+        delete_backward(state)
+      end
+
     notify_change(state)
     {:ok, state}
   end
@@ -456,6 +462,21 @@ defmodule TermUI.Widgets.TextInput do
       true ->
         state
     end
+  end
+
+  defp delete_word_backward(%{cursor_col: 0} = state), do: state
+
+  defp delete_word_backward(state) do
+    line = current_line(state)
+    {before_cursor, after_cursor} = String.split_at(line, state.cursor_col)
+
+    remaining =
+      before_cursor
+      |> String.replace(~r/\s+\z/u, "")
+      |> String.replace(~r/\S+\z/u, "")
+
+    lines = List.replace_at(state.lines, state.cursor_row, remaining <> after_cursor)
+    %{state | lines: lines, cursor_col: String.length(remaining)}
   end
 
   defp delete_forward(state) do

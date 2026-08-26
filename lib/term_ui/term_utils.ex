@@ -39,6 +39,7 @@ defmodule TermUI.TermUtils do
           :timeout
           | :command_not_found
           | :invalid_arguments
+          | :not_tty
           | :execution_failed
           | :output_validation_failed
           | term()
@@ -79,6 +80,7 @@ defmodule TermUI.TermUtils do
   - `{:error, :timeout}` - Command exceeded timeout
   - `{:error, :command_not_found}` - stty not found in PATH
   - `{:error, :invalid_arguments}` - Arguments failed validation
+  - `{:error, :not_tty}` - No controlling terminal is available
   - `{:error, reason}` - Other execution error
 
   ## Example

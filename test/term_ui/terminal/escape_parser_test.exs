@@ -207,6 +207,18 @@ defmodule TermUI.Terminal.EscapeParserTest do
   end
 
   describe "parse/1 - Alt+key" do
+    test "parses macOS Option+Delete (ESC DEL) as Alt+Backspace" do
+      {events, remaining} = EscapeParser.parse(<<27, 127>>)
+      assert remaining == <<>>
+      assert [%Event.Key{key: :backspace, modifiers: [:alt]}] = events
+    end
+
+    test "parses ESC BS as Alt+Backspace" do
+      {events, remaining} = EscapeParser.parse(<<27, 8>>)
+      assert remaining == <<>>
+      assert [%Event.Key{key: :backspace, modifiers: [:alt]}] = events
+    end
+
     test "parses Alt+a" do
       {events, remaining} = EscapeParser.parse("\ea")
       assert remaining == <<>>

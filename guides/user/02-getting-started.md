@@ -9,7 +9,7 @@ Add TermUI to your dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:term_ui, path: "../term_ui"}  # Or from Hex when published
+    {:term_ui, "~> 1.0"}
   ]
 end
 ```

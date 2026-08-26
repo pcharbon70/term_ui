@@ -101,6 +101,18 @@ defmodule TermUI.Widgets.TextInputTest do
   end
 
   describe "backspace" do
+    test "Alt+Backspace deletes the word before the cursor" do
+      props = TextInput.new(value: "Hello brave world")
+      {:ok, state} = TextInput.init(props)
+      state = %{state | cursor_col: String.length("Hello brave world")}
+
+      {:ok, state} =
+        TextInput.handle_event(Event.key(:backspace, modifiers: [:alt]), state)
+
+      assert TextInput.get_value(state) == "Hello brave "
+      assert state.cursor_col == String.length("Hello brave ")
+    end
+
     test "deletes character before cursor" do
       props = TextInput.new(value: "Hello")
       {:ok, state} = TextInput.init(props)

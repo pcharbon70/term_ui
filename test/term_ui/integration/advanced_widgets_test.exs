@@ -149,7 +149,7 @@ defmodule TermUI.Integration.AdvancedWidgetsTest do
       assert length(state.buttons) == 2
 
       output = Dialog.render(state, @default_area)
-      assert output != nil
+      assert %{type: :overlay} = output
     end
 
     test "handles visibility toggle" do
@@ -171,7 +171,7 @@ defmodule TermUI.Integration.AdvancedWidgetsTest do
       # Show dialog
       state = %{state | visible: true}
       output = Dialog.render(state, @default_area)
-      assert output != nil
+      assert %{type: :overlay} = output
     end
 
     test "handles keyboard navigation events" do
@@ -209,7 +209,7 @@ defmodule TermUI.Integration.AdvancedWidgetsTest do
       assert length(state.buttons) == 1
 
       output = Dialog.render(state, @default_area)
-      assert output != nil
+      assert %{type: :overlay} = output
     end
   end
 

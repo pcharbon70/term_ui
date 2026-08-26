@@ -6,7 +6,7 @@ defmodule TermUI.Backend.RawTest do
   Callback implementation tests will be added as each section is implemented.
   """
 
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias TermUI.Backend.Raw
 

@@ -1,5 +1,8 @@
 defmodule TermUI.Layout.SolverTest do
-  use ExUnit.Case, async: true
+  # This module includes wall-clock performance assertions, which must not run
+  # concurrently with the rest of the suite or scheduler contention dominates
+  # the work being measured.
+  use ExUnit.Case, async: false
 
   import ExUnit.CaptureLog
 

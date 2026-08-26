@@ -1,5 +1,5 @@
 defmodule TermUI.Layout.IntegrationTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias TermUI.Layout.Alignment
   alias TermUI.Layout.Cache
@@ -263,20 +263,9 @@ defmodule TermUI.Layout.IntegrationTest do
 
   describe "cache integration" do
     setup do
-      # Cache uses a singleton ETS table, just ensure it's started
-      case Cache.start_link([]) do
-        {:ok, _} -> :ok
-        {:error, {:already_started, _}} -> :ok
-      end
-
-      # Ensure cleanup after test to prevent state leakage
-      on_exit(fn ->
-        try do
-          Cache.clear()
-        rescue
-          ArgumentError -> :ok
-        end
-      end)
+      # The cache owns singleton ETS tables, so give each test a fully managed
+      # process lifecycle instead of linking it to the short-lived test process.
+      start_supervised!(Cache)
 
       :ok
     end

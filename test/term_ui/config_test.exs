@@ -1,5 +1,5 @@
 defmodule TermUI.ConfigTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias TermUI.Config
 

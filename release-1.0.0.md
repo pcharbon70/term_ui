@@ -40,6 +40,45 @@ At the time of writing:
 Re-run every status and validation command below. Do not assume this snapshot
 is still current when performing the release.
 
+## Release-branch execution status (2026-08-26)
+
+The `release/1.0.0` branch was created from `origin/develop` at `4c70486`.
+The release stabilization work makes the following dispositions for the open
+terminal and rendering reports:
+
+| Item | 1.0 disposition |
+|---|---|
+| [PR #33](https://github.com/pcharbon70/term_ui/pull/33) SSH runtime integration | Reconciled. Concurrent SSH runtimes now own distinct buffer managers, custom sessions do not overwrite local terminal global state, SSH cursor gaps/display widths are correct, and teardown restores autowrap. The current cell-diff renderer explicitly emits erase cells for stale content, superseding the PR's full-row redraw path, and safely renders the bottom-right cell with autowrap disabled. |
+| [#35](https://github.com/pcharbon70/term_ui/issues/35) macOS Option+Delete | Fixed. `ESC DEL` and `ESC BS` parse as Alt+Backspace in both Raw and TTY input paths, and text inputs delete the preceding word. |
+| [#11](https://github.com/pcharbon70/term_ui/issues/11) layout constraints not rendered | Fixed. Documented `{node, constraint}` stack children are allocated and clipped by the layout solver. |
+| [#25](https://github.com/pcharbon70/term_ui/issues/25) color changes after update | Fixed by the post-RC style-reset and row-background corrections, with regression coverage. |
+| [#7](https://github.com/pcharbon70/term_ui/issues/7) regular-expression compile error | Fixed by the post-RC Elixir compatibility change and verified by warnings-as-errors compilation. |
+| [#36](https://github.com/pcharbon70/term_ui/issues/36) redraw after foreground/resume | Accepted for a later 1.x patch. Applications can request a redraw with `TermUI.Runtime.force_render/1`. |
+| [#19](https://github.com/pcharbon70/term_ui/issues/19) trigger a full-screen render | Accepted as a documented API/support item; `TermUI.Runtime.force_render/1` is available. |
+| [#5](https://github.com/pcharbon70/term_ui/issues/5) and [#6](https://github.com/pcharbon70/term_ui/issues/6) native Windows input | Not claimed as supported in 1.0. Native Windows console mode, raw input, and resize support remain experimental and are documented as a limitation. |
+| [#10](https://github.com/pcharbon70/term_ui/issues/10) Docker/GLIBC deployment | Deferred as deployment documentation/tooling rather than a core release defect. |
+| [#9](https://github.com/pcharbon70/term_ui/issues/9) Claude integration discussion | Non-blocking discussion. |
+
+Local automated validation has passed the full test suite across multiple
+seeds, warnings-as-errors compilation, formatting, Credo under the repository's
+current policy, Dialyzer, documentation, dependency checks, Hex retirement
+audit, package-content inspection, and compilation of every example. The CI
+workflow now exercises the minimum TTY-compatible Elixir/OTP pair, the current
+Raw-compatible pair, quality/package checks, and every example on `main`,
+`develop`, and `release/**`.
+
+The following gates still require maintainer or platform access and are not
+represented as complete by the local work:
+
+- GitHub CI must run successfully after the release branch is pushed.
+- Raw, TTY, IEx, SSH, resize, cleanup, macOS, WSL/ConPTY, and applicable
+  Windows behavior need the manual terminal sign-off listed below.
+- Branch protection and required checks need maintainer approval and repository
+  configuration.
+- Hex authentication is required to complete `mix hex.publish --dry-run`; the
+  unauthenticated command built version `1.0.0` and stopped at authentication
+  without publishing.
+
 ## Release principles
 
 1. Do not merge the rewrite before the 1.0 release branch exists.

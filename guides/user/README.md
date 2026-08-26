@@ -41,7 +41,7 @@ end
 ## Requirements
 
 - Elixir 1.15+
-- OTP 28+
+- OTP 26+ for TTY mode; OTP 28+ for native raw mode
 - Terminal with ANSI support
 
 ## Examples

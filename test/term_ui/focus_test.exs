@@ -286,7 +286,6 @@ defmodule TermUI.Focus.TrackerTest do
       {:ok, tracker} = Tracker.start_link(initial_focus: true)
 
       test_pid = self()
-      state = %{saved: false, refreshed: false}
 
       # Register autosave on focus lost
       Tracker.on_focus_lost(tracker, fn ->

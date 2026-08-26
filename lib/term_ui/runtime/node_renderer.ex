@@ -10,6 +10,8 @@ defmodule TermUI.Runtime.NodeRenderer do
   """
 
   alias TermUI.Component.RenderNode
+  alias TermUI.Layout.Constraint
+  alias TermUI.Layout.Solver
   alias TermUI.Renderer.Buffer
   alias TermUI.Renderer.BufferManager
   alias TermUI.Renderer.Cell
@@ -89,25 +91,59 @@ defmodule TermUI.Runtime.NodeRenderer do
   end
 
   defp render_node(
-         %RenderNode{type: :stack, direction: :vertical, children: children, style: style},
+         %RenderNode{
+           type: :stack,
+           direction: :vertical,
+           children: children,
+           style: style,
+           width: width,
+           height: height
+         },
          buffer,
          row,
          col,
          parent_style
        ) do
     effective_style = merge_styles(parent_style, style)
-    render_children_vertical(children, buffer, row, col, effective_style)
+
+    render_stack_children(
+      children,
+      :vertical,
+      buffer,
+      row,
+      col,
+      effective_style,
+      width,
+      height
+    )
   end
 
   defp render_node(
-         %RenderNode{type: :stack, direction: :horizontal, children: children, style: style},
+         %RenderNode{
+           type: :stack,
+           direction: :horizontal,
+           children: children,
+           style: style,
+           width: width,
+           height: height
+         },
          buffer,
          row,
          col,
          parent_style
        ) do
     effective_style = merge_styles(parent_style, style)
-    render_children_horizontal(children, buffer, row, col, effective_style)
+
+    render_stack_children(
+      children,
+      :horizontal,
+      buffer,
+      row,
+      col,
+      effective_style,
+      width,
+      height
+    )
   end
 
   defp render_node(%RenderNode{type: :cells, cells: cells}, buffer, row, col, parent_style) do
@@ -306,6 +342,153 @@ defmodule TermUI.Runtime.NodeRenderer do
   end
 
   # Children rendering
+  defp render_stack_children(children, direction, buffer, row, col, style, width, height) do
+    if Enum.any?(children, &constrained_child?/1) do
+      render_constrained_children(children, direction, buffer, row, col, style, width, height)
+    else
+      case direction do
+        :vertical -> render_children_vertical(children, buffer, row, col, style)
+        :horizontal -> render_children_horizontal(children, buffer, row, col, style)
+      end
+    end
+  end
+
+  defp render_constrained_children(
+         children,
+         direction,
+         buffer,
+         row,
+         col,
+         style,
+         requested_width,
+         requested_height
+       ) do
+    {buffer_rows, buffer_cols} = Buffer.dimensions(buffer)
+    remaining_width = max(0, buffer_cols - col + 1)
+    remaining_height = max(0, buffer_rows - row + 1)
+    available_width = available_dimension(requested_width, remaining_width)
+    available_height = available_dimension(requested_height, remaining_height)
+
+    area = %{x: 0, y: 0, width: available_width, height: available_height}
+
+    normalized =
+      Enum.map(children, fn
+        {_child, constraint} = constrained ->
+          if constraint?(constraint),
+            do: constrained,
+            else: auto_constrain(constrained, direction, area, style)
+
+        child ->
+          auto_constrain(child, direction, area, style)
+      end)
+
+    constraints = Enum.map(normalized, &elem(&1, 1))
+    rects = Solver.solve_to_rects(constraints, area, direction: direction)
+
+    rendered =
+      normalized
+      |> Enum.zip(rects)
+      |> Enum.map(fn {{child, _constraint}, rect} ->
+        bounds = render_node_clipped(child, buffer, row + rect.y, col + rect.x, style, rect)
+        {rect, bounds}
+      end)
+
+    constrained_bounds(rendered, direction, requested_width, requested_height)
+  end
+
+  defp constrained_child?({_child, constraint}), do: constraint?(constraint)
+  defp constrained_child?(_child), do: false
+
+  defp constraint?(%Constraint.Length{}), do: true
+  defp constraint?(%Constraint.Percentage{}), do: true
+  defp constraint?(%Constraint.Ratio{}), do: true
+  defp constraint?(%Constraint.Min{}), do: true
+  defp constraint?(%Constraint.Max{}), do: true
+  defp constraint?(%Constraint.Fill{}), do: true
+  defp constraint?(_constraint), do: false
+
+  defp auto_constrain(child, direction, area, style) do
+    {width, height} = measure_node(child, area, style)
+    size = if direction == :horizontal, do: width, else: height
+    {child, Constraint.length(size)}
+  end
+
+  defp measure_node(child, area, style) do
+    case Buffer.new(max(1, area.height), max(1, area.width)) do
+      {:ok, temp_buffer} ->
+        try do
+          render_node(child, temp_buffer, 1, 1, style)
+        after
+          Buffer.destroy(temp_buffer)
+        end
+
+      {:error, _reason} ->
+        {0, 0}
+    end
+  end
+
+  defp render_node_clipped(_child, _buffer, _row, _col, _style, %{width: 0}), do: {0, 0}
+  defp render_node_clipped(_child, _buffer, _row, _col, _style, %{height: 0}), do: {0, 0}
+
+  defp render_node_clipped(child, buffer, row, col, style, rect) do
+    case Buffer.new(rect.height, rect.width) do
+      {:ok, temp_buffer} ->
+        try do
+          {rendered_width, rendered_height} = render_node(child, temp_buffer, 1, 1, style)
+
+          cells =
+            temp_buffer
+            |> Buffer.to_list()
+            |> Enum.map(fn {cell_row, cell_col, cell} ->
+              {row + cell_row - 1, col + cell_col - 1, cell}
+            end)
+
+          Buffer.set_cells(buffer, cells)
+          {min(rendered_width, rect.width), min(rendered_height, rect.height)}
+        after
+          Buffer.destroy(temp_buffer)
+        end
+
+      {:error, _reason} ->
+        {0, 0}
+    end
+  end
+
+  defp constrained_bounds(rendered, :horizontal, requested_width, requested_height) do
+    width = extent(rendered, :horizontal)
+    height = rendered |> Enum.map(fn {_rect, {_width, height}} -> height end) |> max_or_zero()
+    {requested_dimension(requested_width, width), requested_dimension(requested_height, height)}
+  end
+
+  defp constrained_bounds(rendered, :vertical, requested_width, requested_height) do
+    width = rendered |> Enum.map(fn {_rect, {width, _height}} -> width end) |> max_or_zero()
+    height = extent(rendered, :vertical)
+    {requested_dimension(requested_width, width), requested_dimension(requested_height, height)}
+  end
+
+  defp extent([], _direction), do: 0
+
+  defp extent(rendered, :horizontal) do
+    rendered
+    |> Enum.map(fn {rect, _bounds} -> rect.x + rect.width end)
+    |> Enum.max()
+  end
+
+  defp extent(rendered, :vertical) do
+    rendered
+    |> Enum.map(fn {rect, _bounds} -> rect.y + rect.height end)
+    |> Enum.max()
+  end
+
+  defp max_or_zero([]), do: 0
+  defp max_or_zero(values), do: Enum.max(values)
+
+  defp available_dimension(value, remaining) when is_integer(value), do: min(value, remaining)
+  defp available_dimension(_value, remaining), do: remaining
+
+  defp requested_dimension(value, _rendered) when is_integer(value), do: value
+  defp requested_dimension(_value, rendered), do: rendered
+
   defp render_children_vertical(children, buffer, row, col, style) when is_list(children) do
     {max_width, final_row} =
       Enum.reduce(children, {0, row}, fn child, {max_w, current_row} ->

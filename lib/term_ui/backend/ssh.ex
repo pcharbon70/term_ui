@@ -57,6 +57,7 @@ defmodule TermUI.Backend.SSH do
   @behaviour TermUI.Backend
 
   alias TermUI.ANSI
+  alias TermUI.Renderer.DisplayWidth
 
   # ANSI escape sequence constants
   @cursor_hide "\e[?25l"
@@ -65,6 +66,8 @@ defmodule TermUI.Backend.SSH do
   @cursor_home "\e[H"
   @alt_screen_enter "\e[?1049h"
   @alt_screen_leave "\e[?1049l"
+  @autowrap_off "\e[?7l"
+  @autowrap_on "\e[?7h"
   @reset_attrs "\e[0m"
 
   # Mouse tracking sequences
@@ -140,7 +143,7 @@ defmodule TermUI.Backend.SSH do
   - `:hide_cursor` — Hide cursor during rendering (default: `true`)
   - `:mouse_tracking` — Mouse tracking mode (default: `:none`)
   """
-  @spec init(keyword()) :: {:ok, t()} | {:error, term()}
+  @spec init(keyword()) :: {:ok, t()}
   def init(opts) do
     device = Keyword.fetch!(opts, :device)
     size = Keyword.get(opts, :size, {24, 80})
@@ -168,6 +171,9 @@ defmodule TermUI.Backend.SSH do
       device_write(device, @cursor_hide)
     end
 
+    # Prevent a write to the bottom-right cell from scrolling the screen.
+    device_write(device, @autowrap_off)
+
     # Enable mouse tracking
     state = enable_mouse(state, mouse_tracking)
 
@@ -194,6 +200,9 @@ defmodule TermUI.Backend.SSH do
 
     # Show cursor
     device_write(device, @cursor_show)
+
+    # Restore the channel's terminal settings before returning control.
+    device_write(device, @autowrap_on)
 
     # Leave alternate screen
     if state.alternate_screen do
@@ -302,7 +311,7 @@ defmodule TermUI.Backend.SSH do
           safe_char = sanitize_char(char)
 
           new_acc = [acc, move_seq, style_seq, safe_char]
-          {new_acc, new_style, {row, col + String.length(safe_char)}}
+          {new_acc, new_style, {row, col + max(1, DisplayWidth.width(safe_char))}}
       end)
 
     # Flush all accumulated output in a single write
@@ -382,10 +391,6 @@ defmodule TermUI.Backend.SSH do
       cur_row == row and cur_col == col ->
         []
 
-      cur_row == row and col == cur_col + 1 ->
-        # Next column — cursor advances naturally after char write
-        []
-
       cur_row == row ->
         # Same row, different column
         "\e[#{row};#{col}H"
@@ -436,7 +441,6 @@ defmodule TermUI.Backend.SSH do
     end
   end
 
-  @spec build_full_style(TermUI.Backend.color(), TermUI.Backend.color(), [atom()]) :: iodata()
   defp build_full_style(fg, bg, attrs) do
     parts = [@reset_attrs]
     parts = parts ++ attr_sequences(attrs)
@@ -496,5 +500,14 @@ defmodule TermUI.Backend.SSH do
 
   @spec sanitize_char(String.t()) :: String.t()
   defp sanitize_char(""), do: " "
-  defp sanitize_char(char), do: char
+
+  defp sanitize_char(char) when is_binary(char) do
+    char
+    |> String.graphemes()
+    |> List.first()
+    |> case do
+      nil -> " "
+      grapheme -> if Regex.match?(~r/[\x00-\x1F\x7F]/u, grapheme), do: " ", else: grapheme
+    end
+  end
 end

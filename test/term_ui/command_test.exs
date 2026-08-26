@@ -1,5 +1,7 @@
 defmodule TermUI.CommandTest do
-  use ExUnit.Case, async: true
+  # Includes a wall-clock assertion that distinguishes concurrent timers from
+  # sequential execution, so run it without unrelated suite contention.
+  use ExUnit.Case, async: false
 
   alias TermUI.Command
 
@@ -363,7 +365,7 @@ defmodule TermUI.Command.ExecutorTest do
       {:ok, executor} = Executor.start_link()
 
       # Start 3 timers at the same time
-      cmds = for i <- 1..3, do: Command.timer(50, {:done, i})
+      cmds = for i <- 1..3, do: Command.timer(200, {:done, i})
 
       start = System.monotonic_time(:millisecond)
 
@@ -375,14 +377,14 @@ defmodule TermUI.Command.ExecutorTest do
 
       # Wait for all
       for id <- ids do
-        assert_receive {:command_result, :comp, ^id, _}, 200
+        assert_receive {:command_result, :comp, ^id, _}, 750
       end
 
       elapsed = System.monotonic_time(:millisecond) - start
 
-      # Should complete in ~50ms, not 150ms (sequential)
-      # Allow some tolerance for CI
-      assert elapsed < 150
+      # Should complete in ~200ms, not 600ms (sequential). The wider interval
+      # leaves room for scheduler pauses while still detecting serialization.
+      assert elapsed < 500
     end
   end
 end

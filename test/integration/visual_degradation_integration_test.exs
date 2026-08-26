@@ -30,7 +30,10 @@ defmodule TermUI.Integration.VisualDegradationIntegrationTest do
 
   setup do
     # Save original character set config
-    original_charset = Application.get_env(:term_ui, :character_set, :unicode)
+    original_charset = Application.fetch_env(:term_ui, :character_set)
+    original_runtime = :persistent_term.get(:term_ui_character_set, :not_set)
+
+    :persistent_term.erase(:term_ui_character_set)
 
     # Start Theme server
     case Theme.start_link(theme: :dark) do
@@ -40,11 +43,24 @@ defmodule TermUI.Integration.VisualDegradationIntegrationTest do
 
     on_exit(fn ->
       # Restore original character set
-      Application.put_env(:term_ui, :character_set, original_charset)
+      restore_character_set_config(original_charset)
+      restore_runtime_character_set(original_runtime)
     end)
 
     :ok
   end
+
+  defp restore_character_set_config({:ok, value}),
+    do: Application.put_env(:term_ui, :character_set, value)
+
+  defp restore_character_set_config(:error),
+    do: Application.delete_env(:term_ui, :character_set)
+
+  defp restore_runtime_character_set(:not_set),
+    do: :persistent_term.erase(:term_ui_character_set)
+
+  defp restore_runtime_character_set(value),
+    do: :persistent_term.put(:term_ui_character_set, value)
 
   defp test_area(width \\ 80, height \\ 24) do
     %{x: 0, y: 0, width: width, height: height}

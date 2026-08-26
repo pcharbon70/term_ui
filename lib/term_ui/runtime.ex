@@ -54,6 +54,7 @@ defmodule TermUI.Runtime do
              process_render_tick: 1,
              cleanup_input_reader: 1,
              cleanup_input_handler: 1,
+             cleanup_buffer_manager: 1,
              cleanup_resize_callback: 1,
              cleanup_backend: 1,
              cleanup_shutdown: 1,
@@ -68,7 +69,7 @@ defmodule TermUI.Runtime do
           {:root, module()}
           | {:name, GenServer.name()}
           | {:render_interval, pos_integer()}
-          | {:backend, :auto | :raw | :tty}
+          | {:backend, :auto | :raw | :tty | module() | {module(), keyword()}}
           | {:skip_terminal, boolean()}
           | {:use_input_handler, boolean()}
 
@@ -304,21 +305,25 @@ defmodule TermUI.Runtime do
     root_module = Keyword.fetch!(opts, :root)
     render_interval = Keyword.get(opts, :render_interval, @default_render_interval)
 
-    # Suppress default Logger handler to prevent bare \n writes to stdout
-    # during raw mode (Logger output corrupts TUI rendering)
-    logger_handler_config =
-      if Keyword.get(opts, :skip_terminal, false) do
-        nil
-      else
-        suppress_logger()
-      end
-
     {backend_mode, backend, backend_state, capabilities, terminal_started, buffer_manager,
      dimensions} =
-      init_backend(opts)
+      init_backend(opts, unique_buffer_manager_name())
 
-    # Store backend info in persistent_term for global access
-    PersistentTerms.store_backend_context(backend_mode, capabilities)
+    # Suppress the local Logger handler only when this runtime owns the local
+    # terminal. Custom backends such as SSH must not mutate node-global logger
+    # state shared by other sessions.
+    logger_handler_config =
+      if local_backend_mode?(backend_mode) and not Keyword.get(opts, :skip_terminal, false) do
+        suppress_logger()
+      else
+        nil
+      end
+
+    # The public global context describes the local terminal runtime. An SSH
+    # session must not overwrite it for every connected client.
+    if local_backend_mode?(backend_mode) do
+      PersistentTerms.store_backend_context(backend_mode, capabilities)
+    end
 
     # Initialize async command execution before the root module boots.
     {:ok, command_executor} = Executor.start_link()
@@ -377,14 +382,14 @@ defmodule TermUI.Runtime do
     {:ok, state}
   end
 
-  defp init_backend(opts) do
+  defp init_backend(opts, buffer_manager_name) do
     skip_terminal = Keyword.get(opts, :skip_terminal, false)
     backend_opt = Keyword.get(opts, :backend, :auto)
 
     if skip_terminal do
       {:skip, nil, nil, nil, false, nil, nil}
     else
-      select_backend(backend_opt)
+      select_backend(backend_opt, buffer_manager_name)
     end
   end
 
@@ -454,18 +459,27 @@ defmodule TermUI.Runtime do
     }
   end
 
-  defp select_backend(backend_opt) do
+  defp select_backend(backend_opt, buffer_manager_name) do
     case Selector.select(backend_opt) do
-      {:raw, _raw_state} -> attempt_raw_backend(fallback_to_tty: true)
-      {:tty, capabilities} -> init_tty_backend(capabilities)
-      {:explicit, :raw, _opts} -> attempt_raw_backend(fallback_to_tty: false)
-      {:explicit, :tty, _opts} -> init_tty_backend(Selector.detect_capabilities())
-      {:explicit, module, opts} -> init_explicit_backend(module, opts)
+      {:raw, _raw_state} ->
+        attempt_raw_backend(fallback_to_tty: true, buffer_manager_name: buffer_manager_name)
+
+      {:tty, capabilities} ->
+        init_tty_backend(capabilities)
+
+      {:explicit, :raw, _opts} ->
+        attempt_raw_backend(fallback_to_tty: false, buffer_manager_name: buffer_manager_name)
+
+      {:explicit, :tty, _opts} ->
+        init_tty_backend(Selector.detect_capabilities())
+
+      {:explicit, module, opts} ->
+        init_explicit_backend(module, opts, buffer_manager_name)
     end
   end
 
   defp attempt_raw_backend(opts) do
-    case setup_terminal_and_buffers() do
+    case setup_terminal_and_buffers(Keyword.fetch!(opts, :buffer_manager_name)) do
       {true, buffer_manager, dimensions} ->
         init_raw_backend(buffer_manager, dimensions)
 
@@ -504,21 +518,21 @@ defmodule TermUI.Runtime do
     {:tty, backend, backend_state, capabilities, false, nil, nil}
   end
 
-  defp init_explicit_backend(TermUI.Backend.Raw, _opts) do
-    attempt_raw_backend(fallback_to_tty: false)
+  defp init_explicit_backend(TermUI.Backend.Raw, _opts, buffer_manager_name) do
+    attempt_raw_backend(fallback_to_tty: false, buffer_manager_name: buffer_manager_name)
   end
 
-  defp init_explicit_backend(TermUI.Backend.TTY, _opts) do
+  defp init_explicit_backend(TermUI.Backend.TTY, _opts, _buffer_manager_name) do
     init_tty_backend(Selector.detect_capabilities())
   end
 
-  defp init_explicit_backend(module, opts) when is_atom(module) do
+  defp init_explicit_backend(module, opts, buffer_manager_name) when is_atom(module) do
     {:ok, backend_state} = module.init(opts)
     {:ok, {rows, cols}} = module.size(backend_state)
 
     # Start BufferManager for the custom backend
     buffer_pid =
-      case BufferManager.start_link(rows: rows, cols: cols) do
+      case BufferManager.start_link(rows: rows, cols: cols, name: buffer_manager_name) do
         {:ok, pid} -> pid
         {:error, {:already_started, pid}} -> pid
       end
@@ -526,7 +540,7 @@ defmodule TermUI.Runtime do
     {:custom, module, backend_state, nil, false, buffer_pid, {cols, rows}}
   end
 
-  defp setup_terminal_and_buffers do
+  defp setup_terminal_and_buffers(buffer_manager_name) do
     # Start Terminal GenServer (or reuse if already running)
     case Terminal.start_link() do
       {:ok, _pid} -> :ok
@@ -543,7 +557,7 @@ defmodule TermUI.Runtime do
 
     # Start BufferManager (or reuse if already running)
     buffer_pid =
-      case BufferManager.start_link(rows: rows, cols: cols) do
+      case BufferManager.start_link(rows: rows, cols: cols, name: buffer_manager_name) do
         {:ok, pid} -> pid
         {:error, {:already_started, pid}} -> pid
       end
@@ -554,6 +568,13 @@ defmodule TermUI.Runtime do
   catch
     {:terminal_failed, _} -> {false, nil, nil}
   end
+
+  @spec unique_buffer_manager_name() :: {:global, {:term_ui_buffer_manager, pid(), integer()}}
+  defp unique_buffer_manager_name do
+    {:global, {:term_ui_buffer_manager, self(), System.unique_integer([:positive])}}
+  end
+
+  defp local_backend_mode?(mode), do: mode in [:raw, :tty, :skip]
 
   defp get_terminal_dimensions_safe do
     case Terminal.get_terminal_size() do
@@ -782,17 +803,20 @@ defmodule TermUI.Runtime do
 
     # Step 3: Backend shutdown (drain pending input, cooked mode)
     cleanup_backend(state)
+    cleanup_buffer_manager(state)
 
     # Step 4: Terminal restore and resize callback cleanup
     cleanup_resize_callback(state)
     cleanup_shutdown(state)
     cleanup_terminal_restore(state)
 
-    # Step 5: Defensive cleanup (catches anything missed above)
-    terminate_defensive_cleanup()
+    # Steps 5-6 operate on node-global local-terminal state. Never run them
+    # for an independent custom backend such as an SSH channel.
+    if local_backend_mode?(state.backend_mode) do
+      terminate_defensive_cleanup()
+      cleanup_persistent_terms()
+    end
 
-    # Step 6: Persistent terms and echo
-    cleanup_persistent_terms()
     ensure_echo_enabled(state)
 
     :ok
@@ -836,6 +860,14 @@ defmodule TermUI.Runtime do
   rescue
     _ -> :ok
   end
+
+  defp cleanup_buffer_manager(%{buffer_manager: pid}) when is_pid(pid) do
+    if Process.alive?(pid), do: GenServer.stop(pid, :normal)
+  rescue
+    _ -> :ok
+  end
+
+  defp cleanup_buffer_manager(_state), do: :ok
 
   defp cleanup_shutdown(state) do
     if not state.shutting_down do

@@ -19,7 +19,9 @@ TermUI's operating mode:
 - No signal handling
 - Full control over display
 
-The runtime enables raw mode automatically. It's restored when your app exits.
+On supported Unix terminals, the runtime enables raw mode automatically and
+restores it when your app exits. It falls back to the TTY backend in constrained
+environments such as IEx.
 
 ## Alternate Screen
 
@@ -232,20 +234,27 @@ Without bracketed paste, pasted text would arrive as individual key events, whic
 - Focus event support
 - Unicode box drawing characters
 
-### Supported Terminals
+### Terminal compatibility
 
-Tested and working:
+The local backends are supported on Linux and macOS. Individual features still
+depend on the terminal emulator:
 
 | Terminal | Platform | Notes |
 |----------|----------|-------|
-| Alacritty | Cross-platform | Full support |
+| Alacritty | Linux/macOS | Full feature set expected |
 | Kitty | Linux/macOS | Full support |
 | iTerm2 | macOS | Full support |
-| WezTerm | Cross-platform | Full support |
+| WezTerm | Linux/macOS | Full feature set expected |
 | GNOME Terminal | Linux | Full support |
-| Windows Terminal | Windows | Full support |
 | Terminal.app | macOS | Limited mouse |
-| xterm | Cross-platform | Full support |
+| xterm | Unix | Full support |
+| Windows Terminal with WSL | Windows/WSL | Unix backend; verify input and cleanup for the deployed environment |
+| Windows Terminal native | Windows | Experimental; native raw console mode and resize handling are not implemented |
+
+Native Windows may render ANSI output when virtual-terminal processing is
+already enabled, but TermUI 1.0 does not configure the required Win32 console
+modes. Keyboard, mouse, paste, resize, and terminal cleanup are therefore not
+claimed as supported for native Windows.
 
 ### SSH Sessions
 

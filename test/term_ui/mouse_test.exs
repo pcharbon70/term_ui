@@ -182,7 +182,7 @@ defmodule TermUI.Mouse.TrackerTest do
 
       {tracker, _} = Tracker.process(tracker, press)
       {tracker, _} = Tracker.process(tracker, move1)
-      {tracker, events} = Tracker.process(tracker, move2)
+      {_tracker, events} = Tracker.process(tracker, move2)
 
       assert [{:drag_move, :left, 20, 30, 5, 5}] = events
     end

@@ -9,7 +9,7 @@ defmodule TermUI.Widgets.LogViewerTest do
     # Start Theme server for color support if not already started
     case Process.whereis(TermUI.Theme) do
       nil -> Theme.start_link(theme: :dark)
-      _pid -> {:ok, _pid}
+      pid -> {:ok, pid}
     end
 
     :ok

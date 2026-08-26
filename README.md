@@ -20,9 +20,21 @@ TermUI leverages BEAM's unique strengths—fault tolerance, actor model, hot cod
 - **Rich Widget Library** - Gauges, tables, menus, charts, dialogs, and more
 - **Efficient Rendering** - Double-buffered differential updates at 60 FPS
 - **Themable** - True color RGB support (16 million colors)
-- **Cross-Platform** - Linux, macOS, Windows 10+ terminal support
+- **Terminal Backends** - Raw and TTY operation on Unix terminals, plus remote SSH sessions
 - **OTP Integration** - Supervision trees, fault tolerance, hot code reload
 - **IEx Compatible** - Run TUI applications directly in IEx for interactive development
+
+## Platform support
+
+TermUI 1.0's local Raw and TTY backends target Unix-style terminals and are
+supported on Linux and macOS. The SSH backend renders independent sessions to
+OTP SSH channel devices.
+
+Native Windows console support is experimental. ANSI output can work in a
+terminal where virtual-terminal processing is already enabled, but TermUI does
+not yet configure Win32 console modes or provide native raw input and resize
+handling. On Windows, prefer WSL and verify keyboard, mouse, resize, and cleanup
+behavior for the terminal you deploy with.
 
 ## IEx Compatibility
 
@@ -112,7 +124,7 @@ Add `term_ui` to your dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:term_ui, "~> 0.2.0"}
+    {:term_ui, "~> 1.0"}
   ]
 end
 ```

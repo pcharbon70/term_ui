@@ -1,5 +1,5 @@
 defmodule TermUI.Widgets.AlertDialogTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias TermUI.Event
   alias TermUI.PersistentTerms

@@ -22,7 +22,7 @@ node = Widget.render(widget_state, %{width: 80, height: 24})
 
 ### Tabs
 
-> **Example:** See [`examples/tabs/`](../../examples/tabs/) for a complete demonstration.
+> **Example:** See [`examples/tabs/`](https://github.com/pcharbon70/term_ui/tree/main/examples/tabs/) for a complete demonstration.
 
 Tabbed interface for organizing content into switchable panels.
 
@@ -53,7 +53,7 @@ Tabs.render(tabs_state, %{width: 60, height: 1})
 
 ### Context Menu
 
-> **Example:** See [`examples/context_menu/`](../../examples/context_menu/) for a complete demonstration.
+> **Example:** See [`examples/context_menu/`](https://github.com/pcharbon70/term_ui/tree/main/examples/context_menu/) for a complete demonstration.
 
 Right-click context menu that appears at cursor position.
 
@@ -93,7 +93,7 @@ ContextMenu.render(menu_state, %{width: 30, height: 10})
 
 ### Alert Dialog
 
-> **Example:** See [`examples/alert_dialog/`](../../examples/alert_dialog/) for a complete demonstration.
+> **Example:** See [`examples/alert_dialog/`](https://github.com/pcharbon70/term_ui/tree/main/examples/alert_dialog/) for a complete demonstration.
 
 Modal dialog for confirmations and messages with standard button configurations.
 
@@ -158,7 +158,7 @@ AlertDialog.render(dialog_state, %{width: 80, height: 24})
 
 ### Toast
 
-> **Example:** See [`examples/toast/`](../../examples/toast/) for a complete demonstration.
+> **Example:** See [`examples/toast/`](https://github.com/pcharbon70/term_ui/tree/main/examples/toast/) for a complete demonstration.
 
 Non-blocking notification that auto-dismisses. Use `ToastManager` to manage multiple toasts with stacking.
 
@@ -231,7 +231,7 @@ manager = ToastManager.clear_all(manager)
 
 ### Bar Chart
 
-> **Example:** See [`examples/bar_chart/`](../../examples/bar_chart/) for a complete demonstration.
+> **Example:** See [`examples/bar_chart/`](https://github.com/pcharbon70/term_ui/tree/main/examples/bar_chart/) for a complete demonstration.
 
 Horizontal or vertical bar chart for categorical data.
 
@@ -271,7 +271,7 @@ Engineering █████████████████████ 200
 
 ### Line Chart
 
-> **Example:** See [`examples/line_chart/`](../../examples/line_chart/) for a complete demonstration.
+> **Example:** See [`examples/line_chart/`](https://github.com/pcharbon70/term_ui/tree/main/examples/line_chart/) for a complete demonstration.
 
 Line chart using Braille characters for sub-character resolution.
 
@@ -311,7 +311,7 @@ LineChart.render(
 
 ### Canvas
 
-> **Example:** See [`examples/canvas/`](../../examples/canvas/) for a complete demonstration.
+> **Example:** See [`examples/canvas/`](https://github.com/pcharbon70/term_ui/tree/main/examples/canvas/) for a complete demonstration.
 
 Direct drawing surface for custom visualizations.
 
@@ -349,7 +349,7 @@ Canvas.render(canvas_state, %{width: 60, height: 20})
 
 ### Markdown Viewer
 
-> **Example:** See [`examples/markdown_viewer/`](../../examples/markdown_viewer/) for a complete demonstration.
+> **Example:** See [`examples/markdown_viewer/`](https://github.com/pcharbon70/term_ui/tree/main/examples/markdown_viewer/) for a complete demonstration.
 
 Scrollable markdown viewer with syntax highlighting for code blocks.
 
@@ -416,7 +416,7 @@ MarkdownViewer.set_content(viewer_pid, "# Updated content")
 
 ### Viewport
 
-> **Example:** See [`examples/viewport/`](../../examples/viewport/) for a complete demonstration.
+> **Example:** See [`examples/viewport/`](https://github.com/pcharbon70/term_ui/tree/main/examples/viewport/) for a complete demonstration.
 
 Scrollable view of content larger than the display area. The Viewport widget clips content to a visible region and supports both keyboard and mouse scrolling.
 
@@ -522,7 +522,7 @@ end
 
 ### Split Pane
 
-> **Example:** See [`examples/split_pane/`](../../examples/split_pane/) for a complete demonstration.
+> **Example:** See [`examples/split_pane/`](https://github.com/pcharbon70/term_ui/tree/main/examples/split_pane/) for a complete demonstration.
 
 Resizable split layout for IDE-style interfaces.
 
@@ -555,7 +555,7 @@ SplitPane.render(pane_state, %{width: 100, height: 30})
 
 ### Tree View
 
-> **Example:** See [`examples/tree_view/`](../../examples/tree_view/) for a complete demonstration.
+> **Example:** See [`examples/tree_view/`](https://github.com/pcharbon70/term_ui/tree/main/examples/tree_view/) for a complete demonstration.
 
 Hierarchical data with expand/collapse.
 
@@ -598,7 +598,7 @@ TreeView.render(tree_state, %{width: 40, height: 20})
 
 ### Form Builder
 
-> **Example:** See [`examples/form_builder/`](../../examples/form_builder/) for a complete demonstration.
+> **Example:** See [`examples/form_builder/`](https://github.com/pcharbon70/term_ui/tree/main/examples/form_builder/) for a complete demonstration.
 
 Structured forms with validation and multiple field types.
 
@@ -660,7 +660,7 @@ FormBuilder.render(form_state, %{width: 60, height: 20})
 
 ### Command Palette
 
-> **Example:** See [`examples/command_palette/`](../../examples/command_palette/) for a complete demonstration.
+> **Example:** See [`examples/command_palette/`](https://github.com/pcharbon70/term_ui/tree/main/examples/command_palette/) for a complete demonstration.
 
 VS Code-style command interface with fuzzy search.
 
@@ -700,7 +700,7 @@ CommandPalette.render(palette_state, %{width: 80, height: 24})
 
 ### Log Viewer
 
-> **Example:** See [`examples/log_viewer/`](../../examples/log_viewer/) for a complete demonstration.
+> **Example:** See [`examples/log_viewer/`](https://github.com/pcharbon70/term_ui/tree/main/examples/log_viewer/) for a complete demonstration.
 
 High-performance log viewer with virtual scrolling, search, and filtering.
 
@@ -751,7 +751,7 @@ LogViewer.render(viewer_state, %{width: 100, height: 30})
 
 ### Stream Widget
 
-> **Example:** See [`examples/stream_widget/`](../../examples/stream_widget/) for a complete demonstration.
+> **Example:** See [`examples/stream_widget/`](https://github.com/pcharbon70/term_ui/tree/main/examples/stream_widget/) for a complete demonstration.
 
 GenStage-integrated widget for real-time data streams with backpressure.
 
@@ -789,7 +789,7 @@ These widgets leverage Erlang's runtime introspection capabilities for live syst
 
 ### Process Monitor
 
-> **Example:** See [`examples/process_monitor/`](../../examples/process_monitor/) for a complete demonstration.
+> **Example:** See [`examples/process_monitor/`](https://github.com/pcharbon70/term_ui/tree/main/examples/process_monitor/) for a complete demonstration.
 
 Live BEAM process inspection with sorting, filtering, and process control.
 
@@ -835,7 +835,7 @@ ProcessMonitor.render(monitor_state, %{width: 100, height: 30})
 
 ### Supervision Tree Viewer
 
-> **Example:** See [`examples/supervision_tree_viewer/`](../../examples/supervision_tree_viewer/) for a complete demonstration.
+> **Example:** See [`examples/supervision_tree_viewer/`](https://github.com/pcharbon70/term_ui/tree/main/examples/supervision_tree_viewer/) for a complete demonstration.
 
 Visualize supervision hierarchies with live status.
 
@@ -881,7 +881,7 @@ SupervisionTreeViewer.render(tree_state, %{width: 80, height: 25})
 
 ### Cluster Dashboard
 
-> **Example:** See [`examples/cluster_dashboard/`](../../examples/cluster_dashboard/) for a complete demonstration.
+> **Example:** See [`examples/cluster_dashboard/`](https://github.com/pcharbon70/term_ui/tree/main/examples/cluster_dashboard/) for a complete demonstration.
 
 Distributed Erlang cluster visualization.
 
