@@ -1,5 +1,7 @@
 defmodule TermUI.Renderer.IntegrationTest do
-  use ExUnit.Case, async: true
+  # This module contains wall-clock microbenchmarks, so running it alongside
+  # the async suite makes its performance assertions depend on scheduler load.
+  use ExUnit.Case, async: false
 
   alias TermUI.Renderer.{
     Buffer,
