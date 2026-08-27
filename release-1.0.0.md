@@ -67,10 +67,13 @@ retirement and vulnerability audits, package-content inspection, and
 compilation of every example. The CI
 workflow now exercises the minimum TTY-compatible Elixir/OTP pair, the current
 Raw-compatible pair, quality/package checks, and every example on `main`,
-`develop`, and `release/**`. All four jobs passed for release commit `762b37c`
-in [GitHub Actions run 33081894094](https://github.com/pcharbon70/term_ui/actions/runs/33081894094),
-including the minimum-version suite at the exact seed that exposed the shared
-theme test-lifecycle collision.
+`develop`, and `release/**`. All four jobs passed for the terminal-fix
+implementation commit `e6ce19c` in
+[GitHub Actions run 33086690914](https://github.com/pcharbon70/term_ui/actions/runs/33086690914).
+The final local suites passed 5,309 tests on the current toolchain and 5,322
+tests on Elixir 1.15/OTP 26. The minimum-version suite also passed at seed
+`685426`, which exposed and then verified the fix for skipped-terminal runtimes
+incorrectly performing physical-terminal cleanup.
 
 The following gates still require maintainer or platform access and are not
 represented as complete by the local work:
