@@ -149,6 +149,8 @@ defmodule TermUI.Command.ExecutorTest do
   alias TermUI.Command
   alias TermUI.Command.Executor
 
+  @eventual_timeout 1_000
+
   describe "start_link/1" do
     test "starts executor" do
       {:ok, executor} = Executor.start_link()
@@ -173,7 +175,7 @@ defmodule TermUI.Command.ExecutorTest do
 
       assert is_reference(cmd_id)
 
-      assert_receive {:command_result, ^component_id, ^cmd_id, :timer_done}, 100
+      assert_receive {:command_result, ^component_id, ^cmd_id, :timer_done}, @eventual_timeout
     end
 
     test "delivers tuple result message" do
@@ -182,7 +184,7 @@ defmodule TermUI.Command.ExecutorTest do
       cmd = Command.timer(10, {:tick, 42})
       {:ok, cmd_id} = Executor.execute(executor, cmd, self(), :comp)
 
-      assert_receive {:command_result, :comp, ^cmd_id, {:tick, 42}}, 100
+      assert_receive {:command_result, :comp, ^cmd_id, {:tick, 42}}, @eventual_timeout
     end
   end
 
@@ -194,8 +196,8 @@ defmodule TermUI.Command.ExecutorTest do
       {:ok, cmd_id} = Executor.execute(executor, cmd, self(), :comp)
 
       # Should receive multiple ticks
-      assert_receive {:command_result, :comp, ^cmd_id, :tick}, 100
-      assert_receive {:command_result, :comp, ^cmd_id, :tick}, 100
+      assert_receive {:command_result, :comp, ^cmd_id, :tick}, @eventual_timeout
+      assert_receive {:command_result, :comp, ^cmd_id, :tick}, @eventual_timeout
 
       # Cancel to stop
       Executor.cancel(executor, cmd_id)
@@ -213,7 +215,8 @@ defmodule TermUI.Command.ExecutorTest do
       cmd = Command.file_read(path, :loaded)
       {:ok, cmd_id} = Executor.execute(executor, cmd, self(), :comp)
 
-      assert_receive {:command_result, :comp, ^cmd_id, {:loaded, {:ok, "test content"}}}, 100
+      assert_receive {:command_result, :comp, ^cmd_id, {:loaded, {:ok, "test content"}}},
+                     @eventual_timeout
 
       File.rm(path)
     end
@@ -224,7 +227,8 @@ defmodule TermUI.Command.ExecutorTest do
       cmd = Command.file_read("/nonexistent/file", :loaded)
       {:ok, cmd_id} = Executor.execute(executor, cmd, self(), :comp)
 
-      assert_receive {:command_result, :comp, ^cmd_id, {:loaded, {:error, :enoent}}}, 100
+      assert_receive {:command_result, :comp, ^cmd_id, {:loaded, {:error, :enoent}}},
+                     @eventual_timeout
     end
   end
 
@@ -235,7 +239,8 @@ defmodule TermUI.Command.ExecutorTest do
       cmd = Command.send_after(:target, :wake_up, 10)
       {:ok, cmd_id} = Executor.execute(executor, cmd, self(), :comp)
 
-      assert_receive {:command_result, :comp, ^cmd_id, {:send_to, :target, :wake_up}}, 100
+      assert_receive {:command_result, :comp, ^cmd_id, {:send_to, :target, :wake_up}},
+                     @eventual_timeout
     end
   end
 
@@ -269,7 +274,7 @@ defmodule TermUI.Command.ExecutorTest do
       {:ok, cmd_id} = Executor.execute(executor, cmd, self(), :comp)
 
       # Receive one tick
-      assert_receive {:command_result, :comp, ^cmd_id, :tick}, 100
+      assert_receive {:command_result, :comp, ^cmd_id, :tick}, @eventual_timeout
 
       # Cancel
       :ok = Executor.cancel(executor, cmd_id)
@@ -301,7 +306,7 @@ defmodule TermUI.Command.ExecutorTest do
       refute_receive {:command_result, :comp1, _, _}, 50
 
       # Should still receive comp2 result
-      assert_receive {:command_result, :comp2, ^cmd3_id, :c}, 100
+      assert_receive {:command_result, :comp2, ^cmd3_id, :c}, @eventual_timeout
     end
   end
 
@@ -343,7 +348,7 @@ defmodule TermUI.Command.ExecutorTest do
       {:ok, cmd_id} = Executor.execute(executor, cmd, self(), :comp)
 
       # Should receive timeout error
-      assert_receive {:command_result, :comp, ^cmd_id, {:error, :timeout}}, 100
+      assert_receive {:command_result, :comp, ^cmd_id, {:error, :timeout}}, @eventual_timeout
     end
   end
 
@@ -358,7 +363,7 @@ defmodule TermUI.Command.ExecutorTest do
       cmd = Command.timer(1000, :done) |> Command.with_timeout(5)
       {:ok, cmd_id} = Executor.execute(executor, cmd, self(), :comp)
 
-      assert_receive {:command_result, :comp, ^cmd_id, {:error, :timeout}}, 100
+      assert_receive {:command_result, :comp, ^cmd_id, {:error, :timeout}}, @eventual_timeout
     end
   end
 

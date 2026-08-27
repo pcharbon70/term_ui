@@ -10,11 +10,7 @@ defmodule TermUI.Runtime.NodeRendererTest do
   setup do
     # Generate a unique name for each test to avoid conflicts
     name = :"buffer_manager_#{System.unique_integer([:positive])}"
-    {:ok, pid} = BufferManager.start_link(rows: 30, cols: 50, name: name)
-
-    on_exit(fn ->
-      if Process.alive?(pid), do: GenServer.stop(pid)
-    end)
+    pid = start_supervised!({BufferManager, rows: 30, cols: 50, name: name})
 
     {:ok, bm: pid}
   end

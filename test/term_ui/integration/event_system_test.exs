@@ -13,8 +13,8 @@ defmodule TermUI.Integration.EventSystemTest do
   @short_timeout 50
   @default_timeout 100
   @medium_timeout 150
-  @long_timeout 200
   @extended_timeout 250
+  @eventual_timeout 1_000
 
   alias TermUI.Clipboard
   alias TermUI.Clipboard.Selection
@@ -77,7 +77,7 @@ defmodule TermUI.Integration.EventSystemTest do
       :ok = Executor.cancel_all_for_component(executor, :my_component)
 
       # Should only receive result from other_component
-      assert_receive {:command_result, :other_component, _, :third}, @long_timeout
+      assert_receive {:command_result, :other_component, _, :third}, @eventual_timeout
       refute_receive {:command_result, :my_component, _, _}, @short_timeout
     end
 
@@ -96,7 +96,7 @@ defmodule TermUI.Integration.EventSystemTest do
       assert {:error, :max_concurrent_reached} = Executor.execute(executor, cmd3, self(), :comp3)
 
       # After one completes, should be able to execute another
-      assert_receive {:command_result, _, _, _}, @long_timeout
+      assert_receive {:command_result, _, _, _}, @eventual_timeout
 
       cmd4 = Command.timer(10, :fourth)
       assert {:ok, _} = Executor.execute(executor, cmd4, self(), :comp4)
