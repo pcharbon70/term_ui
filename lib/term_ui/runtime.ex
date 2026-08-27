@@ -637,6 +637,7 @@ defmodule TermUI.Runtime do
   end
 
   defp local_backend_mode?(mode), do: mode in [:raw, :tty, :skip]
+  defp terminal_backend_mode?(mode), do: mode in [:raw, :tty]
 
   defp get_terminal_dimensions_safe do
     case Terminal.get_terminal_size() do
@@ -880,14 +881,15 @@ defmodule TermUI.Runtime do
     cleanup_shutdown(state)
     cleanup_terminal_restore(state)
 
-    # Steps 5-6 operate on node-global local-terminal state. Never run them
-    # for an independent custom backend such as an SSH channel.
-    if local_backend_mode?(state.backend_mode) do
+    # Only runtimes that initialized a physical terminal should attempt escape
+    # sequence, stty, or echo restoration. `:skip` still owns the runtime's
+    # persistent backend context, but deliberately has no terminal to restore.
+    if terminal_backend_mode?(state.backend_mode) do
       terminate_defensive_cleanup()
-      cleanup_persistent_terms()
+      ensure_echo_enabled(state)
     end
 
-    ensure_echo_enabled(state)
+    if local_backend_mode?(state.backend_mode), do: cleanup_persistent_terms()
 
     :ok
   end
@@ -965,7 +967,7 @@ defmodule TermUI.Runtime do
 
   defp ensure_echo_enabled(state) do
     # Only restore echo on local terminals, not custom backends (SSH)
-    if state.backend_mode in [:raw, :tty, :skip] do
+    if terminal_backend_mode?(state.backend_mode) do
       :io.setopts(echo: true)
     end
   rescue

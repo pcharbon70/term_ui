@@ -1,6 +1,8 @@
 defmodule TermUI.RuntimeTest do
   use ExUnit.Case, async: false
 
+  import ExUnit.CaptureIO
+
   alias TermUI.Event
   alias TermUI.Runtime
 
@@ -274,6 +276,20 @@ defmodule TermUI.RuntimeTest do
 
       # Process should stop after shutdown
       assert_receive {:DOWN, ^ref, :process, ^runtime, :normal}, 1000
+    end
+
+    test "does not emit terminal cleanup when terminal initialization was skipped" do
+      output =
+        capture_io(:stderr, fn ->
+          {:ok, runtime} = start_test_runtime(root: Counter)
+          ref = Process.monitor(runtime)
+
+          Runtime.shutdown(runtime)
+
+          assert_receive {:DOWN, ^ref, :process, ^runtime, :normal}, 1000
+        end)
+
+      assert output == ""
     end
 
     test "clears pending commands on shutdown" do
