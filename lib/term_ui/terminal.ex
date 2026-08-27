@@ -12,6 +12,7 @@ defmodule TermUI.Terminal do
 
   alias TermUI.ANSI
   alias TermUI.Platform
+  alias TermUI.Terminal.SignalHandler
   alias TermUI.Terminal.SizeDetector
   alias TermUI.Terminal.State
   alias TermUI.TerminalOutput
@@ -207,14 +208,17 @@ defmodule TermUI.Terminal do
     Process.flag(:trap_exit, true)
     check_previous_crash()
     create_ets_table()
+    register_signal_handler()
 
-    raw_mode_active = detect_prestarted_raw_mode()
+    {raw_mode_active, original_settings} = detect_prestarted_raw_mode()
 
     state =
       if raw_mode_active do
-        # Raw mode is already active, but we don't have the original settings
-        # This is OK - we'll use default restoration on shutdown
-        %{State.new() | raw_mode_active: true}
+        %{
+          State.new()
+          | raw_mode_active: true,
+            original_settings: original_settings
+        }
       else
         State.new()
       end
@@ -421,28 +425,59 @@ defmodule TermUI.Terminal do
 
   # Private functions
 
+  defp register_signal_handler do
+    case :os.type() do
+      {:unix, _} ->
+        handler = {SignalHandler, self()}
+
+        case :gen_event.add_sup_handler(:erl_signal_server, handler, self()) do
+          :ok ->
+            :ok
+
+          {:error, reason} ->
+            Logger.warning("Unable to register terminal signal handler: #{inspect(reason)}")
+        end
+
+      _ ->
+        :ok
+    end
+  rescue
+    error ->
+      Logger.warning("Unable to register terminal signal handler: #{Exception.message(error)}")
+  catch
+    kind, reason ->
+      Logger.warning("Unable to register terminal signal handler: #{inspect({kind, reason})}")
+  end
+
   # Backend.Selector may activate native raw mode before this process starts.
   # Pre-OTP 28 versions expose :shell.start_interactive/1 but do not implement
   # the native raw/cooked contract, so they must remain on the TTY path.
   defp detect_prestarted_raw_mode do
     if Platform.native_raw_mode_supported?() do
+      original_settings = save_terminal_settings()
+
       try do
         case :shell.start_interactive({:noshell, :raw}) do
           :ok ->
-            do_disable_raw_mode(nil)
+            do_disable_raw_mode(original_settings)
             :ets.insert(@ets_table, {:raw_mode_active, false})
-            false
+            {false, nil}
 
           {:error, :already_started} ->
+            # Selector may have activated OTP's raw shell before the Terminal
+            # server started. Apply the OS-level flags as well: the native call
+            # alone does not make `IO.getn/2` character-at-a-time in every
+            # non-shell launch (for example `mix run` under a PTY).
+            _ = apply_stty_raw_settings()
             :ets.insert(@ets_table, {:raw_mode_active, true})
-            true
+            {true, original_settings}
         end
       rescue
-        _ -> false
+        _ -> {false, nil}
       end
     else
       :ets.insert(@ets_table, {:raw_mode_active, false})
-      false
+      {false, nil}
     end
   end
 
@@ -549,7 +584,7 @@ defmodule TermUI.Terminal do
     # We pass it as a single argument which stty accepts for restoration
     case TermUtils.safe_stty([settings]) do
       {:ok, _} -> :ok
-      {:error, _} -> :ok
+      {:error, _} -> restore_stty_sane()
     end
   end
 

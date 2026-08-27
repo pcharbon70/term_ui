@@ -5,7 +5,9 @@
 excludes =
   if System.get_env("TERMUI_INCLUDE_TERMINAL_TESTS") do
     # Only check OTP availability when explicitly requested
-    raw_mode_available? = function_exported?(:shell, :start_interactive, 1)
+    raw_mode_available? =
+      Code.ensure_loaded?(:shell) and function_exported?(:shell, :start_interactive, 1)
+
     if raw_mode_available?, do: [], else: [:requires_terminal]
   else
     # Always exclude by default

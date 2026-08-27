@@ -36,6 +36,10 @@ not yet configure Win32 console modes or provide native raw input and resize
 handling. On Windows, prefer WSL and verify keyboard, mouse, resize, and cleanup
 behavior for the terminal you deploy with.
 
+OTP 26's signal API does not expose `SIGWINCH` to application handlers. The
+minimum-version TTY backend still supports size queries, but automatic local
+resize events require a newer OTP; Raw mode already requires OTP 28 or later.
+
 ## IEx Compatibility
 
 TermUI applications work directly in IEx with no code changes. This is perfect for:

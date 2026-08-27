@@ -157,6 +157,11 @@ def view(state) do
 end
 ```
 
+Automatic local resize events depend on OTP exposing `SIGWINCH` to the
+application. OTP 26 TTY applications can still query the current dimensions,
+but need a newer OTP for automatic resize notification. Raw mode requires OTP
+28 or later.
+
 ## Cursor Control
 
 The runtime manages cursor visibility and position. The cursor is hidden during normal operation to avoid flicker.

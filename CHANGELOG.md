@@ -45,6 +45,11 @@ rendering, constraint-based layouts, and the complete widget set.
 - Background-color bleeding and overlay rendering artifacts.
 - Elixir 1.18 regular-expression compilation.
 - Safe `stty` execution when no controlling terminal is available.
+- Explicit Raw runtimes now activate OS-level raw flags and restore the exact
+  saved terminal settings on exit.
+- On supported OTP releases, Unix runtimes now receive real `SIGWINCH` resize
+  notifications and restore the cursor and alternate screen synchronously
+  before `SIGTERM` shutdown.
 - Pre-OTP 28 systems now stay on the TTY/`stty` path instead of invoking the
   OTP 28 native raw/cooked shell-mode contract.
 - Order-dependent tests, singleton cache lifecycles, documentation links, and
@@ -55,6 +60,8 @@ rendering, constraint-based layouts, and the complete widget set.
 - Native Windows console support is experimental. TermUI 1.0 does not configure
   Win32 console modes or implement native raw input and resize handling; use WSL
   where practical and validate the chosen terminal environment.
+- OTP 26 TTY applications can query terminal dimensions, but its signal API
+  does not provide automatic `SIGWINCH` resize notifications.
 - A resume or external terminal redraw may require `TermUI.Runtime.force_render/1`.
 
 ## [0.2.0] - 2024-12-01

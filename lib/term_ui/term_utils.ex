@@ -248,11 +248,29 @@ defmodule TermUI.TermUtils do
 
   @spec run_stty([binary()]) :: {binary(), integer()}
   defp run_stty(args) do
-    attempts = [
-      ["-F", "/dev/tty" | args],
-      ["-f", "/dev/tty" | args],
-      args
-    ]
+    # Programs launched through an Erlang port do not necessarily inherit the
+    # BEAM process's controlling terminal as their standard input. On Linux,
+    # open the VM's stdin descriptor explicitly before trying /dev/tty and the
+    # command's own stdin. This keeps `stty` attached to the terminal that
+    # TermUI actually reads from.
+    beam_stdin = "/proc/#{System.pid()}/fd/0"
+
+    attempts =
+      if File.exists?(beam_stdin) do
+        [
+          ["-F", beam_stdin | args],
+          ["-f", beam_stdin | args],
+          ["-F", "/dev/tty" | args],
+          ["-f", "/dev/tty" | args],
+          args
+        ]
+      else
+        [
+          ["-F", "/dev/tty" | args],
+          ["-f", "/dev/tty" | args],
+          args
+        ]
+      end
 
     Enum.reduce_while(attempts, {"", 1}, fn argv, _acc ->
       result = System.cmd("stty", argv, stderr_to_stdout: true, parallelism: true)
@@ -313,19 +331,33 @@ defmodule TermUI.TermUtils do
       "-cbreak"
     ]
 
-    # Check all arguments are safe
-    Enum.all?(args, fn arg ->
-      # Either it's a known safe flag
-      # Or it's a numeric argument (for min/time)
-      arg in safe_flags or
-        (match?(<<_::utf8>>, arg) and String.length(arg) < 32)
-    end)
-    |> if do
+    ordinary_args? =
+      Enum.all?(args, fn arg ->
+        arg in safe_flags or Regex.match?(~r/^\d{1,3}$/, arg)
+      end)
+
+    # A saved `stty -g` value is passed back as one opaque argv entry. It has
+    # already been validated before storage, but it must also pass this public
+    # boundary when the terminal is restored.
+    saved_settings? =
+      case args do
+        [settings] -> valid_saved_stty_settings?(settings)
+        _ -> false
+      end
+
+    if ordinary_args? or saved_settings? do
       :ok
     else
       Logger.error("TermUtils: Invalid stty arguments: #{inspect(args)}")
       {:error, :invalid_arguments}
     end
+  end
+
+  defp valid_saved_stty_settings?(settings) do
+    safe_chars? = Regex.match?(~r/^[a-zA-Z0-9:;=\-\.]+$/, settings)
+    encoded_format? = String.contains?(settings, ":") or String.contains?(settings, "=")
+
+    safe_chars? and encoded_format? and String.length(settings) < 256
   end
 
   # Validates test command arguments.

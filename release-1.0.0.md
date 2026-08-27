@@ -75,8 +75,8 @@ theme test-lifecycle collision.
 The following gates still require maintainer or platform access and are not
 represented as complete by the local work:
 
-- SSH, resize edge cases, error/interruption cleanup, macOS, WSL/ConPTY, and
-  applicable Windows behavior need the manual terminal sign-off listed below.
+- SSH, macOS, WSL/ConPTY, and applicable Windows behavior need the manual
+  terminal sign-off listed below.
 - Branch protection and required checks need maintainer approval and repository
   configuration.
 - Hex authentication is required to complete `mix hex.publish --dry-run`; the
@@ -84,13 +84,25 @@ represented as complete by the local work:
   without publishing.
 
 Linux Raw, TTY, and IEx verification was completed on 2026-08-27. The
-terminal-only suite passed all 13 tests in a real PTY, including native Raw
+terminal-lifecycle suite passed all 19 tests in a real PTY, including native Raw
 activation, alternate-screen and cursor restoration, input-reader lifecycle,
 and clean shutdown. A direct `iex -S mix` run of `examples/iex_counter`
 selected TTY automatically, reported IEx mode inside the runtime component,
 processed an Up-arrow as `:up`, incremented the counter, returned normally on
 `q`, and restored the IEx prompt. The test terminal used cooked input and
 therefore delivered the key sequences after Enter, as now documented.
+
+A separate Linux PTY probe verified that an explicitly selected Raw runtime
+really disables canonical mode and echo, renders after a real 100x30 to 120x40
+window resize and `SIGWINCH`, handles single-line and multiline bracketed paste,
+parses Shift+Tab and Shift+Up, and restores the exact terminal flags, cursor,
+and alternate screen after normal exit. The same probe passed when shutdown
+immediately followed resize, after an intentionally raised component-update
+error, and when the BEAM received `SIGTERM`.
+
+The `SIGTERM` probe passed for both Raw and cooked TTY backends. Raw restored
+the exact original terminal flags; TTY preserved canonical mode and echo while
+still restoring the cursor and leaving the alternate screen.
 
 ## Release principles
 
@@ -206,11 +218,11 @@ Manual terminal verification should include:
 - [x] Raw backend on Linux.
 - [x] TTY backend on Linux.
 - [x] IEx-compatible operation.
-- [ ] Terminal resize followed by a render.
-- [ ] Resize followed immediately by shutdown.
-- [ ] Bracketed single-line and multiline paste.
-- [ ] Shift+Tab and modified-key navigation.
-- [ ] Normal exit, application error, and interrupted-session cleanup.
+- [x] Terminal resize followed by a render.
+- [x] Resize followed immediately by shutdown.
+- [x] Bracketed single-line and multiline paste.
+- [x] Shift+Tab and modified-key navigation.
+- [x] Normal exit, application error, and interrupted-session cleanup.
 - [ ] SSH backend input, resize, disconnect, and cleanup.
 - [ ] macOS behavior.
 - [ ] WSL/ConPTY behavior.

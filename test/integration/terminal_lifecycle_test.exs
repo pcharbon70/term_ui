@@ -10,6 +10,7 @@ defmodule TermUI.Integration.TerminalLifecycleTest do
 
   alias TermUI.IntegrationHelpers
   alias TermUI.Terminal
+  alias TermUI.TermUtils
 
   # These tests require actual terminal access
   @moduletag :integration
@@ -57,7 +58,9 @@ defmodule TermUI.Integration.TerminalLifecycleTest do
 
     @tag :requires_terminal
     test "full initialization sequence with raw mode" do
+      assert {:ok, original_settings} = TermUtils.safe_stty(["-g"])
       {:ok, _pid} = IntegrationHelpers.start_terminal()
+      assert {:ok, ^original_settings} = TermUtils.safe_stty(["-g"])
 
       # Step 1: Detect capabilities
       caps = TermUI.Capabilities.detect()
@@ -67,6 +70,8 @@ defmodule TermUI.Integration.TerminalLifecycleTest do
       result = Terminal.enable_raw_mode()
       assert {:ok, state} = result
       assert state.raw_mode_active == true
+      assert {:ok, raw_settings} = TermUtils.safe_stty(["-g"])
+      refute raw_settings == original_settings
 
       # Step 3: Enter alternate screen
       assert :ok = Terminal.enter_alternate_screen()
@@ -138,6 +143,7 @@ defmodule TermUI.Integration.TerminalLifecycleTest do
 
     @tag :requires_terminal
     test "full shutdown sequence reverses initialization" do
+      assert {:ok, original_settings} = TermUtils.safe_stty(["-g"])
       {:ok, _pid} = IntegrationHelpers.start_terminal()
 
       # Initialize fully
@@ -157,6 +163,7 @@ defmodule TermUI.Integration.TerminalLifecycleTest do
       # Step 3: Disable raw mode
       assert :ok = Terminal.disable_raw_mode()
       assert Terminal.get_state().raw_mode_active == false
+      assert {:ok, ^original_settings} = TermUtils.safe_stty(["-g"])
 
       # Verify complete shutdown
       IntegrationHelpers.assert_terminal_clean()

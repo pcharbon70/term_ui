@@ -43,6 +43,7 @@ defmodule TermUI.Runtime do
   alias TermUI.Runtime.State
   alias TermUI.Terminal
   alias TermUI.Terminal.InputReader
+  alias TermUI.Terminal.SignalHandler
   alias TermUI.TerminalOutput
 
   # Dialyzer: Functions with unmatched return values in side-effect calls
@@ -372,6 +373,8 @@ defmodule TermUI.Runtime do
         logger_handler_config: logger_handler_config
       })
 
+    register_runtime_signal_handler(backend_mode)
+
     # Schedule first render
     schedule_render(render_interval)
 
@@ -454,6 +457,35 @@ defmodule TermUI.Runtime do
       end
     end
   end
+
+  # Raw mode installs this handler through Terminal. TTY does not start the
+  # Terminal singleton, so give it its own supervised subscriber to restore
+  # the cursor and alternate screen before the VM continues SIGTERM shutdown.
+  defp register_runtime_signal_handler(:tty) do
+    case :os.type() do
+      {:unix, _} ->
+        handler = {SignalHandler, self()}
+        args = {self(), :restore_terminal, nil}
+
+        case :gen_event.add_sup_handler(:erl_signal_server, handler, args) do
+          :ok ->
+            :ok
+
+          {:error, reason} ->
+            Logger.warning("Unable to register TTY signal handler: #{inspect(reason)}")
+        end
+
+      _ ->
+        :ok
+    end
+  rescue
+    error -> Logger.warning("Unable to register TTY signal handler: #{Exception.message(error)}")
+  catch
+    kind, reason ->
+      Logger.warning("Unable to register TTY signal handler: #{inspect({kind, reason})}")
+  end
+
+  defp register_runtime_signal_handler(_backend_mode), do: :ok
 
   defp build_initial_state(params) do
     %{
@@ -570,6 +602,11 @@ defmodule TermUI.Runtime do
     case Terminal.start_link() do
       {:ok, _pid} -> :ok
       {:error, {:already_started, _pid}} -> :ok
+      {:error, reason} -> throw({:terminal_failed, reason})
+    end
+
+    case Terminal.enable_raw_mode() do
+      {:ok, _state} -> :ok
       {:error, reason} -> throw({:terminal_failed, reason})
     end
 
@@ -808,6 +845,14 @@ defmodule TermUI.Runtime do
   @impl true
   def handle_call(:get_state, _from, state) do
     {:reply, state, state}
+  end
+
+  @impl true
+  def handle_call(:restore_terminal, _from, state) do
+    # TTY input may have a blocking IO.getn request queued on standard_io.
+    # Bypass that IO server so signal cleanup cannot stall behind the read.
+    TerminalOutput.write_to_tty(TerminalOutput.cleanup_sequence())
+    {:reply, :ok, state}
   end
 
   @impl true
