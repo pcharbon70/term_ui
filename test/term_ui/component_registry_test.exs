@@ -159,27 +159,54 @@ defmodule TermUI.ComponentRegistryTest do
 
   describe "automatic cleanup" do
     test "unregisters when process dies" do
-      pid = spawn(fn -> Process.sleep(100) end)
+      pid =
+        spawn(fn ->
+          receive do
+            :stop -> :ok
+          end
+        end)
+
       :ok = ComponentRegistry.register(:auto_cleanup, pid, TestModule)
 
       assert ComponentRegistry.registered?(:auto_cleanup)
 
-      # Wait for process to die
-      Process.sleep(150)
+      monitor = Process.monitor(pid)
+      send(pid, :stop)
 
-      refute ComponentRegistry.registered?(:auto_cleanup)
+      assert_receive {:DOWN, ^monitor, :process, ^pid, :normal}, 1_000
+
+      assert eventually?(fn -> not ComponentRegistry.registered?(:auto_cleanup) end)
     end
 
     test "unregisters when process is killed" do
       pid = spawn(fn -> Process.sleep(10_000) end)
       :ok = ComponentRegistry.register(:kill_test, pid, TestModule)
 
+      monitor = Process.monitor(pid)
       Process.exit(pid, :kill)
 
-      # Give time for monitor to trigger
-      Process.sleep(50)
+      assert_receive {:DOWN, ^monitor, :process, ^pid, :killed}, 1_000
 
-      refute ComponentRegistry.registered?(:kill_test)
+      assert eventually?(fn -> not ComponentRegistry.registered?(:kill_test) end)
+    end
+  end
+
+  defp eventually?(condition, timeout_ms \\ 1_000) do
+    deadline = System.monotonic_time(:millisecond) + timeout_ms
+    wait_until(condition, deadline)
+  end
+
+  defp wait_until(condition, deadline) do
+    cond do
+      condition.() ->
+        true
+
+      System.monotonic_time(:millisecond) < deadline ->
+        Process.sleep(10)
+        wait_until(condition, deadline)
+
+      true ->
+        false
     end
   end
 end
