@@ -28,7 +28,7 @@ defmodule IExCounter.App do
 
   ## What Works in IEx
 
-  - All keyboard input is received by the TUI application
+  - Character and navigation input is parsed after the shell delivers it
   - Arrow keys work once the shell delivers them (some terminals require Enter)
   - Terminal state is restored when you quit
   - You return to the IEx prompt ready for next command

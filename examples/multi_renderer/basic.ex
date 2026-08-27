@@ -1,8 +1,8 @@
 # Basic TermUI Example - List Navigation
 #
 # This example demonstrates a simple list navigation application
-# that works identically in both raw mode (full terminal control)
-# and TTY mode (line-based input with graceful degradation).
+# that handles the same normalized events in raw mode (full terminal control)
+# and TTY mode (possibly line-buffered input with graceful degradation).
 #
 # Usage:
 #   elixir -r examples/multi_renderer/basic.ex -e "Basic.run()"

@@ -53,7 +53,11 @@ iex> TermUI.Runtime.run(root: MyApp.Counter)
 
 ### How It Works
 
-TermUI uses Erlang's `:io.get_chars/2` for input instead of Elixir's `IO` module wrapper. This bypasses IEx's input interception, allowing TUI applications to receive keyboard input directly.
+TermUI keeps the active IEx shell in cooked mode and reads through its IO
+server from a dedicated input process. This avoids replacing the shell while
+still allowing TermUI to parse navigation keys and return cleanly to the IEx
+prompt. Depending on the shell and terminal driver, cooked input may be
+delivered immediately or buffered until Enter is pressed.
 
 ### Detection and Configuration
 
@@ -83,10 +87,12 @@ export TERM_UI_IEX_MODE=true
 
 ### Important Notes
 
-- **Arrow keys work immediately** - No need to press Enter for navigation
-- **All keyboard shortcuts work** - Including Tab, Enter, Escape, function keys
+- **Navigation keys are supported** - Some cooked-mode terminals deliver them
+  only after Enter is pressed
+- **Keyboard shortcuts are parsed** - Including Tab, Enter, Escape, and
+  function keys once the shell delivers their bytes
 - **Clean shutdown** - Terminal state is restored when the app exits
-- **IEx remains responsive** - The TUI app can be exited to return to IEx prompt
+- **Clean return to IEx** - Exiting the TUI restores the prompt for more commands
 
 ## Widgets
 

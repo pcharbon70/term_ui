@@ -3,8 +3,9 @@ defmodule TermUI.Input.TTY.Server do
   GenServer that manages IEx-compatible TTY input using a separate process.
 
   This server spawns a separate process that continuously polls for input using
-  `:io.get_chars/2`. This approach allows TUI applications to work correctly
-  inside IEx, bypassing IEx's input interception.
+  `:io.get_chars/2`. This approach lets TUI applications read through the
+  active IEx IO server without replacing its shell. Because the terminal stays
+  in cooked mode, delivery may still be buffered until Enter.
 
   ## Architecture
 

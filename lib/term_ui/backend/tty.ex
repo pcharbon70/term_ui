@@ -624,8 +624,9 @@ defmodule TermUI.Backend.TTY do
   @doc """
   Polls for input events with the specified timeout.
 
-  Uses `IO.getn/2` for character-by-character input. Note that the timeout
-  parameter may not be honored precisely since `IO.getn/2` is blocking.
+  Requests one character at a time with `IO.getn/2`. Because the terminal stays
+  in cooked mode, the shell or terminal driver may buffer input until Enter.
+  The timeout parameter may not be honored since `IO.getn/2` is blocking.
 
   Input is parsed using `TermUI.Terminal.EscapeParser` to handle escape
   sequences like arrow keys, function keys, and mouse events.

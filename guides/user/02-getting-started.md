@@ -43,7 +43,8 @@ Raw mode provides complete terminal control:
 TTY mode works inside IEx and other constrained environments:
 
 - **No alternate screen** - Output appears directly in terminal
-- **Immediate character input** - Uses `:io.get_chars/2` for IEx compatibility
+- **Shell-compatible input** - Uses a dedicated reader without replacing the
+  active IEx shell; some terminals buffer input until Enter
 - **Reduced feature set** - Mouse support may be limited
 - **Works in IEx** - Perfect for development and debugging
 
@@ -270,7 +271,8 @@ iex> MyApp.run()
 
 The app will run in TTY mode, which:
 - Works inside IEx without taking over the shell completely
-- Provides immediate character input (no Enter needed)
+- Supports the same normalized key events after the shell delivers them; some
+  cooked-mode terminals require Enter
 - Displays output directly in the terminal
 
 For the full TUI experience with alternate screen, run from command line instead:

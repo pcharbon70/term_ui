@@ -12,7 +12,8 @@ This directory contains example applications demonstrating TermUI's multi-render
 
 ### 1. Basic Example (`basic.ex`)
 
-A simple list navigation application that works identically in both raw and TTY modes.
+A simple list navigation application that receives the same normalized events
+in raw and TTY modes. TTY delivery may be buffered until Enter.
 
 ```bash
 # Run with auto-detection

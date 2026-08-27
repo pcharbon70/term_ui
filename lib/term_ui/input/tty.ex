@@ -2,15 +2,17 @@ defmodule TermUI.Input.TTY do
   @moduledoc """
   TTY mode input handler implementing the `TermUI.Input` behaviour.
 
-  This module requests one character at a time using `:io.get_chars/2` for IEx
+  This module requests one character at a time using `IO.getn/2` for IEx
   compatibility. The terminal remains in cooked mode, so the shell or terminal
   driver may still buffer those characters until Enter is pressed.
 
   ## Features
 
-  - **IEx Compatible**: Uses `:io.get_chars/2` to bypass IEx's input interception
+  - **IEx Compatible**: Reads through the active shell's IO server without
+    replacing its cooked mode
   - **Single-character reads**: Processes one requested character at a time
-  - **Full keyboard support**: Arrow keys, Tab, Enter, function keys work normally
+  - **Normalized keyboard parsing**: Arrow keys, Tab, Enter, and function keys
+    are parsed once their bytes are delivered
   - **Escape sequence parsing**: Handles arrow keys, function keys, mouse events,
     and other terminal escape sequences
   - **Buffer management**: Maintains partial escape sequences between poll calls
@@ -27,7 +29,7 @@ defmodule TermUI.Input.TTY do
 
   ## How Arrow Keys and Special Keys Work
 
-  `:io.get_chars/2` requests one character, but it does not disable the operating
+  `IO.getn/2` requests one character, but it does not disable the operating
   system's canonical input mode. Delivery therefore depends on the active shell
   and terminal driver. Some environments deliver each key immediately; others
   buffer input until Enter. Once delivered:
@@ -36,7 +38,8 @@ defmodule TermUI.Input.TTY do
   - **Tab**: Works for field/button navigation
   - **Enter**: Detected immediately for selection
   - **Function keys**: F1-F12 work normally
-  - **Ctrl combinations**: Ctrl+C, Ctrl+Z, etc. work
+  - **Ctrl combinations**: Retain the active shell's cooked-mode behavior; some
+    combinations may be handled by the terminal rather than emitted as events
 
   Most keyboard-driven widgets remain usable, with line buffering as the main
   compatibility difference from Raw mode.

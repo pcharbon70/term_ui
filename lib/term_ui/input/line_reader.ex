@@ -11,8 +11,9 @@ defmodule TermUI.Input.LineReader do
   > Unlike `TermUI.Input.Raw` and `TermUI.Input.TTY`, this module does **not**
   > implement the `TermUI.Input` behaviour. It is a standalone utility module
   > for line-based input, not character-by-character polling. Use this module
-  > directly when you need line input with shell editing; use the behaviour
-  > implementations for immediate character input.
+  > directly when you need line input with shell editing. `Input.Raw` provides
+  > immediate character input; `Input.TTY` requests individual characters but
+  > cooked-mode delivery may still be line-buffered.
 
   ## When to Use LineReader
 
@@ -21,9 +22,9 @@ defmodule TermUI.Input.LineReader do
   - **Shell line editing**: Backspace, cursor movement, etc.
   - **Submit on Enter**: Input is complete when user presses Enter
 
-  Most TermUI widgets use character-by-character input (`Input.Raw` or `Input.TTY`)
-  for immediate key response. Use `LineReader` only for text fields that benefit
-  from shell editing.
+  Most TermUI widgets use `Input.Raw` or `Input.TTY` to normalize individual key
+  events. Use `LineReader` only for text fields that benefit from explicit shell
+  line editing.
 
   ## Security Considerations
 
@@ -86,12 +87,12 @@ defmodule TermUI.Input.LineReader do
 
   ## Comparison with Character Input
 
-  | Feature | LineReader | Input.Raw/TTY |
-  |---------|------------|---------------|
-  | Input style | Line-based | Character-by-character |
-  | Submit | Enter key | Immediate |
-  | Editing | Shell-provided | Application-handled |
-  | Use case | TextInput.Line | Menu, PickList, etc. |
+  | Feature | LineReader | Input.Raw | Input.TTY |
+  |---------|------------|-----------|-----------|
+  | Input style | Line-based | Character-by-character | Individual reads; delivery may be line-buffered |
+  | Submit/delivery | Enter key | Immediate | Shell-dependent |
+  | Editing | Shell-provided | Application-handled | Application-handled after delivery |
+  | Use case | TextInput.Line | Full interactive UI | IEx and constrained terminals |
 
   ## Important Notes
 

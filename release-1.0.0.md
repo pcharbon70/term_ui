@@ -40,7 +40,7 @@ At the time of writing:
 Re-run every status and validation command below. Do not assume this snapshot
 is still current when performing the release.
 
-## Release-branch execution status (2026-08-26)
+## Release-branch execution status (2026-08-27)
 
 The `release/1.0.0` branch was created from `origin/develop` at `4c70486`.
 The release stabilization work makes the following dispositions for the open
@@ -67,8 +67,10 @@ retirement and vulnerability audits, package-content inspection, and
 compilation of every example. The CI
 workflow now exercises the minimum TTY-compatible Elixir/OTP pair, the current
 Raw-compatible pair, quality/package checks, and every example on `main`,
-`develop`, and `release/**`. All four jobs passed for release commit `efe9032`
-in [GitHub Actions run 32999802298](https://github.com/pcharbon70/term_ui/actions/runs/32999802298).
+`develop`, and `release/**`. All four jobs passed for release commit `762b37c`
+in [GitHub Actions run 33081894094](https://github.com/pcharbon70/term_ui/actions/runs/33081894094),
+including the minimum-version suite at the exact seed that exposed the shared
+theme test-lifecycle collision.
 
 The following gates still require maintainer or platform access and are not
 represented as complete by the local work:
@@ -127,10 +129,10 @@ The document can later be merged into the 2.0 rewrite line.
 
 Release gate:
 
-- [ ] `release-1.0.0.md` is committed on the pre-rewrite release line.
-- [ ] `re-design-for-2.0.md` is committed on an appropriate 2.0 branch or
+- [x] `release-1.0.0.md` is committed on the pre-rewrite release line.
+- [x] `re-design-for-2.0.md` is committed on an appropriate 2.0 branch or
       otherwise preserved outside the 1.0 release branch.
-- [ ] The `develop` working tree is clean.
+- [x] The `develop` working tree is clean.
 
 ## 2. Freeze and verify the pre-rewrite code
 
@@ -156,10 +158,10 @@ The final command must report `0 0` before the release branch is cut.
 
 Release gate:
 
-- [ ] `develop` contains the intended pre-rewrite code.
-- [ ] `develop` matches `origin/develop`.
-- [ ] The working tree is clean.
-- [ ] Pull request #41 remains unmerged.
+- [x] `develop` contains the intended pre-rewrite code.
+- [x] `develop` matches `origin/develop`.
+- [x] The working tree is clean.
+- [x] Pull request #41 remains unmerged.
 
 ## 3. Create the release branch
 
@@ -175,8 +177,8 @@ should enter this branch.
 
 Release gate:
 
-- [ ] `release/1.0.0` exists locally and on GitHub.
-- [ ] Its starting commit matches the intended `origin/develop` commit.
+- [x] `release/1.0.0` exists locally and on GitHub.
+- [x] Its starting commit matches the intended `origin/develop` commit.
 
 ## 4. Resolve release blockers
 
@@ -185,17 +187,17 @@ release branch before changing the version.
 
 Required work includes:
 
-- [ ] Fix the current test failures.
-- [ ] Make ASCII capability tests isolate all relevant environment and global
+- [x] Fix the current test failures.
+- [x] Make ASCII capability tests isolate all relevant environment and global
       state.
-- [ ] Make `safe_stty` behavior and tests correct when no controlling TTY is
+- [x] Make `safe_stty` behavior and tests correct when no controlling TTY is
       available.
-- [ ] Remove test compilation warnings.
-- [ ] Reconcile the existing SSH backend commit with open pull request #33.
-- [ ] Triage every open terminal and rendering issue.
-- [ ] Explicitly identify which open issues block 1.0 and which are accepted
+- [x] Remove test compilation warnings.
+- [x] Reconcile the existing SSH backend commit with open pull request #33.
+- [x] Triage every open terminal and rendering issue.
+- [x] Explicitly identify which open issues block 1.0 and which are accepted
       for a later 1.x patch.
-- [ ] Make GitHub CI run successfully on supported Elixir/OTP combinations.
+- [x] Make GitHub CI run successfully on supported Elixir/OTP combinations.
 - [ ] Add branch protection and required checks to `main`.
 - [ ] Prefer the same protection for `develop` and `release/1.0.0`.
 
@@ -294,11 +296,11 @@ Review the actual Git comparison before finalizing the notes:
 
 Release gate:
 
-- [ ] `mix.exs` reports `1.0.0`.
-- [ ] README installation instructions report `~> 1.0`.
-- [ ] `CHANGELOG.md` contains a dated `1.0.0` section.
-- [ ] Changelog comparison links are correct.
-- [ ] Documentation and examples describe the code being released.
+- [x] `mix.exs` reports `1.0.0`.
+- [x] README installation instructions report `~> 1.0`.
+- [x] `CHANGELOG.md` contains a dated `1.0.0` section.
+- [x] Changelog comparison links are correct.
+- [x] Documentation and examples describe the code being released.
 
 ## 6. Commit and push the release preparation
 
@@ -315,10 +317,10 @@ explicitly. Avoid `git add .` during release preparation.
 
 Release gate:
 
-- [ ] All intended release changes are committed.
-- [ ] No generated build, documentation, credential, or editor files are
+- [x] All intended release changes are committed.
+- [x] No generated build, documentation, credential, or editor files are
       committed.
-- [ ] `release/1.0.0` matches `origin/release/1.0.0`.
+- [x] `release/1.0.0` matches `origin/release/1.0.0`.
 
 ## 7. Run the complete release validation
 
@@ -365,16 +367,16 @@ and unrelated development documents.
 
 Release gate:
 
-- [ ] Formatting passes.
-- [ ] Compilation passes with warnings treated as errors.
-- [ ] All required automated tests pass with zero failures.
-- [ ] Credo and Dialyzer pass under the agreed policy.
-- [ ] Documentation builds without warnings.
-- [ ] Dependency vulnerability, lockfile, and Hex retirement audits pass.
-- [ ] Every supported example compiles.
+- [x] Formatting passes.
+- [x] Compilation passes with warnings treated as errors.
+- [x] All required automated tests pass with zero failures.
+- [x] Credo and Dialyzer pass under the agreed policy.
+- [x] Documentation builds without warnings.
+- [x] Dependency vulnerability, lockfile, and Hex retirement audits pass.
+- [x] Every supported example compiles.
 - [ ] Manual terminal verification passes.
 - [ ] `mix hex.publish --dry-run` passes.
-- [ ] The unpacked package contains exactly the intended release files.
+- [x] The unpacked package contains exactly the intended release files.
 
 ## 8. Open the release pull request into `main`
 
@@ -394,12 +396,12 @@ merge so the existing commit history remains intact.
 
 Require the following before merging:
 
-- [ ] Green required CI checks.
+- [x] Green required CI checks.
 - [ ] Successful Hex dry run.
-- [ ] Successful documentation build.
+- [x] Successful documentation build.
 - [ ] Manual terminal verification sign-off.
 - [ ] Maintainer review and approval.
-- [ ] Confirmation that pull request #41 is not included.
+- [x] Confirmation that pull request #41 is not included.
 
 ## 9. Merge the release into `main`
 

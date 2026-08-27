@@ -12,10 +12,10 @@ defmodule TermUI.Input do
 
   ### Character Mode (Default)
 
-  Both Raw and TTY backends use character-by-character input via `IO.getn/2`.
-  This means keyboard navigation (arrow keys, Tab, Enter, function keys) works
-  **identically** in both modes. The shell only provides line editing for
-  `IO.gets/1` calls—single character reads are immediate in both modes.
+  Both Raw and TTY handlers request one character at a time. Raw mode receives
+  each keystroke immediately. TTY mode leaves the terminal in cooked mode, so
+  the shell or terminal driver may buffer input until Enter. After delivery,
+  both handlers normalize navigation keys into the same TermUI events.
 
   This is the primary input mode used by most widgets:
   - `Menu`, `PickList`, `Table` - navigation with arrows, selection with Enter
@@ -60,7 +60,8 @@ defmodule TermUI.Input do
   ## Built-in Handlers
 
   - `TermUI.Input.Raw` - Wraps `TermUI.Terminal.InputReader` for raw mode
-  - `TermUI.Input.TTY` - Uses `IO.getn/2` for TTY mode character input
+  - `TermUI.Input.TTY` - Uses blocking `IO.getn/2` through the active shell's
+    IO server; cooked-mode delivery may be line-buffered
 
   Use `TermUI.Input.Selector` to automatically choose the appropriate handler
   based on the active backend.
@@ -169,8 +170,8 @@ defmodule TermUI.Input do
   Return the input mode for this handler.
 
   Returns `:raw` or `:tty` to indicate which mode the handler operates in.
-  This allows components to adapt their behavior if needed, though most
-  widgets work identically in both modes.
+  This allows components to adapt their behavior if needed. Most widgets handle
+  the normalized events identically, although event delivery timing differs.
 
   ## Use Cases
 
