@@ -132,14 +132,14 @@ defmodule TermUI.RuntimeTest do
 
     test "ignores events during shutdown" do
       {:ok, runtime} = start_test_runtime(root: Counter)
+      ref = Process.monitor(runtime)
 
       Runtime.shutdown(runtime)
       Runtime.send_event(runtime, Event.key(:up))
-      Process.sleep(50)
 
       # Process should have stopped after shutdown
       # Events during shutdown should be ignored without crash
-      refute Process.alive?(runtime)
+      assert_receive {:DOWN, ^ref, :process, ^runtime, :normal}, 1000
     end
 
     test "broadcasts resize events" do
@@ -189,14 +189,14 @@ defmodule TermUI.RuntimeTest do
 
     test "ignores messages during shutdown" do
       {:ok, runtime} = start_test_runtime(root: Counter)
+      ref = Process.monitor(runtime)
 
       Runtime.shutdown(runtime)
       Runtime.send_message(runtime, :root, :increment)
-      Process.sleep(50)
 
       # Process should have stopped after shutdown
       # Messages during shutdown should be ignored without crash
-      refute Process.alive?(runtime)
+      assert_receive {:DOWN, ^ref, :process, ^runtime, :normal}, 1000
     end
   end
 
@@ -240,14 +240,14 @@ defmodule TermUI.RuntimeTest do
   describe "command collection" do
     test "collects commands from update results" do
       {:ok, runtime} = start_test_runtime(root: Counter)
+      ref = Process.monitor(runtime)
 
       # Send event that produces a quit command
       # This should trigger shutdown
       Runtime.send_event(runtime, Event.key(:q))
-      Process.sleep(100)
 
       # Process should have stopped due to quit command
-      refute Process.alive?(runtime)
+      assert_receive {:DOWN, ^ref, :process, ^runtime, :normal}, 1000
     end
   end
 
@@ -294,22 +294,22 @@ defmodule TermUI.RuntimeTest do
 
     test "clears pending commands on shutdown" do
       {:ok, runtime} = start_test_runtime(root: Counter)
+      ref = Process.monitor(runtime)
 
       Runtime.shutdown(runtime)
-      Process.sleep(100)
 
       # Process should have stopped after cleanup
-      refute Process.alive?(runtime)
+      assert_receive {:DOWN, ^ref, :process, ^runtime, :normal}, 1000
     end
 
     test "clears components on shutdown" do
       {:ok, runtime} = start_test_runtime(root: Counter)
+      ref = Process.monitor(runtime)
 
       Runtime.shutdown(runtime)
-      Process.sleep(100)
 
       # Process should have stopped after cleanup
-      refute Process.alive?(runtime)
+      assert_receive {:DOWN, ^ref, :process, ^runtime, :normal}, 1000
     end
   end
 
