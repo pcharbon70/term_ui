@@ -256,10 +256,7 @@ defmodule TermUI.AppTest do
     test "runs startup commands returned from init/1" do
       {:ok, pid} = App.start(InitCommandCounter, skip_terminal: true)
 
-      Process.sleep(25)
-      :ok = TermUI.Runtime.sync(pid)
-
-      state = TermUI.Runtime.get_state(pid)
+      state = wait_for_root_state(pid, &(&1.ticks == 1))
       assert state.root_state.ticks == 1
 
       GenServer.stop(pid)
@@ -269,10 +266,7 @@ defmodule TermUI.AppTest do
       {:ok, pid} = App.start(RuntimeCommandCounter, skip_terminal: true)
 
       TermUI.Runtime.send_message(pid, :root, :start_timer)
-      Process.sleep(25)
-      :ok = TermUI.Runtime.sync(pid)
-
-      state = TermUI.Runtime.get_state(pid)
+      state = wait_for_root_state(pid, &(&1.ticks == 1))
       assert state.root_state.ticks == 1
 
       GenServer.stop(pid)
