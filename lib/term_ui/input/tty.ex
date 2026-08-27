@@ -2,14 +2,14 @@ defmodule TermUI.Input.TTY do
   @moduledoc """
   TTY mode input handler implementing the `TermUI.Input` behaviour.
 
-  This module provides character-by-character input using `:io.get_chars/2`
-  for IEx compatibility. The key to IEx compatibility is using Erlang's `:io`
-  module directly instead of Elixir's `IO` module wrapper.
+  This module requests one character at a time using `:io.get_chars/2` for IEx
+  compatibility. The terminal remains in cooked mode, so the shell or terminal
+  driver may still buffer those characters until Enter is pressed.
 
   ## Features
 
   - **IEx Compatible**: Uses `:io.get_chars/2` to bypass IEx's input interception
-  - **Character-by-character input**: Single character reads work immediately
+  - **Single-character reads**: Processes one requested character at a time
   - **Full keyboard support**: Arrow keys, Tab, Enter, function keys work normally
   - **Escape sequence parsing**: Handles arrow keys, function keys, mouse events,
     and other terminal escape sequences
@@ -18,19 +18,19 @@ defmodule TermUI.Input.TTY do
 
   ## IEx Compatibility
 
-  The key to IEx compatibility is using `:io.get_chars/2` (Erlang) instead of
-  `IO.getn/2` (Elixir). While both ultimately use the same IO server, the direct
-  Erlang call behaves differently when running inside IEx, allowing TUI applications
-  to receive keyboard input instead of having it stolen by IEx.
+  IEx owns the active shell, so the TTY backend reads through that shell's IO
+  server instead of trying to replace it with a Raw shell. This allows a TermUI
+  application to receive input and return cleanly to the IEx prompt.
 
   This approach was verified in the `snake_test` project where TUI applications
   run correctly inside IEx using this method.
 
   ## How Arrow Keys and Special Keys Work
 
-  A common misconception is that TTY mode requires Enter to submit input. This is
-  only true for `IO.gets/1` (line-based input). Single character reads via
-  `:io.get_chars/2` return immediately, so:
+  `:io.get_chars/2` requests one character, but it does not disable the operating
+  system's canonical input mode. Delivery therefore depends on the active shell
+  and terminal driver. Some environments deliver each key immediately; others
+  buffer input until Enter. Once delivered:
 
   - **Arrow keys**: Work normally (↑↓←→)
   - **Tab**: Works for field/button navigation
@@ -38,7 +38,8 @@ defmodule TermUI.Input.TTY do
   - **Function keys**: F1-F12 work normally
   - **Ctrl combinations**: Ctrl+C, Ctrl+Z, etc. work
 
-  This means most TUI widgets work **identically** in both Raw and TTY modes.
+  Most keyboard-driven widgets remain usable, with line buffering as the main
+  compatibility difference from Raw mode.
 
   ## Usage
 
@@ -69,7 +70,7 @@ defmodule TermUI.Input.TTY do
   | Timeout support | No (blocking) | Yes (Task-based) |
   | Non-blocking poll | No | Yes |
   | Escape sequences | Yes | Yes |
-  | Arrow/Tab/Enter | Yes | Yes |
+  | Arrow/Tab/Enter | Yes (delivery may be buffered) | Yes |
   | Mouse events | Yes | Yes |
 
   ## When to Use TTY Mode
@@ -87,11 +88,13 @@ defmodule TermUI.Input.TTY do
   ## Escape Sequence Handling
 
   When an escape sequence spans multiple reads (e.g., arrow keys send multiple
-  bytes), the partial sequence is buffered and completed on subsequent polls.
+  bytes), the partial sequence is buffered and completed in the dedicated input
+  reader process before an event is returned.
 
-  When a partial escape sequence is detected (e.g., lone ESC), the handler waits
-  up to 100ms for completion using a blocking read. This matches standard terminal
-  emulator behavior and distinguishes ESC key presses from escape sequences.
+  TTY IO requests cannot be cancelled safely: a timed-out request can still
+  consume a later byte. Sequence completion therefore stays synchronous. In a
+  cooked terminal, a lone Escape is emitted when the containing line is
+  submitted.
 
   ## Security
 
@@ -107,8 +110,8 @@ defmodule TermUI.Input.TTY do
   - **Rate-limited logging**: Buffer overflow warnings use rate-limited logging
     (via `InputBuffer`) to prevent log flooding attacks.
 
-  - **Escape sequence timeout**: Partial sequences timeout after 100ms, preventing
-    indefinite buffering of incomplete sequences.
+  - **Dedicated blocking reader**: Partial sequences are completed outside the
+    runtime process, so blocking TTY delivery cannot stall rendering or cleanup.
 
   For concurrent usage, each handler instance maintains independent state, so
   memory usage scales linearly with the number of concurrent handlers.
@@ -133,12 +136,7 @@ defmodule TermUI.Input.TTY do
              process_input: 2,
              poll: 2,
              setup_io_opts: 0,
-             read_char: 0,
-             handle_escape_timeout: 1}
-
-  # Timeout for escape sequence completion (ms).
-  # Matches snake_test's 100ms timeout for distinguishing ESC key presses.
-  @escape_timeout 100
+             read_char: 0}
 
   # Maximum event queue size to prevent memory exhaustion.
   @max_queue_size 1000
@@ -317,78 +315,22 @@ defmodule TermUI.Input.TTY do
   # Read input with blocking I/O
   @spec read_blocking(t()) :: TermUI.Input.poll_result()
   defp read_blocking(%__MODULE__{} = state) do
-    # Check if we have a partial escape sequence that needs timeout handling
-    if EscapeParser.partial_sequence?(state.buffer) do
-      # Wait a short time for escape sequence completion
-      handle_escape_timeout(state)
-    else
-      # Normal blocking read
-      do_read_blocking(state)
-    end
-  end
-
-  # Handle the case where we have a partial escape sequence
-  @spec handle_escape_timeout(t()) :: TermUI.Input.poll_result()
-  defp handle_escape_timeout(%__MODULE__{} = state) do
-    # For TTY mode, we use a Task with short timeout to check for sequence completion
-    task = Task.async(fn -> read_char() end)
-
-    case Task.yield(task, @escape_timeout) do
-      {:ok, {:ok, data}} ->
-        # Got more input, add to buffer and try to parse
-        process_input(state, data)
-
-      {:ok, :eof} ->
-        {:eof, state}
-
-      {:ok, {:error, reason}} ->
-        Logger.debug("Input.TTY: IO read error: #{inspect(reason)}")
-        {:eof, state}
-
-      nil ->
-        # Timeout - escape sequence didn't complete, emit partial
-        Task.shutdown(task)
-        emit_partial_escape(state)
-    end
+    # TTY input is blocking, so complete escape sequences in this reader
+    # process. A timed Task cannot safely cancel an outstanding IO request:
+    # the request may still consume a byte after the Task is stopped.
+    do_read_blocking(state)
   end
 
   # Emit partial escape sequence as individual key events
   @spec emit_partial_escape(t()) :: TermUI.Input.poll_result()
-  defp emit_partial_escape(%__MODULE__{buffer: buffer} = state) do
-    events =
-      cond do
-        # Lone ESC
-        buffer == <<27>> ->
-          [Event.key(:escape)]
+  defp emit_partial_escape(%__MODULE__{buffer: <<27, rest::binary>>} = state) do
+    {rest_events, remaining} = EscapeParser.parse(rest)
+    event = Event.key(:escape)
 
-        # ESC[ without terminator
-        buffer == <<27, ?[>> ->
-          [Event.key(:escape), Event.key("[", char: "[")]
-
-        # ESC O without terminator
-        buffer == <<27, ?O>> ->
-          [Event.key(:escape), Event.key("O", char: "O")]
-
-        # Other partial sequences starting with ESC
-        String.starts_with?(buffer, <<27>>) ->
-          <<27, rest::binary>> = buffer
-          {rest_events, _} = EscapeParser.parse(rest)
-          [Event.key(:escape) | rest_events]
-
-        true ->
-          []
-      end
-
-    case events do
-      [event | rest] ->
-        # Return first event, queue rest, clear buffer
-        {{:ok, event}, %{state | buffer: <<>>, event_queue: rest}}
-
-      [] ->
-        # No events to emit, continue with blocking read
-        do_read_blocking(%{state | buffer: <<>>})
-    end
+    {{:ok, event}, %{state | buffer: remaining, event_queue: limit_queue(rest_events)}}
   end
+
+  defp emit_partial_escape(%__MODULE__{} = state), do: do_read_blocking(state)
 
   # Perform the actual blocking read
   @spec do_read_blocking(t()) :: TermUI.Input.poll_result()
@@ -409,6 +351,7 @@ defmodule TermUI.Input.TTY do
   # Process input data and try to parse
   @spec process_input(t(), binary()) :: TermUI.Input.poll_result()
   defp process_input(%__MODULE__{} = state, data) do
+    data = normalize_line_ending(state.buffer, data)
     new_buffer = state.buffer <> data
     # InputBuffer.apply_limit uses rate-limited logging via the :source option
     {limited_buffer, _truncated} = InputBuffer.apply_limit(new_buffer, source: :input_tty)
@@ -420,10 +363,28 @@ defmodule TermUI.Input.TTY do
         {{:ok, event}, final_state}
 
       :need_more ->
-        # Still need more, continue reading
-        read_blocking(new_state)
+        if line_ending?(data) and not bracketed_paste?(new_state.buffer) do
+          emit_partial_escape(new_state)
+        else
+          # Still need more, continue reading in the same process so no IO
+          # request can consume and discard part of an escape sequence.
+          read_blocking(new_state)
+        end
     end
   end
+
+  defp line_ending?(data), do: data in ["\n", "\r"]
+
+  # Cooked terminal input commonly reports Enter as LF, while TermUI's event
+  # parser uses CR for :enter. Preserve literal LF inside bracketed paste.
+  defp normalize_line_ending(buffer, "\n") do
+    if bracketed_paste?(buffer), do: "\n", else: "\r"
+  end
+
+  defp normalize_line_ending(_buffer, data), do: data
+
+  defp bracketed_paste?(<<27, "[200~", _rest::binary>>), do: true
+  defp bracketed_paste?(_buffer), do: false
 
   # Read a single character from stdin using :io.get_chars/2
   # This is the key to IEx compatibility - using Erlang's :io module directly
@@ -444,6 +405,9 @@ defmodule TermUI.Input.TTY do
           :error ->
             {:error, :invalid_unicode}
         end
+
+      chars when is_binary(chars) ->
+        {:ok, chars}
 
       {:error, reason} ->
         {:error, reason}

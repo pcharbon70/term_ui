@@ -1,6 +1,8 @@
 defmodule TermUI.Input.TTYTest do
   use ExUnit.Case, async: true
 
+  import ExUnit.CaptureIO
+
   alias TermUI.Event
   alias TermUI.Input
   alias TermUI.Input.Raw
@@ -268,6 +270,58 @@ defmodule TermUI.Input.TTYTest do
       {{:ok, event}, _state} = TTY.poll(state, 0)
 
       assert %Event.Key{} = event
+    end
+  end
+
+  describe "poll/2 through an IO server" do
+    test "does not drop bytes from a delivered arrow-key sequence" do
+      capture_io(<<27, ?[, ?A, ?\n>>, fn ->
+        state = TTY.new()
+
+        try do
+          assert {{:ok, %Event.Key{key: :up}}, _state} = TTY.poll(state, 0)
+        after
+          TTY.stop(state)
+        end
+      end)
+    end
+
+    test "emits a submitted lone Escape without consuming later input" do
+      capture_io(<<27, ?\n>>, fn ->
+        state = TTY.new()
+
+        try do
+          assert {{:ok, %Event.Key{key: :escape}}, _state} = TTY.poll(state, 0)
+        after
+          TTY.stop(state)
+        end
+      end)
+    end
+
+    test "normalizes a cooked line ending to Enter" do
+      capture_io("\n", fn ->
+        state = TTY.new()
+
+        try do
+          assert {{:ok, %Event.Key{key: :enter}}, _state} = TTY.poll(state, 0)
+        after
+          TTY.stop(state)
+        end
+      end)
+    end
+
+    test "preserves line endings inside a multiline bracketed paste" do
+      input = "\e[200~first\nsecond\e[201~"
+
+      capture_io(input, fn ->
+        state = TTY.new()
+
+        try do
+          assert {{:ok, %Event.Paste{content: "first\nsecond"}}, _state} = TTY.poll(state, 0)
+        after
+          TTY.stop(state)
+        end
+      end)
     end
   end
 

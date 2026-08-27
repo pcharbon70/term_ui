@@ -72,6 +72,7 @@ defmodule TermUI.Runtime do
           | {:backend, :auto | :raw | :tty | module() | {module(), keyword()}}
           | {:skip_terminal, boolean()}
           | {:use_input_handler, boolean()}
+          | {:iex_mode, boolean()}
 
   # Default render interval in milliseconds (~60 FPS)
   @default_render_interval 16
@@ -102,6 +103,10 @@ defmodule TermUI.Runtime do
   - `:raw` - Forces raw mode (requires OTP 28+, errors if unavailable)
   - `:tty` - Forces TTY mode (line-based input, no raw mode attempt)
 
+  When the caller is an IEx evaluator, `:auto` resolves directly to `:tty` so
+  the existing shell keeps ownership of the terminal. An explicit `:raw` or
+  custom backend selection is preserved.
+
   ## Examples
 
       # Auto-detect backend (default behavior)
@@ -118,6 +123,7 @@ defmodule TermUI.Runtime do
   """
   @spec start_link([option()]) :: GenServer.on_start()
   def start_link(opts) do
+    opts = inherit_iex_mode(opts)
     {name, opts} = Keyword.pop(opts, :name)
 
     if name do
@@ -149,6 +155,8 @@ defmodule TermUI.Runtime do
   """
   @spec child_spec([option()]) :: Supervisor.child_spec()
   def child_spec(opts) do
+    opts = inherit_iex_mode(opts)
+
     %{
       id: __MODULE__,
       start: {__MODULE__, :start_link, [opts]},
@@ -302,6 +310,10 @@ defmodule TermUI.Runtime do
     # Runtime options take precedence over config
     opts = Config.merge_options(opts)
 
+    # Component callbacks run in this process rather than in the IEx evaluator
+    # that started us. Preserve the caller's mode for TermUI.iex_mode?/0.
+    Process.put({TermUI, :iex_mode}, Keyword.get(opts, :iex_mode, false))
+
     root_module = Keyword.fetch!(opts, :root)
     render_interval = Keyword.get(opts, :render_interval, @default_render_interval)
 
@@ -390,6 +402,19 @@ defmodule TermUI.Runtime do
       {:skip, nil, nil, nil, false, nil, nil}
     else
       select_backend(backend_opt, buffer_manager_name)
+    end
+  end
+
+  defp inherit_iex_mode(opts) do
+    iex_mode = Keyword.get_lazy(opts, :iex_mode, &TermUI.iex_mode?/0)
+    configured_backend = Keyword.get(opts, :backend, Config.get(:backend))
+
+    opts = Keyword.put(opts, :iex_mode, iex_mode)
+
+    if iex_mode and configured_backend == :auto do
+      Keyword.put(opts, :backend, :tty)
+    else
+      opts
     end
   end
 

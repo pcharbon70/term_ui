@@ -60,7 +60,8 @@ defmodule TermUI do
 
   1. Whether the IEx module is loaded
   2. Whether the current process is an IEx evaluator
-  3. Configuration overrides (config or environment variable)
+  3. Whether the TermUI runtime inherited IEx mode from its caller
+  4. Configuration overrides (config or environment variable)
 
   The result can be overridden by:
   - Setting `config :term_ui, iex_compatible: true` in config
@@ -89,18 +90,9 @@ defmodule TermUI do
   """
   @spec iex_mode?() :: boolean()
   def iex_mode? do
-    cond do
-      # Environment variable override takes precedence
-      env_var = System.get_env("TERM_UI_IEX_MODE") ->
-        env_var in ["true", "1", "yes"]
-
-      # Config override
-      config = Application.get_env(:term_ui, :iex_compatible) ->
-        config == true
-
-      # Auto-detection
-      true ->
-        iex_running?()
+    case System.get_env("TERM_UI_IEX_MODE") do
+      nil -> configured_iex_mode?()
+      env_var -> env_var in ["true", "1", "yes"]
     end
   end
 
@@ -124,22 +116,33 @@ defmodule TermUI do
     if iex_mode?(), do: :iex, else: :standalone
   end
 
-  # Check if IEx is actually running (not just loaded)
+  defp configured_iex_mode? do
+    case Application.get_env(:term_ui, :iex_compatible, :auto) do
+      true -> true
+      false -> false
+      :auto -> inherited_or_detected_iex_mode?()
+      _other -> inherited_or_detected_iex_mode?()
+    end
+  end
+
+  defp inherited_or_detected_iex_mode? do
+    case Process.get({__MODULE__, :iex_mode}) do
+      mode when is_boolean(mode) -> mode
+      _other -> iex_running?()
+    end
+  end
+
+  # Check if IEx is actually running (not just loaded).
   defp iex_running? do
-    # Check if IEx module is available and loaded
-    # Check if we're in an IEx evaluator process
     Code.ensure_loaded?(IEx) and
       iex_evaluator_process?()
   end
 
-  # Check if current process or any ancestor is an IEx evaluator
+  # Check if the current process is an IEx evaluator.
   defp iex_evaluator_process? do
-    # Get the current process's dictionary and check for IEx-specific keys
-    # IEx evaluator processes have the :iex_server key in their dictionary
     Process.info(self(), :dictionary)
     |> case do
       {:dictionary, dictionary} ->
-        # Check for IEx evaluator indicator
         Enum.any?(dictionary, fn
           {:iex_server, _} -> true
           _ -> false

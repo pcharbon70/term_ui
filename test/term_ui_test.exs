@@ -109,13 +109,37 @@ defmodule TermUITest do
     test "returns false when config forces standalone mode" do
       # Set config to force standalone mode
       Application.put_env(:term_ui, :iex_compatible, false)
+      original_server = Process.get(:iex_server, :not_set)
+      Process.put(:iex_server, self())
 
       try do
-        # Even if we were in IEx, config forces standalone
+        # Even from an IEx evaluator process, config forces standalone.
         assert TermUI.iex_mode?() == false
       after
         # Clean up
         Application.delete_env(:term_ui, :iex_compatible)
+
+        case original_server do
+          :not_set -> Process.delete(:iex_server)
+          value -> Process.put(:iex_server, value)
+        end
+      end
+    end
+
+    test "config auto preserves IEx evaluator detection" do
+      Application.put_env(:term_ui, :iex_compatible, :auto)
+      original_server = Process.get(:iex_server, :not_set)
+      Process.put(:iex_server, self())
+
+      try do
+        assert TermUI.iex_mode?()
+      after
+        Application.delete_env(:term_ui, :iex_compatible)
+
+        case original_server do
+          :not_set -> Process.delete(:iex_server)
+          value -> Process.put(:iex_server, value)
+        end
       end
     end
 

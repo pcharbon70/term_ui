@@ -73,13 +73,22 @@ in [GitHub Actions run 32999802298](https://github.com/pcharbon70/term_ui/action
 The following gates still require maintainer or platform access and are not
 represented as complete by the local work:
 
-- Raw, TTY, IEx, SSH, resize, cleanup, macOS, WSL/ConPTY, and applicable
-  Windows behavior need the manual terminal sign-off listed below.
+- SSH, resize edge cases, error/interruption cleanup, macOS, WSL/ConPTY, and
+  applicable Windows behavior need the manual terminal sign-off listed below.
 - Branch protection and required checks need maintainer approval and repository
   configuration.
 - Hex authentication is required to complete `mix hex.publish --dry-run`; the
   unauthenticated command built version `1.0.0` and stopped at authentication
   without publishing.
+
+Linux Raw, TTY, and IEx verification was completed on 2026-08-27. The
+terminal-only suite passed all 13 tests in a real PTY, including native Raw
+activation, alternate-screen and cursor restoration, input-reader lifecycle,
+and clean shutdown. A direct `iex -S mix` run of `examples/iex_counter`
+selected TTY automatically, reported IEx mode inside the runtime component,
+processed an Up-arrow as `:up`, incremented the counter, returned normally on
+`q`, and restored the IEx prompt. The test terminal used cooked input and
+therefore delivered the key sequences after Enter, as now documented.
 
 ## Release principles
 
@@ -192,9 +201,9 @@ Required work includes:
 
 Manual terminal verification should include:
 
-- [ ] Raw backend on Linux.
-- [ ] TTY backend on Linux.
-- [ ] IEx-compatible operation.
+- [x] Raw backend on Linux.
+- [x] TTY backend on Linux.
+- [x] IEx-compatible operation.
 - [ ] Terminal resize followed by a render.
 - [ ] Resize followed immediately by shutdown.
 - [ ] Bracketed single-line and multiline paste.

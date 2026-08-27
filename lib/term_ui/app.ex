@@ -34,12 +34,17 @@ defmodule TermUI.App do
       # Use keyboard input, press Q to quit
       # Returns to IEx prompt when done
 
-  All keyboard input works correctly in IEx:
-  - Arrow keys for navigation (no Enter required)
+  Keyboard input remains available in IEx:
+  - Arrow keys for navigation
   - Tab for field switching
   - Function keys (F1-F12)
   - Ctrl+key combinations
   - Alt+key combinations
+
+  IEx uses the TTY backend by default. Depending on the shell and terminal,
+  cooked-mode input may be delivered a line at a time; press Enter when a key
+  is not delivered immediately. Pass `backend: :raw` only when you explicitly
+  want to attempt ownership of the terminal.
 
   ### IEx Detection
 
@@ -76,7 +81,7 @@ defmodule TermUI.App do
 
   **Performance issues in IEx:**
   - IEx adds some overhead due to process inspection
-  - Use `backend: :raw` for better performance (when OTP 28+ is available)
+  - Run the application standalone when it needs Raw backend timing or input
 
   ## Usage
 
