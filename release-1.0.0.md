@@ -66,25 +66,37 @@ repository's current policy, Dialyzer, documentation, dependency checks, Hex
 retirement and vulnerability audits, package-content inspection, and
 compilation of every example. The CI
 workflow now exercises the minimum TTY-compatible Elixir/OTP pair, the current
-Raw-compatible pair, quality/package checks, and every example on `main`,
-`develop`, and `release/**`. All four jobs passed for the terminal-fix
-implementation commit `e6ce19c` in
-[GitHub Actions run 33086690914](https://github.com/pcharbon70/term_ui/actions/runs/33086690914).
-The final local suites passed 5,309 tests on the current toolchain and 5,322
-tests on Elixir 1.15/OTP 26. The minimum-version suite also passed at seed
-`685426`, which exposed and then verified the fix for skipped-terminal runtimes
-incorrectly performing physical-terminal cleanup.
+Raw-compatible pair, complete hosted macOS and Windows suites, quality/package
+checks, and every example on `main`, `develop`, and `release/**`. All six jobs
+passed for commit `90959fe` in
+[GitHub Actions run 33096111049](https://github.com/pcharbon70/term_ui/actions/runs/33096111049).
+The hosted macOS and Windows jobs each passed 5,311 tests. The final local
+current-toolchain suite also passed 5,311 tests; the earlier minimum-version
+suite passed 5,322 tests before two additional SSH lifecycle tests were added.
+
+The SSH integration suite now drives input and resize events through a runtime,
+verifies per-session backend dimensions and rendering, checks normal terminal
+restoration and buffer teardown, and verifies teardown when the channel device
+has already closed. During that work, the suite exposed and fixed a runtime
+guard that silently prevented custom backend and input-handler shutdown.
+
+Branch protection is enabled on `main`, `develop`, and `release/1.0.0`. Each
+branch requires all six CI checks, an up-to-date branch, one approving review,
+dismissal of stale reviews, and resolved conversations. Force-pushes and branch
+deletion are disabled; administrator enforcement remains disabled for emergency
+maintainer access. The CI pull-request trigger includes all three branch
+families, so required checks can be satisfied on release-branch pull requests.
 
 The following gates still require maintainer or platform access and are not
 represented as complete by the local work:
 
-- SSH, macOS, WSL/ConPTY, and applicable Windows behavior need the manual
-  terminal sign-off listed below.
-- Branch protection and required checks need maintainer approval and repository
-  configuration.
+- A live SSH client/server session, interactive macOS terminal behavior,
+  WSL/ConPTY, and applicable native Windows behavior need the manual terminal
+  sign-off listed below. Hosted CI is non-interactive and does not substitute
+  for those checks.
 - Hex authentication is required to complete `mix hex.publish --dry-run`; the
-  unauthenticated command built version `1.0.0` and stopped at authentication
-  without publishing.
+  unauthenticated command rebuilt version `1.0.0`, displayed the intended
+  package contents, and stopped at authentication without publishing.
 
 Linux Raw, TTY, and IEx verification was completed on 2026-08-27. The
 terminal-lifecycle suite passed all 19 tests in a real PTY, including native Raw
@@ -213,10 +225,10 @@ Required work includes:
 - [x] Explicitly identify which open issues block 1.0 and which are accepted
       for a later 1.x patch.
 - [x] Make GitHub CI run successfully on supported Elixir/OTP combinations.
-- [ ] Add branch protection and required checks to `main`.
-- [ ] Prefer the same protection for `develop` and `release/1.0.0`.
+- [x] Add branch protection and required checks to `main`.
+- [x] Prefer the same protection for `develop` and `release/1.0.0`.
 
-Manual terminal verification should include:
+Terminal verification status:
 
 - [x] Raw backend on Linux.
 - [x] TTY backend on Linux.
@@ -226,7 +238,9 @@ Manual terminal verification should include:
 - [x] Bracketed single-line and multiline paste.
 - [x] Shift+Tab and modified-key navigation.
 - [x] Normal exit, application error, and interrupted-session cleanup.
-- [ ] SSH backend input, resize, disconnect, and cleanup.
+- [x] Reproducible SSH backend input, resize, disconnect, and cleanup
+      integration coverage.
+- [ ] Live SSH client/server terminal behavior.
 - [ ] macOS behavior.
 - [ ] WSL/ConPTY behavior.
 - [ ] Windows behavior where supported.
