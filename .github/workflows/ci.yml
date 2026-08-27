@@ -57,6 +57,48 @@ jobs:
       - name: Run tests
         run: mix test
 
+  platform:
+    name: Platform test (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS
+            os: macos-latest
+          - name: Windows
+            os: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: "1.19"
+          otp-version: "28"
+
+      - name: Cache dependencies
+        uses: actions/cache@v6
+        with:
+          path: |
+            deps
+            _build
+          key: ${{ runner.os }}-platform-otp-28-elixir-1.19-${{ hashFiles('**/mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-platform-otp-28-elixir-1.19-
+
+      - name: Install dependencies
+        run: mix deps.get
+
+      - name: Compile with warnings as errors
+        run: mix compile --warnings-as-errors
+
+      - name: Run tests
+        run: mix test
+
   quality:
     name: Quality and package
     runs-on: ubuntu-latest

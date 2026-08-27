@@ -1,6 +1,7 @@
 defmodule TermUI.Integration.SSHRuntimeIntegrationTest do
   use ExUnit.Case, async: false
 
+  alias TermUI.Event
   alias TermUI.Runtime
 
   defmodule SessionRoot do
@@ -18,6 +19,36 @@ defmodule TermUI.Integration.SSHRuntimeIntegrationTest do
 
     @impl true
     def view(state), do: {:text, state.label}
+  end
+
+  defmodule ReleaseSessionRoot do
+    use TermUI.Elm
+
+    @impl true
+    def init(opts) do
+      %{label: Keyword.fetch!(opts, :label), keys: [], dimensions: nil}
+    end
+
+    @impl true
+    def event_to_msg(%Event.Key{key: key}, _state), do: {:msg, {:key, key}}
+
+    def event_to_msg(%Event.Resize{width: width, height: height}, _state),
+      do: {:msg, {:resize, width, height}}
+
+    def event_to_msg(_event, _state), do: :ignore
+
+    @impl true
+    def update({:key, key}, state), do: {%{state | keys: state.keys ++ [key]}, []}
+
+    def update({:resize, width, height}, state),
+      do: {%{state | dimensions: {width, height}}, []}
+
+    def update(_message, state), do: {state, []}
+
+    @impl true
+    def view(state) do
+      {:text, "#{state.label}|keys:#{inspect(state.keys)}|size:#{inspect(state.dimensions)}"}
+    end
   end
 
   test "concurrent SSH sessions own independent render buffers and lifecycle" do
@@ -89,10 +120,58 @@ defmodule TermUI.Integration.SSHRuntimeIntegrationTest do
     assert output =~ "D"
   end
 
-  defp start_ssh_runtime(device, label) do
+  test "SSH session handles input, resize, and graceful disconnect cleanup" do
+    {:ok, device} = StringIO.open("")
+
+    runtime =
+      start_ssh_runtime(device, "release-session", root: ReleaseSessionRoot)
+
+    send(runtime, {:ssh_input, Event.key(:up)})
+    send(runtime, {:ssh_resize, 12, 34})
+    :ok = Runtime.sync(runtime)
+
+    state = Runtime.get_state(runtime)
+    assert state.root_state.keys == [:up]
+    assert state.root_state.dimensions == {34, 12}
+    assert state.dimensions == {34, 12}
+    assert state.backend_state.size == {12, 34}
+
+    force_render_sync(runtime)
+    assert device_output(device) =~ "release-session|keys:[:up]"
+
+    buffer_ref = Process.monitor(state.buffer_manager)
+    runtime_ref = Process.monitor(runtime)
+    Runtime.shutdown(runtime)
+
+    assert_receive {:DOWN, ^runtime_ref, :process, ^runtime, :normal}
+    assert_receive {:DOWN, ^buffer_ref, :process, _pid, :normal}
+
+    output = device_output(device)
+    assert output =~ "\e[?1006l\e[?1003l\e[?1002l\e[?1000l"
+    assert output =~ "\e[?25h"
+    assert output =~ "\e[?7h"
+    assert output =~ "\e[?1049l"
+  end
+
+  test "abrupt SSH channel close does not block runtime teardown" do
+    {:ok, device} = StringIO.open("")
+    runtime = start_ssh_runtime(device, "closed-session")
+    state = Runtime.get_state(runtime)
+
+    runtime_ref = Process.monitor(runtime)
+    buffer_ref = Process.monitor(state.buffer_manager)
+    assert {:ok, _contents} = StringIO.close(device)
+
+    Runtime.shutdown(runtime)
+
+    assert_receive {:DOWN, ^runtime_ref, :process, ^runtime, :normal}
+    assert_receive {:DOWN, ^buffer_ref, :process, _pid, :normal}
+  end
+
+  defp start_ssh_runtime(device, label, opts \\ []) do
     {:ok, runtime} =
       Runtime.start_link(
-        root: SessionRoot,
+        root: Keyword.get(opts, :root, SessionRoot),
         label: label,
         backend: {TermUI.Backend.SSH, device: device, size: {4, 20}},
         render_interval: 60_000

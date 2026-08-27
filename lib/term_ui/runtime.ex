@@ -910,7 +910,7 @@ defmodule TermUI.Runtime do
     end
 
     # Then stop the handler (restores IO opts for TTY, etc.)
-    if state.input_handler and state.input_state do
+    if state.input_handler != nil and state.input_state != nil do
       state.input_handler.stop(state.input_state)
     end
   rescue
@@ -926,7 +926,7 @@ defmodule TermUI.Runtime do
   end
 
   defp cleanup_backend(state) do
-    if state.backend and state.backend_state do
+    if state.backend != nil and state.backend_state != nil do
       state.backend.shutdown(state.backend_state)
     end
   rescue
