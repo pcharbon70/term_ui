@@ -282,15 +282,28 @@ defmodule TermUI.AppTest do
       {:ok, pid} = App.start(RuntimeCommandCounter, skip_terminal: true)
 
       TermUI.Runtime.send_message(pid, :root, :start_send_after)
-      Process.sleep(25)
-      :ok = TermUI.Runtime.sync(pid)
-
-      state = TermUI.Runtime.get_state(pid)
+      state = wait_for_root_state(pid, &(&1.pongs == 1))
       assert state.root_state.pongs == 1
 
       GenServer.stop(pid)
     end
   end
+
+  defp wait_for_root_state(pid, predicate, attempts \\ 100)
+
+  defp wait_for_root_state(pid, predicate, attempts) when attempts > 0 do
+    :ok = TermUI.Runtime.sync(pid)
+    state = TermUI.Runtime.get_state(pid)
+
+    if predicate.(state.root_state) do
+      state
+    else
+      Process.sleep(10)
+      wait_for_root_state(pid, predicate, attempts - 1)
+    end
+  end
+
+  defp wait_for_root_state(pid, _predicate, 0), do: TermUI.Runtime.get_state(pid)
 
   describe "backend_mode/0" do
     test "returns nil when no app is running" do

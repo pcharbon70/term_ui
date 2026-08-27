@@ -198,13 +198,8 @@ defmodule TermUI.Platform.UnixTest do
 
   # Only run these tests on Unix platforms
   @moduletag :unix
-
-  setup do
-    if Platform.unix?() do
-      :ok
-    else
-      {:skip, "Unix-only tests"}
-    end
+  if not Platform.unix?() do
+    @moduletag skip: "Unix-only tests"
   end
 
   describe "info/0" do
