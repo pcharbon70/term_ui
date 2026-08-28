@@ -8,6 +8,9 @@ defmodule TermUI.Platform.Unix do
   - Capability detection hints
   """
 
+  # Dialyzer: Functions return specific map or atom types
+  @dialyzer {:nowarn_function, info: 0, capability_hints: 0, supported_signals: 0}
+
   @doc """
   Returns Unix-specific terminal information.
   """

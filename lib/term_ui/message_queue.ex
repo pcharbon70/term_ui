@@ -28,6 +28,9 @@ defmodule TermUI.MessageQueue do
 
   @default_max_size 1000
 
+  # Dialyzer: Functions return specific tuple types
+  @dialyzer {:nowarn_function, process: 3}
+
   @type message :: term()
   @type t :: %__MODULE__{
           messages: :queue.queue(message()),

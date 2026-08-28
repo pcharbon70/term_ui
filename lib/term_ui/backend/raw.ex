@@ -79,7 +79,7 @@ defmodule TermUI.Backend.Raw do
   This backend is typically used via the runtime, not directly:
 
       # Automatic backend selection (recommended)
-      {:ok, runtime} = TermUI.Runtime.start_link()
+      {:ok, runtime} = TermUI.Runtime.start_link(root: MyApp.Root)
 
       # The runtime handles:
       # 1. Backend selection via Selector
@@ -144,9 +144,16 @@ defmodule TermUI.Backend.Raw do
   @behaviour TermUI.Backend
 
   alias TermUI.ANSI
+  alias TermUI.Backend.InputBuffer
+  alias TermUI.Platform
   alias TermUI.Renderer.CursorOptimizer
   alias TermUI.Terminal.SizeDetector
+  alias TermUI.TerminalOutput
+  alias TermUI.TermUtils
   require Logger
+
+  # Dialyzer: Functions with unmatched return values
+  @dialyzer {:nowarn_function, shutdown: 1, safe_write: 1, safe_cooked_mode: 0}
 
   # Comprehensive mouse disable sequence - disables ALL mouse modes defensively
   # This ensures cleanup even if state is inconsistent
@@ -251,8 +258,6 @@ defmodule TermUI.Backend.Raw do
   # ===========================================================================
   # Behaviour Callbacks - Lifecycle, Queries, Cursor, Rendering, Input
   # ===========================================================================
-  # Full implementations will be added in subsequent tasks
-
   @impl true
   @doc """
   Initializes the Raw backend with terminal setup.
@@ -309,7 +314,9 @@ defmodule TermUI.Backend.Raw do
         write_to_terminal(ANSI.cursor_hide())
       end
 
-      if mouse_tracking != :none do
+      # Skip mouse tracking on WSL/ConPTY -- mouse-off sequences are silently
+      # ignored, so enabling mouse tracking leads to escape code leaks
+      if mouse_tracking != :none and not TerminalOutput.needs_hard_reset?() do
         ansi_mode = mouse_mode_to_ansi(mouse_tracking)
 
         if ansi_mode do
@@ -362,22 +369,22 @@ defmodule TermUI.Backend.Raw do
   """
   @spec shutdown(t()) :: :ok
   def shutdown(state) do
-    # Disable mouse tracking if it was enabled
-    # Use defensive cleanup - disable ALL modes regardless of state
+    # Phase 1: Direct-to-TTY write (most reliable, bypasses Erlang IO)
+    TerminalOutput.write_to_tty(TerminalOutput.cleanup_sequence())
+
+    # Phase 2: Erlang IO backup (in case /dev/tty write failed)
     safe_write(@all_mouse_off)
-
-    # Show cursor (always, even if state says visible - defensive)
     safe_write(ANSI.cursor_show())
-
-    # Reset all text attributes
     safe_write(ANSI.reset())
 
-    # Leave alternate screen if it was entered
     if state.alternate_screen do
       safe_write(ANSI.leave_alternate_screen())
     end
 
-    # Return to cooked mode
+    # Phase 3: Drain pending input (mouse events buffered during shutdown)
+    drain_pending_input()
+
+    # Phase 4: Return to cooked mode
     safe_cooked_mode()
 
     :ok
@@ -408,7 +415,7 @@ defmodule TermUI.Backend.Raw do
   # Note: The error case `{:error, :enotsup}` is included in the typespec for future-proofing
   # and consistency with the Backend behaviour, even though this implementation always returns
   # the cached size. A future backend might need to report unsupported size queries.
-  @spec size(t()) :: {:ok, TermUI.Backend.size()} | {:error, :enotsup}
+  @spec size(t()) :: {:ok, TermUI.Backend.size()}
   def size(state) do
     {:ok, state.size}
   end
@@ -554,20 +561,16 @@ defmodule TermUI.Backend.Raw do
        ) do
     # Use optimizer to find cheapest movement, with error recovery
     # Only catch expected exceptions, not system-level errors
-    try do
-      {sequence, _cost} = CursorOptimizer.optimal_move(from_row, from_col, to_row, to_col)
-      sequence
-    rescue
-      e in [ArgumentError, ArithmeticError, FunctionClauseError] ->
-        # Fall back to absolute positioning if optimizer fails
-        Logger.warning(
-          "CursorOptimizer failed (#{Exception.message(e)}), falling back to absolute positioning",
-          from: {from_row, from_col},
-          to: {to_row, to_col}
-        )
+    {sequence, _cost} = CursorOptimizer.optimal_move(from_row, from_col, to_row, to_col)
+    sequence
+  rescue
+    e in [ArgumentError, ArithmeticError, FunctionClauseError] ->
+      # Fall back to absolute positioning if optimizer fails
+      Logger.warning(
+        "CursorOptimizer failed (#{Exception.message(e)}), falling back to absolute positioning: from #{inspect({from_row, from_col})} to #{inspect({to_row, to_col})}"
+      )
 
-        ANSI.cursor_position(to_row, to_col)
-    end
+      ANSI.cursor_position(to_row, to_col)
   end
 
   @impl true
@@ -732,12 +735,15 @@ defmodule TermUI.Backend.Raw do
   end
 
   def draw_cells(state, cells) when is_list(cells) do
-    # Sort cells by row then column for sequential output
-    sorted_cells = Enum.sort_by(cells, fn {{row, col}, _cell} -> {row, col} end)
+    # Sort cells in row-major order, then by column within each row
+    sorted_cells =
+      Enum.sort_by(cells, fn {{row, col}, _cell} -> {row, col} end)
 
-    # Process cells and build output
+    # Split into contiguous runs and render each with a single cursor position
+    runs = detect_runs(sorted_cells)
+
     {output, final_pos, final_style} =
-      process_cells(sorted_cells, state.cursor_position, state.current_style)
+      render_runs(runs, state.cursor_position, state.current_style)
 
     # Write batched output to terminal
     write_to_terminal(output)
@@ -748,32 +754,61 @@ defmodule TermUI.Backend.Raw do
     {:ok, updated_state}
   end
 
-  # Process a list of cells, accumulating output as iolist
-  # Returns {iolist, final_cursor_position, final_style}
-  @spec process_cells(
-          [{TermUI.Backend.position(), TermUI.Backend.cell()}],
-          {pos_integer(), pos_integer()} | nil,
-          style_state() | nil
-        ) :: {iolist(), {pos_integer(), pos_integer()}, style_state()}
-  defp process_cells(cells, current_pos, current_style) do
-    Enum.reduce(cells, {[], current_pos, current_style}, fn {{row, col} = target_pos,
-                                                             {char, fg, bg, attrs}},
-                                                            {output_acc, cursor_pos, style} ->
-      # Generate cursor movement if needed
-      cursor_output = cursor_move_output(cursor_pos, target_pos)
+  # Detects contiguous runs of cells: same row with consecutive columns.
+  # Returns a list of runs, where each run is a non-empty list of cells
+  # that can be rendered with a single cursor positioning.
+  defp detect_runs([]), do: []
 
-      # Generate style delta
-      new_style = %{fg: fg, bg: bg, attrs: normalize_attrs(attrs)}
-      style_output = style_delta_output(style, new_style)
+  defp detect_runs([first | rest]) do
+    {current_run, runs} =
+      Enum.reduce(rest, {[first], []}, fn {{row, col}, _cell_data} = cell,
+                                          {current_run, completed_runs} ->
+        # Get the last cell in the current run to check adjacency
+        [{{prev_row, prev_col}, _} | _] = current_run
 
-      # Build cell output: [cursor_move, style_delta, character]
-      cell_output = [cursor_output, style_output, char]
+        if row == prev_row and col == prev_col + 1 do
+          # Adjacent: extend current run (prepend for efficiency, reversed later)
+          {[cell | current_run], completed_runs}
+        else
+          # Gap or new row: finalize current run, start new one
+          {[cell], [Enum.reverse(current_run) | completed_runs]}
+        end
+      end)
 
-      # After outputting character, cursor advances one column
-      new_cursor_pos = {row, col + 1}
+    # Don't forget the final run
+    Enum.reverse([Enum.reverse(current_run) | runs])
+  end
 
-      {[output_acc, cell_output], new_cursor_pos, new_style}
+  # Renders a list of runs into an iolist. Each run gets one cursor position
+  # at its start, then streams characters with inline style deltas only when
+  # the style changes. Style state is tracked continuously across runs (no
+  # per-row resets).
+  defp render_runs(runs, initial_pos, initial_style) do
+    Enum.reduce(runs, {[], initial_pos, initial_style}, fn run, {output_acc, cursor_pos, style} ->
+      {run_output, run_end_pos, run_end_style} =
+        render_single_run(run, cursor_pos, style)
+
+      {[output_acc, run_output], run_end_pos, run_end_style}
     end)
+  end
+
+  # Renders a single contiguous run. Emits one cursor position at the start,
+  # then for each cell: style delta (if changed) + character.
+  defp render_single_run([{{row, col}, _} | _] = run, cursor_pos, style) do
+    # Position cursor at run start
+    cursor_output = cursor_move_output(cursor_pos, {row, col})
+
+    # Stream characters with inline style changes
+    {chars_output, end_col, end_style} =
+      Enum.reduce(run, {[], col, style}, fn {{_row, _col}, {char, fg, bg, attrs}},
+                                            {out_acc, cur_col, cur_style} ->
+        new_style = %{fg: fg, bg: bg, attrs: normalize_attrs(attrs)}
+        style_output = style_delta_output(cur_style, new_style)
+
+        {[out_acc, style_output, char], cur_col + 1, new_style}
+      end)
+
+    {[cursor_output, chars_output], {row, end_col}, end_style}
   end
 
   # Normalizes attributes to a sorted list for consistent comparison.
@@ -797,11 +832,11 @@ defmodule TermUI.Backend.Raw do
   # advances one column. This function assumes single-width characters. Multi-width
   # characters (CJK, emoji) would require grapheme width tracking - a future enhancement.
   #
-  # TODO: Consider using CursorOptimizer here for ~40% byte savings on cursor
-  # movement. Current absolute positioning is simple and correct but not optimal.
+  # Note: Using CursorOptimizer could provide ~40% byte savings on cursor movement.
+  # Current absolute positioning is simple and correct but not optimal.
   # See move_cursor/2 for example of CursorOptimizer integration.
   @spec cursor_move_output({pos_integer(), pos_integer()} | nil, {pos_integer(), pos_integer()}) ::
-          iodata()
+          iolist()
   defp cursor_move_output(nil, {row, col}) do
     # No previous position known - must use absolute
     ANSI.cursor_position(row, col)
@@ -830,7 +865,7 @@ defmodule TermUI.Backend.Raw do
   #
   # Note: This uses ANSI module for sequence generation. For parameter-level SGR
   # operations (e.g., combining into single sequence), see TermUI.SGR module.
-  @spec style_delta_output(style_state() | nil, style_state()) :: iodata()
+  @spec style_delta_output(style_state() | nil, style_state()) :: iolist()
   defp style_delta_output(nil, new_style) do
     # No previous style - emit full style
     build_full_style(new_style)
@@ -867,7 +902,7 @@ defmodule TermUI.Backend.Raw do
   #
   # Generates escape sequences for foreground color, background color, and all
   # text attributes in that order.
-  @spec build_full_style(style_state()) :: iodata()
+  @spec build_full_style(style_state()) :: iolist()
   defp build_full_style(%{fg: fg, bg: bg, attrs: attrs}) do
     [
       color_sequence(:fg, fg),
@@ -885,7 +920,7 @@ defmodule TermUI.Backend.Raw do
   #
   # Note: This function is only called when no attributes were removed
   # (removal requires full reset, handled by style_delta_output/2).
-  @spec build_style_delta(style_state(), style_state()) :: iodata()
+  @spec build_style_delta(style_state(), style_state()) :: iolist()
   defp build_style_delta(current, new) do
     fg_output = if current.fg != new.fg, do: color_sequence(:fg, new.fg), else: []
     bg_output = if current.bg != new.bg, do: color_sequence(:bg, new.bg), else: []
@@ -1034,21 +1069,22 @@ defmodule TermUI.Backend.Raw do
   end
 
   def enable_mouse(state, mode) when mode in [:click, :drag, :all] do
-    # Disable current mode if active (to avoid stacking modes)
-    if state.mouse_mode != :none do
-      current_ansi_mode = mouse_mode_to_ansi(state.mouse_mode)
-
-      if current_ansi_mode do
-        write_to_terminal(ANSI.disable_mouse_tracking(current_ansi_mode))
+    # Skip mouse tracking on WSL/ConPTY
+    if TerminalOutput.needs_hard_reset?() do
+      {:ok, state}
+    else
+      # Disable current mode if active (to avoid stacking modes)
+      if state.mouse_mode != :none do
+        disable_current_mouse_mode(state.mouse_mode)
       end
+
+      # Enable new mode
+      ansi_mode = mouse_mode_to_ansi(mode)
+      write_to_terminal(ANSI.enable_mouse_tracking(ansi_mode))
+      write_to_terminal(ANSI.enable_sgr_mouse())
+
+      {:ok, %{state | mouse_mode: mode}}
     end
-
-    # Enable new mode
-    ansi_mode = mouse_mode_to_ansi(mode)
-    write_to_terminal(ANSI.enable_mouse_tracking(ansi_mode))
-    write_to_terminal(ANSI.enable_sgr_mouse())
-
-    {:ok, %{state | mouse_mode: mode}}
   end
 
   @doc """
@@ -1209,8 +1245,8 @@ defmodule TermUI.Backend.Raw do
   @spec read_input_with_timeout(t(), non_neg_integer()) ::
           {:ok, TermUI.Backend.event(), t()} | {:timeout, t()} | {:error, term(), t()}
   defp read_input_with_timeout(state, timeout) do
-    alias TermUI.Terminal.EscapeParser
     alias TermUI.Event
+    alias TermUI.Terminal.EscapeParser
 
     # For zero timeout, just check if there's input ready
     # Unfortunately, IO.getn blocks, so we use a Task with timeout
@@ -1239,8 +1275,8 @@ defmodule TermUI.Backend.Raw do
   @spec try_parse_or_continue(t(), non_neg_integer()) ::
           {:ok, TermUI.Backend.event(), t()} | {:timeout, t()} | {:error, term(), t()}
   defp try_parse_or_continue(state, _timeout) do
-    alias TermUI.Terminal.EscapeParser
     alias TermUI.Event
+    alias TermUI.Terminal.EscapeParser
 
     buffer = state.input_buffer
 
@@ -1268,8 +1304,8 @@ defmodule TermUI.Backend.Raw do
   @spec wait_for_escape_completion(t(), binary()) ::
           {:ok, TermUI.Backend.event(), t()} | {:timeout, t()} | {:error, term(), t()}
   defp wait_for_escape_completion(state, buffer) do
-    alias TermUI.Terminal.EscapeParser
     alias TermUI.Event
+    alias TermUI.Terminal.EscapeParser
 
     task = Task.async(fn -> read_one_byte() end)
 
@@ -1277,19 +1313,7 @@ defmodule TermUI.Backend.Raw do
       {:ok, {:ok, data}} ->
         # Got more data - try to parse again
         new_buffer = buffer <> data
-
-        case EscapeParser.parse(new_buffer) do
-          {[event | _], remaining} ->
-            {:ok, event, %{state | input_buffer: remaining}}
-
-          {[], remaining} ->
-            if EscapeParser.partial_sequence?(remaining) do
-              # Still partial - recurse with remaining timeout
-              wait_for_escape_completion(state, remaining)
-            else
-              {:timeout, %{state | input_buffer: remaining}}
-            end
-        end
+        handle_parse_result(EscapeParser.parse(new_buffer), state, new_buffer)
 
       {:ok, :eof} ->
         # EOF during escape sequence - emit what we have
@@ -1301,6 +1325,21 @@ defmodule TermUI.Backend.Raw do
       nil ->
         # Timeout - emit partial escape sequence
         emit_partial_escape(state, buffer)
+    end
+  end
+
+  # Handles the result of parsing escape sequence data.
+  defp handle_parse_result({[event | _], remaining}, state, _buffer) do
+    {:ok, event, %{state | input_buffer: remaining}}
+  end
+
+  defp handle_parse_result({[], remaining}, state, _buffer) do
+    alias TermUI.Terminal.EscapeParser
+
+    if EscapeParser.partial_sequence?(remaining) do
+      wait_for_escape_completion(state, remaining)
+    else
+      {:timeout, %{state | input_buffer: remaining}}
     end
   end
 
@@ -1323,7 +1362,6 @@ defmodule TermUI.Backend.Raw do
   # Emits events from a partial escape sequence (timeout disambiguation).
   @spec emit_partial_escape(t(), binary()) :: {:ok, TermUI.Backend.event(), t()}
   defp emit_partial_escape(state, buffer) do
-    alias TermUI.Terminal.EscapeParser
     alias TermUI.Event
 
     # Handle known partial sequences
@@ -1430,7 +1468,7 @@ defmodule TermUI.Backend.Raw do
   # Uses the shared InputBuffer module for rate-limited logging.
   @spec append_to_input_buffer(t(), binary()) :: t()
   defp append_to_input_buffer(state, data) do
-    TermUI.Backend.InputBuffer.append_with_limit(state, data, :input_buffer, source: __MODULE__)
+    InputBuffer.append_with_limit(state, data, :input_buffer, source: __MODULE__)
   end
 
   # Queues events with size limit protection.
@@ -1462,10 +1500,9 @@ defmodule TermUI.Backend.Raw do
     end
   end
 
-  # Writes data to the terminal, wrapping in try/rescue for error safety.
-  # Debug logging helps troubleshoot rendering issues without exposing errors to users.
+  # Writes data to the terminal via TerminalOutput (ONLCR-aware).
   defp write_to_terminal(data) do
-    IO.write(data)
+    TerminalOutput.write(data)
   rescue
     e ->
       Logger.debug("Terminal write failed: #{Exception.message(e)}")
@@ -1474,19 +1511,75 @@ defmodule TermUI.Backend.Raw do
 
   # Error-safe write for shutdown - logs errors but continues
   defp safe_write(data) do
-    IO.write(data)
+    TerminalOutput.write(data)
   rescue
-    e ->
-      Logger.warning("Failed to write during shutdown: #{Exception.message(e)}")
-      :ok
+    _ -> :ok
+  end
+
+  # Drains pending input bytes (e.g. mouse events buffered during shutdown).
+  # Sets /dev/tty to non-blocking, reads and discards pending bytes, then
+  # restores it. Reading :stdio here can block under pre-OTP 28 I/O servers
+  # when stdin is captured or redirected, even after stty fails.
+  defp drain_pending_input do
+    case TermUtils.safe_stty(["min", "0", "time", "1"]) do
+      {:ok, _output} ->
+        try do
+          drain_tty_input()
+        after
+          _ = TermUtils.safe_stty(["min", "1", "time", "0"])
+        end
+
+      {:error, _reason} ->
+        :ok
+    end
+  rescue
+    _ -> :ok
+  end
+
+  defp drain_tty_input do
+    case File.open("/dev/tty", [:read, :binary]) do
+      {:ok, tty} ->
+        try do
+          drain_input_loop(tty, 0, 20)
+        after
+          File.close(tty)
+        end
+
+      {:error, _reason} ->
+        :ok
+    end
+  end
+
+  defp drain_input_loop(_tty, iteration, max) when iteration >= max, do: :ok
+
+  defp drain_input_loop(tty, iteration, max) do
+    case IO.binread(tty, 64) do
+      data when is_binary(data) and byte_size(data) > 0 ->
+        drain_input_loop(tty, iteration + 1, max)
+
+      _ ->
+        :ok
+    end
+  rescue
+    _ -> :ok
+  end
+
+  # Disables the current mouse tracking mode
+  defp disable_current_mouse_mode(mode) do
+    ansi_mode = mouse_mode_to_ansi(mode)
+
+    if ansi_mode do
+      write_to_terminal(ANSI.disable_mouse_tracking(ansi_mode))
+    end
   end
 
   # Error-safe cooked mode restoration
   defp safe_cooked_mode do
-    :shell.start_interactive({:noshell, :cooked})
+    if Platform.native_raw_mode_supported?() do
+      :shell.start_interactive({:noshell, :cooked})
+    end
   rescue
     e in UndefinedFunctionError ->
-      # :shell.start_interactive/1 not available (pre-OTP 28)
       Logger.warning(
         "Cooked mode restoration not available (OTP 28+ required): #{Exception.message(e)}"
       )

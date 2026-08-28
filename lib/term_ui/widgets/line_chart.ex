@@ -9,12 +9,17 @@ defmodule TermUI.Widgets.LineChart do
 
       LineChart.render(
         series: [
-          %{data: [1, 3, 5, 2, 8], color: :blue},
-          %{data: [2, 4, 3, 6, 4], color: :red}
+          %{data: [1, 3, 5, 2, 8]},
+          %{data: [2, 4, 3, 6, 4]}
         ],
         width: 40,
-        height: 10
+        height: 10,
+        style: TermUI.Renderer.Style.new(fg: :cyan)
       )
+
+  The current renderer overlays every series into one Braille canvas and applies
+  one optional `:style` to the completed chart. Per-series colors are not
+  supported.
 
   ## Braille Patterns
 
@@ -60,14 +65,14 @@ defmodule TermUI.Widgets.LineChart do
 
   ## Options
 
-  - `:series` - List of series with data and optional color
+  - `:series` - List of `%{data: [number()]}` series maps
   - `:data` - Single series data (alternative to :series)
   - `:width` - Chart width in characters (default: 40, max: #{VizHelper.max_width()})
   - `:height` - Chart height in characters (default: 10, max: #{VizHelper.max_height()})
   - `:min` - Minimum Y value (default: auto)
   - `:max` - Maximum Y value (default: auto)
   - `:show_axis` - Show axis lines (default: false)
-  - `:style` - Style for the chart
+  - `:style` - Style applied to the complete chart
   """
   @spec render(keyword()) :: TermUI.Component.RenderNode.t()
   def render(opts) do
@@ -77,25 +82,26 @@ defmodule TermUI.Widgets.LineChart do
     show_axis = Keyword.get(opts, :show_axis, false)
     style = Keyword.get(opts, :style)
 
-    cond do
-      Enum.empty?(series) ->
-        empty()
+    if Enum.empty?(series) do
+      empty()
+    else
+      # Validate series data BEFORE accessing s.data to avoid crashes
+      case VizHelper.validate_series_data(series) do
+        :ok ->
+          render_validated_series(series, width, height, show_axis, style, opts)
 
-      true ->
-        # Validate series data BEFORE accessing s.data to avoid crashes
-        case VizHelper.validate_series_data(series) do
-          :ok ->
-            # Now safe to check if all data is empty
-            if Enum.all?(series, fn s -> Enum.empty?(s.data) end) do
-              empty()
-            else
-              do_render(series, width, height, show_axis, style, opts)
-            end
+        {:error, _msg} ->
+          # Return empty for invalid data rather than crashing
+          empty()
+      end
+    end
+  end
 
-          {:error, _msg} ->
-            # Return empty for invalid data rather than crashing
-            empty()
-        end
+  defp render_validated_series(series, width, height, show_axis, style, opts) do
+    if Enum.all?(series, fn s -> Enum.empty?(s.data) end) do
+      empty()
+    else
+      do_render(series, width, height, show_axis, style, opts)
     end
   end
 
@@ -117,9 +123,6 @@ defmodule TermUI.Widgets.LineChart do
   end
 
   defp do_render(series, width, height, show_axis, style, opts) do
-    # Get character set for axis characters
-    chars = CharacterSet.current_charset()
-
     # Get all values for scaling
     all_values = series |> Enum.flat_map(& &1.data)
     {min, max} = VizHelper.calculate_range(all_values, opts)

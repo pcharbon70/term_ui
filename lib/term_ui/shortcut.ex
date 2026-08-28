@@ -6,6 +6,10 @@ defmodule TermUI.Shortcut do
   matching key events against registered shortcuts, and executing
   the associated actions.
 
+  This registry is opt-in. `TermUI.Runtime` does not start it, register
+  shortcuts, or route root events through it; an application must perform that
+  integration explicitly.
+
   ## Usage
 
       # Create a registry
@@ -30,6 +34,9 @@ defmodule TermUI.Shortcut do
   use GenServer
 
   alias TermUI.Event
+
+  # Dialyzer: Functions with unmatched return values in side-effect calls
+  @dialyzer {:nowarn_function, match: 3, handle_cast: 2, handle_call: 3, check_sequence_match: 2}
 
   @type scope :: :global | {:mode, atom()} | {:component, atom()}
 

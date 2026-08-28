@@ -29,15 +29,22 @@ defmodule TermUI.Sanitize do
       "Normal text"
   """
 
-  @ansi_escape_pattern ~r/(\x1b\[
-                         [0-9;:=?]*[
-                         \x40-\x7e]|
-                         \x1b\]
-                         [^\x07\x1b]*\x07|
-                         \x1b[^\x1b\x07]|
-                         \x07[\x05\x06]|
-                         \x00-\x08|\x0b-\x0c|\x0e-\x1f
-                       )/x
+  # NOTE: Defined as a function rather than a module attribute because compiled
+  # Regex structs contain references that cannot be injected into function bodies.
+  defp ansi_escape_pattern do
+    ~r/(\x1b\[
+         [0-9;:=?]*[
+         \x40-\x7e]|
+         \x1b\]
+         [^\x07\x1b]*\x07|
+         \x1b[^\x1b\x07]|
+         \x07[\x05\x06]|
+         \x00-\x08|\x0b-\x0c|\x0e-\x1f
+       )/x
+  end
+
+  # Dialyzer: Functions return specific atom types
+  @dialyzer {:nowarn_function, validate: 1}
 
   @doc """
   Sanitizes a string by processing terminal escape sequences.
@@ -90,7 +97,7 @@ defmodule TermUI.Sanitize do
   """
   @spec has_ansi?(binary()) :: boolean()
   def has_ansi?(input) when is_binary(input) do
-    Regex.match?(@ansi_escape_pattern, input)
+    Regex.match?(ansi_escape_pattern(), input)
   end
 
   @doc """
@@ -106,7 +113,7 @@ defmodule TermUI.Sanitize do
   """
   @spec strip_ansi(binary()) :: binary()
   def strip_ansi(input) when is_binary(input) do
-    Regex.replace(@ansi_escape_pattern, input, "")
+    Regex.replace(ansi_escape_pattern(), input, "")
   end
 
   @doc """
@@ -188,7 +195,7 @@ defmodule TermUI.Sanitize do
   end
 
   defp sanitize_escapes(input, :remove) do
-    Regex.replace(@ansi_escape_pattern, input, "")
+    Regex.replace(ansi_escape_pattern(), input, "")
   end
 
   defp sanitize_escapes(input, :keep), do: input

@@ -58,6 +58,9 @@ defmodule TermUI.Backend.InputBuffer do
   # ETS table for tracking last warning times (created on first use)
   @warning_table :term_ui_input_buffer_warnings
 
+  # Dialyzer: Functions return specific types or constants
+  @dialyzer {:nowarn_function, max_size: 0, keep_size: 0, ensure_table_exists: 0}
+
   @doc """
   Returns the maximum buffer size allowed.
 

@@ -2,9 +2,11 @@ defmodule TermUI.Event do
   @moduledoc """
   Event type definitions for TermUI.
 
-  Events represent user input from the terminal: keyboard presses,
-  mouse actions, and focus changes. Events are routed to components
-  by the EventRouter based on focus state and position.
+  Events represent user input from the terminal: keyboard presses, mouse
+  actions, focus changes, resize, paste, ticks, and custom input. The primary
+  `TermUI.Runtime` delivers events to its single root Elm module.
+  `TermUI.EventRouter` is an independent lower-level service for applications
+  that explicitly start and populate the process-oriented component subsystem.
 
   ## Event Types
 
@@ -12,6 +14,9 @@ defmodule TermUI.Event do
   - `Mouse` - Mouse actions (click, move, scroll)
   - `Focus` - Focus changes (gained, lost)
   - `Custom` - Application-defined events
+  - `Resize` - Terminal dimensions changed
+  - `Paste` - Bracketed-paste content
+  - `Tick` - Host-created timing metadata (commands normally deliver messages)
 
   ## Examples
 
@@ -27,11 +32,22 @@ defmodule TermUI.Event do
       # Focus event
       event = Event.focus(:gained)
       event = Event.focus(:lost)
+
+      # Resize, paste, and host-created tick events
+      event = Event.resize(120, 40)
+      event = Event.paste("pasted text")
+      event = Event.tick(16)
   """
 
   @typedoc "Union type for all event types"
   @type t ::
-          Key.t() | Mouse.t() | Focus.t() | Custom.t() | Resize.t() | Paste.t() | Tick.t()
+          __MODULE__.Key.t()
+          | __MODULE__.Mouse.t()
+          | __MODULE__.Focus.t()
+          | __MODULE__.Custom.t()
+          | __MODULE__.Resize.t()
+          | __MODULE__.Paste.t()
+          | __MODULE__.Tick.t()
 
   # Key Event
 
@@ -43,7 +59,7 @@ defmodule TermUI.Event do
     """
 
     @type t :: %__MODULE__{
-            key: atom(),
+            key: atom() | String.t(),
             char: String.t() | nil,
             modifiers: [atom()],
             timestamp: integer()
@@ -235,9 +251,11 @@ defmodule TermUI.Event do
 
   defmodule Tick do
     @moduledoc """
-    Timer tick event.
+    Host-created timer tick event.
 
-    Represents a periodic timer event for animations and time-based updates.
+    Represents timing metadata for animations and time-based updates. The 1.0
+    runtime's `Command.timer/2` and `Command.interval/2` deliver their configured
+    messages; they do not construct `%Event.Tick{}` automatically.
     """
 
     @type t :: %__MODULE__{
@@ -277,7 +295,7 @@ defmodule TermUI.Event do
       Event.key(:a, char: "a")
       Event.key(:c, modifiers: [:ctrl])
   """
-  @spec key(atom(), keyword()) :: Key.t()
+  @spec key(atom() | String.t(), keyword()) :: __MODULE__.Key.t()
   def key(key, opts \\ []) do
     Key.new(key, opts)
   end
@@ -290,7 +308,13 @@ defmodule TermUI.Event do
       Event.mouse(:click, :left, 10, 20)
       Event.mouse(:move, nil, x, y)
   """
-  @spec mouse(Mouse.action(), Mouse.button(), integer(), integer(), keyword()) :: Mouse.t()
+  @spec mouse(
+          __MODULE__.Mouse.action(),
+          __MODULE__.Mouse.button(),
+          integer(),
+          integer(),
+          keyword()
+        ) :: __MODULE__.Mouse.t()
   def mouse(action, button, x, y, opts \\ []) do
     Mouse.new(action, button, x, y, opts)
   end
@@ -303,7 +327,7 @@ defmodule TermUI.Event do
       Event.focus(:gained)
       Event.focus(:lost)
   """
-  @spec focus(Focus.action(), keyword()) :: Focus.t()
+  @spec focus(__MODULE__.Focus.action(), keyword()) :: __MODULE__.Focus.t()
   def focus(action, opts \\ []) do
     Focus.new(action, opts)
   end
@@ -315,7 +339,7 @@ defmodule TermUI.Event do
 
       Event.custom(:submit, %{value: "hello"})
   """
-  @spec custom(atom(), term(), keyword()) :: Custom.t()
+  @spec custom(atom(), term(), keyword()) :: __MODULE__.Custom.t()
   def custom(name, payload \\ nil, opts \\ []) do
     Custom.new(name, payload, opts)
   end
@@ -327,7 +351,7 @@ defmodule TermUI.Event do
 
       Event.resize(120, 40)
   """
-  @spec resize(pos_integer(), pos_integer(), keyword()) :: Resize.t()
+  @spec resize(pos_integer(), pos_integer(), keyword()) :: __MODULE__.Resize.t()
   def resize(width, height, opts \\ []) do
     Resize.new(width, height, opts)
   end
@@ -339,7 +363,7 @@ defmodule TermUI.Event do
 
       Event.paste("Hello, World!")
   """
-  @spec paste(String.t(), keyword()) :: Paste.t()
+  @spec paste(String.t(), keyword()) :: __MODULE__.Paste.t()
   def paste(content, opts \\ []) do
     Paste.new(content, opts)
   end
@@ -352,7 +376,7 @@ defmodule TermUI.Event do
       Event.tick(16)  # ~60 FPS
       Event.tick(1000)  # 1 second
   """
-  @spec tick(pos_integer(), keyword()) :: Tick.t()
+  @spec tick(pos_integer(), keyword()) :: __MODULE__.Tick.t()
   def tick(interval, opts \\ []) do
     Tick.new(interval, opts)
   end
@@ -397,7 +421,15 @@ defmodule TermUI.Event do
   @doc """
   Returns the event type as an atom.
   """
-  @spec type(Key.t() | Mouse.t() | Focus.t() | Custom.t() | Resize.t() | Paste.t() | Tick.t()) ::
+  @spec type(
+          __MODULE__.Key.t()
+          | __MODULE__.Mouse.t()
+          | __MODULE__.Focus.t()
+          | __MODULE__.Custom.t()
+          | __MODULE__.Resize.t()
+          | __MODULE__.Paste.t()
+          | __MODULE__.Tick.t()
+        ) ::
           :key | :mouse | :focus | :custom | :resize | :paste | :tick
   def type(%Key{}), do: :key
   def type(%Mouse{}), do: :mouse
@@ -410,7 +442,7 @@ defmodule TermUI.Event do
   @doc """
   Checks if a modifier is present in the event.
   """
-  @spec has_modifier?(Key.t() | Mouse.t(), atom()) :: boolean()
+  @spec has_modifier?(__MODULE__.Key.t() | __MODULE__.Mouse.t(), atom()) :: boolean()
   def has_modifier?(%{modifiers: modifiers}, modifier) do
     modifier in modifiers
   end

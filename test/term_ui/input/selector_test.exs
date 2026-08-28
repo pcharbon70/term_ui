@@ -1,9 +1,16 @@
 defmodule TermUI.Input.SelectorTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias TermUI.Input.Selector
 
   doctest TermUI.Input.Selector
+
+  setup do
+    # Ensure modules are fully loaded before testing function exports
+    Code.ensure_loaded(TermUI.Input.Raw)
+    Code.ensure_loaded(TermUI.Input.TTY)
+    :ok
+  end
 
   describe "select/1 with :raw mode" do
     test "returns TermUI.Input.Raw" do

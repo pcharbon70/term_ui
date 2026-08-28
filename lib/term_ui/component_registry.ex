@@ -6,6 +6,9 @@ defmodule TermUI.ComponentRegistry do
   which is essential for event routing and focus management.
   Components register on mount and unregister on unmount.
 
+  This registry belongs to the standalone process-oriented component services.
+  The single-root `TermUI.Runtime` does not start or query it.
+
   ## Usage
 
       # Register a component
@@ -26,6 +29,9 @@ defmodule TermUI.ComponentRegistry do
   @table_name :term_ui_component_registry
   @pid_index :term_ui_component_pid_index
   @parent_table :term_ui_component_parents
+
+  # Dialyzer: Functions return specific types
+  @dialyzer {:nowarn_function, init: 1, get_info: 1, handle_call: 3}
 
   # Client API
 

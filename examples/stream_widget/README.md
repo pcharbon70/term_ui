@@ -1,13 +1,15 @@
 # StreamWidget Example
 
-A demonstration of the TermUI StreamWidget for displaying backpressure-aware streaming data with GenStage integration.
+A demonstration of the TermUI StreamWidget with a bounded buffer and a GenStage consumer adapter.
 
 ## Widget Overview
 
-The StreamWidget provides real-time display of streaming data with built-in buffer management and GenStage integration. It handles backpressure automatically and provides controls for stream management, making it ideal for applications that need to display continuous data flows like logs, events, or sensor readings.
+The StreamWidget provides real-time display of streaming data with built-in
+buffer management. The example connects a GenStage consumer to the root runtime,
+which forwards event batches into the embedded widget state.
 
 **Key Features:**
-- GenStage integration for demand-based streaming
+- GenStage consumer integration using normal subscription demand
 - Configurable buffer with overflow strategies
 - Pause/resume controls
 - Real-time statistics (items/sec, buffer usage)
@@ -28,11 +30,13 @@ The `StreamWidget.new/1` function accepts these options:
 - `:overflow_strategy` - What to do when buffer is full (default: `:drop_oldest`)
   - `:drop_oldest` - Remove oldest items to make room
   - `:drop_newest` - Discard new items when full
-  - `:block` - Stop accepting items until space is available
+  - `:block` - Compatibility name that rejects/counts new items when full in 1.0
   - `:sliding` - Same as `:drop_oldest`
-- `:demand` - How many items to request at a time from producer (default: 10)
+- `:demand` - Reserved widget metadata (default: 10); configure actual demand
+  with `max_demand`/`min_demand` when subscribing
 - `:show_stats` - Display statistics bar (default: true)
-- `:render_rate_ms` - Minimum time between renders in ms (default: 100)
+- `:render_rate_ms` - Reserved widget metadata (default: 100); it does not
+  throttle the runtime render loop in 1.0
 - `:item_renderer` - Function to render each item: `fn item -> String.t()`
 - `:on_item` - Callback when item is received: `fn item -> ... end`
 - `:on_error` - Callback when error occurs: `fn error -> ... end`
@@ -68,7 +72,7 @@ Or manually:
 
 ```bash
 cd examples/stream_widget
-mix run -e "StreamWidget.App.run()" --no-halt
+mix run -e "StreamWidgetExample.App.run()" --no-halt
 ```
 
 ### TTY Mode (IEx Compatible)
@@ -83,12 +87,11 @@ iex -S mix
 Then in IEx:
 
 ```elixir
-StreamWidget.App.run()
+StreamWidgetExample.App.run()
 ```
 
 **Note:** TTY mode works inside IEx but has limitations:
-- No alternate screen buffer (output mixes with IEx prompt)
-- Character input works immediately (no Enter needed)
+- Input is read through the shell; some terminals buffer keys until Enter is pressed
 - For full TUI, use raw mode instead
 
 ## Controls
@@ -134,6 +137,8 @@ When enabled, the widget shows:
 The example demonstrates proper GenStage integration:
 
 1. A Producer (`StreamWidgetExample.Producer`) generates events at a configurable interval
-2. A Consumer (`StreamWidget.Consumer`) subscribes to the producer
-3. The StreamWidget manages demand and backpressure
-4. Events flow through the pipeline respecting the buffer capacity and overflow strategy
+2. A Consumer (`StreamWidget.Consumer`) subscribes to the producer and sends
+   batches to the root runtime process
+3. The root's `handle_info/2` forwards batches into the embedded widget state
+4. GenStage applies configured subscription demand; the widget independently
+   applies its buffer capacity and overflow strategy

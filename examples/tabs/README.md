@@ -1,6 +1,8 @@
 # Tabs Widget Example
 
-This example demonstrates how to use the `TermUI.Widgets.Tabs` widget for organizing content into switchable panels.
+This example demonstrates tab behavior by implementing the interaction directly
+in an Elm root. The API snippets below document the built-in
+`TermUI.Widgets.Tabs`; the example application does not embed that widget.
 
 ## Features Demonstrated
 
@@ -52,8 +54,7 @@ Tabs.App.run()
 ```
 
 **Note:** TTY mode works inside IEx but has limitations:
-- No alternate screen buffer (output mixes with IEx prompt)
-- Character input works immediately (no Enter needed)
+- Input is read through the shell; some terminals buffer keys until Enter is pressed
 - For full TUI, use raw mode instead
 
 ## Controls

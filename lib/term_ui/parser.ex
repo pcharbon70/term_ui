@@ -4,11 +4,18 @@ defmodule TermUI.Parser do
 
   Transforms raw terminal input bytes into structured events (key presses,
   mouse actions, paste content, focus changes).
+
+  This is a standalone compatibility parser that returns structs under
+  `TermUI.Parser.Events`. `TermUI.Runtime` does not call it; runtime Raw and TTY
+  input use `TermUI.Terminal.EscapeParser` and return `TermUI.Event` structs.
   """
 
   import Bitwise
 
   alias TermUI.Parser.Events.{FocusEvent, KeyEvent, MouseEvent, PasteEvent}
+
+  # Dialyzer: Functions return specific map types
+  @dialyzer {:nowarn_function, new: 0}
 
   @type event :: KeyEvent.t() | MouseEvent.t() | PasteEvent.t() | FocusEvent.t()
 

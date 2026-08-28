@@ -3,9 +3,9 @@ defmodule TermUI.Widgets.TextInput.Line do
   Line-based text input widget using shell line editing.
 
   This widget provides a simple text input experience using `IO.gets/1` through
-  the `TermUI.Input.LineReader` module. Unlike the standard `TextInput` widget
-  which handles character-by-character input, this widget delegates to the shell
-  for line editing, providing familiar shell features.
+  the `TermUI.Input.LineReader` module. Unlike the standard event-driven
+  `TextInput` widget, this widget delegates to the shell for line editing,
+  providing familiar shell features.
 
   ## When to Use TextInput.Line
 
@@ -15,7 +15,7 @@ defmodule TermUI.Widgets.TextInput.Line do
   - **Simple input flow**: Just prompt → read → validate → done
 
   Use the standard `TextInput` widget when you need:
-  - Character-by-character input handling
+  - Event-driven key handling (delivery depends on the selected backend)
   - Custom key bindings or input transformations
   - Real-time validation as the user types
   - Multi-line text editing
@@ -36,13 +36,15 @@ defmodule TermUI.Widgets.TextInput.Line do
   ## TTY Mode Compatibility
 
   This widget is designed for TTY mode where shell line editing is available.
-  It also works in raw mode, but the shell editing features may be limited.
+  It should not be mixed with a running Raw runtime, which already owns local
+  terminal input.
 
   > #### Standard TextInput Works in TTY Mode {: .info}
   >
-  > The standard `TermUI.Widgets.TextInput` widget works perfectly in TTY mode
-  > for character-by-character input. Use `TextInput.Line` only when you
-  > specifically want shell line editing features.
+  > The standard `TermUI.Widgets.TextInput` consumes the same normalized key
+  > events in either backend. In cooked TTY mode those events may be buffered
+  > until Enter; Raw mode provides character-at-a-time delivery. Use
+  > `TextInput.Line` when you intentionally want a blocking shell line read.
 
   ## Usage
 
@@ -90,7 +92,7 @@ defmodule TermUI.Widgets.TextInput.Line do
 
   | Feature | TextInput.Line | TextInput |
   |---------|----------------|-----------|
-  | Input style | Line-based (Enter to submit) | Character-by-character |
+  | Input style | Line-based (Enter to submit) | Event-driven; backend-dependent delivery |
   | Line editing | Shell-provided | Widget-handled |
   | Real-time validation | No | Yes |
   | Multi-line | No | Yes (optional) |
@@ -126,6 +128,9 @@ defmodule TermUI.Widgets.TextInput.Line do
   import TermUI.Component.RenderNode
   alias TermUI.Renderer.Style
   alias TermUI.Theme
+
+  # Dialyzer: Suppress opaque type warnings for Style helpers
+  @dialyzer {:nowarn_function, fg_semantic: 1, fg_color: 1, new: 1, clear: 1}
 
   @typedoc """
   TextInput.Line state structure.
@@ -301,21 +306,34 @@ defmodule TermUI.Widgets.TextInput.Line do
         # Has validator, use read_line/2
         case LineReader.read_line(state.prompt, validator) do
           {:ok, value} ->
-            # Value may be transformed by validator
-            string_value = if is_binary(value), do: value, else: inspect(value)
-            new_state = %{state | value: string_value, error: nil}
-            {:ok, value, new_state}
+            handle_read_success(state, value)
 
           {:error, reason} ->
-            error_msg = if is_binary(reason), do: reason, else: inspect(reason)
-            new_state = %{state | error: error_msg}
-            {:error, reason, new_state}
+            handle_read_error(state, reason)
 
           :eof ->
             {:eof, state}
         end
     end
   end
+
+  defp handle_read_success(state, value) do
+    string_value = format_value(value)
+    new_state = %{state | value: string_value, error: nil}
+    {:ok, value, new_state}
+  end
+
+  defp handle_read_error(state, reason) do
+    error_msg = format_error(reason)
+    new_state = %{state | error: error_msg}
+    {:error, reason, new_state}
+  end
+
+  defp format_value(value) when is_binary(value), do: value
+  defp format_value(value), do: inspect(value)
+
+  defp format_error(reason) when is_binary(reason), do: reason
+  defp format_error(reason), do: inspect(reason)
 
   @doc """
   Gets the current value.
@@ -479,19 +497,27 @@ defmodule TermUI.Widgets.TextInput.Line do
       validator when is_function(validator, 1) ->
         case LineReader.read_line(state.prompt, validator) do
           {:ok, value} ->
-            string_value = if is_binary(value), do: value, else: inspect(value)
-            new_state = %{state | value: string_value, error: nil}
-            {:ok, value, new_state}
+            handle_focused_read_success(state, value)
 
           {:error, reason} ->
-            error_msg = if is_binary(reason), do: reason, else: inspect(reason)
-            new_state = %{state | error: error_msg}
-            {:error, reason, new_state}
+            handle_focused_read_error(state, reason)
 
           :eof ->
             {:cancelled, state}
         end
     end
+  end
+
+  defp handle_focused_read_success(state, value) do
+    string_value = format_value(value)
+    new_state = %{state | value: string_value, error: nil}
+    {:ok, value, new_state}
+  end
+
+  defp handle_focused_read_error(state, reason) do
+    error_msg = format_error(reason)
+    new_state = %{state | error: error_msg}
+    {:error, reason, new_state}
   end
 
   # Clear focused state in result
@@ -501,23 +527,19 @@ defmodule TermUI.Widgets.TextInput.Line do
 
   # Call on_blur callback if configured (with error protection)
   defp call_on_blur({_, _, state}) when is_function(state.on_blur, 1) do
-    try do
-      state.on_blur.(state)
-    rescue
-      e ->
-        require Logger
-        Logger.error("TextInput.Line on_blur callback error: #{inspect(e)}")
-    end
+    state.on_blur.(state)
+  rescue
+    e ->
+      require Logger
+      Logger.error("TextInput.Line on_blur callback error: #{inspect(e)}")
   end
 
   defp call_on_blur({:cancelled, state}) when is_function(state.on_blur, 1) do
-    try do
-      state.on_blur.(state)
-    rescue
-      e ->
-        require Logger
-        Logger.error("TextInput.Line on_blur callback error: #{inspect(e)}")
-    end
+    state.on_blur.(state)
+  rescue
+    e ->
+      require Logger
+      Logger.error("TextInput.Line on_blur callback error: #{inspect(e)}")
   end
 
   defp call_on_blur(_), do: :ok
@@ -527,10 +549,10 @@ defmodule TermUI.Widgets.TextInput.Line do
 
   ## Examples
 
-      TextInput.Line.is_focused?(state)  # => true or false
+      TextInput.Line.focused?(state)  # => true or false
   """
-  @spec is_focused?(t()) :: boolean()
-  def is_focused?(%__MODULE__{focused: focused}), do: focused
+  @spec focused?(t()) :: boolean()
+  def focused?(%__MODULE__{focused: focused}), do: focused
 
   @doc """
   Sets the focus state directly.
@@ -638,7 +660,7 @@ defmodule TermUI.Widgets.TextInput.Line do
     display_text =
       if state.value == "" and state.placeholder != "" do
         # Show placeholder with muted style
-        placeholder_style = Style.new(fg: :bright_black)
+        placeholder_style = fg_color(:bright_black)
 
         stack(:horizontal, [
           text(state.prompt),
@@ -652,9 +674,25 @@ defmodule TermUI.Widgets.TextInput.Line do
     display_text
   end
 
+  # ----------------------------------------------------------------------------
+  # Style Helper Functions
+  # ----------------------------------------------------------------------------
+
+  @spec fg_semantic(atom()) :: Style.t()
+  defp fg_semantic(color) when is_atom(color),
+    do: Style.new() |> Style.fg(color)
+
+  @spec fg_color(atom()) :: Style.t()
+  defp fg_color(color) when is_atom(color),
+    do: Style.new(fg: color)
+
+  # ----------------------------------------------------------------------------
+  # Error Rendering
+  # ----------------------------------------------------------------------------
+
   # Renders the error message
   defp render_error(error) do
-    error_style = Style.new() |> Style.fg(Theme.get_semantic(:error))
+    error_style = fg_semantic(Theme.get_semantic(:error))
     text(error, error_style)
   end
 end

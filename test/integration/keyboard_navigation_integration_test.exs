@@ -30,8 +30,8 @@ defmodule TermUI.Integration.KeyboardNavigationIntegrationTest do
   use ExUnit.Case, async: true
 
   alias TermUI.Event
-  alias TermUI.Widgets.{Menu, Tabs, TreeView}
   alias TermUI.Theme
+  alias TermUI.Widgets.{Menu, Tabs, TreeView}
 
   setup do
     # Start Theme server (ignore if already started)
@@ -384,11 +384,9 @@ defmodule TermUI.Integration.KeyboardNavigationIntegrationTest do
   # ===========================================================================
 
   describe "identical behavior verification" do
-    @moduledoc """
-    These tests verify that keyboard navigation behavior is deterministic and
-    mode-independent. Since Event.Key is produced identically in both modes,
-    the same events should always produce the same state transitions.
-    """
+    # These tests verify that keyboard navigation behavior is deterministic and
+    # mode-independent. Since Event.Key is produced identically in both modes,
+    # the same events should always produce the same state transitions.
 
     test "menu navigation is deterministic" do
       items = [

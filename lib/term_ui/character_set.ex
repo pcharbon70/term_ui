@@ -62,11 +62,12 @@ defmodule TermUI.CharacterSet do
 
   ## Configuration
 
-  The default character set can be configured in your application:
+  When no runtime context exists, the fallback character set can be configured
+  in your application:
 
       config :term_ui, :character_set, :unicode
 
-  Or at runtime:
+  Or changed while no runtime-managed value is present:
 
       Application.put_env(:term_ui, :character_set, :ascii)
   """
@@ -77,6 +78,10 @@ defmodule TermUI.CharacterSet do
   - `:unicode` - Full Unicode box-drawing characters
   - `:ascii` - ASCII fallback characters
   """
+
+  # Dialyzer: Functions return specific list types
+  @dialyzer {:nowarn_function, keys: 0}
+
   @type charset :: :unicode | :ascii
 
   @typedoc """
@@ -291,8 +296,9 @@ defmodule TermUI.CharacterSet do
   @doc """
   Returns the currently configured character set type.
 
-  Reads from persistent_term via PersistentTerms (set by Runtime),
-  falling back to application config. Defaults to `:unicode` if neither is configured.
+  Reads from persistent_term via PersistentTerms (set by Runtime from detected
+  Unicode capabilities), falling back to application config. Defaults to
+  `:unicode` if neither is configured.
 
   ## Returns
 

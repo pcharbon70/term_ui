@@ -10,10 +10,28 @@ defmodule TermUI.Runtime.NodeRenderer do
   """
 
   alias TermUI.Component.RenderNode
+  alias TermUI.Layout.Constraint
+  alias TermUI.Layout.Solver
   alias TermUI.Renderer.Buffer
   alias TermUI.Renderer.BufferManager
   alias TermUI.Renderer.Cell
   alias TermUI.Renderer.Style
+
+  # Dialyzer: Functions with unmatched return values
+  @dialyzer {:nowarn_function,
+             render_node: 5,
+             render_text: 5,
+             render_line: 5,
+             render_children_vertical: 5,
+             render_children_horizontal: 5,
+             render_positioned_cells: 5,
+             render_viewport: 1,
+             render_and_copy_viewport: 4,
+             fill_overlay_background: 4,
+             fill_overlay_area: 6,
+             fill_background: 6,
+             apply_parent_style_to_cell: 2,
+             copy_viewport_region: 2}
 
   @doc """
   Renders a node tree to the buffer starting at the given position.
@@ -73,25 +91,59 @@ defmodule TermUI.Runtime.NodeRenderer do
   end
 
   defp render_node(
-         %RenderNode{type: :stack, direction: :vertical, children: children, style: style},
+         %RenderNode{
+           type: :stack,
+           direction: :vertical,
+           children: children,
+           style: style,
+           width: width,
+           height: height
+         },
          buffer,
          row,
          col,
          parent_style
        ) do
     effective_style = merge_styles(parent_style, style)
-    render_children_vertical(children, buffer, row, col, effective_style)
+
+    render_stack_children(
+      children,
+      :vertical,
+      buffer,
+      row,
+      col,
+      effective_style,
+      width,
+      height
+    )
   end
 
   defp render_node(
-         %RenderNode{type: :stack, direction: :horizontal, children: children, style: style},
+         %RenderNode{
+           type: :stack,
+           direction: :horizontal,
+           children: children,
+           style: style,
+           width: width,
+           height: height
+         },
          buffer,
          row,
          col,
          parent_style
        ) do
     effective_style = merge_styles(parent_style, style)
-    render_children_horizontal(children, buffer, row, col, effective_style)
+
+    render_stack_children(
+      children,
+      :horizontal,
+      buffer,
+      row,
+      col,
+      effective_style,
+      width,
+      height
+    )
   end
 
   defp render_node(%RenderNode{type: :cells, cells: cells}, buffer, row, col, parent_style) do
@@ -114,7 +166,17 @@ defmodule TermUI.Runtime.NodeRenderer do
          col,
          style
        ) do
-    render_viewport(content, buffer, row, col, style, scroll_x, scroll_y, width, height)
+    render_viewport(%{
+      content: content,
+      buffer: buffer,
+      dest_row: row,
+      dest_col: col,
+      style: style,
+      scroll_x: scroll_x,
+      scroll_y: scroll_y,
+      vp_width: width,
+      vp_height: height
+    })
   end
 
   # Handle overlay nodes (from AlertDialog, Dialog, ContextMenu, Toast widgets)
@@ -138,20 +200,49 @@ defmodule TermUI.Runtime.NodeRenderer do
     buf_col = x + 1
 
     # If width, height, and bg are provided, fill background first
-    case overlay do
-      %{width: width, height: height, bg: bg} when is_integer(width) and is_integer(height) ->
-        fill_background(buffer, buf_row, buf_col, width, height, bg)
+    # This creates an opaque background for the overlay content
+    _fill_result =
+      case overlay do
+        %{width: width, height: height, bg: %Style{} = bg_style}
+        when is_integer(width) and width > 0 and is_integer(height) and height > 0 ->
+          fill_background(buffer, buf_row, buf_col, width, height, bg_style)
 
-      _ ->
-        :ok
-    end
+        _ ->
+          :ok
+      end
 
-    render_node(content, buffer, buf_row, buf_col, style)
+    # Merge bg style with parent style so content inherits the background
+    # This ensures borders and text without explicit bg get the overlay background
+    effective_style =
+      case overlay do
+        %{bg: %Style{} = bg_style} -> merge_styles(style, bg_style)
+        _ -> style
+      end
+
+    render_node(content, buffer, buf_row, buf_col, effective_style)
   end
 
   # Handle tuple-based render nodes from Elm.Helpers
   defp render_node({:text, content}, buffer, row, col, style) do
     render_text(content, buffer, row, col, style)
+  end
+
+  # Handle overlay tuple from Elm components (background content with overlay on top)
+  defp render_node({:overlay, background, %{} = overlay_map}, buffer, row, col, style) do
+    # First render the background content at current position
+    render_node(background, buffer, row, col, style)
+
+    # Then render the overlay using its absolute positioning
+    x = Map.get(overlay_map, :x, 0)
+    y = Map.get(overlay_map, :y, 0)
+
+    # Fill overlay background if specified
+    fill_overlay_background(buffer, overlay_map, x, y)
+
+    # Merge overlay's bg style with parent style for proper background inheritance
+    overlay_style = merge_overlay_style(style, overlay_map)
+
+    render_node(overlay_map, buffer, y + 1, x + 1, overlay_style)
   end
 
   defp render_node({:styled, content, style}, buffer, row, col, parent_style) do
@@ -182,6 +273,36 @@ defmodule TermUI.Runtime.NodeRenderer do
 
   # Fallback for unknown node types
   defp render_node(_node, _buffer, _row, _col, _style), do: {0, 0}
+
+  # Overlay helper functions
+  defp fill_overlay_background(buffer, overlay_map, x, y) do
+    case overlay_map do
+      %{width: width, height: height, bg: %Style{} = bg_style}
+      when is_integer(width) and width > 0 and is_integer(height) and height > 0 ->
+        fill_overlay_area(buffer, x, y, width, height, bg_style)
+
+      _ ->
+        :ok
+    end
+  end
+
+  defp fill_overlay_area(buffer, x, y, width, height, bg_style) do
+    for dy <- 0..(height - 1) do
+      buf_row = y + 1 + dy
+
+      for dx <- 0..(width - 1) do
+        cell = create_cell(" ", bg_style)
+        Buffer.set_cell(buffer, buf_row, x + 1 + dx, cell)
+      end
+    end
+  end
+
+  defp merge_overlay_style(parent_style, overlay_map) do
+    case Map.get(overlay_map, :bg) do
+      %Style{} = bg_style -> merge_styles(parent_style, bg_style)
+      _ -> parent_style
+    end
+  end
 
   # Text rendering
   defp render_text(nil, _buffer, _row, _col, _style), do: {0, 0}
@@ -221,6 +342,153 @@ defmodule TermUI.Runtime.NodeRenderer do
   end
 
   # Children rendering
+  defp render_stack_children(children, direction, buffer, row, col, style, width, height) do
+    if Enum.any?(children, &constrained_child?/1) do
+      render_constrained_children(children, direction, buffer, row, col, style, width, height)
+    else
+      case direction do
+        :vertical -> render_children_vertical(children, buffer, row, col, style)
+        :horizontal -> render_children_horizontal(children, buffer, row, col, style)
+      end
+    end
+  end
+
+  defp render_constrained_children(
+         children,
+         direction,
+         buffer,
+         row,
+         col,
+         style,
+         requested_width,
+         requested_height
+       ) do
+    {buffer_rows, buffer_cols} = Buffer.dimensions(buffer)
+    remaining_width = max(0, buffer_cols - col + 1)
+    remaining_height = max(0, buffer_rows - row + 1)
+    available_width = available_dimension(requested_width, remaining_width)
+    available_height = available_dimension(requested_height, remaining_height)
+
+    area = %{x: 0, y: 0, width: available_width, height: available_height}
+
+    normalized =
+      Enum.map(children, fn
+        {_child, constraint} = constrained ->
+          if constraint?(constraint),
+            do: constrained,
+            else: auto_constrain(constrained, direction, area, style)
+
+        child ->
+          auto_constrain(child, direction, area, style)
+      end)
+
+    constraints = Enum.map(normalized, &elem(&1, 1))
+    rects = Solver.solve_to_rects(constraints, area, direction: direction)
+
+    rendered =
+      normalized
+      |> Enum.zip(rects)
+      |> Enum.map(fn {{child, _constraint}, rect} ->
+        bounds = render_node_clipped(child, buffer, row + rect.y, col + rect.x, style, rect)
+        {rect, bounds}
+      end)
+
+    constrained_bounds(rendered, direction, requested_width, requested_height)
+  end
+
+  defp constrained_child?({_child, constraint}), do: constraint?(constraint)
+  defp constrained_child?(_child), do: false
+
+  defp constraint?(%Constraint.Length{}), do: true
+  defp constraint?(%Constraint.Percentage{}), do: true
+  defp constraint?(%Constraint.Ratio{}), do: true
+  defp constraint?(%Constraint.Min{}), do: true
+  defp constraint?(%Constraint.Max{}), do: true
+  defp constraint?(%Constraint.Fill{}), do: true
+  defp constraint?(_constraint), do: false
+
+  defp auto_constrain(child, direction, area, style) do
+    {width, height} = measure_node(child, area, style)
+    size = if direction == :horizontal, do: width, else: height
+    {child, Constraint.length(size)}
+  end
+
+  defp measure_node(child, area, style) do
+    case Buffer.new(max(1, area.height), max(1, area.width)) do
+      {:ok, temp_buffer} ->
+        try do
+          render_node(child, temp_buffer, 1, 1, style)
+        after
+          Buffer.destroy(temp_buffer)
+        end
+
+      {:error, _reason} ->
+        {0, 0}
+    end
+  end
+
+  defp render_node_clipped(_child, _buffer, _row, _col, _style, %{width: 0}), do: {0, 0}
+  defp render_node_clipped(_child, _buffer, _row, _col, _style, %{height: 0}), do: {0, 0}
+
+  defp render_node_clipped(child, buffer, row, col, style, rect) do
+    case Buffer.new(rect.height, rect.width) do
+      {:ok, temp_buffer} ->
+        try do
+          {rendered_width, rendered_height} = render_node(child, temp_buffer, 1, 1, style)
+
+          cells =
+            temp_buffer
+            |> Buffer.to_list()
+            |> Enum.map(fn {cell_row, cell_col, cell} ->
+              {row + cell_row - 1, col + cell_col - 1, cell}
+            end)
+
+          Buffer.set_cells(buffer, cells)
+          {min(rendered_width, rect.width), min(rendered_height, rect.height)}
+        after
+          Buffer.destroy(temp_buffer)
+        end
+
+      {:error, _reason} ->
+        {0, 0}
+    end
+  end
+
+  defp constrained_bounds(rendered, :horizontal, requested_width, requested_height) do
+    width = extent(rendered, :horizontal)
+    height = rendered |> Enum.map(fn {_rect, {_width, height}} -> height end) |> max_or_zero()
+    {requested_dimension(requested_width, width), requested_dimension(requested_height, height)}
+  end
+
+  defp constrained_bounds(rendered, :vertical, requested_width, requested_height) do
+    width = rendered |> Enum.map(fn {_rect, {width, _height}} -> width end) |> max_or_zero()
+    height = extent(rendered, :vertical)
+    {requested_dimension(requested_width, width), requested_dimension(requested_height, height)}
+  end
+
+  defp extent([], _direction), do: 0
+
+  defp extent(rendered, :horizontal) do
+    rendered
+    |> Enum.map(fn {rect, _bounds} -> rect.x + rect.width end)
+    |> Enum.max()
+  end
+
+  defp extent(rendered, :vertical) do
+    rendered
+    |> Enum.map(fn {rect, _bounds} -> rect.y + rect.height end)
+    |> Enum.max()
+  end
+
+  defp max_or_zero([]), do: 0
+  defp max_or_zero(values), do: Enum.max(values)
+
+  defp available_dimension(value, remaining) when is_integer(value), do: min(value, remaining)
+  defp available_dimension(_value, remaining), do: remaining
+
+  defp requested_dimension(value, _rendered) when is_integer(value), do: value
+  defp requested_dimension(_value, rendered), do: rendered
+
   defp render_children_vertical(children, buffer, row, col, style) when is_list(children) do
     {max_width, final_row} =
       Enum.reduce(children, {0, row}, fn child, {max_w, current_row} ->
@@ -259,53 +527,76 @@ defmodule TermUI.Runtime.NodeRenderer do
 
   # Viewport rendering - clips content to a region with scroll offsets
   # Creates a temporary buffer to render content, then copies visible portion
-  defp render_viewport(
-         content,
-         buffer,
-         dest_row,
-         dest_col,
-         style,
-         scroll_x,
-         scroll_y,
-         vp_width,
-         vp_height
-       ) do
-    # Estimate content size - we need a buffer large enough to hold the content
-    # Use a reasonable maximum to avoid excessive memory usage
+  defp render_viewport(params) do
+    %{
+      content: content,
+      buffer: buffer,
+      dest_row: dest_row,
+      dest_col: dest_col,
+      style: style,
+      scroll_x: scroll_x,
+      scroll_y: scroll_y,
+      vp_width: vp_width,
+      vp_height: vp_height
+    } = params
+
+    {content_width, content_height} =
+      calculate_viewport_content_size(scroll_x, scroll_y, vp_width, vp_height)
+
+    case Buffer.new(content_height, content_width) do
+      {:ok, temp_buffer} ->
+        opts =
+          build_viewport_opts(buffer, dest_row, dest_col, scroll_x, scroll_y, vp_width, vp_height)
+
+        render_and_copy_viewport(temp_buffer, content, style, opts)
+
+      _error ->
+        {vp_width, vp_height}
+    end
+  end
+
+  defp build_viewport_opts(buffer, dest_row, dest_col, scroll_x, scroll_y, vp_width, vp_height) do
+    %{
+      buffer: buffer,
+      dest_row: dest_row,
+      dest_col: dest_col,
+      scroll_x: scroll_x,
+      scroll_y: scroll_y,
+      vp_width: vp_width,
+      vp_height: vp_height
+    }
+  end
+
+  defp calculate_viewport_content_size(scroll_x, scroll_y, vp_width, vp_height) do
     content_width = scroll_x + vp_width + 100
     content_height = scroll_y + vp_height + 100
 
-    # Cap at reasonable limits
     content_width = min(content_width, Buffer.max_cols())
     content_height = min(content_height, Buffer.max_rows())
 
-    # Create temporary buffer for content
-    case Buffer.new(content_height, content_width) do
-      {:ok, temp_buffer} ->
-        # Render content to temporary buffer
-        render_node(content, temp_buffer, 1, 1, style)
+    {content_width, content_height}
+  end
 
-        # Copy visible region to destination buffer
-        # Source region starts at (scroll_y + 1, scroll_x + 1) in temp buffer (1-indexed)
-        # Destination starts at (dest_row, dest_col) in main buffer
-        for dy <- 0..(vp_height - 1), dx <- 0..(vp_width - 1) do
-          src_row = scroll_y + 1 + dy
-          src_col = scroll_x + 1 + dx
+  defp render_and_copy_viewport(temp_buffer, content, style, opts) do
+    # Render content to temporary buffer
+    render_node(content, temp_buffer, 1, 1, style)
 
-          cell = Buffer.get_cell(temp_buffer, src_row, src_col)
+    # Copy visible region to destination buffer
+    copy_viewport_region(temp_buffer, opts)
 
-          # Only copy non-empty cells (or copy all for consistent background)
-          Buffer.set_cell(buffer, dest_row + dy, dest_col + dx, cell)
-        end
+    # Clean up temporary buffer
+    Buffer.destroy(temp_buffer)
 
-        # Clean up temporary buffer
-        Buffer.destroy(temp_buffer)
+    {opts.vp_width, opts.vp_height}
+  end
 
-        {vp_width, vp_height}
+  defp copy_viewport_region(temp_buffer, opts) do
+    for dy <- 0..(opts.vp_height - 1), dx <- 0..(opts.vp_width - 1) do
+      src_row = opts.scroll_y + 1 + dy
+      src_col = opts.scroll_x + 1 + dx
 
-      {:error, _reason} ->
-        # If we can't create a buffer, just return the viewport dimensions
-        {vp_width, vp_height}
+      cell = Buffer.get_cell(temp_buffer, src_row, src_col)
+      Buffer.set_cell(opts.buffer, opts.dest_row + dy, opts.dest_col + dx, cell)
     end
   end
 

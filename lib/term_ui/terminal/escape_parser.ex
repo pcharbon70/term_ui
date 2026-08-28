@@ -19,12 +19,21 @@ defmodule TermUI.Terminal.EscapeParser do
 
   alias TermUI.Event
 
+  # Dialyzer: parse_bytes/2 and parse_escape_sequence/1 call Event.key with string args
+  # Key.new/2 spec says atom() but the function works with strings too
+  @dialyzer {:nowarn_function, parse_bytes: 2, parse_escape_sequence: 1}
+
   @escape 0x1B
   @delete 0x7F
 
   # Maximum coordinate value for mouse events.
   # Provides defense against malicious input with huge coordinates.
   @max_mouse_coordinate 9999
+
+  # Maximum bytes to buffer for an unterminated bracketed-paste sequence.
+  # Generous enough that real pastes never trip it; prevents unbounded memory
+  # growth from a stuck terminal that emits ESC[200~ but never the end marker.
+  @max_paste_buffer 8 * 1024 * 1024
 
   @doc """
   Parses input bytes into a list of events and remaining bytes.
@@ -152,6 +161,13 @@ defmodule TermUI.Terminal.EscapeParser do
     parse_ss3_sequence(rest)
   end
 
+  # Alt+Backspace. macOS terminals commonly encode Option+Delete as ESC DEL,
+  # while some terminal profiles use ESC BS. Consume both forms immediately
+  # instead of leaving them in the partial-sequence buffer indefinitely.
+  defp parse_escape_sequence(<<char, rest::binary>>) when char in [8, @delete] do
+    {:ok, Event.key(:backspace, modifiers: [:alt]), rest}
+  end
+
   # Alt+key (ESC followed by printable character)
   defp parse_escape_sequence(<<char, rest::binary>>) when char in 32..126 do
     char_str = <<char>>
@@ -175,6 +191,9 @@ defmodule TermUI.Terminal.EscapeParser do
   defp parse_csi_sequence(<<"C", rest::binary>>), do: {:ok, Event.key(:right), rest}
   defp parse_csi_sequence(<<"D", rest::binary>>), do: {:ok, Event.key(:left), rest}
 
+  defp parse_csi_sequence(<<"Z", rest::binary>>),
+    do: {:ok, Event.key(:tab, modifiers: [:shift]), rest}
+
   # Home/End
   defp parse_csi_sequence(<<"H", rest::binary>>), do: {:ok, Event.key(:home), rest}
   defp parse_csi_sequence(<<"F", rest::binary>>), do: {:ok, Event.key(:end), rest}
@@ -186,6 +205,30 @@ defmodule TermUI.Terminal.EscapeParser do
   defp parse_csi_sequence(<<"4~", rest::binary>>), do: {:ok, Event.key(:end), rest}
   defp parse_csi_sequence(<<"5~", rest::binary>>), do: {:ok, Event.key(:page_up), rest}
   defp parse_csi_sequence(<<"6~", rest::binary>>), do: {:ok, Event.key(:page_down), rest}
+
+  # Bracketed paste: ESC [ 200 ~ content ESC [ 201 ~
+  # Scan forward for the end marker and emit the parked content as a single
+  # Paste event. Without the end marker, return :incomplete so InputReader
+  # keeps buffering — up to @max_paste_buffer, after which we bail out and
+  # emit whatever we have so the buffer cannot grow without bound. An
+  # eventually arriving \e[201~ is then swallowed by the stray-end clause.
+  defp parse_csi_sequence(<<"200~", rest::binary>>) do
+    case :binary.match(rest, <<@escape, "[201~">>) do
+      {pos, _len} ->
+        content = binary_part(rest, 0, pos)
+        tail = binary_part(rest, pos + 6, byte_size(rest) - pos - 6)
+        {:ok, Event.paste(content), tail}
+
+      :nomatch when byte_size(rest) > @max_paste_buffer ->
+        {:ok, Event.paste(rest), <<>>}
+
+      :nomatch ->
+        :incomplete
+    end
+  end
+
+  # Stray paste-end marker (defensive): consume silently.
+  defp parse_csi_sequence(<<"201~", rest::binary>>), do: {:ok, Event.key(:unknown), rest}
 
   # Function keys F1-F4 (some terminals)
   defp parse_csi_sequence(<<"11~", rest::binary>>), do: {:ok, Event.key(:f1), rest}
@@ -216,6 +259,13 @@ defmodule TermUI.Terminal.EscapeParser do
 
     modifiers = decode_modifier(modifier - ?0)
     event = Event.key(key, modifiers: modifiers)
+    {:ok, event, rest}
+  end
+
+  # Modified Shift+Tab sequence: ESC [ 1 ; modifier Z
+  defp parse_csi_sequence(<<"1;", modifier, "Z", rest::binary>>) when modifier in ?0..?9 do
+    modifiers = decode_modifier(modifier - ?0)
+    event = Event.key(:tab, modifiers: modifiers)
     {:ok, event, rest}
   end
 
@@ -327,49 +377,38 @@ defmodule TermUI.Terminal.EscapeParser do
   end
 
   defp decode_mouse_event(cb, cx, cy, terminator) do
-    # Extract button from lower bits (0-2)
     button_code = cb &&& 0b11
+    {action, button} = determine_mouse_action(cb, button_code, terminator)
+    modifiers = extract_mouse_modifiers(cb)
 
-    # Check for scroll (bit 6) and motion (bit 5)
-    is_scroll = (cb &&& 64) != 0
-    is_motion = (cb &&& 32) != 0
-
-    # Determine action and button
-    {action, button} =
-      cond do
-        is_scroll and button_code == 0 ->
-          {:scroll_up, nil}
-
-        is_scroll and button_code == 1 ->
-          {:scroll_down, nil}
-
-        is_motion and terminator == :press ->
-          # Motion with button held = drag
-          button = decode_button(button_code)
-          {:drag, button}
-
-        terminator == :release ->
-          # On release, button_code is usually 3 (meaning "released")
-          # We use :left as default since we don't track which was pressed
-          {:release, :left}
-
-        true ->
-          # Normal press
-          button = decode_button(button_code)
-          {:press, button}
-      end
-
-    # Extract modifiers from bits 2-4
-    modifiers = []
-    modifiers = if (cb &&& 4) != 0, do: [:shift | modifiers], else: modifiers
-    modifiers = if (cb &&& 8) != 0, do: [:alt | modifiers], else: modifiers
-    modifiers = if (cb &&& 16) != 0, do: [:ctrl | modifiers], else: modifiers
-
-    # Convert 1-indexed terminal coords to 0-indexed
     x = cx - 1
     y = cy - 1
 
     Event.mouse(action, button, x, y, modifiers: modifiers)
+  end
+
+  defp determine_mouse_action(cb, button_code, terminator) do
+    is_scroll = (cb &&& 64) != 0
+    is_motion = (cb &&& 32) != 0
+
+    cond do
+      is_scroll and button_code == 0 -> {:scroll_up, nil}
+      is_scroll and button_code == 1 -> {:scroll_down, nil}
+      is_motion and terminator == :press -> {:drag, decode_button(button_code)}
+      terminator == :release -> {:release, :left}
+      true -> {:press, decode_button(button_code)}
+    end
+  end
+
+  defp extract_mouse_modifiers(cb) do
+    []
+    |> maybe_add_modifier(cb, 4, :shift)
+    |> maybe_add_modifier(cb, 8, :alt)
+    |> maybe_add_modifier(cb, 16, :ctrl)
+  end
+
+  defp maybe_add_modifier(modifiers, cb, bit, modifier) do
+    if (cb &&& bit) != 0, do: [modifier | modifiers], else: modifiers
   end
 
   defp decode_button(0), do: :left
@@ -405,6 +444,7 @@ defmodule TermUI.Terminal.EscapeParser do
   @spec partial_sequence?(binary()) :: boolean()
   def partial_sequence?(<<@escape>>), do: true
   def partial_sequence?(<<@escape, "[">>), do: true
+  def partial_sequence?(<<@escape, "[200~", _rest::binary>>), do: true
   def partial_sequence?(<<@escape, "[", rest::binary>>), do: partial_csi?(rest)
   def partial_sequence?(<<@escape, "O">>), do: true
   def partial_sequence?(_), do: false

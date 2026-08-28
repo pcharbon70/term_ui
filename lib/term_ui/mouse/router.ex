@@ -6,6 +6,10 @@ defmodule TermUI.Mouse.Router do
   should receive a mouse event, handles z-order for overlapping
   components, and transforms coordinates to component-local space.
 
+  This is a pure, opt-in router over the component map supplied by its caller.
+  `TermUI.Runtime` does not build that map or call this router for embedded
+  widgets.
+
   ## Usage
 
       # Find component at position

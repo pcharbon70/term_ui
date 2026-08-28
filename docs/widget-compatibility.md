@@ -1,359 +1,152 @@
 # Widget Compatibility Guide
 
-This document describes widget behavior across different terminal backends (Raw Mode and TTY Mode) and provides best practices for building compatible widgets.
+This guide describes the code-level differences that affect widgets in Raw,
+TTY, and explicit SSH/custom operation.
 
-## Overview
+## Read the matrix in two layers
 
-TermUI supports two terminal backends:
+Most widgets are backend-independent state machines: given the same
+`TermUI.Event`, their `handle_event/2` behavior is the same. Input delivery is
+not identical, however:
 
-- **Raw Mode**: Full terminal control with mouse support, 60 FPS rendering, and immediate key handling. Requires OTP 28+ with native raw mode support.
-- **TTY Mode**: Compatible mode using standard I/O operations. Works on all systems but with limited features.
+- Raw input is character-at-a-time and runtime setup enables mouse reporting
+  except on WSL/ConPTY.
+- TTY remains cooked. `IO.getn/2` requests one character, but the shell or
+  terminal driver may buffer input until Enter. The runtime does not enable TTY
+  mouse reporting.
+- SSH/custom hosts are responsible for parsing and forwarding normalized events
+  to each session runtime.
 
-Most widgets work identically in both modes because keyboard navigation (arrows, Tab, Enter) uses `IO.getn/2` which provides character-by-character input regardless of terminal mode.
+“Keyboard” below means the widget works once normalized key events are
+delivered; it does not promise immediate cooked-terminal delivery.
 
-## Widget Compatibility Matrix
+## Compatibility matrix
 
-| Widget | Raw Mode | TTY Mode | Notes |
-|--------|----------|----------|-------|
-| **Navigation & Selection** |
-| Menu | Full | Full | Keyboard navigation works identically |
-| Tabs | Full | Full | Tab switching via keyboard |
-| Table | Full | Full | Arrow keys for navigation, sorting |
-| TreeView | Full | Full | Expand/collapse via arrow keys |
-| CommandPalette | Full | Full | Fuzzy search and selection |
-| **Input** |
-| TextInput | Full | Full | Character-by-character input |
-| TextInput.Line | Full | Full | Shell line editing via `IO.gets/1` |
-| FormBuilder | Full | Full | Tab navigation between fields |
-| **Feedback** |
-| Dialog | Full | Full | Modal with button navigation |
-| AlertDialog | Full | Full | Type-based icons and styling |
-| Toast | Full | Full | Auto-dismissing notifications |
-| **Layout** |
-| SplitPane | Full | Keyboard | Mouse drag unavailable; use Ctrl+arrows |
-| Viewport | Full | Full | Keyboard scrolling |
-| ScrollBar | Full | Keyboard | Click unavailable; use arrow keys |
-| **Data Visualization** |
-| Gauge | Full | Full | Progress bars |
-| BarChart | Full | Full | Vertical bar charts |
-| LineChart | Full | Full | Line graphs |
-| Sparkline | Full | Full | Inline mini charts |
-| Canvas | Full | Full | Pixel/character drawing |
-| **Context Menus** |
-| ContextMenu | Full | Position N/A | Use ContextMenu.Inline for TTY |
-| ContextMenu.Inline | Full | Full | Numbered selection, no positioning |
-| **Monitoring** |
-| ProcessMonitor | Full | Full | Process list display |
-| SupervisionTreeViewer | Full | Full | Tree visualization |
-| ClusterDashboard | Full | Full | Cluster status |
-| LogViewer | Full | Full | Log streaming |
+| Widget family | Raw | TTY | Notes |
+|---|---|---|---|
+| Menu, Tabs, Table, TreeView, PickList | Keyboard + mouse where implemented | Keyboard | Root must forward events and retain state |
+| TextInput | Immediate event-driven editing | Event-driven, possibly line-buffered | Use `TextInput.Line` for intentional blocking line reads |
+| FormBuilder, CommandPalette | Immediate keyboard | Keyboard, possibly line-buffered | Same widget state machine |
+| Dialog, AlertDialog | Keyboard + mouse buttons | Keyboard; their code ignores TTY mouse events | Update area before Raw mouse hit-testing |
+| Toast | Render/timer driven | Render/timer driven | Root must call update/tick helpers |
+| Viewport, ScrollBar | Keyboard + mouse | Keyboard | TTY mouse reporting is not enabled |
+| SplitPane | Keyboard + Raw mouse drag | Keyboard | Ctrl+arrow resizing is the fallback |
+| ContextMenu | Positioned keyboard/mouse overlay | Keyboard works, but opening position needs a host | Prefer Inline when no pointer position exists |
+| ContextMenu.Inline | Keyboard/mouse events | Keyboard/numbers | No absolute pointer position required |
+| Charts, Gauge, Sparkline, Canvas | Render | Render | Some Braille/Markdown-style visuals intentionally require Unicode; see below |
+| LogViewer, StreamWidget | Keyboard + supplied data | Keyboard + supplied data | Producers are independent of terminal backend |
+| BEAM introspection widgets | Keyboard + refresh messages | Keyboard + refresh messages | Root owns refresh scheduling |
 
-### Legend
+## Stateful widget integration
 
-- **Full**: All features work as expected
-- **Keyboard**: Mouse features unavailable; keyboard alternatives provided
-- **Position N/A**: Requires mouse positioning; use inline variant instead
+The 1.0 runtime has a single Elm root. It does not mount widget processes or
+route focus automatically. Follow the state-machine lifecycle:
 
-## Widget Variants
-
-Some widgets have variants optimized for different backends:
-
-### TextInput vs TextInput.Line
-
-| Feature | TextInput | TextInput.Line |
-|---------|-----------|----------------|
-| Input Method | Character-by-character | Line-based (`IO.gets/1`) |
-| Shell Editing | No | Yes (history, readline) |
-| Real-time Validation | Yes | On submit only |
-| Cursor Control | Full | Shell-controlled |
-| Blocking | No (event-driven) | Yes (blocks during read) |
-| Best For | Real-time input, search | Free-form text entry |
-
-> **Note:** `TextInput.Line` uses blocking I/O. When `read/1` is called, the
-> process blocks until the user presses Enter. This is intentional to enable
-> shell line editing features. For non-blocking input, use `TextInput`.
-
-**Usage:**
 ```elixir
-# Real-time input (e.g., search)
-TextInput.new(placeholder: "Search...")
+props = TermUI.Widgets.Table.new(columns: columns, data: rows)
+{:ok, table} = TermUI.Widgets.Table.init(props)
 
-# Line-based input with shell editing
-alias TermUI.Widgets.TextInput.Line
-Line.new(prompt: "> ", label: "Enter command")
+{:ok, table} = TermUI.Widgets.Table.handle_event(event, table)
+node = TermUI.Widgets.Table.render(table, %{x: 0, y: 0, width: 80, height: 20})
 ```
 
-### ContextMenu vs ContextMenu.Inline
+Keep `table` in root state and decide when to forward each event. Stateless
+widgets such as Gauge and Sparkline render directly in `view/1`.
 
-| Feature | ContextMenu | ContextMenu.Inline |
-|---------|-------------|-------------------|
-| Positioning | Mouse cursor | Below current focus |
-| Selection | Click or arrows | Numbers or arrows |
-| Best For | Right-click menus | Keyboard-only environments |
+## Text input choices
 
-**Usage:**
-```elixir
-alias TermUI.Widgets.ContextMenu
-alias TermUI.Widgets.ContextMenu.Inline, as: InlineMenu
+| Feature | `TermUI.Widgets.TextInput` | `TermUI.Widgets.TextInput.Line` |
+|---|---|---|
+| API style | Stateful event handler | Explicit line read |
+| Blocking | No inside widget; delivery depends on backend | Yes until Enter |
+| Cursor/editing | Widget-managed | Shell-managed |
+| Validation | Per delivered event | On submitted line |
+| Use case | Forms, search, live editing | Shell-like prompt in cooked I/O |
 
-# Create menu items (same for both variants)
-items = [
-  ContextMenu.action(:copy, "Copy"),
-  ContextMenu.action(:paste, "Paste"),
-  ContextMenu.separator(),
-  ContextMenu.action(:delete, "Delete")
-]
+`TextInput.Line` is not selected automatically by TTY mode.
 
-# Positioned context menu (requires mouse)
-ContextMenu.new(items: items, position: {x, y})
+## Context menu choices
 
-# Inline menu with number keys
-InlineMenu.new(items: items)
-# Renders: [1] Copy  [2] Paste  [3] Delete
-```
+Use the positioned `ContextMenu` when the application has an `{x, y}` opening
+position. Use `ContextMenu.Inline` for a menu rendered in normal layout with
+number-key selection. `TermUI.Widgets.ContextMenu.Factory` can choose a variant
+from its options and capability queries.
 
-## Features with Keyboard Alternatives
+Callbacks execute synchronously. Context-menu callback exceptions are rescued
+and logged by the shared behavior; long work should still be dispatched to
+another process so it does not block the runtime callback.
 
-### SplitPane Resize
+## Keyboard alternatives
 
-Mouse dragging is unavailable in TTY mode. Use keyboard shortcuts:
+Every pointer action should have a keyboard path. Existing examples include:
 
-| Action | Shortcut |
-|--------|----------|
-| Decrease left/top pane | Ctrl+Left / Ctrl+Up |
-| Increase left/top pane | Ctrl+Right / Ctrl+Down |
+- SplitPane: Ctrl+arrow resizing
+- Viewport/Table/TreeView: arrows, Page Up/Down, Home/End
+- Dialogs: Tab/Shift+Tab and Enter/Space
+- ContextMenu.Inline: number keys and arrows
+- ScrollBar consumers: arrow/page navigation in the owning widget
 
-```elixir
-alias TermUI.Widgets.SplitPane
+## Character compatibility
 
-# SplitPane uses :panes list for pane definitions
-SplitPane.new(
-  orientation: :horizontal,
-  panes: [
-    %{id: :left, content: left_panel, size: 0.5},
-    %{id: :right, content: right_panel, size: 0.5}
-  ],
-  ctrl_resize_step: 0.05,  # 5% per keystroke
-  min_ratio: 0.1,          # Minimum 10%
-  max_ratio: 0.9           # Maximum 90%
-)
-```
-
-### ScrollBar Interaction
-
-Click-to-scroll is unavailable in TTY mode. Scrolling via:
-- Arrow keys (line by line)
-- Page Up/Page Down (page by page)
-- Home/End (jump to start/end)
-
----
-
-## Best Practices for Widget Development
-
-### 1. Always Use Theme for Colors
-
-Never hardcode color values. Use the Theme system for automatic degradation:
+Use `TermUI.CharacterSet.current_charset/0` instead of hard-coded box drawing,
+arrows, chart blocks, or indicators:
 
 ```elixir
-# Bad - hardcoded colors
-style = Style.new() |> Style.fg({255, 0, 0})
-
-# Good - theme-based colors
-style = Style.new() |> Style.fg(Theme.get_semantic(:error))
-
-# Good - component styles with monochrome fallback
-style = Theme.get_component_style(:list, :selected)
-```
-
-The Theme system automatically:
-- Converts RGB to 256-color when needed
-- Converts to 16-color palette when needed
-- Provides monochrome fallbacks (reverse, bold, underline)
-
-### 2. Always Use CharacterSet for Special Characters
-
-Never hardcode Unicode characters. Use CharacterSet for automatic ASCII fallback:
-
-```elixir
-# Bad - hardcoded Unicode
-border = "┌" <> String.duplicate("─", width) <> "┐"
-
-# Good - CharacterSet-based
-chars = CharacterSet.current_charset()
+chars = TermUI.CharacterSet.current_charset()
 border = chars.tl <> String.duplicate(chars.h_line, width) <> chars.tr
 ```
 
-Available character categories:
-- **Box drawing**: `tl`, `tr`, `bl`, `br`, `h_line`, `v_line`, `cross`, etc.
-- **Arrows**: `arrow_up`, `arrow_down`, `arrow_left`, `arrow_right`
-- **Indicators**: `check`, `cross_mark`, `bullet`, `pointer`
-- **Progress**: `bar_full`, `bar_empty`, `bar_levels`, `sparkline_levels`
-- **Icons**: `info`, `warning`, `loading`
+When a local runtime starts, `TermUI.PersistentTerms` selects Unicode or ASCII
+from detected terminal capabilities. `config :term_ui, character_set: ...` is
+only the fallback when no runtime-managed value exists in 1.0; it is not a
+force override after runtime startup. A custom widget can explicitly call
+`TermUI.CharacterSet.get(:ascii)` when it must force ASCII.
 
-### 3. Provide Keyboard Alternatives for Mouse Features
+Most core borders, navigation indicators, gauges, sparklines, and bar charts
+use the selected character set. The following 1.0 implementations need special
+attention:
 
-Every mouse interaction should have a keyboard equivalent:
+- `LineChart` and Braille-mode `Canvas` output use Unicode Braille cells; there
+  is no equivalent sub-character ASCII representation.
+- `Markdown`/`MarkdownViewer` and the legacy `PickList` contain hard-coded
+  Unicode drawing characters. The TTY backend maps the known glyphs to ASCII
+  while writing cells; Raw/custom output does not add that final mapping, so a
+  custom ASCII-only backend must translate them or avoid those renderers.
 
-```elixir
-# Handle both mouse and keyboard for selection
-def handle_event(%Event.Mouse{action: :click, y: y}, state) do
-  select_item_at(state, y)
-end
+Use a different presentation or validate Unicode support before relying on
+those visuals in an ASCII-only environment.
 
-def handle_event(%Event.Key{key: :enter}, state) do
-  select_current_item(state)
-end
+## Color compatibility
 
-def handle_event(%Event.Key{key: :down}, state) do
-  move_cursor(state, 1)
-end
-```
+Use semantic theme styles where possible and provide attribute/character cues
+that survive monochrome output. The TTY backend degrades RGB/256/named colors
+to its detected color mode. Raw emits the requested ANSI style.
 
-Common keyboard patterns:
-| Mouse Action | Keyboard Alternative |
-|--------------|---------------------|
-| Click to select | Enter/Space |
-| Drag to resize | Ctrl+Arrow keys |
-| Scroll wheel | Arrow keys, Page Up/Down |
-| Right-click menu | Context key, Shift+F10 |
-| Hover tooltip | Focus + delay |
-
-### 4. Test with Both Backends
-
-Always test widgets in both Raw and TTY modes:
+Capability queries:
 
 ```elixir
-# In tests, configure backend explicitly
-defmodule MyWidgetTest do
-  use ExUnit.Case
-
-  describe "keyboard navigation" do
-    test "works in raw mode" do
-      Application.put_env(:term_ui, :backend, :raw)
-      # Test keyboard navigation
-    end
-
-    test "works in tty mode" do
-      Application.put_env(:term_ui, :backend, :tty)
-      # Same navigation should work identically
-    end
-  end
+case TermUI.Runtime.backend_mode() do
+  :raw -> :immediate_local_input
+  :tty -> :cooked_local_input
+  :custom -> :host_managed_input
+  :skip -> :no_terminal_backend
+  nil -> :no_local_runtime_context
 end
+
+unicode? = TermUI.App.supports?(:unicode)
+true_color? = TermUI.App.supports?(:true_color)
+color_256_or_better? = TermUI.App.supports?(:color_256)
 ```
 
-### 5. Use Appropriate Widget State Patterns
+These values describe detected output capabilities. They do not indicate that
+focus, paste, or mouse reporting was enabled.
 
-Widgets should use the StatefulComponent pattern:
+## Compatibility checklist
 
-```elixir
-defmodule MyWidget do
-  use TermUI.StatefulComponent
-
-  @impl true
-  def init(props) do
-    state = %{
-      # Initialize state from props
-    }
-    {:ok, state}
-  end
-
-  @impl true
-  def handle_event(event, state) do
-    # Handle keyboard and mouse events
-    {:ok, new_state}
-  end
-
-  @impl true
-  def render(state, area) do
-    # Return render nodes
-    stack(:vertical, [...])
-  end
-end
-```
-
-### 6. Support Capability Degradation
-
-Check capabilities at runtime when needed:
-
-```elixir
-defp render_with_fallback(state) do
-  chars = CharacterSet.current_charset()
-
-  # CharacterSet automatically provides ASCII fallback
-  # based on :term_ui, :character_set config
-
-  border = chars.tl <> String.duplicate(chars.h_line, width) <> chars.tr
-  # In Unicode mode: ┌────────┐
-  # In ASCII mode:   +--------+
-end
-```
-
----
-
-## Color Mode Reference
-
-The Theme system supports multiple color modes:
-
-| Mode | Colors | Use Case |
-|------|--------|----------|
-| `true_color` | 16M (RGB) | Modern terminals |
-| `color_256` | 256 | Most terminals |
-| `color_16` | 16 | Basic terminals |
-| `monochrome` | 2 | No color support |
-
-Monochrome fallbacks:
-- **Selected items**: Reverse video
-- **Focused items**: Bold
-- **Error states**: Underline
-- **Disabled items**: Dim
-
----
-
-## Character Set Reference
-
-Two character sets are available:
-
-| Character | Unicode | ASCII |
-|-----------|---------|-------|
-| Corners | `┌┐└┘` | `+` |
-| Lines | `─│` | `-\|` |
-| Arrows | `↑↓←→` | `^v<>` |
-| Triangles | `▲▼◀▶` | `^v<>` |
-| Progress | `█░` | `#.` |
-| Check | `✓` | `x` |
-| Cross | `✗` | `X` |
-| Bullet | `●○` | `*o` |
-
-Configure at runtime:
-```elixir
-# In config/config.exs
-config :term_ui, :character_set, :unicode  # or :ascii
-
-# Or at runtime
-Application.put_env(:term_ui, :character_set, :ascii)
-```
-
----
-
-## Quick Reference
-
-### Creating a Compatible Widget
-
-1. Use `TermUI.StatefulComponent`
-2. Handle keyboard events for all interactions
-3. Use `Theme.get_*` for colors
-4. Use `CharacterSet.current_charset()` for special characters
-5. Test in both Raw and TTY modes
-
-### Checking Current Mode
-
-```elixir
-# Get current backend
-backend = Application.get_env(:term_ui, :backend, :raw)
-
-# Get current character set
-charset = CharacterSet.current()  # :unicode or :ascii
-
-# Get current color capabilities
-color_mode = Theme.get_color_mode()  # :true_color, :color_256, etc.
-```
+1. Keep widget state in the Elm root and forward events explicitly.
+2. Provide keyboard access for every mouse action.
+3. Expect TTY input to be buffered until Enter.
+4. Use `CharacterSet` for UI glyphs.
+5. Use semantic styles plus non-color cues.
+6. Test widget state transitions independently of the terminal.
+7. Test Raw, TTY, SSH/custom, WSL, and cleanup paths on the platforms you claim.

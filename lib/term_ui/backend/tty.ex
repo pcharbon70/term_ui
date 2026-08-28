@@ -3,7 +3,7 @@ defmodule TermUI.Backend.TTY do
   TTY terminal backend for constrained environments.
 
   The TTY backend provides terminal rendering when raw mode is unavailable. This
-  includes Nerves devices, SSH sessions, remote IEx consoles, and other scenarios
+  includes Nerves devices, shell-based SSH sessions, remote IEx consoles, and other scenarios
   where `:shell.start_interactive({:noshell, :raw})` returns `{:error, :already_started}`.
 
   ## When This Backend is Selected
@@ -15,8 +15,10 @@ defmodule TermUI.Backend.TTY do
 
   ## Key Difference from Raw Backend
 
-  **This backend is still fully interactive.** Even without raw mode, we can:
-  - Read individual characters and escape sequences using `IO.getn/2`
+  **This backend remains event-capable, but delivery is terminal-dependent.**
+  Without raw mode, it can:
+  - Request characters and escape sequences using `IO.getn/2`; the shell or
+    terminal driver may still buffer them until Enter
   - Process arrow keys, Tab, function keys, and control sequences
   - Position the cursor and render styled text
 
@@ -69,7 +71,7 @@ defmodule TermUI.Backend.TTY do
   This backend is typically used via the runtime, not directly:
 
       # Automatic backend selection (recommended)
-      {:ok, runtime} = TermUI.Runtime.start_link()
+      {:ok, runtime} = TermUI.Runtime.start_link(root: MyApp.Root)
 
       # The runtime handles backend selection based on environment
 
@@ -82,6 +84,13 @@ defmodule TermUI.Backend.TTY do
   """
 
   @behaviour TermUI.Backend
+
+  alias TermUI.Backend.InputBuffer
+  alias TermUI.Color.Converter
+  alias TermUI.Terminal.EscapeParser
+
+  # Dialyzer: Functions return specific struct types
+  @dialyzer {:nowarn_function, init: 1, map_character: 2, sanitize_char: 1}
 
   # ===========================================================================
   # ANSI Escape Sequence Constants
@@ -199,7 +208,7 @@ defmodule TermUI.Backend.TTY do
   - `{:ok, state}` - Successfully initialized
   - `{:error, reason}` - Initialization failed
   """
-  @spec init(keyword()) :: {:ok, t()} | {:error, term()}
+  @spec init(keyword()) :: {:ok, t()}
   def init(opts \\ []) do
     capabilities = Keyword.get(opts, :capabilities, %{})
     line_mode = Keyword.get(opts, :line_mode, :full_redraw)
@@ -617,8 +626,9 @@ defmodule TermUI.Backend.TTY do
   @doc """
   Polls for input events with the specified timeout.
 
-  Uses `IO.getn/2` for character-by-character input. Note that the timeout
-  parameter may not be honored precisely since `IO.getn/2` is blocking.
+  Requests one character at a time with `IO.getn/2`. Because the terminal stays
+  in cooked mode, the shell or terminal driver may buffer input until Enter.
+  The timeout parameter may not be honored since `IO.getn/2` is blocking.
 
   Input is parsed using `TermUI.Terminal.EscapeParser` to handle escape
   sequences like arrow keys, function keys, and mouse events.
@@ -671,8 +681,6 @@ defmodule TermUI.Backend.TTY do
   end
 
   defp parse_buffered_input(buffer) do
-    alias TermUI.Terminal.EscapeParser
-
     case EscapeParser.parse(buffer) do
       {[event | _rest_events], remaining} ->
         # Return first event, keep remaining in buffer
@@ -713,8 +721,6 @@ defmodule TermUI.Backend.TTY do
           {:ok, TermUI.Backend.event(), t()}
           | {:timeout, t()}
   defp parse_and_return_event(state, input) do
-    alias TermUI.Terminal.EscapeParser
-
     case EscapeParser.parse(input) do
       {[event | _rest], remaining} ->
         {:ok, event, %{state | input_buffer: remaining}}
@@ -732,14 +738,14 @@ defmodule TermUI.Backend.TTY do
   # Uses the shared InputBuffer module for rate-limited logging.
   @spec append_to_input_buffer(t(), binary()) :: t()
   defp append_to_input_buffer(state, data) do
-    TermUI.Backend.InputBuffer.append_with_limit(state, data, :input_buffer, source: __MODULE__)
+    InputBuffer.append_with_limit(state, data, :input_buffer, source: __MODULE__)
   end
 
   # Applies buffer size limit, truncating if necessary.
   # Uses the shared InputBuffer module for rate-limited logging.
   @spec apply_buffer_limit(t()) :: t()
   defp apply_buffer_limit(%{input_buffer: buffer} = state) do
-    {limited, _overflowed} = TermUI.Backend.InputBuffer.apply_limit(buffer, source: __MODULE__)
+    {limited, _overflowed} = InputBuffer.apply_limit(buffer, source: __MODULE__)
     %{state | input_buffer: limited}
   end
 
@@ -755,12 +761,15 @@ defmodule TermUI.Backend.TTY do
       :color_256 -> :color_256
       :color_16 -> :color_16
       :monochrome -> :monochrome
-      n when is_integer(n) and n >= 16_777_216 -> :true_color
-      n when is_integer(n) and n >= 256 -> :color_256
-      n when is_integer(n) and n >= 16 -> :color_16
+      n when is_integer(n) -> color_mode_from_integer(n)
       _ -> :true_color
     end
   end
+
+  defp color_mode_from_integer(n) when n >= 16_777_216, do: :true_color
+  defp color_mode_from_integer(n) when n >= 256, do: :color_256
+  defp color_mode_from_integer(n) when n >= 16, do: :color_16
+  defp color_mode_from_integer(_), do: :true_color
 
   # Determines character set from capabilities map.
   @spec determine_character_set(map()) :: character_set()
@@ -780,13 +789,17 @@ defmodule TermUI.Backend.TTY do
         {rows, cols}
 
       nil ->
-        case Map.get(capabilities, :dimensions) do
-          {rows, cols} when is_integer(rows) and is_integer(cols) and rows > 0 and cols > 0 ->
-            {rows, cols}
+        size_from_capabilities_or_default(capabilities)
 
-          _ ->
-            {24, 80}
-        end
+      _ ->
+        {24, 80}
+    end
+  end
+
+  defp size_from_capabilities_or_default(capabilities) do
+    case Map.get(capabilities, :dimensions) do
+      {rows, cols} when is_integer(rows) and is_integer(cols) and rows > 0 and cols > 0 ->
+        {rows, cols}
 
       _ ->
         {24, 80}
@@ -1001,14 +1014,14 @@ defmodule TermUI.Backend.TTY do
        when is_integer(r) and r >= 0 and r <= 255 and
               is_integer(g) and g >= 0 and g <= 255 and
               is_integer(b) and b >= 0 and b <= 255 do
-    "\e[38;5;#{TermUI.Color.Converter.rgb_to_256({r, g, b})}m"
+    "\e[38;5;#{Converter.rgb_to_256({r, g, b})}m"
   end
 
   defp color_to_sgr({r, g, b}, :bg, :color_256)
        when is_integer(r) and r >= 0 and r <= 255 and
               is_integer(g) and g >= 0 and g <= 255 and
               is_integer(b) and b >= 0 and b <= 255 do
-    "\e[48;5;#{TermUI.Color.Converter.rgb_to_256({r, g, b})}m"
+    "\e[48;5;#{Converter.rgb_to_256({r, g, b})}m"
   end
 
   # 16-color mode - convert RGB to basic color (with validation)
@@ -1016,14 +1029,14 @@ defmodule TermUI.Backend.TTY do
        when is_integer(r) and r >= 0 and r <= 255 and
               is_integer(g) and g >= 0 and g <= 255 and
               is_integer(b) and b >= 0 and b <= 255 do
-    "\e[#{TermUI.Color.Converter.rgb_to_16({r, g, b}, :fg)}m"
+    "\e[#{Converter.rgb_to_16({r, g, b}, :fg)}m"
   end
 
   defp color_to_sgr({r, g, b}, :bg, :color_16)
        when is_integer(r) and r >= 0 and r <= 255 and
               is_integer(g) and g >= 0 and g <= 255 and
               is_integer(b) and b >= 0 and b <= 255 do
-    "\e[#{TermUI.Color.Converter.rgb_to_16({r, g, b}, :bg)}m"
+    "\e[#{Converter.rgb_to_16({r, g, b}, :bg)}m"
   end
 
   # Monochrome mode - skip colors entirely
@@ -1139,7 +1152,7 @@ defmodule TermUI.Backend.TTY do
   # This function provides minimal ESC removal as a safety net in case
   # unsanitized content somehow reaches the rendering layer.
   #
-  # For comprehensive sanitization, see TermUI.Renderer.Cell.sanitize/1.
+  # For comprehensive sanitization, see TermUI.Sanitize.sanitize/1.
   @spec sanitize_char(String.t()) :: String.t()
   defp sanitize_char(char) when is_binary(char) do
     String.replace(char, "\e", "")

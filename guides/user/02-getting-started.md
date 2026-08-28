@@ -9,7 +9,7 @@ Add TermUI to your dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:term_ui, path: "../term_ui"}  # Or from Hex when published
+    {:term_ui, "~> 1.0"}
   ]
 end
 ```
@@ -22,7 +22,9 @@ mix deps.get
 
 ## Understanding Backends: Raw vs TTY
 
-TermUI supports two terminal backends that are automatically selected based on your environment:
+TermUI automatically selects between two local terminal backends based on your
+environment. Independent OTP SSH channels use the explicit SSH backend
+described below.
 
 ### Raw Mode (Full TUI Experience)
 
@@ -30,8 +32,8 @@ Raw mode provides complete terminal control:
 
 - **Alternate screen buffer** - Preserves your shell history
 - **Character-by-character input** - No line buffering
-- **Full mouse support** - Click, drag, and scroll events
-- **Live UI updates** - Smooth 60 FPS rendering
+- **Mouse support** - Click, drag, and scroll events, except under WSL/ConPTY
+- **Live UI updates** - Dirty rendering capped at roughly 60 FPS
 
 **When it's used:**
 - Running from command line (`mix run`, `mix termui.run`)
@@ -42,8 +44,9 @@ Raw mode provides complete terminal control:
 
 TTY mode works inside IEx and other constrained environments:
 
-- **No alternate screen** - Output appears directly in terminal
-- **Immediate character input** - Uses `:io.get_chars/2` for IEx compatibility
+- **Alternate screen** - The runtime enables it, just as it does in Raw mode
+- **Shell-compatible input** - Uses a dedicated reader without replacing the
+  active IEx shell; some terminals buffer input until Enter
 - **Reduced feature set** - Mouse support may be limited
 - **Works in IEx** - Perfect for development and debugging
 
@@ -54,13 +57,11 @@ TTY mode works inside IEx and other constrained environments:
 
 ### Automatic Backend Selection
 
-TermUI automatically selects the appropriate backend:
+TermUI automatically selects the appropriate local backend:
 
-1. Attempts raw mode first
-2. Falls back to TTY mode if:
-   - IEx is detected
-   - A shell is already running
-   - Raw mode is unavailable
+1. Selects TTY directly when IEx is detected, preserving shell ownership
+2. Otherwise attempts Raw on a supported Unix/OTP combination
+3. Falls back to TTY when Raw mode is unavailable
 
 You can also force a specific mode:
 
@@ -79,9 +80,12 @@ TermUI.Runtime.run(root: MyApp.Counter, backend: :tty)
 | Production application | Raw (auto-detected) |
 | Development in IEx | TTY (auto-detected) |
 | Testing/Debugging | TTY for IEx convenience |
-| SSH sessions | Auto (usually TTY) |
+| Local shell reached over SSH | Auto (Raw or TTY according to ownership) |
+| Independent OTP SSH channel | Explicit `TermUI.Backend.SSH` |
 
-The same code works in both modes - no changes needed!
+The same root component runs in both local modes. Account for cooked TTY input
+possibly arriving only after Enter and for mouse reporting not being enabled in
+TTY mode.
 
 ## Your First Application
 
@@ -118,7 +122,7 @@ defmodule MyApp.Counter do
 
   # Update state based on messages
   def update(:quit, state) do
-    {state, [:quit]}
+    {state, [TermUI.Command.quit()]}
   end
 
   def update(:increment, state) do
@@ -162,19 +166,13 @@ defmodule MyApp do
 end
 ```
 
-### Step 3: Create a Run Script
-
-Create `run.exs`:
-
-```elixir
-MyApp.run()
-```
-
-### Step 4: Run the Application
+### Step 3: Run the Application
 
 ```bash
-mix run run.exs
+mix termui.run
 ```
+
+The `mix termui.run` command will automatically discover and run your root module (`MyApp` in this case).
 
 You should see your counter application. Press `↑` to increment, `↓` to decrement, and `Q` to quit.
 
@@ -191,7 +189,8 @@ This sets up your module as an Elm Architecture component, importing necessary f
 2. **`event_to_msg/2`** - Converts terminal events to application messages. Return values:
    - `{:msg, message}` - Send message to `update/2`
    - `:ignore` - Discard the event
-   - `:propagate` - Pass to parent component
+   - `:propagate` - Leave unhandled; the single-root 1.0 runtime has no parent,
+     so it is currently discarded
 
 3. **`update/2`** - Handles messages and returns `{new_state, commands}`. Commands are side effects like timers or quit requests.
 
@@ -276,10 +275,12 @@ iex> MyApp.run()
 
 The app will run in TTY mode, which:
 - Works inside IEx without taking over the shell completely
-- Provides immediate character input (no Enter needed)
-- Displays output directly in the terminal
+- Supports the same normalized key events after the shell delivers them; some
+  cooked-mode terminals require Enter
+- Uses the runtime-managed alternate screen and restores it on exit
 
-For the full TUI experience with alternate screen, run from command line instead:
+For immediate character input, automatic Raw mouse setup, and differential
+output, run from the command line instead:
 
 ```bash
 mix termui.run

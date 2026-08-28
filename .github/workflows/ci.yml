@@ -2,9 +2,13 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop, "release/**"]
   pull_request:
-    branches: [main]
+    branches: [main, develop, "release/**"]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   MIX_ENV: test
@@ -15,14 +19,18 @@ jobs:
     runs-on: ubuntu-latest
 
     strategy:
+      fail-fast: false
       matrix:
         include:
+          # Minimum supported Elixir. Pre-OTP 28 uses the TTY fallback.
+          - elixir: "1.15"
+            otp: "26"
           - elixir: "1.19"
             otp: "28"
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Elixir
         uses: erlef/setup-beam@v1
@@ -31,7 +39,7 @@ jobs:
           otp-version: ${{ matrix.otp }}
 
       - name: Cache dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             deps
@@ -43,11 +51,133 @@ jobs:
       - name: Install dependencies
         run: mix deps.get
 
-      - name: Check formatting
-        run: mix format --check-formatted
+      - name: Compile with warnings as errors
+        run: mix compile --warnings-as-errors
+
+      - name: Run tests
+        run: mix test
+
+  platform:
+    name: Platform test (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS
+            os: macos-latest
+          - name: Windows
+            os: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: "1.19"
+          otp-version: "28"
+
+      - name: Cache dependencies
+        uses: actions/cache@v6
+        with:
+          path: |
+            deps
+            _build
+          key: ${{ runner.os }}-platform-otp-28-elixir-1.19-${{ hashFiles('**/mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-platform-otp-28-elixir-1.19-
+
+      - name: Install dependencies
+        run: mix deps.get
 
       - name: Compile with warnings as errors
         run: mix compile --warnings-as-errors
 
       - name: Run tests
         run: mix test
+
+  quality:
+    name: Quality and package
+    runs-on: ubuntu-latest
+    env:
+      MIX_ENV: dev
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: "1.19"
+          otp-version: "28"
+
+      - name: Cache dependencies and PLTs
+        uses: actions/cache@v6
+        with:
+          path: |
+            deps
+            _build
+            priv/plts
+          key: ${{ runner.os }}-quality-otp-28-elixir-1.19-${{ hashFiles('**/mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-quality-otp-28-elixir-1.19-
+
+      - name: Install dependencies
+        run: mix deps.get
+
+      - name: Check formatting
+        run: mix format --check-formatted
+
+      - name: Compile with warnings as errors
+        run: mix compile --warnings-as-errors
+
+      - name: Run Credo
+        run: mix credo --strict
+
+      - name: Run Dialyzer
+        run: mix dialyzer
+
+      - name: Build documentation
+        run: mix docs --warnings-as-errors
+
+      - name: Check dependencies
+        run: |
+          mix deps.unlock --check-unused
+          mix hex.audit
+          mix deps.audit
+
+      - name: Build Hex package
+        run: mix hex.build
+
+  examples:
+    name: Compile examples
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: "1.19"
+          otp-version: "28"
+
+      - name: Compile every example with warnings as errors
+        shell: bash
+        run: |
+          example_deps="$RUNNER_TEMP/term-ui-example-deps"
+          example_build="$RUNNER_TEMP/term-ui-example-build"
+
+          for mix_file in examples/*/mix.exs; do
+            example_dir="${mix_file%/mix.exs}"
+            (
+              cd "$example_dir"
+              MIX_DEPS_PATH="$example_deps" MIX_BUILD_PATH="$example_build" mix deps.get
+              MIX_DEPS_PATH="$example_deps" MIX_BUILD_PATH="$example_build" mix compile --warnings-as-errors
+            )
+          done

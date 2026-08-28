@@ -44,7 +44,19 @@ defmodule TermUI.Widgets.LogViewer do
   use TermUI.StatefulComponent
 
   alias TermUI.Event
+  alias TermUI.Renderer.Style
   alias TermUI.Theme
+
+  # Dialyzer: Suppress opaque type warnings for Style helpers and contract warnings for specific map types
+  @dialyzer {:nowarn_function,
+             fg_semantic: 1,
+             fg_color: 1,
+             fg_dim_semantic: 1,
+             fg_bg_semantic: 2,
+             new: 1,
+             add_line: 2,
+             clear: 1,
+             clear_filter: 1}
 
   @type log_level ::
           :debug | :info | :notice | :warning | :error | :critical | :alert | :emergency
@@ -72,21 +84,47 @@ defmodule TermUI.Widgets.LogViewer do
           highlight: boolean()
         }
 
-  @level_patterns [
-    {:emergency, ~r/\b(EMERGENCY|EMERG)\b/i},
-    {:alert, ~r/\b(ALERT)\b/i},
-    {:critical, ~r/\b(CRITICAL|CRIT|FATAL)\b/i},
-    {:error, ~r/\b(ERROR|ERR)\b/i},
-    {:warning, ~r/\b(WARNING|WARN)\b/i},
-    {:notice, ~r/\b(NOTICE)\b/i},
-    {:info, ~r/\b(INFO)\b/i},
-    {:debug, ~r/\b(DEBUG|DBG)\b/i}
-  ]
+  # NOTE: Regex patterns defined as functions rather than module attributes because
+  # compiled Regex structs contain references that cannot be injected into function bodies.
+  defp level_patterns do
+    [
+      {:emergency, ~r/\b(EMERGENCY|EMERG)\b/i},
+      {:alert, ~r/\b(ALERT)\b/i},
+      {:critical, ~r/\b(CRITICAL|CRIT|FATAL)\b/i},
+      {:error, ~r/\b(ERROR|ERR)\b/i},
+      {:warning, ~r/\b(WARNING|WARN)\b/i},
+      {:notice, ~r/\b(NOTICE)\b/i},
+      {:info, ~r/\b(INFO)\b/i},
+      {:debug, ~r/\b(DEBUG|DBG)\b/i}
+    ]
+  end
 
-  @timestamp_pattern ~r/\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?/
-  @source_pattern ~r/\[([^\]]+)\]/
+  defp timestamp_pattern,
+    do: ~r/\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?/
+
+  defp source_pattern, do: ~r/\[([^\]]+)\]/
 
   @page_size 20
+
+  # ----------------------------------------------------------------------------
+  # Style Helper Functions
+  # ----------------------------------------------------------------------------
+
+  @spec fg_semantic(atom()) :: Style.t()
+  defp fg_semantic(color) when is_atom(color),
+    do: Style.new() |> Style.fg(color)
+
+  @spec fg_color(atom()) :: Style.t()
+  defp fg_color(color) when is_atom(color),
+    do: Style.new() |> Style.fg(color)
+
+  @spec fg_dim_semantic(atom()) :: Style.t()
+  defp fg_dim_semantic(color) when is_atom(color),
+    do: Style.new() |> Style.fg(color) |> Style.dim()
+
+  @spec fg_bg_semantic(atom(), atom()) :: Style.t()
+  defp fg_bg_semantic(fg, bg) when is_atom(fg) and is_atom(bg),
+    do: Style.new() |> Style.fg(fg) |> Style.bg(bg)
 
   # ----------------------------------------------------------------------------
   # Props
@@ -772,22 +810,39 @@ defmodule TermUI.Widgets.LogViewer do
   end
 
   defp matches_filter?(line, idx, filter, bookmarks) do
-    level_match =
-      filter.levels == nil or line.level in filter.levels
+    level_match?(line, filter) and
+      source_match?(line, filter) and
+      pattern_match?(line, filter) and
+      bookmark_match?(idx, filter, bookmarks)
+  end
 
-    source_match =
-      filter.source == nil or
-        (line.source != nil and String.contains?(line.source, filter.source))
+  defp level_match?(line, filter) do
+    filter.levels == nil or line.level in filter.levels
+  end
 
-    pattern_match =
-      filter.pattern == nil or
-        (is_struct(filter.pattern, Regex) and Regex.match?(filter.pattern, line.raw)) or
-        (is_binary(filter.pattern) and String.contains?(line.raw, filter.pattern))
+  defp source_match?(line, filter) do
+    filter.source == nil or
+      (line.source != nil and String.contains?(line.source, filter.source))
+  end
 
-    bookmark_match =
-      not filter.bookmarks_only or MapSet.member?(bookmarks, idx)
+  defp pattern_match?(line, filter) do
+    filter.pattern == nil or matches_regex_pattern?(line, filter) or
+      matches_string_pattern?(line, filter)
+  end
 
-    level_match and source_match and pattern_match and bookmark_match
+  defp matches_regex_pattern?(line, %{pattern: %Regex{} = regex}),
+    do: Regex.match?(regex, line.raw)
+
+  defp matches_regex_pattern?(_line, _filter), do: false
+
+  defp matches_string_pattern?(line, %{pattern: pattern}) when is_binary(pattern) do
+    String.contains?(line.raw, pattern)
+  end
+
+  defp matches_string_pattern?(_line, _filter), do: false
+
+  defp bookmark_match?(idx, filter, bookmarks) do
+    not filter.bookmarks_only or MapSet.member?(bookmarks, idx)
   end
 
   # ----------------------------------------------------------------------------
@@ -842,7 +897,7 @@ defmodule TermUI.Widgets.LogViewer do
   end
 
   defp extract_timestamp(line) do
-    case Regex.run(@timestamp_pattern, line) do
+    case Regex.run(timestamp_pattern(), line) do
       [match | _] ->
         case DateTime.from_iso8601(match) do
           {:ok, dt, _} -> dt
@@ -855,13 +910,13 @@ defmodule TermUI.Widgets.LogViewer do
   end
 
   defp extract_level(line) do
-    Enum.find_value(@level_patterns, fn {level, pattern} ->
+    Enum.find_value(level_patterns(), fn {level, pattern} ->
       if Regex.match?(pattern, line), do: level, else: nil
     end)
   end
 
   defp extract_source(line) do
-    case Regex.run(@source_pattern, line) do
+    case Regex.run(source_pattern(), line) do
       [_, source | _] -> source
       nil -> nil
     end
@@ -884,7 +939,7 @@ defmodule TermUI.Widgets.LogViewer do
     parts =
       if state.show_line_numbers do
         num_str = String.pad_leading("#{actual_idx + 1}", 5)
-        num_style = Style.new() |> Style.fg(Theme.get_semantic(:muted)) |> Style.dim()
+        num_style = fg_dim_semantic(Theme.get_semantic(:muted))
         parts ++ [text(num_str <> " ", num_style)]
       else
         parts
@@ -893,7 +948,7 @@ defmodule TermUI.Widgets.LogViewer do
     # Bookmark indicator
     parts =
       if is_bookmarked do
-        bookmark_style = Style.new() |> Style.fg(Theme.get_semantic(:warning))
+        bookmark_style = fg_semantic(Theme.get_semantic(:warning))
         parts ++ [text("*", bookmark_style)]
       else
         parts ++ [text(" ", nil)]
@@ -903,7 +958,7 @@ defmodule TermUI.Widgets.LogViewer do
     parts =
       if state.show_levels && line.level do
         level_str = String.pad_trailing(level_abbrev(line.level), 5)
-        level_style = Style.new() |> Style.fg(level_color(line.level))
+        level_style = fg_color(level_color(line.level))
         parts ++ [text(level_str <> " ", level_style)]
       else
         parts
@@ -917,19 +972,15 @@ defmodule TermUI.Widgets.LogViewer do
     stack(:horizontal, parts)
   end
 
-  defp level_color(level) do
-    case level do
-      :debug -> Theme.get_semantic(:info)
-      :info -> Theme.get_semantic(:success)
-      :notice -> Theme.get_color(:primary)
-      :warning -> Theme.get_semantic(:warning)
-      :error -> Theme.get_semantic(:error)
-      :critical -> Theme.get_color(:accent)
-      :alert -> Theme.get_semantic(:error)
-      :emergency -> Theme.get_semantic(:error)
-      _ -> Theme.get_color(:foreground)
-    end
-  end
+  defp level_color(:debug), do: Theme.get_semantic(:info)
+  defp level_color(:info), do: Theme.get_semantic(:success)
+  defp level_color(:notice), do: Theme.get_color(:primary)
+  defp level_color(:warning), do: Theme.get_semantic(:warning)
+  defp level_color(:error), do: Theme.get_semantic(:error)
+  defp level_color(:critical), do: Theme.get_color(:accent)
+  defp level_color(:alert), do: Theme.get_semantic(:error)
+  defp level_color(:emergency), do: Theme.get_semantic(:error)
+  defp level_color(_), do: Theme.get_color(:foreground)
 
   defp level_abbrev(:debug), do: "DEBUG"
   defp level_abbrev(:info), do: "INFO"
@@ -971,10 +1022,10 @@ defmodule TermUI.Widgets.LogViewer do
         Theme.get_component_style(:item, :selected)
 
       is_search_match ->
-        Style.new() |> Style.fg(base_color) |> Style.bg(Theme.get_semantic(:warning))
+        fg_bg_semantic(base_color, Theme.get_semantic(:warning))
 
       true ->
-        Style.new() |> Style.fg(base_color)
+        fg_color(base_color)
     end
   end
 
@@ -1034,18 +1085,18 @@ defmodule TermUI.Widgets.LogViewer do
       end
 
     status = Enum.join(parts, "")
-    status_style = Style.new() |> Style.fg(Theme.get_semantic(:info)) |> Style.dim()
+    status_style = fg_dim_semantic(Theme.get_semantic(:info))
     text(status, status_style)
   end
 
   defp render_input_bar(state) do
     cond do
       state.search_input != nil ->
-        search_style = Style.new() |> Style.fg(Theme.get_semantic(:warning))
+        search_style = fg_semantic(Theme.get_semantic(:warning))
         [text("Search: " <> state.search_input <> "_", search_style)]
 
       state.filter_input != nil ->
-        filter_style = Style.new() |> Style.fg(Theme.get_semantic(:success))
+        filter_style = fg_semantic(Theme.get_semantic(:success))
         [text("Filter: " <> state.filter_input <> "_", filter_style)]
 
       true ->

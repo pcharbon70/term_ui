@@ -4,20 +4,22 @@ defmodule TermUI.Runtime.State do
 
   Contains all runtime state including:
   - Root component module and state
-  - Component registry
+  - The reserved `:root` component entry (there is no public 1.0 registration API)
   - Message queue
   - Event queue (bounded, prevents DoS)
   - Render configuration
-  - Focus tracking
+  - Root focus bookkeeping
   - Shutdown status
   - Backend selection and capabilities
   - Input handler (Raw or TTY mode)
+  - Command executor for async side effects
   """
 
+  alias TermUI.Command.Executor
   alias TermUI.EventQueue
   alias TermUI.MessageQueue
 
-  @type backend_mode :: :raw | :tty | nil
+  @type backend_mode :: :raw | :tty | :custom | :skip | nil
 
   @type capabilities :: %{
           optional(:colors) => :true_color | :color_256 | :color_16 | :monochrome,
@@ -42,12 +44,15 @@ defmodule TermUI.Runtime.State do
           buffer_manager: pid() | nil,
           dimensions: {pos_integer(), pos_integer()} | nil,
           input_reader: pid() | nil,
+          input_handler_reader: pid() | nil,
           backend_mode: backend_mode(),
           backend: module() | nil,
           backend_state: term() | nil,
           capabilities: capabilities() | nil,
+          command_executor: Executor.t() | nil,
           input_handler: module() | nil,
-          input_state: term() | nil
+          input_state: term() | nil,
+          logger_handler_config: map() | nil
         }
 
   @type component_entry :: %{
@@ -75,11 +80,14 @@ defmodule TermUI.Runtime.State do
     :buffer_manager,
     :dimensions,
     :input_reader,
+    input_handler_reader: nil,
     backend_mode: nil,
     backend: nil,
     backend_state: nil,
     capabilities: nil,
+    command_executor: nil,
     input_handler: nil,
-    input_state: nil
+    input_state: nil,
+    logger_handler_config: nil
   ]
 end

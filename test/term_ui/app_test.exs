@@ -2,6 +2,7 @@ defmodule TermUI.AppTest do
   use ExUnit.Case, async: false
 
   alias TermUI.App
+  alias TermUI.Command
 
   # Clean up persistent_term values between tests
   setup do
@@ -38,6 +39,41 @@ defmodule TermUI.AppTest do
     def view(state), do: {:text, "Count: " <> to_string(state.count)}
   end
 
+  defmodule InitCommandCounter do
+    use TermUI.Elm
+
+    def init(_opts) do
+      {:ok, %{ticks: 0}, [Command.timer(0, :tick)]}
+    end
+
+    def event_to_msg(_, _), do: :ignore
+
+    def update(:tick, state), do: {%{state | ticks: state.ticks + 1}, []}
+    def update(_, state), do: {state, []}
+    def view(_state), do: {:text, "Init command"}
+  end
+
+  defmodule RuntimeCommandCounter do
+    use TermUI.Elm
+
+    def init(_opts), do: %{ticks: 0, pongs: 0}
+
+    def event_to_msg(_, _), do: :ignore
+
+    def update(:start_timer, state) do
+      {state, [Command.timer(0, :tick)]}
+    end
+
+    def update(:start_send_after, state) do
+      {state, [Command.send_after(:root, :pong, 1)]}
+    end
+
+    def update(:tick, state), do: {%{state | ticks: state.ticks + 1}, []}
+    def update(:pong, state), do: {%{state | pongs: state.pongs + 1}, []}
+    def update(_, state), do: {state, []}
+    def view(_state), do: {:text, "Runtime commands"}
+  end
+
   describe "start/2" do
     test "starts application and returns {:ok, pid}" do
       {:ok, pid} = App.start(SimpleCounter, skip_terminal: true)
@@ -50,11 +86,12 @@ defmodule TermUI.AppTest do
     end
 
     test "passes options to Runtime" do
-      {:ok, pid} = App.start(SimpleCounter,
-        skip_terminal: true,
-        backend: :tty,
-        render_interval: 100
-      )
+      {:ok, pid} =
+        App.start(SimpleCounter,
+          skip_terminal: true,
+          backend: :tty,
+          render_interval: 100
+        )
 
       assert is_pid(pid)
 
@@ -67,10 +104,11 @@ defmodule TermUI.AppTest do
     end
 
     test "accepts name option for registered process" do
-      {:ok, _pid} = App.start(SimpleCounter,
-        skip_terminal: true,
-        name: :test_app
-      )
+      {:ok, _pid} =
+        App.start(SimpleCounter,
+          skip_terminal: true,
+          name: :test_app
+        )
 
       # Verify we can access by name
       state = TermUI.Runtime.get_state(:test_app)
@@ -117,6 +155,7 @@ defmodule TermUI.AppTest do
 
           # Wait for it to stop
           ref = Process.monitor(pid)
+
           receive do
             {:DOWN, ^ref, :process, ^pid, :normal} ->
               {:ok, :exited_normally}
@@ -159,6 +198,7 @@ defmodule TermUI.AppTest do
 
           # Wait for it to stop
           ref = Process.monitor(pid)
+
           receive do
             {:DOWN, ^ref, :process, ^pid, :normal} ->
               {:ok, :exited_normally}
@@ -198,6 +238,7 @@ defmodule TermUI.AppTest do
 
           # Wait for it to stop
           ref = Process.monitor(pid)
+
           receive do
             {:DOWN, ^ref, :process, ^pid, :normal} ->
               {:ok, :exited_normally}
@@ -210,6 +251,53 @@ defmodule TermUI.AppTest do
       assert {:ok, :exited_normally} = Task.await(task, 5000)
     end
   end
+
+  describe "root command execution" do
+    test "runs startup commands returned from init/1" do
+      {:ok, pid} = App.start(InitCommandCounter, skip_terminal: true)
+
+      state = wait_for_root_state(pid, &(&1.ticks == 1))
+      assert state.root_state.ticks == 1
+
+      GenServer.stop(pid)
+    end
+
+    test "executes runtime commands returned from update/2" do
+      {:ok, pid} = App.start(RuntimeCommandCounter, skip_terminal: true)
+
+      TermUI.Runtime.send_message(pid, :root, :start_timer)
+      state = wait_for_root_state(pid, &(&1.ticks == 1))
+      assert state.root_state.ticks == 1
+
+      GenServer.stop(pid)
+    end
+
+    test "routes send_after results to the target component message queue" do
+      {:ok, pid} = App.start(RuntimeCommandCounter, skip_terminal: true)
+
+      TermUI.Runtime.send_message(pid, :root, :start_send_after)
+      state = wait_for_root_state(pid, &(&1.pongs == 1))
+      assert state.root_state.pongs == 1
+
+      GenServer.stop(pid)
+    end
+  end
+
+  defp wait_for_root_state(pid, predicate, attempts \\ 100)
+
+  defp wait_for_root_state(pid, predicate, attempts) when attempts > 0 do
+    :ok = TermUI.Runtime.sync(pid)
+    state = TermUI.Runtime.get_state(pid)
+
+    if predicate.(state.root_state) do
+      state
+    else
+      Process.sleep(10)
+      wait_for_root_state(pid, predicate, attempts - 1)
+    end
+  end
+
+  defp wait_for_root_state(pid, _predicate, 0), do: TermUI.Runtime.get_state(pid)
 
   describe "backend_mode/0" do
     test "returns nil when no app is running" do
@@ -232,10 +320,11 @@ defmodule TermUI.AppTest do
     end
 
     test "returns backend mode after starting app" do
-      {:ok, pid} = App.start(SimpleCounter,
-        skip_terminal: true,
-        backend: :tty
-      )
+      {:ok, pid} =
+        App.start(SimpleCounter,
+          skip_terminal: true,
+          backend: :tty
+        )
 
       # When skip_terminal is true, backend mode is :skip
       assert App.backend_mode() == :skip
@@ -350,10 +439,11 @@ defmodule TermUI.AppTest do
 
   describe "shutdown/0" do
     test "shuts down running Runtime process" do
-      {:ok, _pid} = App.start(SimpleCounter,
-        skip_terminal: true,
-        name: :test_shutdown
-      )
+      {:ok, _pid} =
+        App.start(SimpleCounter,
+          skip_terminal: true,
+          name: :test_shutdown
+        )
 
       assert Process.alive?(Process.whereis(:test_shutdown))
 

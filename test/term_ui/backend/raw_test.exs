@@ -6,7 +6,7 @@ defmodule TermUI.Backend.RawTest do
   Callback implementation tests will be added as each section is implemented.
   """
 
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias TermUI.Backend.Raw
 
@@ -1565,6 +1565,17 @@ defmodule TermUI.Backend.RawTest do
 
   describe "enable_mouse/2 callback" do
     setup do
+      # Override ConPTY detection so mouse tracking tests run on all platforms
+      key = {TermUI.TerminalOutput, :needs_hard_reset}
+      original = :persistent_term.get(key, :unset)
+      :persistent_term.put(key, false)
+
+      on_exit(fn ->
+        if original == :unset,
+          do: :persistent_term.erase(key),
+          else: :persistent_term.put(key, original)
+      end)
+
       {:ok, state} = Raw.init(size: {24, 80}, alternate_screen: false)
       %{state: state}
     end
@@ -1627,6 +1638,21 @@ defmodule TermUI.Backend.RawTest do
     # These tests verify the correct escape sequences are emitted
     # by checking that init with mouse_tracking option produces expected state
 
+    setup do
+      # Override ConPTY detection so mouse tracking tests run on all platforms
+      key = {TermUI.TerminalOutput, :needs_hard_reset}
+      original = :persistent_term.get(key, :unset)
+      :persistent_term.put(key, false)
+
+      on_exit(fn ->
+        if original == :unset,
+          do: :persistent_term.erase(key),
+          else: :persistent_term.put(key, original)
+      end)
+
+      :ok
+    end
+
     test "click mode maps to ANSI normal mode (1000)" do
       {:ok, state} = Raw.init(size: {24, 80}, mouse_tracking: :click, alternate_screen: false)
       assert state.mouse_mode == :click
@@ -1649,6 +1675,17 @@ defmodule TermUI.Backend.RawTest do
 
   describe "disable_mouse/1 callback" do
     setup do
+      # Override ConPTY detection so mouse tracking tests run on all platforms
+      key = {TermUI.TerminalOutput, :needs_hard_reset}
+      original = :persistent_term.get(key, :unset)
+      :persistent_term.put(key, false)
+
+      on_exit(fn ->
+        if original == :unset,
+          do: :persistent_term.erase(key),
+          else: :persistent_term.put(key, original)
+      end)
+
       {:ok, state} = Raw.init(size: {24, 80}, alternate_screen: false)
       %{state: state}
     end
@@ -1703,6 +1740,17 @@ defmodule TermUI.Backend.RawTest do
 
   describe "enable_mouse/2 and disable_mouse/1 integration" do
     setup do
+      # Override ConPTY detection so mouse tracking tests run on all platforms
+      key = {TermUI.TerminalOutput, :needs_hard_reset}
+      original = :persistent_term.get(key, :unset)
+      :persistent_term.put(key, false)
+
+      on_exit(fn ->
+        if original == :unset,
+          do: :persistent_term.erase(key),
+          else: :persistent_term.put(key, original)
+      end)
+
       {:ok, state} = Raw.init(size: {24, 80}, alternate_screen: false)
       %{state: state}
     end
@@ -1733,8 +1781,8 @@ defmodule TermUI.Backend.RawTest do
     # These tests verify that EscapeParser correctly parses SGR mouse sequences
     # which are used by poll_event/2 when mouse tracking is enabled
 
-    alias TermUI.Terminal.EscapeParser
     alias TermUI.Event
+    alias TermUI.Terminal.EscapeParser
 
     test "parses left button press" do
       # ESC [ < 0 ; 10 ; 20 M  (left button press at col 10, row 20)
@@ -1900,6 +1948,17 @@ defmodule TermUI.Backend.RawTest do
     import ExUnit.CaptureIO
 
     setup do
+      # Override ConPTY detection so mouse tracking tests run on all platforms
+      key = {TermUI.TerminalOutput, :needs_hard_reset}
+      original = :persistent_term.get(key, :unset)
+      :persistent_term.put(key, false)
+
+      on_exit(fn ->
+        if original == :unset,
+          do: :persistent_term.erase(key),
+          else: :persistent_term.put(key, original)
+      end)
+
       {:ok, state} = Raw.init(size: {24, 80}, alternate_screen: false)
       %{state: state}
     end
@@ -2023,6 +2082,336 @@ defmodule TermUI.Backend.RawTest do
       # Should contain mouse tracking disable
       assert output =~ "1006l"
       assert output =~ "1000l"
+    end
+  end
+
+  # ===========================================================================
+  # Section: Run Coalescing Tests
+  # ===========================================================================
+
+  describe "draw_cells/2 run coalescing" do
+    import ExUnit.CaptureIO
+
+    setup do
+      key = {TermUI.TerminalOutput, :needs_hard_reset}
+      original = :persistent_term.get(key, :unset)
+      :persistent_term.put(key, false)
+
+      on_exit(fn ->
+        if original == :unset,
+          do: :persistent_term.erase(key),
+          else: :persistent_term.put(key, original)
+      end)
+
+      # Init inside capture_io to discard setup sequences (cursor hide, clear, etc.)
+      ExUnit.CaptureIO.capture_io(fn ->
+        {:ok, s} = Raw.init(size: {24, 80}, alternate_screen: false)
+        send(self(), {:state, s})
+      end)
+
+      state =
+        receive do
+          {:state, s} -> s
+        end
+
+      %{state: state}
+    end
+
+    test "adjacent cells on same row use single cursor position", %{state: state} do
+      # 3 adjacent cells: col 5, 6, 7
+      cells = [
+        {{1, 5}, {"A", :default, :default, []}},
+        {{1, 6}, {"B", :default, :default, []}},
+        {{1, 7}, {"C", :default, :default, []}}
+      ]
+
+      output =
+        capture_io(fn ->
+          {:ok, _state} = Raw.draw_cells(state, cells)
+        end)
+
+      # Should have exactly ONE cursor position sequence for this run
+      cursor_positions = Regex.scan(~r/\e\[\d+;\d+H/, output)
+      assert length(cursor_positions) == 1
+      assert output =~ "\e[1;5H"
+
+      # Characters should appear in sequence without cursor moves between them
+      assert output =~ "ABC"
+    end
+
+    test "non-adjacent cells on same row get separate cursor positions", %{state: state} do
+      # Gap between col 3 and col 10
+      cells = [
+        {{1, 3}, {"X", :default, :default, []}},
+        {{1, 10}, {"Y", :default, :default, []}}
+      ]
+
+      output =
+        capture_io(fn ->
+          {:ok, _state} = Raw.draw_cells(state, cells)
+        end)
+
+      # Should have TWO cursor position sequences (one per run)
+      cursor_positions = Regex.scan(~r/\e\[\d+;\d+H/, output)
+      assert length(cursor_positions) == 2
+      assert output =~ "\e[1;3H"
+      assert output =~ "\e[1;10H"
+    end
+
+    test "style change within a run emits inline SGR without cursor reposition", %{state: state} do
+      # Adjacent cells at col 5,6,7 (not at cursor start) with different styles
+      cells = [
+        {{1, 5}, {"R", :red, :default, []}},
+        {{1, 6}, {"G", :green, :default, []}},
+        {{1, 7}, {"B", :blue, :default, []}}
+      ]
+
+      output =
+        capture_io(fn ->
+          {:ok, _state} = Raw.draw_cells(state, cells)
+        end)
+
+      # Should have exactly ONE cursor position (start of run)
+      cursor_positions = Regex.scan(~r/\e\[\d+;\d+H/, output)
+      assert length(cursor_positions) == 1
+
+      # All three characters should be present
+      assert output =~ "R"
+      assert output =~ "G"
+      assert output =~ "B"
+    end
+
+    test "multiple runs on same row coalesce independently", %{state: state} do
+      # Two runs: cols 5-7 and cols 15-17 (neither at cursor start {1,1})
+      cells = [
+        {{1, 5}, {"A", :default, :default, []}},
+        {{1, 6}, {"B", :default, :default, []}},
+        {{1, 7}, {"C", :default, :default, []}},
+        {{1, 15}, {"X", :default, :default, []}},
+        {{1, 16}, {"Y", :default, :default, []}},
+        {{1, 17}, {"Z", :default, :default, []}}
+      ]
+
+      output =
+        capture_io(fn ->
+          {:ok, _state} = Raw.draw_cells(state, cells)
+        end)
+
+      # Exactly 2 cursor positions (one per run)
+      cursor_positions = Regex.scan(~r/\e\[\d+;\d+H/, output)
+      assert length(cursor_positions) == 2
+
+      # Characters should be streamed contiguously within each run
+      assert output =~ "ABC"
+      assert output =~ "XYZ"
+    end
+
+    test "cells across rows each get cursor position for their run", %{state: state} do
+      cells = [
+        {{2, 1}, {"A", :default, :default, []}},
+        {{2, 2}, {"B", :default, :default, []}},
+        {{3, 1}, {"C", :default, :default, []}},
+        {{3, 2}, {"D", :default, :default, []}}
+      ]
+
+      output =
+        capture_io(fn ->
+          {:ok, _state} = Raw.draw_cells(state, cells)
+        end)
+
+      # 2 cursor positions: one for row 2 run, one for row 3 run
+      cursor_positions = Regex.scan(~r/\e\[\d+;\d+H/, output)
+      assert length(cursor_positions) == 2
+      assert output =~ "\e[2;1H"
+      assert output =~ "\e[3;1H"
+      assert output =~ "AB"
+      assert output =~ "CD"
+    end
+
+    test "single cell still works correctly", %{state: state} do
+      cells = [{{5, 10}, {"Z", :red, :default, [:bold]}}]
+
+      output =
+        capture_io(fn ->
+          {:ok, result} = Raw.draw_cells(state, cells)
+          assert result.cursor_position == {5, 11}
+          assert result.current_style.fg == :red
+        end)
+
+      assert output =~ "\e[5;10H"
+      assert output =~ "Z"
+    end
+
+    test "full row of same style produces minimal output", %{state: state} do
+      # 40 adjacent cells on row 2 (not at cursor start), same style
+      cells =
+        for col <- 1..40 do
+          {{2, col}, {"X", :green, :default, []}}
+        end
+
+      output =
+        capture_io(fn ->
+          {:ok, _state} = Raw.draw_cells(state, cells)
+        end)
+
+      # Exactly 1 cursor position for the entire run
+      cursor_positions = Regex.scan(~r/\e\[\d+;\d+H/, output)
+      assert length(cursor_positions) == 1
+
+      # All 40 X characters should be contiguous
+      assert output =~ String.duplicate("X", 40)
+    end
+
+    test "run coalescing reduces byte count vs per-cell positioning", %{state: state} do
+      # 20 adjacent cells on row 5 (not at cursor start), same style - measure output size
+      cells =
+        for col <- 1..20 do
+          {{5, col}, {"A", :default, :default, []}}
+        end
+
+      output =
+        capture_io(fn ->
+          {:ok, _state} = Raw.draw_cells(state, cells)
+        end)
+
+      output_bytes = byte_size(output)
+
+      # Per-cell positioning would need ~10 bytes per cursor move * 20 cells = 200+ bytes
+      # Coalesced: 1 cursor position (~6 bytes) + 20 chars = ~26 bytes + style overhead
+      # Should be well under 100 bytes for 20 same-style chars
+      assert output_bytes < 100,
+             "Expected < 100 bytes for 20 coalesced cells, got #{output_bytes}"
+    end
+
+    test "style continuity across runs avoids redundant SGR", %{state: state} do
+      # Two separate runs with same style on row 3 (not at cursor start)
+      cells = [
+        {{3, 1}, {"A", :red, :default, [:bold]}},
+        {{3, 2}, {"B", :red, :default, [:bold]}},
+        # gap
+        {{3, 10}, {"C", :red, :default, [:bold]}},
+        {{3, 11}, {"D", :red, :default, [:bold]}}
+      ]
+
+      output =
+        capture_io(fn ->
+          {:ok, _state} = Raw.draw_cells(state, cells)
+        end)
+
+      # Style is set once at the beginning; second run should NOT re-emit the same style
+      # Count red foreground sequences (SGR 31)
+      red_seqs = Regex.scan(~r/\e\[31m/, output)
+      assert length(red_seqs) == 1, "Expected 1 red fg sequence, got #{length(red_seqs)}"
+    end
+
+    test "no per-row style reset when style continues", %{state: state} do
+      # Same style across two rows - should not emit reset between them
+      cells = [
+        {{3, 1}, {"A", :red, :default, []}},
+        {{4, 1}, {"B", :red, :default, []}}
+      ]
+
+      output =
+        capture_io(fn ->
+          {:ok, _state} = Raw.draw_cells(state, cells)
+        end)
+
+      # Should NOT contain any ESC[0m reset sequences
+      reset_count = length(Regex.scan(~r/\e\[0m/, output))
+
+      assert reset_count == 0,
+             "Expected 0 resets for same-style cross-row cells, got #{reset_count}"
+    end
+
+    test "reset emitted only when attributes are removed", %{state: state} do
+      cells = [
+        {{3, 1}, {"A", :default, :default, [:bold, :italic]}},
+        {{3, 2}, {"B", :default, :default, [:bold]}}
+      ]
+
+      output =
+        capture_io(fn ->
+          {:ok, _state} = Raw.draw_cells(state, cells)
+        end)
+
+      # Should emit exactly one reset (when italic is removed)
+      reset_count = length(Regex.scan(~r/\e\[0m/, output))
+      assert reset_count == 1
+    end
+
+    test "unsorted cells are sorted before coalescing", %{state: state} do
+      # Pass cells in reverse order on row 3 (not at cursor start)
+      cells = [
+        {{3, 3}, {"C", :default, :default, []}},
+        {{3, 1}, {"A", :default, :default, []}},
+        {{3, 2}, {"B", :default, :default, []}}
+      ]
+
+      output =
+        capture_io(fn ->
+          {:ok, _state} = Raw.draw_cells(state, cells)
+        end)
+
+      # Should coalesce into single run after sorting
+      cursor_positions = Regex.scan(~r/\e\[\d+;\d+H/, output)
+      assert length(cursor_positions) == 1
+      assert output =~ "ABC"
+    end
+
+    test "mixed rows with runs produce correct output structure", %{state: state} do
+      cells = [
+        # Row 2: two runs (not at cursor start {1,1})
+        {{2, 1}, {"A", :red, :default, []}},
+        {{2, 2}, {"B", :red, :default, []}},
+        {{2, 10}, {"C", :blue, :default, []}},
+        # Row 4: one run (skip row 3)
+        {{4, 5}, {"D", :green, :default, []}},
+        {{4, 6}, {"E", :green, :default, []}},
+        {{4, 7}, {"F", :green, :default, []}}
+      ]
+
+      output =
+        capture_io(fn ->
+          {:ok, result} = Raw.draw_cells(state, cells)
+          # Final cursor at end of last cell
+          assert result.cursor_position == {4, 8}
+        end)
+
+      # 3 runs = 3 cursor positions
+      cursor_positions = Regex.scan(~r/\e\[\d+;\d+H/, output)
+      assert length(cursor_positions) == 3
+
+      # Verify character groupings
+      assert output =~ "AB"
+      assert output =~ "DEF"
+    end
+
+    test "full screen render is efficient", %{state: state} do
+      # 24 rows x 80 cols, all same style
+      cells =
+        for row <- 1..24, col <- 1..80 do
+          {{row, col}, {"X", :default, :default, []}}
+        end
+
+      output =
+        capture_io(fn ->
+          {:ok, result} = Raw.draw_cells(state, cells)
+          assert result.cursor_position == {24, 81}
+        end)
+
+      # Row 1 starts at cursor {1,1} so no move needed: 23 explicit positions
+      cursor_positions = Regex.scan(~r/\e\[\d+;\d+H/, output)
+      assert length(cursor_positions) == 23
+
+      # Output should contain 24 runs of 80 X's
+      x_runs = Regex.scan(~r/X{80}/, output)
+      assert length(x_runs) == 24
+
+      # Total output should be much less than per-cell approach
+      # Per-cell: ~10 bytes cursor * 1920 + 1920 chars = ~21,000 bytes
+      # Coalesced: ~8 bytes cursor * 23 + 1920 chars + style = ~2,200 bytes
+      assert byte_size(output) < 5000,
+             "Full screen output #{byte_size(output)} bytes, expected < 5000"
     end
   end
 

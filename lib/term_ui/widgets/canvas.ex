@@ -36,6 +36,21 @@ defmodule TermUI.Widgets.Canvas do
 
   alias TermUI.CharacterSet
 
+  # Dialyzer: Functions return specific map types
+  # Dialyzer: draw_* functions call CharacterSet.current_charset() which returns specific struct
+  # Need to cover both arities due to default arguments
+  @dialyzer {:nowarn_function,
+             new: 1,
+             clear: 1,
+             clear_braille: 1,
+             draw: 3,
+             draw_hline: 4,
+             draw_hline: 5,
+             draw_vline: 4,
+             draw_vline: 5,
+             draw_line: 5,
+             draw_line: 6}
+
   # Braille patterns
   @braille_base 0x2800
 

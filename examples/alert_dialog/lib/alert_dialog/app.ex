@@ -93,28 +93,36 @@ defmodule AlertDialog.App do
   end
 
   def update(:quit, state) do
-    {state, [:quit]}
+    {state, [TermUI.Command.quit()]}
   end
 
   # Helper to create and initialize an alert dialog
   defp show_alert(state, type, title, message) do
     props = AlertDialog.new(type: type, title: title, message: message)
     {:ok, alert} = AlertDialog.init(props)
+
+    # Set terminal area for accurate mouse click detection
+    # (In a full implementation, this would be obtained from the runtime)
+    alert = AlertDialog.update_area(alert, %{width: 80, height: 24})
+
     %{state | alert: alert}
   end
 
   @doc """
   Render the current state to a render tree.
+
+  When an alert is visible, return the alert overlay directly (not stacked).
+  This allows the overlay to be positioned absolutely over the main content.
   """
   def view(state) do
     main_content = render_main_content(state)
 
     if state.alert != nil do
-      stack(:vertical, [
-        main_content,
-        text("", nil),
-        AlertDialog.render(state.alert, %{width: 80, height: 24})
-      ])
+      # Standard terminal size for this example
+      area = %{width: 80, height: 24}
+
+      # Render the overlay directly - it will be positioned absolutely
+      {:overlay, main_content, AlertDialog.render(state.alert, area)}
     else
       main_content
     end

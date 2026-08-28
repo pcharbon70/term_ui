@@ -39,6 +39,7 @@ defmodule TermUI.TermUtils do
           :timeout
           | :command_not_found
           | :invalid_arguments
+          | :not_tty
           | :execution_failed
           | :output_validation_failed
           | term()
@@ -54,6 +55,10 @@ defmodule TermUI.TermUtils do
 
   # Known-safe command locations (will be resolved at runtime)
   @allowed_commands ~w(stty test infocmp)
+
+  # Dialyzer: Functions return specific types
+  @dialyzer {:nowarn_function,
+             default_validate: 1, validate_stty_settings: 1, validate_stty_size: 1}
 
   # ===========================================================================
   # Public API
@@ -75,6 +80,7 @@ defmodule TermUI.TermUtils do
   - `{:error, :timeout}` - Command exceeded timeout
   - `{:error, :command_not_found}` - stty not found in PATH
   - `{:error, :invalid_arguments}` - Arguments failed validation
+  - `{:error, :not_tty}` - No controlling terminal is available
   - `{:error, reason}` - Other execution error
 
   ## Example
@@ -86,7 +92,7 @@ defmodule TermUI.TermUtils do
   def safe_stty(args, opts \\ []) do
     case validate_stty_args(args) do
       :ok ->
-        safe_command("stty", args, opts)
+        safe_stty_command(args, opts)
 
       {:error, _} = error ->
         error
@@ -205,6 +211,83 @@ defmodule TermUI.TermUtils do
     await_result(task, timeout, command)
   end
 
+  @spec safe_stty_command([binary()], options()) :: result()
+  defp safe_stty_command(args, opts) do
+    timeout = Keyword.get(opts, :timeout, @default_timeout)
+    validate_fn = Keyword.get(opts, :validate, &default_validate/1)
+
+    task =
+      Task.async(fn ->
+        try do
+          case run_stty(args) do
+            {output, 0} ->
+              case validate_fn.(output) do
+                :ok -> {:ok, String.trim(output)}
+                {:error, _} -> {:error, :output_validation_failed}
+              end
+
+            {error_output, _code} ->
+              if not_tty_error?(error_output) do
+                {:error, :not_tty}
+              else
+                Logger.warning(
+                  "TermUtils: Command 'stty #{Enum.join(args, " ")}' failed: #{error_output}"
+                )
+
+                {:error, :execution_failed}
+              end
+          end
+        rescue
+          _ ->
+            {:error, :execution_failed}
+        end
+      end)
+
+    await_result(task, timeout, "stty")
+  end
+
+  @spec run_stty([binary()]) :: {binary(), integer()}
+  defp run_stty(args) do
+    # Programs launched through an Erlang port do not necessarily inherit the
+    # BEAM process's controlling terminal as their standard input. On Linux,
+    # open the VM's stdin descriptor explicitly before trying /dev/tty and the
+    # command's own stdin. This keeps `stty` attached to the terminal that
+    # TermUI actually reads from.
+    beam_stdin = "/proc/#{System.pid()}/fd/0"
+
+    attempts =
+      if File.exists?(beam_stdin) do
+        [
+          ["-F", beam_stdin | args],
+          ["-f", beam_stdin | args],
+          ["-F", "/dev/tty" | args],
+          ["-f", "/dev/tty" | args],
+          args
+        ]
+      else
+        [
+          ["-F", "/dev/tty" | args],
+          ["-f", "/dev/tty" | args],
+          args
+        ]
+      end
+
+    Enum.reduce_while(attempts, {"", 1}, fn argv, _acc ->
+      result = System.cmd("stty", argv, stderr_to_stdout: true, parallelism: true)
+      if match?({_, 0}, result), do: {:halt, result}, else: {:cont, result}
+    end)
+  end
+
+  @spec not_tty_error?(binary()) :: boolean()
+  defp not_tty_error?(output) do
+    message = String.downcase(output)
+
+    String.contains?(message, "inappropriate ioctl for device") or
+      String.contains?(message, "not a tty") or
+      String.contains?(message, "not a terminal") or
+      String.contains?(message, "isn't a terminal")
+  end
+
   # Separate function to have access to timeout variable in catch block
   defp await_result(task, timeout, command) do
     case Task.await(task, timeout) do
@@ -234,6 +317,7 @@ defmodule TermUI.TermUtils do
     # Safe stty flags (non-injectable)
     safe_flags = [
       "-g",
+      "size",
       "raw",
       "-raw",
       "-echo",
@@ -249,19 +333,33 @@ defmodule TermUI.TermUtils do
       "-cbreak"
     ]
 
-    # Check all arguments are safe
-    Enum.all?(args, fn arg ->
-      # Either it's a known safe flag
-      arg in safe_flags or
-        # Or it's a numeric argument (for min/time)
-        match?(<<_::utf8>>, arg) and String.length(arg) < 32
-    end)
-    |> if do
+    ordinary_args? =
+      Enum.all?(args, fn arg ->
+        arg in safe_flags or Regex.match?(~r/^\d{1,3}$/, arg)
+      end)
+
+    # A saved `stty -g` value is passed back as one opaque argv entry. It has
+    # already been validated before storage, but it must also pass this public
+    # boundary when the terminal is restored.
+    saved_settings? =
+      case args do
+        [settings] -> valid_saved_stty_settings?(settings)
+        _ -> false
+      end
+
+    if ordinary_args? or saved_settings? do
       :ok
     else
       Logger.error("TermUtils: Invalid stty arguments: #{inspect(args)}")
       {:error, :invalid_arguments}
     end
+  end
+
+  defp valid_saved_stty_settings?(settings) do
+    safe_chars? = Regex.match?(~r/^[a-zA-Z0-9:;=\-\.]+$/, settings)
+    encoded_format? = String.contains?(settings, ":") or String.contains?(settings, "=")
+
+    safe_chars? and encoded_format? and String.length(settings) < 256
   end
 
   # Validates test command arguments.
@@ -316,7 +414,7 @@ defmodule TermUI.TermUtils do
     term_name_regex = ~r/^[a-zA-Z0-9_-]+$/
 
     Enum.all?(args, fn arg ->
-      arg in safe_flags or Regex.match?(term_name_regex, arg) and String.length(arg) < 64
+      arg in safe_flags or (Regex.match?(term_name_regex, arg) and String.length(arg) < 64)
     end)
     |> if do
       :ok

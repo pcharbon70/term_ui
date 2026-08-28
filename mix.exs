@@ -1,7 +1,7 @@
 defmodule TermUI.MixProject do
   use Mix.Project
 
-  @version "1.0.0-rc"
+  @version "1.0.0"
   @source_url "https://github.com/pcharbon70/term_ui"
 
   def project do
@@ -22,7 +22,19 @@ defmodule TermUI.MixProject do
       docs: docs(),
 
       # Test coverage
-      test_coverage: [tool: ExCoveralls]
+      test_coverage: [tool: ExCoveralls],
+
+      # Dialyzer
+      # Note: call_without_opaque warnings suppressed with :no_opaque in widget modules
+      # due to MapSet nested in opaque Style type
+      dialyzer: [
+        flags: [
+          :error_handling,
+          :underspecs,
+          :unmatched_returns
+        ],
+        plt_add_apps: [:mix, :ex_unit]
+      ]
     ]
   end
 
@@ -52,8 +64,11 @@ defmodule TermUI.MixProject do
 
       # Code quality
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
+      {:mix_audit, "~> 2.1", only: :dev, runtime: false},
 
       # Testing
+      {:castore, "~> 1.0", only: :test},
       {:excoveralls, "~> 0.18", only: :test},
       {:stream_data, "~> 1.0", only: :test},
 
@@ -61,14 +76,11 @@ defmodule TermUI.MixProject do
       {:gen_stage, "~> 1.2"},
 
       # Markdown processing
-      {:mdex, "~> 0.10"},
+      {:mdex, "~> 0.13.2"},
 
       # Syntax highlighting for code blocks
       {:makeup, "~> 1.1"},
-      {:makeup_elixir, "~> 1.0"},
-
-      # LLM usage rules
-      {:usage_rules, "~> 0.1", only: :dev, runtime: false}
+      {:makeup_elixir, "~> 1.0"}
     ]
   end
 
@@ -83,6 +95,7 @@ defmodule TermUI.MixProject do
         lib
         mix/tasks
         guides
+        docs/widget-compatibility.md
         mix.exs
         README.md
         LICENSE
@@ -100,6 +113,9 @@ defmodule TermUI.MixProject do
       extras: [
         "README.md",
         "CHANGELOG.md",
+        "guides/api_reference.md": [title: "TermUI 1.0 API Map"],
+        "guides/component_system.md": [title: "Component Systems"],
+        "docs/widget-compatibility.md": [title: "Widget Compatibility"],
         "guides/user/README.md": [filename: "user-guides", title: "User Guides"],
         "guides/user/01-overview.md": [title: "Overview"],
         "guides/user/02-getting-started.md": [title: "Getting Started"],
@@ -123,26 +139,56 @@ defmodule TermUI.MixProject do
         "guides/developer/09-testing-framework.md": [title: "Testing Framework"]
       ],
       groups_for_extras: [
+        "Reference Guides":
+          ~r/(guides\/(api_reference|component_system)|docs\/widget-compatibility)\.md/,
         "User Guides": ~r/guides\/user\/.*/,
         "Developer Guides": ~r/guides\/developer\/.*/
       ],
       groups_for_modules: [
         Core: [
           TermUI,
+          TermUI.App,
+          TermUI.Config,
           TermUI.Elm,
           TermUI.Runtime,
-          TermUI.Component,
-          TermUI.Event
+          TermUI.Command,
+          TermUI.Event,
+          TermUI.Message
         ],
+        "Component APIs": [
+          TermUI.Component,
+          TermUI.StatefulComponent,
+          TermUI.Container
+        ],
+        "Standalone component services": [
+          TermUI.ComponentServer,
+          TermUI.ComponentSupervisor,
+          TermUI.ComponentRegistry,
+          TermUI.Component.StatePersistence,
+          TermUI.Component.Introspection,
+          TermUI.EventRouter,
+          TermUI.Event.Propagation,
+          TermUI.Event.Transformation,
+          TermUI.FocusManager,
+          TermUI.Focus.Tracker,
+          TermUI.Focus.Indicator,
+          TermUI.Focus.Traversal,
+          TermUI.SpatialIndex
+        ],
+        "Standalone compatibility APIs": ~r/TermUI\.(?:(?:Style|Parser)(?:\..*)?|Widget\..*)/,
         Widgets: ~r/TermUI\.Widgets\..*/,
         Rendering: [
           TermUI.Renderer.Style,
           TermUI.Renderer.Cell,
           TermUI.Renderer.Buffer,
+          TermUI.Renderer.BufferManager,
+          TermUI.Runtime.NodeRenderer,
           TermUI.Component.RenderNode
         ],
         Layout: ~r/TermUI\.Layout\..*/,
-        Terminal: ~r/TermUI\.Terminal\..*/
+        Backends: ~r/TermUI\.Backend(\..*)?/,
+        Terminal: ~r/TermUI\.(Terminal|Input)(\..*)?/,
+        Testing: ~r/TermUI\.Test\..*/
       ],
       before_closing_body_tag: %{
         html: """

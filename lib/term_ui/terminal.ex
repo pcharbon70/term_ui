@@ -10,15 +10,29 @@ defmodule TermUI.Terminal do
   use GenServer
   require Logger
 
-  alias TermUI.Terminal.State
-  alias TermUI.Terminal.SizeDetector
   alias TermUI.ANSI
+  alias TermUI.Platform
+  alias TermUI.Terminal.SignalHandler
+  alias TermUI.Terminal.SizeDetector
+  alias TermUI.Terminal.State
+  alias TermUI.TerminalOutput
   alias TermUI.TermUtils
 
-  @ets_table :term_ui_terminal_state
+  # Dialyzer: unmatched_return, pattern_match_cov, guard_fail warnings
+  @dialyzer {:nowarn_function,
+             init: 1,
+             handle_call: 3,
+             handle_cast: 2,
+             handle_info: 2,
+             terminate: 2,
+             do_restore: 1,
+             io_has_terminal?: 0,
+             check_tty: 0,
+             apply_stty_raw_settings: 0,
+             terminal?: 0,
+             do_enable_raw_mode: 0}
 
-  # Full terminal reset sequence (not in ANSI module as it's rarely needed)
-  @reset_terminal "\ec"
+  @ets_table :term_ui_terminal_state
 
   # Comprehensive mouse disable - disables ALL mouse modes defensively
   # This is kept as a constant for performance in cleanup paths
@@ -194,8 +208,21 @@ defmodule TermUI.Terminal do
     Process.flag(:trap_exit, true)
     check_previous_crash()
     create_ets_table()
+    register_signal_handler()
 
-    state = State.new()
+    {raw_mode_active, original_settings} = detect_prestarted_raw_mode()
+
+    state =
+      if raw_mode_active do
+        %{
+          State.new()
+          | raw_mode_active: true,
+            original_settings: original_settings
+        }
+      else
+        State.new()
+      end
+
     {:ok, state}
   end
 
@@ -309,26 +336,32 @@ defmodule TermUI.Terminal do
 
   @impl true
   def handle_call({:enable_mouse_tracking, mode}, _from, state) do
-    # First disable any existing tracking
-    if state.mouse_tracking != :off do
-      disable_current_mouse_mode(state.mouse_tracking)
-    end
-
-    # Enable new tracking mode with SGR
-    # Map user-friendly mode names to ANSI protocol modes:
-    # :click -> :normal (1000), :drag -> :button (1002), :all -> :all (1003)
-    ansi_mode =
-      case mode do
-        :click -> :normal
-        :drag -> :button
-        :all -> :all
+    # Skip mouse tracking on WSL/ConPTY -- mouse-off sequences are silently
+    # ignored by ConPTY, so enabling mouse tracking leads to escape code leaks
+    if TerminalOutput.needs_hard_reset?() do
+      {:reply, :ok, state}
+    else
+      # First disable any existing tracking
+      if state.mouse_tracking != :off do
+        disable_current_mouse_mode(state.mouse_tracking)
       end
 
-    write_to_terminal(ANSI.enable_mouse_tracking(ansi_mode))
-    write_to_terminal(ANSI.enable_sgr_mouse())
+      # Enable new tracking mode with SGR
+      # Map user-friendly mode names to ANSI protocol modes:
+      # :click -> :normal (1000), :drag -> :button (1002), :all -> :all (1003)
+      ansi_mode =
+        case mode do
+          :click -> :normal
+          :drag -> :button
+          :all -> :all
+        end
 
-    new_state = %{state | mouse_tracking: mode}
-    {:reply, :ok, new_state}
+      write_to_terminal(ANSI.enable_mouse_tracking(ansi_mode))
+      write_to_terminal(ANSI.enable_sgr_mouse())
+
+      new_state = %{state | mouse_tracking: mode}
+      {:reply, :ok, new_state}
+    end
   end
 
   @impl true
@@ -392,42 +425,87 @@ defmodule TermUI.Terminal do
 
   # Private functions
 
+  defp register_signal_handler do
+    case :os.type() do
+      {:unix, _} ->
+        handler = {SignalHandler, self()}
+
+        case :gen_event.add_sup_handler(:erl_signal_server, handler, self()) do
+          :ok ->
+            :ok
+
+          {:error, reason} ->
+            Logger.warning("Unable to register terminal signal handler: #{inspect(reason)}")
+        end
+
+      _ ->
+        :ok
+    end
+  rescue
+    error ->
+      Logger.warning("Unable to register terminal signal handler: #{Exception.message(error)}")
+  catch
+    kind, reason ->
+      Logger.warning("Unable to register terminal signal handler: #{inspect({kind, reason})}")
+  end
+
+  # Backend.Selector may activate native raw mode before this process starts.
+  # Pre-OTP 28 versions expose :shell.start_interactive/1 but do not implement
+  # the native raw/cooked contract, so they must remain on the TTY path.
+  defp detect_prestarted_raw_mode do
+    if Platform.native_raw_mode_supported?() do
+      original_settings = save_terminal_settings()
+
+      try do
+        case :shell.start_interactive({:noshell, :raw}) do
+          :ok ->
+            do_disable_raw_mode(original_settings)
+            :ets.insert(@ets_table, {:raw_mode_active, false})
+            {false, nil}
+
+          {:error, :already_started} ->
+            # Selector may have activated OTP's raw shell before the Terminal
+            # server started. Apply the OS-level flags as well: the native call
+            # alone does not make `IO.getn/2` character-at-a-time in every
+            # non-shell launch (for example `mix run` under a PTY).
+            _ = apply_stty_raw_settings()
+            :ets.insert(@ets_table, {:raw_mode_active, true})
+            {true, original_settings}
+        end
+      rescue
+        _ -> {false, nil}
+      end
+    else
+      :ets.insert(@ets_table, {:raw_mode_active, false})
+      {false, nil}
+    end
+  end
+
   defp do_enable_raw_mode do
     if terminal?() do
       # Save original terminal settings first
       original_settings = save_terminal_settings()
 
       try do
-        # OTP 28 raw mode activation
-        # This sets character-at-a-time mode with no echo
-        case :shell.start_interactive({:noshell, :raw}) do
-          :ok ->
-            # Apply additional stty settings to ensure full raw mode
-            # This guarantees echo is disabled and input is unbuffered
-            apply_stty_raw_settings()
-            {:ok, original_settings}
-
-          {:error, reason} ->
-            # Try stty fallback
-            case apply_stty_raw_settings() do
-              :ok ->
-                {:ok, original_settings}
-
-              {:error, _stty_reason} ->
-                {:error, reason}
-            end
-        end
-      rescue
-        _e in UndefinedFunctionError ->
-          # Not OTP 28+, use stty fallback
-          case apply_stty_raw_settings() do
+        if Platform.native_raw_mode_supported?() do
+          # OTP 28 raw mode activation sets character-at-a-time mode with no echo.
+          case :shell.start_interactive({:noshell, :raw}) do
             :ok ->
+              apply_stty_raw_settings()
               {:ok, original_settings}
 
             {:error, reason} ->
-              {:error,
-               {:otp_version, "OTP 28+ required and stty fallback failed: #{inspect(reason)}"}}
+              case apply_stty_raw_settings() do
+                :ok -> {:ok, original_settings}
+                {:error, _stty_reason} -> {:error, reason}
+              end
           end
+        else
+          enable_raw_mode_with_stty(original_settings)
+        end
+      rescue
+        _e in UndefinedFunctionError ->
+          enable_raw_mode_with_stty(original_settings)
 
         e ->
           {:error, {:raw_mode_failed, Exception.message(e)}}
@@ -437,6 +515,16 @@ defmodule TermUI.Terminal do
       end
     else
       {:error, :not_a_terminal}
+    end
+  end
+
+  defp enable_raw_mode_with_stty(original_settings) do
+    case apply_stty_raw_settings() do
+      :ok ->
+        {:ok, original_settings}
+
+      {:error, reason} ->
+        {:error, {:otp_version, "OTP 28+ required and stty fallback failed: #{inspect(reason)}"}}
     end
   end
 
@@ -464,7 +552,7 @@ defmodule TermUI.Terminal do
     # time 0: timeout in tenths of a second (0 = no timeout)
     # -isig: disable signal generation (Ctrl+C etc handled by app)
     # -ixon: disable XON/XOFF flow control
-    case TermUtils.safe_stty(["raw", "-echo", "-isig", "-ixon", "1", "0"]) do
+    case TermUtils.safe_stty(["raw", "-echo", "-isig", "-ixon", "min", "1", "time", "0"]) do
       {:ok, _output} ->
         :ok
 
@@ -474,6 +562,8 @@ defmodule TermUI.Terminal do
   end
 
   defp do_disable_raw_mode(original_settings) do
+    _ = ensure_cooked_mode()
+
     # First try to restore original settings if we have them
     if is_binary(original_settings) and original_settings != "" do
       restore_terminal_settings(original_settings)
@@ -482,8 +572,6 @@ defmodule TermUI.Terminal do
       restore_stty_sane()
     end
 
-    # Always write reset sequence as final cleanup
-    write_to_terminal(@reset_terminal)
     :ok
   rescue
     _ -> :ok
@@ -496,7 +584,7 @@ defmodule TermUI.Terminal do
     # We pass it as a single argument which stty accepts for restoration
     case TermUtils.safe_stty([settings]) do
       {:ok, _} -> :ok
-      {:error, _} -> :ok
+      {:error, _} -> restore_stty_sane()
     end
   end
 
@@ -514,24 +602,33 @@ defmodule TermUI.Terminal do
   end
 
   defp do_restore(state) do
-    # Always disable ALL mouse tracking modes defensively
-    # This ensures cleanup even if state is inconsistent
+    # Phase 1: Direct-to-TTY write (most reliable, bypasses Erlang IO)
+    TerminalOutput.write_to_tty(TerminalOutput.cleanup_sequence())
+
+    # Phase 2: Erlang IO backup (in case /dev/tty write failed)
     write_to_terminal(@all_mouse_off)
 
     if not state.cursor_visible do
       write_to_terminal(ANSI.cursor_show())
     end
 
+    # Reset terminal attributes before leaving alt screen
+    write_to_terminal(ANSI.reset())
+
     if state.alternate_screen_active do
       write_to_terminal(ANSI.leave_alternate_screen())
     end
 
+    # Phase 3: Cooked mode (before stty so stty gets final say)
+    ensure_cooked_mode()
+
+    # Phase 4: Restore original stty settings
     if state.raw_mode_active do
       do_disable_raw_mode(state.original_settings)
     end
 
-    # Reset terminal attributes (colors, styles)
-    write_to_terminal(ANSI.reset())
+    # Phase 5: Cleanup ONLCR persistent_term
+    TerminalOutput.disable_onlcr()
 
     if :ets.whereis(@ets_table) != :undefined do
       :ets.insert(@ets_table, {:raw_mode_active, false})
@@ -556,9 +653,19 @@ defmodule TermUI.Terminal do
   end
 
   defp write_to_terminal(data) do
-    IO.write(data)
+    TerminalOutput.write(data)
   rescue
     _ -> :ok
+  end
+
+  defp ensure_cooked_mode do
+    if Platform.native_raw_mode_supported?() do
+      :shell.start_interactive({:noshell, :cooked})
+    end
+  rescue
+    _ -> :ok
+  catch
+    _, _ -> :ok
   end
 
   defp terminal? do
@@ -601,11 +708,7 @@ defmodule TermUI.Terminal do
       case :ets.lookup(@ets_table, :raw_mode_active) do
         [{:raw_mode_active, true}] ->
           Logger.warning("Detected unclean termination from previous run, resetting terminal")
-          # Disable all mouse tracking modes first
-          write_to_terminal(@all_mouse_off)
-          write_to_terminal(ANSI.cursor_show())
-          write_to_terminal(ANSI.leave_alternate_screen())
-          write_to_terminal(@reset_terminal)
+          TerminalOutput.write_to_tty(TerminalOutput.cleanup_sequence())
 
         _ ->
           :ok

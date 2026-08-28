@@ -62,6 +62,9 @@ defmodule TermUI.Widgets.ContextMenu.Factory do
 
   @type mode :: :auto | :positioned | :inline
 
+  # Dialyzer: Functions return specific types
+  @dialyzer {:nowarn_function, create: 1, create!: 1, determine_mode: 1, build_props: 3}
+
   @type option ::
           {:items, [map()]}
           | {:position, {non_neg_integer(), non_neg_integer()}}
@@ -104,11 +107,29 @@ defmodule TermUI.Widgets.ContextMenu.Factory do
   """
   @spec create(keyword()) :: {:ok, {module(), map()}} | {:error, atom()}
   def create(opts) do
-    with {:ok, items} <- fetch_items(opts),
-         {:ok, mode} <- determine_mode(opts),
-         {:ok, {module, props}} <- build_props(mode, items, opts) do
-      {:ok, {module, props}}
+    opts
+    |> fetch_and_validate_items()
+    |> fetch_and_validate_mode(opts)
+    |> build_menu_props(opts)
+  end
+
+  defp fetch_and_validate_items(opts) do
+    fetch_items(opts)
+  end
+
+  defp fetch_and_validate_mode({:error, _} = error, _opts), do: error
+
+  defp fetch_and_validate_mode({:ok, items}, opts) do
+    case determine_mode(opts) do
+      {:ok, mode} -> {:ok, items, mode}
+      {:error, _} = error -> error
     end
+  end
+
+  defp build_menu_props({:error, _} = error, _opts), do: error
+
+  defp build_menu_props({:ok, items, mode}, opts) do
+    build_props(mode, items, opts)
   end
 
   @doc """
@@ -174,13 +195,15 @@ defmodule TermUI.Widgets.ContextMenu.Factory do
         {:ok, :positioned}
 
       {:auto, nil} ->
-        if mouse_supported?() do
-          # Mouse is supported but no position provided
-          # This is ambiguous - caller should either provide position or force inline
-          {:error, :position_required}
-        else
-          {:ok, :inline}
-        end
+        resolve_auto_mode()
+    end
+  end
+
+  defp resolve_auto_mode do
+    if mouse_supported?() do
+      {:error, :position_required}
+    else
+      {:ok, :inline}
     end
   end
 

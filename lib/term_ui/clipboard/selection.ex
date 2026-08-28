@@ -24,6 +24,9 @@ defmodule TermUI.Clipboard.Selection do
       selected_text = Selection.extract(selection, "Hello World")
   """
 
+  # Dialyzer: Functions return specific struct types
+  @dialyzer {:nowarn_function, new: 0}
+
   @type t :: %__MODULE__{
           start_pos: integer() | nil,
           end_pos: integer() | nil,

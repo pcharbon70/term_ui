@@ -14,10 +14,16 @@ defmodule TermUI.Elm do
   4. **view/1** renders current state to a render tree
   5. **Commands** execute asynchronously, sending result messages back
 
+  `TermUI.Runtime` runs one Elm root module and owns its state. Stateful widgets
+  are explicit state machines embedded in that root state; the runtime does not
+  automatically start a process or route focus for each widget.
+
   ## Usage
 
       defmodule Counter do
         use TermUI.Elm
+
+        alias TermUI.Event
 
         def init(_opts), do: %{count: 0}
 
@@ -41,6 +47,11 @@ defmodule TermUI.Elm do
   @type msg :: Message.t()
   @type command :: term()
   @type render_tree :: term()
+  @type init_result ::
+          state()
+          | {state(), [command()]}
+          | {:ok, state()}
+          | {:ok, state(), [command()]}
 
   @type update_result ::
           {state(), [command()]}
@@ -67,7 +78,9 @@ defmodule TermUI.Elm do
 
   - `{:msg, message}` - Event converted to a message for update
   - `:ignore` - Event not handled by this component
-  - `:propagate` - Pass event to parent component
+  - `:propagate` - Leave the event unhandled. The 1.0 single-root runtime has no
+    parent to receive it, so this currently has the same practical effect as
+    `:ignore`.
   """
   @callback event_to_msg(Event.t(), state()) :: event_to_msg_result()
 
@@ -77,8 +90,11 @@ defmodule TermUI.Elm do
   This is the core logic of the component. It receives the current state
   and a message, and returns the new state plus any commands to execute.
 
-  Update functions must be pure—no side effects, no external calls.
-  Side effects are performed through commands returned in the result.
+  Keep update functions pure when practical—state transitions remain easier to
+  test when side effects are represented by returned commands. The runtime does
+  not enforce purity, and application-owned processes may instead report
+  results through `TermUI.Runtime.send_message/3` or the optional root
+  `handle_info/2` extension.
 
   ## Parameters
 
@@ -97,8 +113,8 @@ defmodule TermUI.Elm do
         {%{state | count: state.count + 1}, []}
       end
 
-      def update({:fetch_data, url}, state) do
-        cmd = Command.http_get(url, {:data_loaded, :response})
+      def update({:load_file, path}, state) do
+        cmd = Command.file_read(path, :file_loaded)
         {%{state | loading: true}, [cmd]}
       end
 
@@ -110,7 +126,8 @@ defmodule TermUI.Elm do
   Renders the current state to a render tree.
 
   View functions must be pure—given the same state, they always produce
-  the same output. View functions should be fast since they run every frame.
+  the same output. View functions should be fast because the runtime invokes
+  them whenever the application is dirty and needs a render.
 
   ## Parameters
 
@@ -143,7 +160,7 @@ defmodule TermUI.Elm do
 
   Initial state for the component.
   """
-  @callback init(opts :: keyword()) :: state()
+  @callback init(opts :: keyword()) :: init_result()
 
   @optional_callbacks [init: 1]
 
@@ -172,6 +189,24 @@ defmodule TermUI.Elm do
   end
 
   @doc """
+  Normalizes init result to standard form.
+
+  Supports plain state as well as state with startup commands.
+  """
+  @spec normalize_init_result(init_result()) :: {state(), [command()]}
+  def normalize_init_result({:ok, state}), do: {state, []}
+
+  def normalize_init_result({:ok, state, commands}) when is_list(commands) do
+    {state, commands}
+  end
+
+  def normalize_init_result({state, commands}) when is_list(commands) do
+    {state, commands}
+  end
+
+  def normalize_init_result(state), do: {state, []}
+
+  @doc """
   Normalizes update result to standard form.
 
   Converts shorthand forms to the full `{state, commands}` tuple.
@@ -192,8 +227,9 @@ defmodule TermUI.Elm do
   @doc """
   Validates that an update function is pure (best effort).
 
-  Returns warnings if the update function appears to have side effects.
-  This is a heuristic check, not a guarantee.
+  This 1.0 compatibility hook does not perform static or runtime analysis and
+  currently always returns `:ok`. Purity is a recommended application design,
+  not a runtime-enforced property.
   """
   @spec validate_update_purity(module()) :: :ok | {:warnings, [String.t()]}
   def validate_update_purity(_module) do

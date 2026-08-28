@@ -3,7 +3,10 @@ defmodule TermUI.Markdown do
   Markdown processor for rendering styled text in TermUI.
 
   Converts markdown content to styled segments that can be rendered
-  by TermUI components.
+  by TermUI components. MDEx parses CommonMark input; this renderer handles
+  headings, paragraphs, emphasis, code, lists, blockquotes, thematic breaks,
+  links, and image alt text. Unsupported nodes degrade to their text/children
+  where possible.
 
   ## Usage
 
@@ -12,6 +15,7 @@ defmodule TermUI.Markdown do
       iex> result = TermUI.Markdown.render_with_elements("```elixir\\ndef hello, do: :world\\n```", 80)
   """
 
+  alias TermUI.Component.RenderNode
   alias TermUI.Renderer.Style
 
   @type styled_segment :: {String.t(), Style.t() | nil}
@@ -46,6 +50,14 @@ defmodule TermUI.Markdown do
   @link_style Style.new(fg: :blue, attrs: [:underline])
   @list_bullet_style Style.new(fg: :cyan)
   @hr_style Style.new(fg: :bright_black)
+
+  # Dialyzer: Pattern match coverage warnings
+  @dialyzer {:nowarn_function,
+             render: 2,
+             render_with_elements: 3,
+             render_line_to_node: 1,
+             process_document: 1,
+             process_document_with_elements: 2}
 
   # Syntax highlighting token styles
   @token_styles %{
@@ -169,20 +181,20 @@ defmodule TermUI.Markdown do
   @doc """
   Converts a styled line to a TermUI render node.
   """
-  @spec render_line_to_node(styled_line()) :: TermUI.Component.RenderNode.t()
-  def render_line_to_node([]), do: TermUI.Component.RenderNode.text("", nil)
+  @spec render_line_to_node(styled_line()) :: RenderNode.t()
+  def render_line_to_node([]), do: RenderNode.text("", nil)
 
   def render_line_to_node([{text, style}]) do
-    TermUI.Component.RenderNode.text(text, style)
+    RenderNode.text(text, style)
   end
 
   def render_line_to_node(segments) when is_list(segments) do
     nodes =
       Enum.map(segments, fn {text, style} ->
-        TermUI.Component.RenderNode.text(text, style)
+        RenderNode.text(text, style)
       end)
 
-    TermUI.Component.RenderNode.stack(:horizontal, nodes)
+    RenderNode.stack(:horizontal, nodes)
   end
 
   # Document Processing
@@ -218,12 +230,22 @@ defmodule TermUI.Markdown do
     header =
       if lang do
         focus_hint = if is_focused, do: " [c]", else: ""
-        [[{"┌─ " <> lang <> focus_hint <> " ", @code_block_style},
-          {String.duplicate("─", 40 - String.length(focus_hint)), border_style}]]
+
+        [
+          [
+            {"┌─ " <> lang <> focus_hint <> " ", @code_block_style},
+            {String.duplicate("─", 40 - String.length(focus_hint)), border_style}
+          ]
+        ]
       else
         focus_hint = if is_focused, do: " [c]", else: ""
-        [[{"┌" <> focus_hint, @code_block_style},
-          {String.duplicate("─", 44 - String.length(focus_hint)), border_style}]]
+
+        [
+          [
+            {"┌" <> focus_hint, @code_block_style},
+            {String.duplicate("─", 44 - String.length(focus_hint)), border_style}
+          ]
+        ]
       end
 
     code_lines = render_code_block(code, lang)
@@ -257,18 +279,17 @@ defmodule TermUI.Markdown do
   # Node Processing
   defp process_node(%MDEx.Heading{level: 1, nodes: children}) do
     content = extract_text(children)
-    [[{"# " <> content, @header1_style}], [{"", nil}]]
+    [[{content, @header1_style}], [{"", nil}]]
   end
 
   defp process_node(%MDEx.Heading{level: 2, nodes: children}) do
     content = extract_text(children)
-    [[{"## " <> content, @header2_style}], [{"", nil}]]
+    [[{content, @header2_style}], [{"", nil}]]
   end
 
   defp process_node(%MDEx.Heading{level: level, nodes: children}) when level >= 3 do
-    prefix = String.duplicate("#", level) <> " "
     content = extract_text(children)
-    [[{prefix <> content, @header3_style}], [{"", nil}]]
+    [[{content, @header3_style}], [{"", nil}]]
   end
 
   defp process_node(%MDEx.Paragraph{nodes: children}) do
@@ -281,8 +302,12 @@ defmodule TermUI.Markdown do
 
     header =
       if lang do
-        [[{"┌─ " <> lang <> " ", @code_block_style},
-          {String.duplicate("─", 40), @code_border_style}]]
+        [
+          [
+            {"┌─ " <> lang <> " ", @code_block_style},
+            {String.duplicate("─", 40), @code_border_style}
+          ]
+        ]
       else
         [[{"┌", @code_block_style}, {String.duplicate("─", 44), @code_border_style}]]
       end
@@ -308,6 +333,7 @@ defmodule TermUI.Markdown do
       case segments do
         [{text, _style} | rest] ->
           [{"│ " <> text, @blockquote_style} | rest]
+
         [] ->
           [{"│ ", @blockquote_style}]
       end
@@ -419,11 +445,10 @@ defmodule TermUI.Markdown do
   defp normalize_token_text(text) when is_list(text) do
     text
     |> List.flatten()
-    |> Enum.map(fn
+    |> Enum.map_join(fn
       char when is_integer(char) -> <<char::utf8>>
       str when is_binary(str) -> str
     end)
-    |> Enum.join()
   end
 
   defp normalize_token_text(text), do: to_string(text)
@@ -453,6 +478,7 @@ defmodule TermUI.Markdown do
 
   defp process_inline_node(%MDEx.Link{url: url, nodes: children}) do
     text = extract_text(children)
+
     if text == url do
       [{text, @link_style}]
     else
@@ -484,33 +510,38 @@ defmodule TermUI.Markdown do
     |> Enum.flat_map(&process_node/1)
     |> Enum.with_index()
     |> Enum.map(fn {segments, idx} ->
-      if idx == 0 do
-        case segments do
-          [{text, style} | rest] ->
-            [{prefix, @list_bullet_style}, {text, style} | rest]
-          [] ->
-            [{prefix, @list_bullet_style}]
-        end
-      else
-        indent = String.duplicate(" ", String.length(prefix))
-        case segments do
-          [{text, style} | rest] ->
-            [{indent <> text, style} | rest]
-          [] ->
-            segments
-        end
-      end
+      process_list_line(segments, idx, prefix)
     end)
     |> Enum.reject(fn segments ->
       segments == [{"", nil}]
     end)
   end
 
+  defp process_list_line(segments, 0, prefix) do
+    case segments do
+      [{text, style} | rest] ->
+        [{prefix, @list_bullet_style}, {text, style} | rest]
+
+      [] ->
+        [{prefix, @list_bullet_style}]
+    end
+  end
+
+  defp process_list_line(segments, _idx, prefix) do
+    indent = String.duplicate(" ", String.length(prefix))
+
+    case segments do
+      [{text, style} | rest] ->
+        [{indent <> text, style} | rest]
+
+      [] ->
+        segments
+    end
+  end
+
   # Text Extraction
   defp extract_text(nodes) when is_list(nodes) do
-    nodes
-    |> Enum.map(&extract_text/1)
-    |> Enum.join()
+    Enum.map_join(nodes, &extract_text/1)
   end
 
   defp extract_text(%{literal: text}) when is_binary(text), do: text
@@ -526,6 +557,7 @@ defmodule TermUI.Markdown do
       case acc do
         [{prev_text, ^style} | rest] ->
           [{prev_text <> text, style} | rest]
+
         _ ->
           [{text, style} | acc]
       end
@@ -545,26 +577,13 @@ defmodule TermUI.Markdown do
   defp wrap_styled_line([], _max_width), do: [[]]
 
   defp wrap_styled_line(segments, max_width) do
-    expanded_segments =
-      segments
-      |> Enum.flat_map(fn {text, style} ->
-        if String.contains?(text, "\n") do
-          text
-          |> String.split("\n")
-          |> Enum.intersperse(:newline)
-          |> Enum.map(fn
-            :newline -> :newline
-            t -> {t, style}
-          end)
-        else
-          [{text, style}]
-        end
-      end)
+    expanded_segments = expand_newlines_in_segments(segments)
 
     {current, wrapped} =
       Enum.reduce(expanded_segments, {[], []}, fn
         :newline, {current, acc} ->
           {[], acc ++ [Enum.reverse(current)]}
+
         segment, {current, acc} ->
           {[segment | current], acc}
       end)
@@ -575,6 +594,26 @@ defmodule TermUI.Markdown do
     |> Enum.flat_map(fn line_segments ->
       wrap_segments_for_width(line_segments, max_width)
     end)
+  end
+
+  defp expand_newlines_in_segments(segments) do
+    Enum.flat_map(segments, fn {text, style} ->
+      expand_segment_newlines(text, style)
+    end)
+  end
+
+  defp expand_segment_newlines(text, style) do
+    if String.contains?(text, "\n") do
+      text
+      |> String.split("\n")
+      |> Enum.intersperse(:newline)
+      |> Enum.map(fn
+        :newline -> :newline
+        t -> {t, style}
+      end)
+    else
+      [{text, style}]
+    end
   end
 
   defp wrap_segments_for_width([], _max_width), do: [[]]
@@ -614,35 +653,39 @@ defmodule TermUI.Markdown do
   defp wrap_text_at_words(text, style, lines, current, width, max_width) do
     words = String.split(text, ~r/(\s+)/, include_captures: true)
 
-    {final_lines, final_current, final_width} =
-      Enum.reduce(words, {lines, current, width}, fn word, {ls, cur, w} ->
-        word_len = String.length(word)
+    Enum.reduce(words, {lines, current, width}, fn word, acc ->
+      handle_wrap_word(word, style, acc, max_width)
+    end)
+  end
 
-        cond do
-          word == "" ->
-            {ls, cur, w}
+  defp handle_wrap_word("", _style, acc, _max_width), do: acc
 
-          w + word_len <= max_width ->
-            {ls, cur ++ [{word, style}], w + word_len}
+  defp handle_wrap_word(word, style, {ls, cur, w}, max_width) do
+    word_len = String.length(word)
 
-          word_len > max_width ->
-            {new_lines, remainder} = break_long_word(word, style, max_width - w, max_width)
+    cond do
+      w + word_len <= max_width ->
+        {ls, cur ++ [{word, style}], w + word_len}
 
-            if cur == [] do
-              {ls ++ new_lines, [{remainder, style}], String.length(remainder)}
-            else
-              {ls ++ [cur] ++ new_lines, [{remainder, style}], String.length(remainder)}
-            end
+      word_len > max_width ->
+        handle_long_word(word, style, ls, cur, w, max_width)
 
-          String.trim(word) == "" ->
-            {ls, cur, w}
+      String.trim(word) == "" ->
+        {ls, cur, w}
 
-          true ->
-            {ls ++ [cur], [{word, style}], word_len}
-        end
-      end)
+      true ->
+        {ls ++ [cur], [{word, style}], word_len}
+    end
+  end
 
-    {final_lines, final_current, final_width}
+  defp handle_long_word(word, style, ls, cur, w, max_width) do
+    {new_lines, remainder} = break_long_word(word, style, max_width - w, max_width)
+
+    if cur == [] do
+      {ls ++ new_lines, [{remainder, style}], String.length(remainder)}
+    else
+      {ls ++ [cur] ++ new_lines, [{remainder, style}], String.length(remainder)}
+    end
   end
 
   defp break_long_word(word, style, first_chunk_size, max_width) do

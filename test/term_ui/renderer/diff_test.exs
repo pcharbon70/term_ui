@@ -531,6 +531,37 @@ defmodule TermUI.Renderer.DiffTest do
       Buffer.destroy(previous)
     end
 
+    test "re-emits style on each row when adjacent rows share a style" do
+      # Regression test: filter_redundant_style must invalidate its
+      # tracked last_style when a :reset op flows through, otherwise
+      # the second row span's :style gets deduped after the :reset
+      # has already cleared the terminal SGR state -- leaving every
+      # row but the first rendered without styling.
+      {:ok, current} = Buffer.new(2, 5)
+      {:ok, previous} = Buffer.new(2, 5)
+
+      cell = Cell.new("X", bg: 236)
+
+      for col <- 1..5 do
+        Buffer.set_cell(current, 1, col, cell)
+        Buffer.set_cell(current, 2, col, cell)
+      end
+
+      operations = Diff.diff(current, previous)
+
+      style_ops =
+        Enum.filter(operations, fn
+          {:style, %Style{bg: 236}} -> true
+          _ -> false
+        end)
+
+      assert length(style_ops) == 2,
+             "expected one :style op per row, got #{length(style_ops)}: #{inspect(operations)}"
+
+      Buffer.destroy(current)
+      Buffer.destroy(previous)
+    end
+
     test "handles changes at buffer boundaries" do
       {:ok, current} = Buffer.new(5, 10)
       {:ok, previous} = Buffer.new(5, 10)

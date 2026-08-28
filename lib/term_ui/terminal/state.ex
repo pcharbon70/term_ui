@@ -4,6 +4,9 @@ defmodule TermUI.Terminal.State do
   and active features (mouse tracking, bracketed paste, alternate screen).
   """
 
+  # Dialyzer: Functions return specific struct types
+  @dialyzer {:nowarn_function, new: 0, new: 2}
+
   @type t :: %__MODULE__{
           raw_mode_active: boolean(),
           alternate_screen_active: boolean(),

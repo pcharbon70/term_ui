@@ -11,7 +11,7 @@ defmodule TermUI.Command do
   - `:timer` - Deliver message after delay
   - `:interval` - Deliver repeated messages at interval
   - `:file_read` - Read file contents
-  - `:send_after` - Send message to component after delay
+  - `:send_after` - Send a delayed message to the root component
   - `:quit` - Request application shutdown
   - `:none` - No-op command (useful for conditional commands)
 
@@ -27,6 +27,11 @@ defmodule TermUI.Command do
         {%{state | timer_active: false, count: state.count + 1}, []}
       end
   """
+
+  # Dialyzer: Command constructors return specific struct types with known
+  # type: atoms, but the public spec uses the general t() type for API clarity.
+  @dialyzer {:nowarn_function,
+             timer: 2, interval: 2, file_read: 2, send_after: 3, quit: 1, none: 0, valid?: 1}
 
   @type t :: %__MODULE__{
           id: reference() | nil,
@@ -54,8 +59,8 @@ defmodule TermUI.Command do
       Command.timer(1000, :timer_done)
       Command.timer(500, {:tick, 1})
   """
-  @spec timer(pos_integer(), term()) :: t()
-  def timer(delay_ms, on_result) when is_integer(delay_ms) and delay_ms > 0 do
+  @spec timer(non_neg_integer(), term()) :: t()
+  def timer(delay_ms, on_result) when is_integer(delay_ms) and delay_ms >= 0 do
     %__MODULE__{
       type: :timer,
       payload: delay_ms,
@@ -66,8 +71,9 @@ defmodule TermUI.Command do
   @doc """
   Creates an interval command that delivers repeated messages.
 
-  The interval continues until cancelled. Each tick delivers
-  the on_result message.
+  Each tick delivers the `on_result` message. The primary runtime cancels
+  intervals when the root shuts down, but its public API does not expose an
+  individual interval cancellation handle in 1.0.
 
   ## Examples
 
@@ -103,14 +109,15 @@ defmodule TermUI.Command do
   end
 
   @doc """
-  Creates a send_after command that sends a message to a component after delay.
+  Creates a send_after command that sends a delayed message to a component ID.
 
-  Unlike timer which sends to the originating component, send_after
-  can target any component.
+  The primary 1.0 runtime has only the reserved `:root` component, so use
+  `:root` there. Lower-level executor integrations may use another component
+  ID as their own routing key.
 
   ## Examples
 
-      Command.send_after(:other_component, :wake_up, 1000)
+      Command.send_after(:root, :wake_up, 1000)
   """
   @spec send_after(atom(), term(), pos_integer()) :: t()
   def send_after(component_id, message, delay_ms)
@@ -167,8 +174,9 @@ defmodule TermUI.Command do
   @doc """
   Sets a timeout for command execution.
 
-  If the command takes longer than the timeout, it's cancelled
-  and an error message is sent.
+  The 1.0 executor enforces this field for `timer/2` and `file_read/2`: if the
+  operation takes longer, it is cancelled and `{:error, :timeout}` is sent.
+  Interval and delayed-send execution do not currently enforce this field.
 
   ## Examples
 
@@ -189,7 +197,7 @@ defmodule TermUI.Command do
   @spec validate(t()) :: :ok | {:error, term()}
   def validate(%__MODULE__{type: :none}), do: :ok
 
-  def validate(%__MODULE__{type: :timer, payload: delay}) when is_integer(delay) and delay > 0,
+  def validate(%__MODULE__{type: :timer, payload: delay}) when is_integer(delay) and delay >= 0,
     do: :ok
 
   def validate(%__MODULE__{type: :interval, payload: interval})

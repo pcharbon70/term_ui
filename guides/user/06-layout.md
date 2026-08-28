@@ -225,37 +225,50 @@ def view(state) do
 end
 ```
 
-## Text Alignment
+## Rectangle Alignment
 
-Align text within available space:
+`TermUI.Layout.Alignment` is a lower-level helper for repositioning rectangles
+after constraints have been solved. It is not an option accepted by the
+`text/2` render helper.
 
 ```elixir
-alias TermUI.Layout.Alignment
+alias TermUI.Layout.{Alignment, Constraint, Solver}
 
-# Left aligned (default)
-text("Left", alignment: :left)
+area = %{x: 0, y: 0, width: 80, height: 10}
+constraints = [Constraint.length(10), Constraint.length(20)]
+rects = Solver.solve_to_rects(constraints, area, :horizontal)
 
-# Center aligned
-text("Center", alignment: :center)
-
-# Right aligned
-text("Right", alignment: :right)
+Alignment.apply(rects, area,
+  direction: :horizontal,
+  justify: :center,
+  align: :start
+)
 ```
+
+For aligned text inside a fixed width, pad the string yourself with
+`String.pad_leading/2` or `String.pad_trailing/2`, or use a widget that exposes
+alignment explicitly, such as `TermUI.Widgets.Table.Column`.
 
 ## Box Drawing
 
 Create bordered containers:
 
 ```elixir
+alias TermUI.CharacterSet
+
 def render_box(title, content) do
+  chars = CharacterSet.current_charset()
+
   stack(:vertical, [
-    text("┌─ #{title} " <> String.duplicate("─", 20) <> "┐"),
+    text(chars.top_left <> chars.horizontal <> " #{title} " <>
+      String.duplicate(chars.horizontal, 20) <> chars.top_right),
     stack(:horizontal, [
-      text("│ "),
+      text(chars.vertical <> " "),
       content,
-      text(" │")
+      text(" " <> chars.vertical)
     ]),
-    text("└" <> String.duplicate("─", 24) <> "┘")
+    text(chars.bottom_left <> String.duplicate(chars.horizontal, 24) <>
+      chars.bottom_right)
   ])
 end
 ```
@@ -390,22 +403,26 @@ stack(:horizontal, [
 ])
 ```
 
-### 3. Memoize Complex Layouts
+### 3. Reuse Static Nodes
 
 For layouts that don't change often:
 
 ```elixir
 def view(state) do
   stack(:vertical, [
-    render_static_header(),        # Cached internally
-    render_dynamic_content(state)  # Recomputed each frame
+    render_static_header(),
+    render_dynamic_content(state)
   ])
 end
 
-# Static content can be module attribute
+# A module attribute constructs this immutable node at compile time.
 @header text("My Application", Style.new(fg: :cyan))
 defp render_static_header, do: @header
 ```
+
+The runtime does not automatically memoize individual view functions. It
+avoids the entire render pass while the root is not dirty; explicit
+`TermUI.ViewCache` use is available for lower-level integrations.
 
 ## Next Steps
 

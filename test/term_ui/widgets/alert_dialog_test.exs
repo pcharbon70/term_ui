@@ -1,7 +1,8 @@
 defmodule TermUI.Widgets.AlertDialogTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias TermUI.Event
+  alias TermUI.PersistentTerms
   alias TermUI.Widgets.AlertDialog
 
   describe "new/1" do
@@ -235,6 +236,111 @@ defmodule TermUI.Widgets.AlertDialogTest do
 
       # Centered: (80 - 50) / 2 = 15
       assert result.x == 15
+    end
+  end
+
+  describe "mouse support" do
+    setup do
+      # Store and restore backend mode
+      original_mode = PersistentTerms.backend_mode()
+      :persistent_term.put(:term_ui_backend_mode, :raw)
+
+      on_exit(fn ->
+        if original_mode do
+          :persistent_term.put(:term_ui_backend_mode, original_mode)
+        else
+          :persistent_term.erase(:term_ui_backend_mode)
+        end
+      end)
+
+      :ok
+    end
+
+    test "mouse click activates button in raw mode" do
+      props = AlertDialog.new(type: :ok_cancel, title: "Test", message: "Message")
+      {:ok, state} = AlertDialog.init(props)
+
+      # Set terminal area for accurate button click detection
+      state = AlertDialog.update_area(state, %{width: 80, height: 24})
+
+      on_result = fn result -> send(self(), {:result, result}) end
+      state = %{state | on_result: on_result}
+
+      # Calculate expected button positions
+      # Dialog: default width=50, height=7 (6+1 message line)
+      # Dialog x = (80-50)/2 = 15, dialog y = (24-7)/2 = 8
+      # Button row in dialog = 4+1 = 5, so button_y = 8+5 = 13
+      # Button order: Cancel, OK (OK is default/focused)
+      # Cancel (non-focused): "  Cancel  " (10 chars)
+      # OK (focused): "[ OK ]" (6 chars)
+      # Buttons joined: "  Cancel    [ OK ]" (17 chars with space between)
+      # inner_width = 46, left_pad = div(46-17, 2) = 14
+      # buttons_start_x = 15 + 2 + 14 = 31
+      # Cancel button at x=31, width=10 (positions 31-40)
+      # OK button at x=42, width=6 (positions 42-47)
+
+      # Click on OK button (x=43, y=13)
+      event = %Event.Mouse{action: :press, button: :left, x: 43, y: 13}
+      {:ok, _state} = AlertDialog.handle_event(event, state)
+
+      assert_receive {:result, :ok}
+    end
+
+    test "mouse click is ignored in TTY mode" do
+      props = AlertDialog.new(type: :ok_cancel, title: "Test", message: "Message")
+      {:ok, state} = AlertDialog.init(props)
+
+      # Set terminal area for accurate button click detection
+      state = AlertDialog.update_area(state, %{width: 80, height: 24})
+
+      # Set to TTY mode
+      :persistent_term.put(:term_ui_backend_mode, :tty)
+
+      on_result = fn result -> send(self(), {:result, result}) end
+      state = %{state | on_result: on_result}
+
+      # Click on button position (OK button at x=43, y=13)
+      event = %Event.Mouse{action: :press, button: :left, x: 43, y: 13}
+      {:ok, _state} = AlertDialog.handle_event(event, state)
+
+      # Should not receive result
+      refute_receive {:result, _}, 100
+    end
+
+    test "click outside button bounds does nothing" do
+      props = AlertDialog.new(type: :ok_cancel, title: "Test", message: "Message")
+      {:ok, state} = AlertDialog.init(props)
+
+      # Set terminal area for accurate button click detection
+      state = AlertDialog.update_area(state, %{width: 80, height: 24})
+
+      on_result = fn result -> send(self(), {:result, result}) end
+      state = %{state | on_result: on_result}
+
+      # Click far outside the dialog
+      event = %Event.Mouse{action: :press, button: :left, x: 0, y: 0}
+      {:ok, _state} = AlertDialog.handle_event(event, state)
+
+      # Should not receive result
+      refute_receive {:result, _}, 100
+    end
+
+    test "click on wrong row does nothing" do
+      props = AlertDialog.new(type: :ok_cancel, title: "Test", message: "Message")
+      {:ok, state} = AlertDialog.init(props)
+
+      # Set terminal area for accurate button click detection
+      state = AlertDialog.update_area(state, %{width: 80, height: 24})
+
+      on_result = fn result -> send(self(), {:result, result}) end
+      state = %{state | on_result: on_result}
+
+      # Click on button x but wrong y
+      event = %Event.Mouse{action: :press, button: :left, x: 33, y: 10}
+      {:ok, _state} = AlertDialog.handle_event(event, state)
+
+      # Should not receive result
+      refute_receive {:result, _}, 100
     end
   end
 end

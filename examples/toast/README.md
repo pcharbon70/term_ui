@@ -1,6 +1,9 @@
 # Toast Widget Example
 
-This example demonstrates the `TermUI.Widgets.Toast` and `TermUI.Widgets.ToastManager` widgets for displaying auto-dismissing notifications.
+This example demonstrates the `TermUI.Widgets.Toast` and
+`TermUI.Widgets.ToastManager` widgets for displaying notifications. The root
+schedules a 100 ms `Command.interval/2` and calls `ToastManager.tick/1` so
+expired notifications are removed.
 
 ## Features Demonstrated
 
@@ -45,8 +48,7 @@ Toast.App.run()
 ```
 
 **Note:** TTY mode works inside IEx but has limitations:
-- No alternate screen buffer (output mixes with IEx prompt)
-- Character input works immediately (no Enter needed)
+- Input is read through the shell; some terminals buffer keys until Enter is pressed
 - For full TUI, use raw mode instead
 
 ## Controls
@@ -123,7 +125,8 @@ manager = ToastManager.new(
 manager = ToastManager.add_toast(manager, "First message", :info)
 manager = ToastManager.add_toast(manager, "Second message", :success)
 
-# Update on tick (removes expired toasts)
+# Schedule a root interval, then update on each :tick message
+{state, [TermUI.Command.interval(100, :tick)]}
 manager = ToastManager.tick(manager)
 
 # Get visible toasts
@@ -135,7 +138,8 @@ manager = ToastManager.clear_all(manager)
 
 ## Features
 
-- **Auto-dismiss**: Toasts automatically disappear after duration (default 3s)
+- **Auto-dismiss**: The example's root tick removes toasts after their duration
+  (default 3s)
 - **Manual dismiss**: Click on toast or press Escape to dismiss early
 - **Stacking**: Multiple toasts stack vertically at the chosen position
 - **Max limit**: ToastManager limits number of simultaneous toasts (default 5)

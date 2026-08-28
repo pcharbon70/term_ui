@@ -142,21 +142,9 @@ defmodule TermUI.PerformanceTest do
   describe "cache performance" do
     setup do
       # Cache uses singleton ETS table
-      case Cache.start_link([]) do
-        {:ok, _} -> :ok
-        {:error, {:already_started, _}} -> :ok
-      end
+      start_supervised!(Cache)
 
       Cache.clear()
-
-      # Ensure cleanup after test (safely handle if table doesn't exist)
-      on_exit(fn ->
-        try do
-          Cache.clear()
-        rescue
-          ArgumentError -> :ok
-        end
-      end)
 
       :ok
     end
@@ -358,24 +346,12 @@ defmodule TermUI.PerformanceTest do
   describe "full frame simulation" do
     setup do
       # Cache uses singleton
-      case Cache.start_link([]) do
-        {:ok, _} -> :ok
-        {:error, {:already_started, _}} -> :ok
-      end
+      start_supervised!(Cache)
 
       Cache.clear()
 
       theme_name = :"frame_theme_#{:erlang.unique_integer([:positive])}"
       {:ok, _} = Theme.start_link(name: theme_name, theme: :dark)
-
-      # Ensure cleanup after test (safely handle if table doesn't exist)
-      on_exit(fn ->
-        try do
-          Cache.clear()
-        rescue
-          ArgumentError -> :ok
-        end
-      end)
 
       %{theme: theme_name}
     end

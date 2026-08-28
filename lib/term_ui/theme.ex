@@ -5,6 +5,11 @@ defmodule TermUI.Theme do
   Themes define colors, semantic meanings, and component style defaults.
   The theme system supports runtime switching and notifies subscribers of changes.
 
+  `TermUI.Runtime` does not start or subscribe to this server. Without a running
+  theme server, read helpers return the built-in dark theme. To switch themes,
+  supervise `TermUI.Theme`, subscribe from an application-owned process, and
+  cause the Elm root to update or force a render when a notification arrives.
+
   ## Theme Structure
 
   A theme contains:
@@ -87,6 +92,80 @@ defmodule TermUI.Theme do
   # ETS table for fast reads
   @ets_table :term_ui_theme
 
+  # Dialyzer-typed style helpers to avoid opaque type warnings
+  # These helpers provide type constraints for Style operations
+  # We suppress dialyzer warnings because we know the color atoms are valid
+
+  @dialyzer {:nowarn_function,
+             fg_style: 1,
+             fg_bg_style: 2,
+             fg_bold: 1,
+             fg_bg_bold: 2,
+             fg_bold_underline: 1,
+             fg_dim: 1,
+             fg_underline: 1,
+             fg_bg_reverse: 2,
+             fg_bg_bold_reverse: 2,
+             fg_bg_underline: 2,
+             style_from_theme: 4}
+
+  @doc false
+  @spec fg_style(atom()) :: Style.t()
+  defp fg_style(color) when is_atom(color), do: Style.new() |> Style.fg(color)
+
+  @doc false
+  @spec fg_bg_style(atom(), atom()) :: Style.t()
+  defp fg_bg_style(fg_color, bg_color)
+       when is_atom(fg_color) and is_atom(bg_color),
+       do: Style.new() |> Style.fg(fg_color) |> Style.bg(bg_color)
+
+  @doc false
+  @spec fg_bold(atom()) :: Style.t()
+  defp fg_bold(color) when is_atom(color), do: Style.new() |> Style.fg(color) |> Style.bold()
+
+  @doc false
+  @spec fg_bg_bold(atom(), atom()) :: Style.t()
+  defp fg_bg_bold(fg_color, bg_color)
+       when is_atom(fg_color) and is_atom(bg_color),
+       do: Style.new() |> Style.fg(fg_color) |> Style.bg(bg_color) |> Style.bold()
+
+  @doc false
+  @spec fg_bold_underline(atom()) :: Style.t()
+  defp fg_bold_underline(color) when is_atom(color),
+    do: Style.new() |> Style.fg(color) |> Style.bold() |> Style.underline()
+
+  @doc false
+  @spec fg_dim(atom()) :: Style.t()
+  defp fg_dim(color) when is_atom(color), do: Style.new() |> Style.fg(color) |> Style.dim()
+
+  @doc false
+  @spec fg_underline(atom()) :: Style.t()
+  defp fg_underline(color) when is_atom(color),
+    do: Style.new() |> Style.fg(color) |> Style.underline()
+
+  @doc false
+  @spec fg_bg_reverse(atom(), atom()) :: Style.t()
+  defp fg_bg_reverse(fg_color, bg_color)
+       when is_atom(fg_color) and is_atom(bg_color),
+       do: Style.new() |> Style.fg(fg_color) |> Style.bg(bg_color) |> Style.reverse()
+
+  @doc false
+  @spec fg_bg_bold_reverse(atom(), atom()) :: Style.t()
+  defp fg_bg_bold_reverse(fg_color, bg_color)
+       when is_atom(fg_color) and is_atom(bg_color),
+       do:
+         Style.new()
+         |> Style.fg(fg_color)
+         |> Style.bg(bg_color)
+         |> Style.bold()
+         |> Style.reverse()
+
+  @doc false
+  @spec fg_bg_underline(atom(), atom()) :: Style.t()
+  defp fg_bg_underline(fg_color, bg_color)
+       when is_atom(fg_color) and is_atom(bg_color),
+       do: Style.new() |> Style.fg(fg_color) |> Style.bg(bg_color) |> Style.underline()
+
   # Built-in theme definitions as functions (to avoid compile-time struct issues)
 
   defp dark_theme do
@@ -110,40 +189,40 @@ defmodule TermUI.Theme do
       },
       components: %{
         button: %{
-          normal: Style.new() |> Style.fg(:white) |> Style.bg(:bright_black),
-          focused: Style.new() |> Style.fg(:white) |> Style.bg(:blue) |> Style.bold(),
-          disabled: Style.new() |> Style.fg(:bright_black) |> Style.bg(:black)
+          normal: fg_bg_style(:white, :bright_black),
+          focused: fg_bg_bold(:white, :blue),
+          disabled: fg_bg_style(:bright_black, :black)
         },
         text_input: %{
-          normal: Style.new() |> Style.fg(:white) |> Style.bg(:bright_black),
-          focused: Style.new() |> Style.fg(:white) |> Style.bg(:blue),
-          disabled: Style.new() |> Style.fg(:bright_black) |> Style.bg(:black)
+          normal: fg_bg_style(:white, :bright_black),
+          focused: fg_bg_style(:white, :blue),
+          disabled: fg_bg_style(:bright_black, :black)
         },
         text: %{
-          normal: Style.new() |> Style.fg(:white),
-          muted: Style.new() |> Style.fg(:bright_black),
-          emphasis: Style.new() |> Style.fg(:white) |> Style.bold()
+          normal: fg_style(:white),
+          muted: fg_style(:bright_black),
+          emphasis: fg_bold(:white)
         },
         border: %{
-          normal: Style.new() |> Style.fg(:bright_black),
-          focused: Style.new() |> Style.fg(:blue),
-          accent: Style.new() |> Style.fg(:magenta)
+          normal: fg_style(:bright_black),
+          focused: fg_style(:blue),
+          accent: fg_style(:magenta)
         },
         item: %{
-          normal: Style.new() |> Style.fg(:white),
-          selected: Style.new() |> Style.fg(:black) |> Style.bg(:cyan) |> Style.reverse(),
-          focused: Style.new() |> Style.fg(:white) |> Style.bg(:blue) |> Style.bold()
+          normal: fg_style(:white),
+          selected: fg_bg_bold_reverse(:black, :cyan),
+          focused: fg_bg_bold(:white, :blue)
         },
         divider: %{
-          normal: Style.new() |> Style.fg(:white),
-          focused: Style.new() |> Style.fg(:cyan) |> Style.bold() |> Style.reverse()
+          normal: fg_style(:white),
+          focused: fg_bg_bold_reverse(:white, :cyan)
         },
         status: %{
-          running: Style.new() |> Style.fg(:green),
-          warning: Style.new() |> Style.fg(:yellow) |> Style.bold(),
-          error: Style.new() |> Style.fg(:red) |> Style.underline(),
-          terminated: Style.new() |> Style.fg(:red) |> Style.underline(),
-          unknown: Style.new() |> Style.fg(:white) |> Style.dim()
+          running: fg_style(:green),
+          warning: fg_bold(:yellow),
+          error: fg_underline(:red),
+          terminated: fg_underline(:red),
+          unknown: fg_dim(:white)
         }
       }
     }
@@ -170,40 +249,40 @@ defmodule TermUI.Theme do
       },
       components: %{
         button: %{
-          normal: Style.new() |> Style.fg(:black) |> Style.bg(:white),
-          focused: Style.new() |> Style.fg(:white) |> Style.bg(:blue) |> Style.bold(),
-          disabled: Style.new() |> Style.fg(:bright_black) |> Style.bg(:white)
+          normal: fg_bg_style(:black, :white),
+          focused: fg_bg_bold(:white, :blue),
+          disabled: fg_bg_style(:bright_black, :white)
         },
         text_input: %{
-          normal: Style.new() |> Style.fg(:black) |> Style.bg(:white),
-          focused: Style.new() |> Style.fg(:black) |> Style.bg(:cyan),
-          disabled: Style.new() |> Style.fg(:bright_black) |> Style.bg(:white)
+          normal: fg_bg_style(:black, :white),
+          focused: fg_bg_style(:black, :cyan),
+          disabled: fg_bg_style(:bright_black, :white)
         },
         text: %{
-          normal: Style.new() |> Style.fg(:black),
-          muted: Style.new() |> Style.fg(:bright_black),
-          emphasis: Style.new() |> Style.fg(:black) |> Style.bold()
+          normal: fg_style(:black),
+          muted: fg_style(:bright_black),
+          emphasis: fg_bold(:black)
         },
         border: %{
-          normal: Style.new() |> Style.fg(:bright_black),
-          focused: Style.new() |> Style.fg(:blue),
-          accent: Style.new() |> Style.fg(:magenta)
+          normal: fg_style(:bright_black),
+          focused: fg_style(:blue),
+          accent: fg_style(:magenta)
         },
         item: %{
-          normal: Style.new() |> Style.fg(:black),
-          selected: Style.new() |> Style.fg(:black) |> Style.bg(:cyan) |> Style.reverse(),
-          focused: Style.new() |> Style.fg(:white) |> Style.bg(:blue) |> Style.bold()
+          normal: fg_style(:black),
+          selected: fg_bg_reverse(:black, :cyan),
+          focused: fg_bg_bold(:white, :blue)
         },
         divider: %{
-          normal: Style.new() |> Style.fg(:black),
-          focused: Style.new() |> Style.fg(:cyan) |> Style.bold() |> Style.reverse()
+          normal: fg_style(:black),
+          focused: fg_bg_bold_reverse(:black, :cyan)
         },
         status: %{
-          running: Style.new() |> Style.fg(:green),
-          warning: Style.new() |> Style.fg(:yellow) |> Style.bold(),
-          error: Style.new() |> Style.fg(:red) |> Style.underline(),
-          terminated: Style.new() |> Style.fg(:red) |> Style.underline(),
-          unknown: Style.new() |> Style.fg(:black) |> Style.dim()
+          running: fg_style(:green),
+          warning: fg_bold(:yellow),
+          error: fg_underline(:red),
+          terminated: fg_underline(:red),
+          unknown: fg_dim(:black)
         }
       }
     }
@@ -230,57 +309,40 @@ defmodule TermUI.Theme do
       },
       components: %{
         button: %{
-          normal: Style.new() |> Style.fg(:bright_white) |> Style.bg(:black) |> Style.bold(),
-          focused:
-            Style.new()
-            |> Style.fg(:black)
-            |> Style.bg(:bright_cyan)
-            |> Style.bold(),
-          disabled: Style.new() |> Style.fg(:white) |> Style.bg(:black)
+          normal: fg_bg_bold(:bright_white, :black),
+          focused: fg_bg_bold(:black, :bright_cyan),
+          disabled: fg_bg_style(:white, :black)
         },
         text_input: %{
-          normal:
-            Style.new()
-            |> Style.fg(:bright_white)
-            |> Style.bg(:black)
-            |> Style.underline(),
-          focused:
-            Style.new()
-            |> Style.fg(:black)
-            |> Style.bg(:bright_yellow)
-            |> Style.bold(),
-          disabled: Style.new() |> Style.fg(:white) |> Style.bg(:black)
+          normal: fg_bg_underline(:bright_white, :black),
+          focused: fg_bg_bold(:black, :bright_yellow),
+          disabled: fg_bg_style(:white, :black)
         },
         text: %{
-          normal: Style.new() |> Style.fg(:bright_white),
-          muted: Style.new() |> Style.fg(:white),
-          emphasis: Style.new() |> Style.fg(:bright_yellow) |> Style.bold()
+          normal: fg_style(:bright_white),
+          muted: fg_style(:white),
+          emphasis: fg_bold(:bright_yellow)
         },
         border: %{
-          normal: Style.new() |> Style.fg(:white),
-          focused: Style.new() |> Style.fg(:bright_cyan) |> Style.bold(),
-          accent: Style.new() |> Style.fg(:bright_magenta)
+          normal: fg_style(:white),
+          focused: fg_bold(:bright_cyan),
+          accent: fg_style(:bright_magenta)
         },
         item: %{
-          normal: Style.new() |> Style.fg(:bright_white),
-          selected:
-            Style.new()
-            |> Style.fg(:black)
-            |> Style.bg(:bright_cyan)
-            |> Style.bold()
-            |> Style.reverse(),
-          focused: Style.new() |> Style.fg(:black) |> Style.bg(:bright_yellow) |> Style.bold()
+          normal: fg_style(:bright_white),
+          selected: fg_bg_bold_reverse(:black, :bright_cyan),
+          focused: fg_bg_bold(:black, :bright_yellow)
         },
         divider: %{
-          normal: Style.new() |> Style.fg(:white),
-          focused: Style.new() |> Style.fg(:bright_cyan) |> Style.bold() |> Style.reverse()
+          normal: fg_style(:white),
+          focused: fg_bg_bold_reverse(:white, :bright_cyan)
         },
         status: %{
-          running: Style.new() |> Style.fg(:bright_green) |> Style.bold(),
-          warning: Style.new() |> Style.fg(:bright_yellow) |> Style.bold(),
-          error: Style.new() |> Style.fg(:bright_red) |> Style.bold() |> Style.underline(),
-          terminated: Style.new() |> Style.fg(:bright_red) |> Style.bold() |> Style.underline(),
-          unknown: Style.new() |> Style.fg(:bright_white) |> Style.dim()
+          running: fg_bold(:bright_green),
+          warning: fg_bold(:bright_yellow),
+          error: fg_bold_underline(:bright_red),
+          terminated: fg_bold_underline(:bright_red),
+          unknown: fg_dim(:bright_white)
         }
       }
     }
@@ -320,9 +382,31 @@ defmodule TermUI.Theme do
   """
   @spec get_theme(GenServer.server()) :: t()
   def get_theme(server \\ __MODULE__) do
-    case :ets.lookup(ets_table(server), :current_theme) do
-      [{:current_theme, theme}] -> theme
-      [] -> GenServer.call(server, :get_theme)
+    table = ets_table(server)
+
+    case :ets.whereis(table) do
+      :undefined ->
+        # Table doesn't exist, check if GenServer is running
+        case Process.whereis(server) do
+          nil ->
+            # Neither table nor GenServer exist, return default theme
+            dark_theme()
+
+          _pid ->
+            # GenServer is running, call it
+            try do
+              GenServer.call(server, :get_theme)
+            catch
+              :exit, _ -> dark_theme()
+            end
+        end
+
+      _ref ->
+        # Table exists, try to lookup
+        case :ets.lookup(table, :current_theme) do
+          [{:current_theme, theme}] -> theme
+          [] -> GenServer.call(server, :get_theme)
+        end
     end
   end
 

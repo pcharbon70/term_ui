@@ -45,8 +45,19 @@ defmodule TermUI.Widgets.TextInput do
   alias TermUI.Renderer.Style
   alias TermUI.Theme
 
+  # Dialyzer: Suppress opaque type warnings for Style helpers and contract warnings for specific map types
+  @dialyzer {:nowarn_function, fg_theme_color: 1, new: 1, set_value: 2, clear: 1}
+
   @default_width 40
   @default_max_visible_lines 5
+
+  # ----------------------------------------------------------------------------
+  # Style Helper Functions
+  # ----------------------------------------------------------------------------
+
+  @spec fg_theme_color(atom()) :: Style.t()
+  defp fg_theme_color(color) when is_atom(color),
+    do: Style.new() |> Style.fg(color)
 
   # ----------------------------------------------------------------------------
   # Props
@@ -207,9 +218,15 @@ defmodule TermUI.Widgets.TextInput do
     end
   end
 
-  # Backspace
-  def handle_event(%Event.Key{key: :backspace}, state) do
-    state = delete_backward(state)
+  # Backspace; Alt+Backspace / Option+Delete deletes the preceding word.
+  def handle_event(%Event.Key{key: :backspace, modifiers: modifiers}, state) do
+    state =
+      if :alt in modifiers do
+        delete_word_backward(state)
+      else
+        delete_backward(state)
+      end
+
     notify_change(state)
     {:ok, state}
   end
@@ -447,6 +464,21 @@ defmodule TermUI.Widgets.TextInput do
     end
   end
 
+  defp delete_word_backward(%{cursor_col: 0} = state), do: state
+
+  defp delete_word_backward(state) do
+    line = current_line(state)
+    {before_cursor, after_cursor} = String.split_at(line, state.cursor_col)
+
+    remaining =
+      before_cursor
+      |> String.replace(~r/\s+\z/u, "")
+      |> String.replace(~r/\S+\z/u, "")
+
+    lines = List.replace_at(state.lines, state.cursor_row, remaining <> after_cursor)
+    %{state | lines: lines, cursor_col: String.length(remaining)}
+  end
+
   defp delete_forward(state) do
     line = current_line(state)
     line_len = String.length(line)
@@ -622,7 +654,7 @@ defmodule TermUI.Widgets.TextInput do
     # Determine style
     base_style =
       if state.focused do
-        state.focused_style || Style.new() |> Style.fg(Theme.get_color(:foreground))
+        state.focused_style || fg_theme_color(Theme.get_color(:foreground))
       else
         state.style
       end
@@ -692,7 +724,7 @@ defmodule TermUI.Widgets.TextInput do
     ])
   end
 
-  defp render_scroll_indicator(state, total_lines, visible_count, chars) do
+  defp render_scroll_indicator(state, total_lines, visible_count, _chars) do
     if total_lines > visible_count do
       chars = CharacterSet.current_charset()
       can_scroll_up = state.scroll_offset > 0

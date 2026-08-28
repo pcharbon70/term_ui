@@ -56,6 +56,14 @@ defmodule TermUI.TerminalTest do
       {:trap_exit, trap} = Process.info(pid, :trap_exit)
       assert trap == true
     end
+
+    test "registers an OS signal handler on Unix", %{pid: pid} do
+      if match?({:unix, _}, :os.type()) do
+        assert {TermUI.Terminal.SignalHandler, pid} in :gen_event.which_handlers(
+                 :erl_signal_server
+               )
+      end
+    end
   end
 
   describe "get_state/0" do

@@ -21,7 +21,7 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
   - Supervisor strategy display
   - Process state inspection
   - Restart/terminate controls with confirmation
-  - Auto-refresh on supervision tree changes
+  - Explicit refresh API for supervision tree changes
 
   ## Keyboard Controls
 
@@ -50,13 +50,34 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
 
   The widget uses both theme component styles and explicit text indicators
   for complete monochrome compatibility.
+
+  The `:update_interval` option is stored as refresh metadata but does not start
+  a timer. In an Elm root, schedule `Command.interval/2` yourself and call
+  `refresh/1` for each message. `TermUI.Runtime` does not invoke this widget's
+  `handle_info/2` callback automatically.
   """
 
   use TermUI.StatefulComponent
 
   alias TermUI.CharacterSet
   alias TermUI.Event
+  alias TermUI.Renderer.Style
   alias TermUI.Theme
+
+  # Dialyzer: Suppress opaque type warnings for Style helpers and contract warnings for specific map types
+  @dialyzer {:nowarn_function,
+             fg_semantic: 1,
+             fg_bold_semantic: 1,
+             fg_dim_semantic: 1,
+             fg_bold_help: 0,
+             collect_supervisor_ids: 1,
+             collect_children_supervisor_ids: 1,
+             new: 1,
+             refresh: 1,
+             set_root: 2,
+             expand_all: 1,
+             collapse_all: 1,
+             flatten_tree: 3}
 
   @type node_type :: :supervisor | :worker
   @type node_status :: :running | :restarting | :terminated | :undefined
@@ -100,6 +121,31 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
     undefined: "[U]"
   }
 
+  # ----------------------------------------------------------------------------
+  # Style Helper Functions
+  # ----------------------------------------------------------------------------
+
+  @spec fg_semantic(atom()) :: Style.t()
+  defp fg_semantic(color) when is_atom(color),
+    do: Style.new() |> Style.fg(color)
+
+  @spec fg_bold_semantic(atom()) :: Style.t()
+  defp fg_bold_semantic(color) when is_atom(color),
+    do: Style.new() |> Style.fg(color) |> Style.bold()
+
+  @spec fg_dim_semantic(atom()) :: Style.t()
+  defp fg_dim_semantic(color) when is_atom(color),
+    do: Style.new() |> Style.fg(color) |> Style.dim()
+
+  @spec fg_bold_help() :: Style.t()
+  defp fg_bold_help do
+    Style.new() |> Style.fg(Theme.get_semantic(:help)) |> Style.dim()
+  end
+
+  # ----------------------------------------------------------------------------
+  # Icon Functions
+  # ----------------------------------------------------------------------------
+
   defp get_type_icons do
     %{
       supervisor: "S",
@@ -109,6 +155,7 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
 
   defp get_strategy_display do
     chars = CharacterSet.current_charset()
+
     %{
       one_for_one: "1:1",
       one_for_all: "1:*",
@@ -127,7 +174,8 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
   ## Options
 
   - `:root` - Root supervisor (pid, registered name, or module) - required
-  - `:update_interval` - Refresh interval in ms (default: 2000)
+  - `:update_interval` - Refresh interval metadata in ms (default: 2000); no
+    timer is started by the widget
   - `:on_select` - Callback when node is selected: `fn node -> ... end`
   - `:on_action` - Callback when action is performed: `fn {:restarted | :terminated, pid} -> ... end`
   - `:show_workers` - Show worker processes (default: true)
@@ -239,54 +287,16 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
   # Left - collapse or move to parent
   def handle_event(%Event.Key{key: :left}, state) do
     case get_selected(state) do
-      nil ->
-        {:ok, state}
-
-      node ->
-        if node.type == :supervisor and MapSet.member?(state.expanded, node.id) do
-          # Collapse this node
-          expanded = MapSet.delete(state.expanded, node.id)
-          flattened = flatten_tree(state.tree, expanded, true)
-          {:ok, %{state | expanded: expanded, flattened: flattened}}
-        else
-          # Move to parent
-          parent_idx = find_parent_idx(state.flattened, state.selected_idx)
-
-          if parent_idx do
-            {:ok, %{state | selected_idx: parent_idx}}
-          else
-            {:ok, state}
-          end
-        end
+      nil -> {:ok, state}
+      node -> handle_left_key(node, state)
     end
   end
 
   # Right - expand or move to first child
   def handle_event(%Event.Key{key: :right}, state) do
     case get_selected(state) do
-      nil ->
-        {:ok, state}
-
-      node ->
-        if node.type == :supervisor do
-          if MapSet.member?(state.expanded, node.id) do
-            # Move to first child
-            child_idx = state.selected_idx + 1
-
-            if child_idx < length(state.flattened) do
-              {:ok, %{state | selected_idx: child_idx}}
-            else
-              {:ok, state}
-            end
-          else
-            # Expand this node
-            expanded = MapSet.put(state.expanded, node.id)
-            flattened = flatten_tree(state.tree, expanded, true)
-            {:ok, %{state | expanded: expanded, flattened: flattened}}
-          end
-        else
-          {:ok, state}
-        end
+      nil -> {:ok, state}
+      node -> handle_right_key(node, state)
     end
   end
 
@@ -432,6 +442,62 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
   end
 
   # ----------------------------------------------------------------------------
+  # Private Helpers for Event Handling
+  # ----------------------------------------------------------------------------
+
+  defp handle_left_key(%{type: :supervisor, id: id}, state) do
+    if MapSet.member?(state.expanded, id) do
+      collapse_node(id, state)
+    else
+      move_to_parent(state)
+    end
+  end
+
+  defp handle_left_key(_node, state), do: move_to_parent(state)
+
+  defp collapse_node(node_id, state) do
+    expanded = MapSet.delete(state.expanded, node_id)
+    flattened = flatten_tree(state.tree, expanded, true)
+    {:ok, %{state | expanded: expanded, flattened: flattened}}
+  end
+
+  defp move_to_parent(state) do
+    parent_idx = find_parent_idx(state.flattened, state.selected_idx)
+
+    if parent_idx do
+      {:ok, %{state | selected_idx: parent_idx}}
+    else
+      {:ok, state}
+    end
+  end
+
+  defp handle_right_key(%{type: :supervisor, id: id}, state) do
+    if MapSet.member?(state.expanded, id) do
+      move_to_first_child(state)
+    else
+      expand_node(id, state)
+    end
+  end
+
+  defp handle_right_key(_node, state), do: {:ok, state}
+
+  defp move_to_first_child(state) do
+    child_idx = state.selected_idx + 1
+
+    if child_idx < length(state.flattened) do
+      {:ok, %{state | selected_idx: child_idx}}
+    else
+      {:ok, state}
+    end
+  end
+
+  defp expand_node(node_id, state) do
+    expanded = MapSet.put(state.expanded, node_id)
+    flattened = flatten_tree(state.tree, expanded, true)
+    {:ok, %{state | expanded: expanded, flattened: flattened}}
+  end
+
+  # ----------------------------------------------------------------------------
   # Handle Info (Timer)
   # ----------------------------------------------------------------------------
 
@@ -567,7 +633,14 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
     child_nodes =
       children
       |> Enum.map(fn {id, child_pid, type, _modules} ->
-        build_child_node(id, child_pid, type, sup_pid, depth + 1, show_workers)
+        build_child_node(%{
+          id: id,
+          child_pid: child_pid,
+          type: type,
+          parent_pid: sup_pid,
+          depth: depth + 1,
+          show_workers: show_workers
+        })
       end)
       |> Enum.reject(&is_nil/1)
 
@@ -585,151 +658,131 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
       children: child_nodes,
       memory: process_info[:memory] || 0,
       reductions: process_info[:reductions] || 0,
-      message_queue_len: process_info[:message_queue_len] || 0,
+      message_queue_len: Keyword.get(process_info, :message_queue_len, 0),
       depth: depth,
       parent_pid: parent_pid
     }
   end
 
-  defp build_child_node(id, child_pid, type, parent_pid, depth, show_workers) do
+  defp build_child_node(params) do
+    %{
+      id: id,
+      child_pid: child_pid,
+      type: type,
+      parent_pid: parent_pid,
+      depth: depth,
+      show_workers: show_workers
+    } = params
+
     case {type, child_pid} do
       {:supervisor, pid} when is_pid(pid) ->
         build_tree(pid, parent_pid, depth, show_workers)
 
       {:supervisor, :restarting} ->
-        %{
-          id: id,
-          pid: :restarting,
-          name: nil,
-          type: :supervisor,
-          status: :restarting,
-          child_spec: nil,
-          strategy: nil,
-          restart_count: 0,
-          max_restarts: nil,
-          max_seconds: nil,
-          children: nil,
-          memory: 0,
-          reductions: 0,
-          message_queue_len: 0,
-          depth: depth,
-          parent_pid: parent_pid
-        }
+        build_status_node(id, :restarting, :supervisor, depth, parent_pid)
 
       {:supervisor, :undefined} ->
-        %{
-          id: id,
-          pid: :undefined,
-          name: nil,
-          type: :supervisor,
-          status: :undefined,
-          child_spec: nil,
-          strategy: nil,
-          restart_count: 0,
-          max_restarts: nil,
-          max_seconds: nil,
-          children: nil,
-          memory: 0,
-          reductions: 0,
-          message_queue_len: 0,
-          depth: depth,
-          parent_pid: parent_pid
-        }
+        build_status_node(id, :undefined, :supervisor, depth, parent_pid)
 
       {:worker, pid} when is_pid(pid) ->
-        if show_workers do
-          process_info = get_process_info(pid)
-
-          %{
-            id: id,
-            pid: pid,
-            name: get_registered_name(pid),
-            type: :worker,
-            status: :running,
-            child_spec: nil,
-            strategy: nil,
-            restart_count: 0,
-            max_restarts: nil,
-            max_seconds: nil,
-            children: nil,
-            memory: process_info[:memory] || 0,
-            reductions: process_info[:reductions] || 0,
-            message_queue_len: process_info[:message_queue_len] || 0,
-            depth: depth,
-            parent_pid: parent_pid
-          }
-        else
-          nil
-        end
+        maybe_build_worker_node(id, pid, depth, parent_pid, show_workers)
 
       {:worker, :restarting} ->
-        if show_workers do
-          %{
-            id: id,
-            pid: :restarting,
-            name: nil,
-            type: :worker,
-            status: :restarting,
-            child_spec: nil,
-            strategy: nil,
-            restart_count: 0,
-            max_restarts: nil,
-            max_seconds: nil,
-            children: nil,
-            memory: 0,
-            reductions: 0,
-            message_queue_len: 0,
-            depth: depth,
-            parent_pid: parent_pid
-          }
-        else
-          nil
-        end
+        maybe_build_status_worker(id, :restarting, depth, parent_pid, show_workers)
 
       {:worker, :undefined} ->
-        if show_workers do
-          %{
-            id: id,
-            pid: :undefined,
-            name: nil,
-            type: :worker,
-            status: :undefined,
-            child_spec: nil,
-            strategy: nil,
-            restart_count: 0,
-            max_restarts: nil,
-            max_seconds: nil,
-            children: nil,
-            memory: 0,
-            reductions: 0,
-            message_queue_len: 0,
-            depth: depth,
-            parent_pid: parent_pid
-          }
-        else
-          nil
-        end
+        maybe_build_status_worker(id, :undefined, depth, parent_pid, show_workers)
     end
   end
 
+  # Builds a node with a specific status (restarting or undefined).
+  defp build_status_node(id, status, type, depth, parent_pid) do
+    %{
+      id: id,
+      pid: status,
+      name: nil,
+      type: type,
+      status: status,
+      child_spec: nil,
+      strategy: nil,
+      restart_count: 0,
+      max_restarts: nil,
+      max_seconds: nil,
+      children: nil,
+      memory: 0,
+      reductions: 0,
+      message_queue_len: 0,
+      depth: depth,
+      parent_pid: parent_pid
+    }
+  end
+
+  # Builds a worker node with process info if show_workers is true.
+  defp maybe_build_worker_node(id, pid, depth, parent_pid, true) do
+    process_info = get_process_info(pid)
+
+    %{
+      id: id,
+      pid: pid,
+      name: get_registered_name(pid),
+      type: :worker,
+      status: :running,
+      child_spec: nil,
+      strategy: nil,
+      restart_count: 0,
+      max_restarts: nil,
+      max_seconds: nil,
+      children: nil,
+      memory: process_info[:memory] || 0,
+      reductions: process_info[:reductions] || 0,
+      message_queue_len: Keyword.get(process_info, :message_queue_len, 0),
+      depth: depth,
+      parent_pid: parent_pid
+    }
+  end
+
+  defp maybe_build_worker_node(_id, _pid, _depth, _parent_pid, false), do: nil
+
+  # Builds a worker node with a specific status if show_workers is true.
+  defp maybe_build_status_worker(id, status, depth, parent_pid, true) do
+    %{
+      id: id,
+      pid: status,
+      name: nil,
+      type: :worker,
+      status: status,
+      child_spec: nil,
+      strategy: nil,
+      restart_count: 0,
+      max_restarts: nil,
+      max_seconds: nil,
+      children: nil,
+      memory: 0,
+      reductions: 0,
+      message_queue_len: 0,
+      depth: depth,
+      parent_pid: parent_pid
+    }
+  end
+
+  defp maybe_build_status_worker(_id, _status, _depth, _parent_pid, false), do: nil
+
   defp get_supervisor_flags(sup_pid) do
-    try do
-      # Try to get supervisor init args
-      case :sys.get_state(sup_pid, 500) do
-        %{strategy: strategy, intensity: intensity, period: period} ->
-          {strategy, intensity, period}
+    # Try to get supervisor init args
+    case :sys.get_state(sup_pid, 500) do
+      %{strategy: strategy, intensity: intensity, period: period} ->
+        {strategy, intensity, period}
 
-        # For older supervisor state format
-        state when is_tuple(state) ->
-          # Try to extract from supervisor internal state
-          {:one_for_one, nil, nil}
+      # For older supervisor state format
+      state when is_tuple(state) ->
+        # Try to extract from supervisor internal state
+        {:one_for_one, nil, nil}
 
-        _ ->
-          {:one_for_one, nil, nil}
-      end
-    catch
-      :exit, _ -> {:one_for_one, nil, nil}
+      _ ->
+        {:one_for_one, nil, nil}
     end
+  catch
+    :exit, _ -> {:one_for_one, nil, nil}
   end
 
   defp get_process_info(pid) when is_pid(pid) do
@@ -773,41 +826,42 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
     end
   end
 
+  @spec collect_supervisor_ids(term() | nil) :: MapSet.t()
   defp collect_supervisor_ids(nil), do: MapSet.new()
 
+  @spec collect_supervisor_ids(term()) :: MapSet.t()
   defp collect_supervisor_ids(node) do
     if node.type == :supervisor do
-      children_ids =
-        if node.children do
-          Enum.reduce(node.children, MapSet.new(), fn child, acc ->
-            MapSet.union(acc, collect_supervisor_ids(child))
-          end)
-        else
-          MapSet.new()
-        end
-
+      children_ids = collect_children_supervisor_ids(node.children)
       MapSet.put(children_ids, node.id)
     else
       MapSet.new()
     end
   end
 
+  defp collect_children_supervisor_ids(children) when is_list(children) do
+    Enum.reduce(children, MapSet.new(), fn child, acc ->
+      MapSet.union(acc, collect_supervisor_ids(child))
+    end)
+  end
+
+  defp collect_children_supervisor_ids(_), do: MapSet.new()
+
   defp find_parent_idx(flattened, current_idx) do
     case Enum.at(flattened, current_idx) do
-      nil ->
-        nil
-
-      current ->
-        current_depth = current.depth
-
-        flattened
-        |> Enum.take(current_idx)
-        |> Enum.with_index()
-        |> Enum.reverse()
-        |> Enum.find_value(fn {node, idx} ->
-          if node.depth < current_depth, do: idx, else: nil
-        end)
+      nil -> nil
+      current -> find_shallower_node_idx(flattened, current.depth, current_idx)
     end
+  end
+
+  defp find_shallower_node_idx(flattened, current_depth, current_idx) do
+    flattened
+    |> Enum.take(current_idx)
+    |> Enum.with_index()
+    |> Enum.reverse()
+    |> Enum.find_value(fn {node, idx} ->
+      if node.depth < current_depth, do: idx, else: nil
+    end)
   end
 
   # ----------------------------------------------------------------------------
@@ -929,7 +983,7 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
 
     count = length(state.flattened)
 
-    style = Style.new() |> Style.fg(Theme.get_semantic(:info)) |> Style.bold()
+    style = fg_bold_semantic(Theme.get_semantic(:info))
 
     text(
       "Supervision Tree: #{root_name} | Nodes: #{count}",
@@ -960,81 +1014,87 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
       |> Enum.with_index(scroll_offset)
 
     if Enum.empty?(visible_nodes) do
-      style = Style.new() |> Style.fg(Theme.get_semantic(:muted)) |> Style.dim()
+      muted_color = Theme.get_semantic(:muted)
+      style = fg_dim_semantic(muted_color)
       text("  No processes found", style)
     else
       lines =
         Enum.map(visible_nodes, fn {node, idx} ->
-          render_node_line(node, idx == state.selected_idx, state.expanded, chars, status_icons, type_icons, strategy_display)
+          render_node_line(
+            node,
+            idx == state.selected_idx,
+            state.expanded,
+            chars,
+            status_icons,
+            type_icons,
+            strategy_display
+          )
         end)
 
       stack(:vertical, lines)
     end
   end
 
-  defp render_node_line(node, selected, expanded, chars, status_icons, type_icons, strategy_display) do
+  defp render_node_line(
+         node,
+         selected,
+         expanded,
+         chars,
+         status_icons,
+         type_icons,
+         strategy_display
+       ) do
     indent = String.duplicate("  ", node.depth)
-
-    # Expand/collapse indicator
-    expand_indicator =
-      case {node.type, node.children} do
-        {:supervisor, children} when is_list(children) and length(children) > 0 ->
-          if MapSet.member?(expanded, node.id), do: "#{chars.arrow_down} ", else: "#{chars.arrow_right} "
-
-        {:supervisor, _} ->
-          "#{chars.arrow_right} "
-
-        _ ->
-          "  "
-      end
-
-    # Status indicator with icon and text
+    expand_indicator = expand_indicator(node, expanded, chars)
     status_ind = status_indicator(node.status, status_icons)
-
-    # Type icon
     type_icon = Map.get(type_icons, node.type, " ")
-
-    # Name
     name = node_display_name(node)
-
-    # Strategy for supervisors
-    strategy_str =
-      if node.type == :supervisor and node.strategy do
-        " [#{Map.get(strategy_display, node.strategy, "?")}]"
-      else
-        ""
-      end
-
-    # Memory info
-    memory_str =
-      if node.memory > 0 do
-        " #{format_bytes(node.memory)}"
-      else
-        ""
-      end
+    strategy_str = strategy_string(node, strategy_display)
+    memory_str = memory_string(node)
 
     content = "#{indent}#{expand_indicator}#{type_icon} #{name}#{strategy_str}#{memory_str}"
-
-    # Render with status indicator prefix and appropriate style
     full_content = "#{status_ind} #{content}"
 
-    if selected do
-      # Use theme selection style
-      text(full_content, Theme.get_component_style(:item, :selected))
-    else
-      # Use theme status style
-      text(full_content, status_style(node.status))
+    style = node_line_style(selected, node.status)
+    text(full_content, style)
+  end
+
+  defp expand_indicator(node, expanded, chars) do
+    case {node.type, node.children} do
+      {:supervisor, children} when is_list(children) and length(children) > 0 ->
+        if MapSet.member?(expanded, node.id),
+          do: "#{chars.arrow_down} ",
+          else: "#{chars.arrow_right} "
+
+      {:supervisor, _} ->
+        "#{chars.arrow_right} "
+
+      _ ->
+        "  "
     end
   end
+
+  defp strategy_string(%{type: :supervisor, strategy: strategy}, strategy_display)
+       when is_binary(strategy) do
+    " [#{Map.get(strategy_display, strategy, "?")}]"
+  end
+
+  defp strategy_string(_, _), do: ""
+
+  defp memory_string(%{memory: memory}) when memory > 0, do: " #{format_bytes(memory)}"
+  defp memory_string(_), do: ""
+
+  defp node_line_style(true, _status), do: Theme.get_component_style(:item, :selected)
+  defp node_line_style(false, status), do: status_style(status)
 
   defp render_filter_line(state) do
     cond do
       state.filter_input != nil ->
-        style = Style.new() |> Style.fg(Theme.get_semantic(:warning))
+        style = fg_semantic(Theme.get_semantic(:warning))
         text("Filter: #{state.filter_input}_", style)
 
       state.filter != nil ->
-        style = Style.new() |> Style.fg(Theme.get_semantic(:warning)) |> Style.dim()
+        style = fg_dim_semantic(Theme.get_semantic(:warning))
         text("Filter: #{state.filter} (Esc to clear)", style)
 
       true ->
@@ -1049,10 +1109,13 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
           nil
 
         node ->
-          info_style = Style.new() |> Style.fg(Theme.get_semantic(:info))
+          info_style = fg_semantic(Theme.get_semantic(:info))
 
           lines = [
-            text("#{String.duplicate(chars.h_line, 3)} Process Info #{String.duplicate(chars.h_line, 3)}", info_style),
+            text(
+              "#{String.duplicate(chars.h_line, 3)} Process Info #{String.duplicate(chars.h_line, 3)}",
+              info_style
+            ),
             text("  ID: #{inspect(node.id)}", nil),
             text("  PID: #{inspect(node.pid)}", nil),
             text("  Name: #{inspect(node.name)}", nil),
@@ -1063,33 +1126,36 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
             )
           ]
 
-          lines =
-            if node.type == :supervisor do
-              lines ++
-                [
-                  text("  Strategy: #{node.strategy || "unknown"}", nil),
-                  text(
-                    "  Max restarts: #{node.max_restarts || "?"}/#{node.max_seconds || "?"}s",
-                    nil
-                  )
-                ]
-            else
-              lines
-            end
-
-          lines =
-            lines ++
-              [
-                text("  Memory: #{format_bytes(node.memory)}", nil),
-                text("  Reductions: #{format_number(node.reductions)}", nil),
-                text("  Msg Queue: #{node.message_queue_len}", nil)
-              ]
+          lines = add_supervisor_info(lines, node)
+          lines = add_node_metrics(lines, node)
 
           stack(:vertical, lines)
       end
     else
       nil
     end
+  end
+
+  defp add_supervisor_info(lines, %{type: :supervisor} = node) do
+    lines ++
+      [
+        text("  Strategy: #{node.strategy || "unknown"}", nil),
+        text(
+          "  Max restarts: #{node.max_restarts || "?"}/#{node.max_seconds || "?"}s",
+          nil
+        )
+      ]
+  end
+
+  defp add_supervisor_info(lines, _node), do: lines
+
+  defp add_node_metrics(lines, node) do
+    lines ++
+      [
+        text("  Memory: #{format_bytes(node.memory)}", nil),
+        text("  Reductions: #{format_number(node.reductions)}", nil),
+        text("  Msg Queue: #{node.message_queue_len}", nil)
+      ]
   end
 
   defp render_confirmation(state) do
@@ -1100,19 +1166,19 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
       :restart ->
         node = get_selected(state)
         name = if node, do: node_display_name(node), else: "?"
-        style = Style.new() |> Style.fg(Theme.get_semantic(:warning)) |> Style.bold()
+        style = fg_bold_semantic(Theme.get_semantic(:warning))
         text("Restart #{name}? [y/n]", style)
 
       :terminate ->
         node = get_selected(state)
         name = if node, do: node_display_name(node), else: "?"
-        style = Style.new() |> Style.fg(Theme.get_semantic(:error)) |> Style.bold()
+        style = fg_bold_semantic(Theme.get_semantic(:error))
         text("Terminate #{name}? [y/n]", style)
     end
   end
 
   defp render_footer(_state, chars) do
-    style = Style.new() |> Style.fg(Theme.get_semantic(:help)) |> Style.dim()
+    style = fg_bold_help()
 
     text(
       "[#{chars.arrow_up}#{chars.arrow_down}] Navigate [#{chars.arrow_left}#{chars.arrow_right}] Expand/Collapse [i] Info [r] Restart [k] Kill [R] Refresh [/] Filter",

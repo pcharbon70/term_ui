@@ -455,4 +455,39 @@ defmodule TermUI.Widgets.TableTest do
       assert hd(new_state.sorted_data).name == "Zoe"
     end
   end
+
+  describe "data helpers" do
+    test "set_data updates rows and clamps cursor state" do
+      props = Table.new(columns: @test_columns, data: @test_data)
+      {:ok, state} = Table.init(props)
+
+      state =
+        state
+        |> Map.put(:cursor, 4)
+        |> Map.put(:scroll_offset, 4)
+        |> Map.put(:selected, MapSet.new([1, 4]))
+        |> Table.sort_by(:age, :asc)
+
+      new_data = [
+        %{name: "Zoe", age: 18, city: "Miami"},
+        %{name: "Yuki", age: 40, city: "Tokyo"}
+      ]
+
+      state = Table.set_data(state, new_data)
+
+      assert state.data == new_data
+      assert state.cursor == 1
+      assert state.scroll_offset == 0
+      assert state.selected == MapSet.new([1])
+      assert Enum.map(state.sorted_data, & &1.name) == ["Zoe", "Yuki"]
+    end
+
+    test "get_selected is an alias for get_selection" do
+      props = Table.new(columns: @test_columns, data: @test_data)
+      {:ok, state} = Table.init(props)
+      state = %{state | selected: MapSet.new([0, 2])}
+
+      assert Table.get_selected(state) == Table.get_selection(state)
+    end
+  end
 end

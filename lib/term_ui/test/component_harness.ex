@@ -5,6 +5,11 @@ defmodule TermUI.Test.ComponentHarness do
   Mounts a component in isolation with a test renderer, allowing
   event simulation and state/render inspection.
 
+  This helper predates `TermUI.StatefulComponent`'s current return values and
+  deliberately uses the compact interface documented below. Current widgets
+  with `{:ok, state}` event results and `render/2` should be tested directly or
+  through an adapter module.
+
   ## Usage
 
       # Mount component
@@ -78,7 +83,7 @@ defmodule TermUI.Test.ComponentHarness do
 
   - `:width` - Renderer width (default: 80)
   - `:height` - Renderer height (default: 24)
-  - `:props` - Initial props to pass to component
+  All options other than `:width` and `:height` are passed to `init/1`.
 
   ## Examples
 
@@ -288,7 +293,7 @@ defmodule TermUI.Test.ComponentHarness do
   @doc """
   Checks if state has changed since last render.
   """
-  @spec state_changed?(t()) :: boolean()
+  @spec state_changed?(t()) :: true
   def state_changed?(%__MODULE__{renders: [], state: _}), do: true
 
   def state_changed?(%__MODULE__{} = _harness) do
@@ -320,7 +325,7 @@ defmodule TermUI.Test.ComponentHarness do
   @doc """
   Resets the harness to initial state.
   """
-  @spec reset(t()) :: {:ok, t()} | {:error, term()}
+  @spec reset(t()) :: {:ok, t()}
   def reset(%__MODULE__{} = harness) do
     with {:ok, state} <- init_component(harness.module, harness.props) do
       TestRenderer.clear(harness.renderer)

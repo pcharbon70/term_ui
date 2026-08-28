@@ -5,6 +5,11 @@ defmodule TermUI.Component do
   Components are the building blocks of TermUI applications. This behaviour
   defines the minimal interface that all components must implement.
 
+  This is the low-level stateless widget behaviour. The default application
+  runtime expects a root module implementing `TermUI.Elm`; it does not mount
+  `TermUI.Component` modules as independent runtime children. Applications
+  normally call a stateless widget's `render/2` from the root `view/1`.
+
   ## Basic Usage
 
   The simplest component only needs to implement `render/2`:
@@ -32,11 +37,14 @@ defmodule TermUI.Component do
   - A `RenderNode` struct
   - A list of render nodes
   - A plain string (converted to text node)
+  - A tuple/map node accepted by `TermUI.Runtime.NodeRenderer`
 
   ## Props
 
-  Props are passed as a map to the `render/2` callback. Use `default_props/0`
-  to define defaults that are merged with passed props.
+  Props are passed as a map to the `render/2` callback. `use TermUI.Component`
+  defines `merge_props/1`; call it inside `render/2` when you want to merge
+  `default_props/0` with caller props. No runtime performs that merge
+  automatically.
 
   ## Area
 
@@ -51,8 +59,8 @@ defmodule TermUI.Component do
 
   # Type definitions
 
-  @typedoc "Render tree output - can be a node, list of nodes, or string"
-  @type render_tree :: RenderNode.t() | [render_tree()] | String.t()
+  @typedoc "Render tree output accepted by the integrated node renderer"
+  @type render_tree :: RenderNode.t() | [render_tree()] | String.t() | tuple() | map()
 
   @typedoc "Component props passed to render"
   @type props :: map()
@@ -87,15 +95,9 @@ defmodule TermUI.Component do
   ## Examples
 
       @impl true
-      def render(props, area) do
-        text = props[:text] || ""
-        style = props[:style]
-
-        if style do
-          styled_text(text, style)
-        else
-          text(text)
-        end
+      def render(props, _area) do
+        props = merge_props(props)
+        text(props[:text] || "", props[:style])
       end
   """
   @callback render(props(), rect()) :: render_tree()
@@ -123,8 +125,8 @@ defmodule TermUI.Component do
   @doc """
   Returns default prop values for the component.
 
-  These defaults are merged with props passed to `render/2`,
-  with passed props taking precedence.
+  These defaults are consumed by the generated `merge_props/1` helper, with
+  caller props taking precedence. `render/2` must call that helper explicitly.
 
   ## Examples
 

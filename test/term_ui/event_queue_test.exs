@@ -46,7 +46,7 @@ defmodule TermUI.EventQueueTest do
 
     test "pop from empty queue returns empty" do
       queue = EventQueue.new()
-      assert {:empty, queue} = EventQueue.pop(queue)
+      assert {:empty, ^queue} = EventQueue.pop(queue)
     end
   end
 
@@ -62,7 +62,7 @@ defmodule TermUI.EventQueueTest do
 
     test "peek on empty queue" do
       queue = EventQueue.new()
-      assert {:empty, queue} = EventQueue.peek(queue)
+      assert {:empty, ^queue} = EventQueue.peek(queue)
     end
   end
 

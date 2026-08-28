@@ -2,8 +2,13 @@ defmodule TermUI.Widgets.StreamWidget.Consumer do
   @moduledoc """
   GenStage consumer for StreamWidget.
 
-  This module provides a GenStage consumer that forwards events to a StreamWidget.
-  It handles backpressure by managing demand based on the widget's buffer state.
+  This module provides a GenStage consumer that forwards events to a process as
+  `{:stream_items, events}`. GenStage manages subscription demand; this adapter
+  does not dynamically change demand from the widget's buffer occupancy.
+
+  With an embedded widget, pass the runtime/root PID and forward received
+  messages from the root's optional `handle_info/2` to the stream widget's
+  state callback.
 
   ## Usage
 
@@ -28,7 +33,8 @@ defmodule TermUI.Widgets.StreamWidget.Consumer do
 
   ## Options
 
-  - `:demand` - How many items to request at a time (default: 10)
+  - `:demand` - Retained metadata (default: 10); use `max_demand` and
+    `min_demand` in `subscribe/3` to control the actual subscription
   """
   @spec start_link(pid(), keyword()) :: GenServer.on_start()
   def start_link(widget_pid, opts \\ []) do
@@ -87,8 +93,7 @@ defmodule TermUI.Widgets.StreamWidget.Consumer do
   end
 
   def handle_info({:set_demand, _demand}, state) do
-    # Widget is telling us how much demand is available
-    # This is handled by GenStage's built-in demand management
+    # Compatibility message. Subscription demand is configured in subscribe/3.
     {:noreply, [], state}
   end
 

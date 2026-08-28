@@ -4,12 +4,17 @@ defmodule TermUI.Runtime do
 
   The runtime implements The Elm Architecture dispatch loop:
   1. Receive event from terminal
-  2. Route to appropriate component
-  3. Call component's event_to_msg
-  4. Call component's update with message
+  2. Deliver it to the single root Elm module
+  3. Call the root's event_to_msg
+  4. Call the root's update with the resulting message
   5. Collect commands from update
   6. Mark component dirty
   7. On render timer, call view and render
+
+  The `components` field in runtime state currently contains only the reserved
+  `:root` entry. `TermUI.ComponentServer`, `TermUI.EventRouter`, and the other
+  process-oriented component services are separate lower-level APIs; they are
+  not mounted or consulted by this runtime loop.
 
   ## Usage
 
@@ -27,10 +32,12 @@ defmodule TermUI.Runtime do
   require Logger
 
   alias TermUI.Backend.Selector
+  alias TermUI.Command
+  alias TermUI.Command.Executor
   alias TermUI.Config
   alias TermUI.Elm
-  alias TermUI.EventQueue
   alias TermUI.Event
+  alias TermUI.EventQueue
   alias TermUI.Input.Selector, as: InputSelector
   alias TermUI.MessageQueue
   alias TermUI.PersistentTerms
@@ -41,19 +48,44 @@ defmodule TermUI.Runtime do
   alias TermUI.Runtime.State
   alias TermUI.Terminal
   alias TermUI.Terminal.InputReader
+  alias TermUI.Terminal.SignalHandler
+  alias TermUI.TerminalOutput
+
+  # Dialyzer: Functions with unmatched return values in side-effect calls
+  @dialyzer {:nowarn_function,
+             init: 1,
+             handle_call: 3,
+             handle_info: 2,
+             terminate: 2,
+             process_render_tick: 1,
+             cleanup_input_reader: 1,
+             cleanup_input_handler: 1,
+             cleanup_buffer_manager: 1,
+             cleanup_resize_callback: 1,
+             cleanup_backend: 1,
+             cleanup_shutdown: 1,
+             cleanup_terminal_restore: 1,
+             cleanup_persistent_terms: 0,
+             ensure_echo_enabled: 1,
+             render_with_buffer_manager: 2,
+             render_to_tty_backend: 2,
+             extract_all_cells: 1}
 
   @type option ::
           {:root, module()}
           | {:name, GenServer.name()}
           | {:render_interval, pos_integer()}
-          | {:backend, :auto | :raw | :tty}
+          | {:backend, :auto | :raw | :tty | module() | {module(), keyword()}}
           | {:skip_terminal, boolean()}
           | {:use_input_handler, boolean()}
+          | {:iex_mode, boolean()}
 
   # Default render interval in milliseconds (~60 FPS)
   @default_render_interval 16
 
-  # Input polling interval (same as render interval)
+  # Timeout for input handler poll calls in the async reader process.
+  # For Raw handler: controls how long each poll waits before returning :timeout.
+  # For TTY handler: ignored (TTY.poll blocks regardless of timeout).
   @input_poll_interval 16
 
   # --- Public API ---
@@ -66,8 +98,11 @@ defmodule TermUI.Runtime do
   - `:root` - The root component module (required)
   - `:name` - GenServer name (optional)
   - `:render_interval` - Milliseconds between renders (default: 16)
-  - `:backend` - Backend selection: `:auto` (default), `:raw`, `:tty`
+  - `:backend` - `:auto` (default), `:raw`, `:tty`, a backend module, or
+    `{backend_module, backend_opts}`
   - `:skip_terminal` - Skip terminal initialization (default: false, for testing)
+  - `:use_input_handler` - Use the `TermUI.Input` handler path instead of the
+    legacy local input reader (default: false)
 
   ## Backend Selection
 
@@ -76,6 +111,10 @@ defmodule TermUI.Runtime do
   - `:auto` (default) - Attempts raw mode first, falls back to TTY if unavailable
   - `:raw` - Forces raw mode (requires OTP 28+, errors if unavailable)
   - `:tty` - Forces TTY mode (line-based input, no raw mode attempt)
+
+  When the caller is an IEx evaluator, `:auto` resolves directly to `:tty` so
+  the existing shell keeps ownership of the terminal. An explicit `:raw` or
+  custom backend selection is preserved.
 
   ## Examples
 
@@ -93,6 +132,7 @@ defmodule TermUI.Runtime do
   """
   @spec start_link([option()]) :: GenServer.on_start()
   def start_link(opts) do
+    opts = inherit_iex_mode(opts)
     {name, opts} = Keyword.pop(opts, :name)
 
     if name do
@@ -111,8 +151,10 @@ defmodule TermUI.Runtime do
   - `:root` - The root component module (required)
   - `:name` - GenServer name (optional)
   - `:render_interval` - Milliseconds between renders (default: 16)
-  - `:backend` - Backend selection: `:auto`, `:raw`, `:tty`
+  - `:backend` - `:auto`, `:raw`, `:tty`, a backend module, or
+    `{backend_module, backend_opts}`
   - `:skip_terminal` - Skip terminal initialization (default: false)
+  - `:use_input_handler` - Use the `TermUI.Input` handler path (default: false)
 
   ## Examples
 
@@ -124,6 +166,8 @@ defmodule TermUI.Runtime do
   """
   @spec child_spec([option()]) :: Supervisor.child_spec()
   def child_spec(opts) do
+    opts = inherit_iex_mode(opts)
+
     %{
       id: __MODULE__,
       start: {__MODULE__, :start_link, [opts]},
@@ -142,7 +186,10 @@ defmodule TermUI.Runtime do
   end
 
   @doc """
-  Sends a message directly to a component.
+  Sends a message to a runtime component ID.
+
+  In the 1.0 runtime, only `:root` is registered. Messages sent to any other ID
+  are ignored.
   """
   @spec send_message(GenServer.server(), term(), term()) :: :ok
   def send_message(runtime, component_id, message) do
@@ -195,8 +242,9 @@ defmodule TermUI.Runtime do
   @doc """
   Gets the current backend mode.
 
-  Returns `:raw` if raw mode is active, `:tty` if TTY mode is active,
-  or `nil` if no runtime has been started.
+  Returns the node-global local backend context: `:raw`, `:tty`, `:skip`, or
+  `nil`. Explicit custom/SSH runtimes do not publish a mode here; query their
+  host/session state instead.
 
   ## Examples
 
@@ -215,7 +263,9 @@ defmodule TermUI.Runtime do
   - `:dimensions` - `{rows, cols}` tuple or `nil`
   - `:terminal` - Boolean indicating terminal presence
 
-  Returns `nil` if no runtime has been started.
+  Returns the node-global local Raw/TTY capability map, or `nil` when no local
+  context is published. Explicit custom/SSH runtimes keep capabilities in
+  their session/backend state and do not publish them here.
 
   ## Examples
 
@@ -225,7 +275,7 @@ defmodule TermUI.Runtime do
   def capabilities, do: PersistentTerms.capabilities()
 
   @doc """
-  Forces an immediate render (bypassing framerate limiter).
+  Marks the runtime dirty and performs an immediate render.
   """
   @spec force_render(GenServer.server()) :: :ok
   def force_render(runtime) do
@@ -277,27 +327,123 @@ defmodule TermUI.Runtime do
     # Runtime options take precedence over config
     opts = Config.merge_options(opts)
 
+    # Component callbacks run in this process rather than in the IEx evaluator
+    # that started us. Preserve the caller's mode for TermUI.iex_mode?/0.
+    Process.put({TermUI, :iex_mode}, Keyword.get(opts, :iex_mode, false))
+
     root_module = Keyword.fetch!(opts, :root)
     render_interval = Keyword.get(opts, :render_interval, @default_render_interval)
-    skip_terminal = Keyword.get(opts, :skip_terminal, false)
-    backend_opt = Keyword.get(opts, :backend, :auto)
-    use_input_handler = Keyword.get(opts, :use_input_handler, true)
 
-    # Select backend using Backend.Selector
-    {backend_mode, backend, backend_state, capabilities, terminal_started, buffer_manager, dimensions} =
-      if skip_terminal do
-        {:skip, nil, nil, nil, false, nil, nil}
+    {backend_mode, backend, backend_state, capabilities, terminal_started, buffer_manager,
+     dimensions} =
+      init_backend(opts, unique_buffer_manager_name())
+
+    # Suppress the local Logger handler only when this runtime owns the local
+    # terminal. Custom backends such as SSH must not mutate node-global logger
+    # state shared by other sessions.
+    logger_handler_config =
+      if local_backend_mode?(backend_mode) and not Keyword.get(opts, :skip_terminal, false) do
+        suppress_logger()
       else
-        select_backend(backend_opt)
+        nil
       end
 
-    # Store backend info in persistent_term for global access
-    PersistentTerms.store_backend_context(backend_mode, capabilities)
+    # The public global context describes the local terminal runtime. An SSH
+    # session must not overwrite it for every connected client.
+    if local_backend_mode?(backend_mode) do
+      PersistentTerms.store_backend_context(backend_mode, capabilities)
+    end
 
-    # Initialize root component state
-    root_state = root_module.init(opts)
+    # Initialize async command execution before the root module boots.
+    {:ok, command_executor} = Executor.start_link()
 
-    # Select and initialize input handler (if enabled)
+    # Initialize root component state and any startup commands.
+    {root_state, init_commands} =
+      opts
+      |> root_module.init()
+      |> Elm.normalize_init_result()
+
+    # Initialize input handling
+    {use_input_handler, input_handler, input_state, input_reader} =
+      init_input_handling(opts, backend_mode, terminal_started)
+
+    # Register for resize callbacks if using new input handler
+    register_resize_callback(use_input_handler, backend_mode)
+
+    state =
+      build_initial_state(%{
+        root_module: root_module,
+        root_state: root_state,
+        render_interval: render_interval,
+        terminal_started: terminal_started,
+        buffer_manager: buffer_manager,
+        dimensions: dimensions,
+        input_reader: input_reader,
+        backend_mode: backend_mode,
+        backend: backend,
+        backend_state: backend_state,
+        capabilities: capabilities,
+        command_executor: command_executor,
+        input_handler: input_handler,
+        input_state: input_state,
+        logger_handler_config: logger_handler_config
+      })
+
+    register_runtime_signal_handler(backend_mode)
+
+    # Schedule first render
+    schedule_render(render_interval)
+
+    # Spawn async reader process for input handler (runs poll loop in separate process)
+    state =
+      if state.input_handler do
+        reader_pid =
+          spawn_input_handler_reader(state.input_handler, state.input_state, self())
+
+        %{state | input_handler_reader: reader_pid}
+      else
+        state
+      end
+
+    state =
+      init_commands
+      |> Enum.map(&{:root, &1})
+      |> then(&execute_commands(&1, state))
+
+    {:ok, state}
+  end
+
+  defp init_backend(opts, buffer_manager_name) do
+    skip_terminal = Keyword.get(opts, :skip_terminal, false)
+    backend_opt = Keyword.get(opts, :backend, :auto)
+
+    if skip_terminal do
+      {:skip, nil, nil, nil, false, nil, nil}
+    else
+      select_backend(backend_opt, buffer_manager_name)
+    end
+  end
+
+  defp inherit_iex_mode(opts) do
+    iex_mode = Keyword.get_lazy(opts, :iex_mode, &TermUI.iex_mode?/0)
+    configured_backend = Keyword.get(opts, :backend, Config.get(:backend))
+
+    opts = Keyword.put(opts, :iex_mode, iex_mode)
+
+    if iex_mode and configured_backend == :auto do
+      Keyword.put(opts, :backend, :tty)
+    else
+      opts
+    end
+  end
+
+  defp init_input_handling(opts, backend_mode, terminal_started) do
+    use_input_handler_opt = Keyword.get(opts, :use_input_handler, false)
+
+    # TTY mode requires the new input handler (IEx compatible)
+    # Raw mode can use either InputReader (legacy) or Input.Raw (new)
+    use_input_handler = use_input_handler_opt or backend_mode == :tty
+
     {input_handler, input_state} =
       if use_input_handler and backend_mode in [:raw, :tty] do
         handler = InputSelector.select(backend_mode)
@@ -316,161 +462,198 @@ defmodule TermUI.Runtime do
         nil
       end
 
-    # Register for resize callbacks if using new input handler
-    # TTY backend also needs resize events even though terminal_started=false
+    {use_input_handler, input_handler, input_state, input_reader}
+  end
+
+  defp register_resize_callback(use_input_handler, backend_mode) do
     if use_input_handler and backend_mode in [:raw, :tty] do
       # Only register if Terminal GenServer is running
       if Process.whereis(Terminal) do
         Terminal.register_resize_callback(self())
       end
     end
+  end
 
-    state = %State{
-      root_module: root_module,
-      root_state: root_state,
+  # Raw mode installs this handler through Terminal. TTY does not start the
+  # Terminal singleton, so give it its own supervised subscriber to restore
+  # the cursor and alternate screen before the VM continues SIGTERM shutdown.
+  defp register_runtime_signal_handler(:tty) do
+    case :os.type() do
+      {:unix, _} ->
+        handler = {SignalHandler, self()}
+        args = {self(), :restore_terminal, nil}
+
+        case :gen_event.add_sup_handler(:erl_signal_server, handler, args) do
+          :ok ->
+            :ok
+
+          {:error, reason} ->
+            Logger.warning("Unable to register TTY signal handler: #{inspect(reason)}")
+        end
+
+      _ ->
+        :ok
+    end
+  rescue
+    error -> Logger.warning("Unable to register TTY signal handler: #{Exception.message(error)}")
+  catch
+    kind, reason ->
+      Logger.warning("Unable to register TTY signal handler: #{inspect({kind, reason})}")
+  end
+
+  defp register_runtime_signal_handler(_backend_mode), do: :ok
+
+  defp build_initial_state(params) do
+    %{
+      root_module: params.root_module,
+      root_state: params.root_state,
       message_queue: MessageQueue.new(),
       event_queue: EventQueue.new(),
-      render_interval: render_interval,
+      render_interval: params.render_interval,
       # Initial render needed
       dirty: true,
       focused_component: :root,
-      components: %{root: %{module: root_module, state: root_state}},
+      components: %{root: %{module: params.root_module, state: params.root_state}},
       pending_commands: %{},
       shutting_down: false,
-      terminal_started: terminal_started,
-      buffer_manager: buffer_manager,
-      dimensions: dimensions,
-      input_reader: input_reader,
-      backend_mode: backend_mode,
-      backend: backend,
-      backend_state: backend_state,
-      capabilities: capabilities,
-      input_handler: input_handler,
-      input_state: input_state
+      terminal_started: params.terminal_started,
+      buffer_manager: params.buffer_manager,
+      dimensions: params.dimensions,
+      input_reader: params.input_reader,
+      input_handler_reader: nil,
+      backend_mode: params.backend_mode,
+      backend: params.backend,
+      backend_state: params.backend_state,
+      capabilities: params.capabilities,
+      command_executor: params.command_executor,
+      input_handler: params.input_handler,
+      input_state: params.input_state,
+      logger_handler_config: params[:logger_handler_config]
     }
-
-    # Log backend selection and execution mode
-    if backend_mode && backend_mode != :skip do
-      require Logger
-      mode_str = if TermUI.iex_mode?(), do: "IEx", else: "standalone"
-      Logger.info("TermUI.Runtime started with #{backend_mode} backend (#{mode_str} mode)")
-    end
-
-    # Schedule first render
-    schedule_render(render_interval)
-
-    # Schedule first input poll (if using new input handler)
-    if input_handler do
-      schedule_input_poll()
-    end
-
-    {:ok, state}
   end
 
-  defp select_backend(backend_opt) do
+  defp select_backend(backend_opt, buffer_manager_name) do
     case Selector.select(backend_opt) do
       {:raw, _raw_state} ->
-        # Raw mode succeeded - set up terminal and buffers
-        case setup_terminal_and_buffers() do
-          {true, buffer_manager, dimensions} ->
-            backend = TermUI.Backend.Raw
-            # Initialize Raw backend with terminal setup
-            {:ok, backend_state} = backend.init(
-              alternate_screen: true,
-              hide_cursor: true,
-              mouse_tracking: :all,
-              size: dimensions
-            )
-            {:raw, backend, backend_state, nil, true, buffer_manager, dimensions}
-
-          {false, nil, nil} ->
-            # Terminal setup failed, fall back to TTY
-            capabilities = Selector.detect_capabilities()
-            backend = TermUI.Backend.TTY
-            {:ok, backend_state} = backend.init(capabilities: capabilities)
-            {:tty, backend, backend_state, capabilities, false, nil, nil}
-        end
+        attempt_raw_backend(fallback_to_tty: true, buffer_manager_name: buffer_manager_name)
 
       {:tty, capabilities} ->
-        # TTY mode - no terminal setup, no buffer manager
-        backend = TermUI.Backend.TTY
-        {:ok, backend_state} = backend.init(capabilities: capabilities)
-        {:tty, backend, backend_state, capabilities, false, nil, nil}
+        init_tty_backend(capabilities)
 
       {:explicit, :raw, _opts} ->
-        # Explicit raw backend selection - atom form
-        case setup_terminal_and_buffers() do
-          {true, buffer_manager, dimensions} ->
-            backend = TermUI.Backend.Raw
-            {:ok, backend_state} = backend.init(
-              alternate_screen: true,
-              hide_cursor: true,
-              mouse_tracking: :all,
-              size: dimensions
-            )
-            {:raw, backend, backend_state, nil, true, buffer_manager, dimensions}
-
-          {false, nil, nil} ->
-            raise "Raw backend requested but unavailable"
-        end
+        attempt_raw_backend(fallback_to_tty: false, buffer_manager_name: buffer_manager_name)
 
       {:explicit, :tty, _opts} ->
-        # Explicit TTY backend selection - atom form
-        capabilities = Selector.detect_capabilities()
-        backend = TermUI.Backend.TTY
-        {:ok, backend_state} = backend.init(capabilities: capabilities)
-        {:tty, backend, backend_state, capabilities, false, nil, nil}
+        init_tty_backend(Selector.detect_capabilities())
 
-      {:explicit, module, _opts} ->
-        # Explicit backend selection - module form (TermUI.Backend.Raw or TermUI.Backend.TTY)
-        case module do
-          TermUI.Backend.Raw ->
-            case setup_terminal_and_buffers() do
-              {true, buffer_manager, dimensions} ->
-                {:ok, backend_state} = module.init(
-                  alternate_screen: true,
-                  hide_cursor: true,
-                  mouse_tracking: :all,
-                  size: dimensions
-                )
-                {:raw, module, backend_state, nil, true, buffer_manager, dimensions}
+      {:explicit, module, opts} ->
+        init_explicit_backend(module, opts, buffer_manager_name)
+    end
+  end
 
-              {false, nil, nil} ->
-                raise "Raw backend requested but unavailable"
-            end
+  defp attempt_raw_backend(opts) do
+    case setup_terminal_and_buffers(Keyword.fetch!(opts, :buffer_manager_name)) do
+      {true, buffer_manager, dimensions} ->
+        init_raw_backend(buffer_manager, dimensions)
 
-          TermUI.Backend.TTY ->
-            capabilities = Selector.detect_capabilities()
-            {:ok, backend_state} = module.init(capabilities: capabilities)
-            {:tty, module, backend_state, capabilities, false, nil, nil}
+      {false, nil, nil} ->
+        if Keyword.get(opts, :fallback_to_tty, false) do
+          init_tty_backend(Selector.detect_capabilities())
+        else
+          raise "Raw backend requested but unavailable"
         end
     end
   end
 
-  defp setup_terminal_and_buffers do
-    # Enable raw mode first
-    with {:ok, _} <- Terminal.enable_raw_mode(),
-         :ok <- Terminal.enter_alternate_screen(),
-         :ok <- Terminal.hide_cursor(),
-         :ok <- Terminal.enable_mouse_tracking(:all),
-         {rows, cols} <- get_terminal_dimensions_safe(),
-         {:ok, buffer_pid} <- BufferManager.start_link(rows: rows, cols: cols) do
-      {true, buffer_pid, {cols, rows}}
-    else
-      {:error, {:already_started, buffer_pid}} ->
-        # BufferManager already started, use it
-        {rows, cols} = get_terminal_dimensions_safe()
-        {true, buffer_pid, {cols, rows}}
+  defp init_raw_backend(buffer_manager, {cols, rows}) do
+    backend = TermUI.Backend.Raw
 
-      {:error, _reason} ->
-        {false, nil, nil}
+    # Enable ONLCR translation (bare \n → \r\n) since raw mode disables OPOST
+    TerminalOutput.enable_onlcr()
 
-      _ ->
-        {false, nil, nil}
+    # Terminal GenServer already entered alternate screen and hid cursor in
+    # setup_terminal_and_buffers, so skip those here to avoid double entry.
+    # Mouse tracking is also already configured.
+    {:ok, backend_state} =
+      backend.init(
+        alternate_screen: false,
+        hide_cursor: false,
+        mouse_tracking: :none,
+        size: {cols, rows}
+      )
+
+    {:raw, backend, backend_state, nil, true, buffer_manager, {cols, rows}}
+  end
+
+  defp init_tty_backend(capabilities) do
+    backend = TermUI.Backend.TTY
+    {:ok, backend_state} = backend.init(capabilities: capabilities, alternate_screen: true)
+    {:tty, backend, backend_state, capabilities, false, nil, nil}
+  end
+
+  defp init_explicit_backend(TermUI.Backend.Raw, _opts, buffer_manager_name) do
+    attempt_raw_backend(fallback_to_tty: false, buffer_manager_name: buffer_manager_name)
+  end
+
+  defp init_explicit_backend(TermUI.Backend.TTY, _opts, _buffer_manager_name) do
+    init_tty_backend(Selector.detect_capabilities())
+  end
+
+  defp init_explicit_backend(module, opts, buffer_manager_name) when is_atom(module) do
+    {:ok, backend_state} = module.init(opts)
+    {:ok, {rows, cols}} = module.size(backend_state)
+
+    # Start BufferManager for the custom backend
+    buffer_pid =
+      case BufferManager.start_link(rows: rows, cols: cols, name: buffer_manager_name) do
+        {:ok, pid} -> pid
+        {:error, {:already_started, pid}} -> pid
+      end
+
+    {:custom, module, backend_state, nil, false, buffer_pid, {cols, rows}}
+  end
+
+  defp setup_terminal_and_buffers(buffer_manager_name) do
+    # Start Terminal GenServer (or reuse if already running)
+    case Terminal.start_link() do
+      {:ok, _pid} -> :ok
+      {:error, {:already_started, _pid}} -> :ok
+      {:error, reason} -> throw({:terminal_failed, reason})
     end
+
+    case Terminal.enable_raw_mode() do
+      {:ok, _state} -> :ok
+      {:error, reason} -> throw({:terminal_failed, reason})
+    end
+
+    # Configure terminal for TUI mode
+    :ok = Terminal.enter_alternate_screen()
+    :ok = Terminal.hide_cursor()
+    :ok = Terminal.enable_mouse_tracking(:all)
+
+    {rows, cols} = get_terminal_dimensions_safe()
+
+    # Start BufferManager (or reuse if already running)
+    buffer_pid =
+      case BufferManager.start_link(rows: rows, cols: cols, name: buffer_manager_name) do
+        {:ok, pid} -> pid
+        {:error, {:already_started, pid}} -> pid
+      end
+
+    {true, buffer_pid, {cols, rows}}
   rescue
     _ -> {false, nil, nil}
+  catch
+    {:terminal_failed, _} -> {false, nil, nil}
   end
+
+  @spec unique_buffer_manager_name() :: {:global, {:term_ui_buffer_manager, pid(), integer()}}
+  defp unique_buffer_manager_name do
+    {:global, {:term_ui_buffer_manager, self(), System.unique_integer([:positive])}}
+  end
+
+  defp local_backend_mode?(mode), do: mode in [:raw, :tty, :skip]
+  defp terminal_backend_mode?(mode), do: mode in [:raw, :tty]
 
   defp get_terminal_dimensions_safe do
     case Terminal.get_terminal_size() do
@@ -489,9 +672,11 @@ defmodule TermUI.Runtime do
       state = %{state | event_queue: new_queue}
       # Log if event was dropped
       case result do
-        {:dropped, _} -> :ok  # EventQueue already logged
+        # EventQueue already logged
+        {:dropped, _} -> :ok
         :ok -> :ok
       end
+
       # Process queued events
       state = process_event_queue(state)
       {:noreply, state}
@@ -533,35 +718,19 @@ defmodule TermUI.Runtime do
   end
 
   @impl true
-  def handle_info(:input_poll, state) do
-    # Poll input handler for new events
-    if state.shutting_down or state.input_handler == nil do
+  def handle_info(:input_eof, state) do
+    # EOF from async input handler reader - initiate shutdown
+    if state.shutting_down do
       {:noreply, state}
     else
-      case state.input_handler.poll(state.input_state, @input_poll_interval) do
-        {{:ok, event}, new_input_state} ->
-          # Dispatch the event and continue polling
-          state = %{state | input_state: new_input_state}
-          state = dispatch_event(event, state)
-          schedule_input_poll()
-          {:noreply, state}
-
-        {:timeout, new_input_state} ->
-          # No input, but continue polling
-          schedule_input_poll()
-          {:noreply, %{state | input_state: new_input_state}}
-
-        {:eof, _new_input_state} ->
-          # EOF - initiate shutdown
-          state = initiate_shutdown(%{state | input_state: nil})
-          {:noreply, state}
-      end
+      state = initiate_shutdown(%{state | input_handler_reader: nil})
+      {:noreply, state}
     end
   end
 
   @impl true
   def handle_info({:input, event}, state) do
-    # Keyboard/mouse input from InputReader
+    # Keyboard/mouse input from InputReader or async input handler reader
     if state.shutting_down do
       {:noreply, state}
     else
@@ -575,6 +744,7 @@ defmodule TermUI.Runtime do
         {:dropped, _} -> :ok
         :ok -> :ok
       end
+
       {:noreply, state}
     end
   end
@@ -591,8 +761,45 @@ defmodule TermUI.Runtime do
   end
 
   @impl true
+  def handle_info({:ssh_input, event}, state) do
+    # SSH input delivered externally from the host process
+    if state.shutting_down do
+      {:noreply, state}
+    else
+      {result, new_queue} = EventQueue.push(state.event_queue, event)
+      state = %{state | event_queue: new_queue}
+      state = process_event_queue(state)
+
+      case result do
+        {:dropped, _} -> :ok
+        :ok -> :ok
+      end
+
+      {:noreply, state}
+    end
+  end
+
+  @impl true
+  def handle_info({:ssh_resize, rows, cols}, state)
+      when is_integer(rows) and rows > 0 and is_integer(cols) and cols > 0 do
+    # SSH window_change event from the host process
+    if state.shutting_down do
+      {:noreply, state}
+    else
+      state = handle_resize(rows, cols, state)
+      {:noreply, state}
+    end
+  end
+
+  @impl true
   def handle_info({:DOWN, _ref, :process, _pid, _reason}, state) do
     # Command task completed (handled via command_result)
+    {:noreply, state}
+  end
+
+  @impl true
+  def handle_info({:command_result, component_id, command_id, result}, state) do
+    state = handle_command_result(component_id, command_id, result, state)
     {:noreply, state}
   end
 
@@ -602,43 +809,67 @@ defmodule TermUI.Runtime do
     {:stop, :normal, state}
   end
 
+  # Handle linked process exits (input handler reader, etc.)
+  @impl true
+  def handle_info({:EXIT, pid, reason}, state) do
+    if pid == state[:input_handler_reader] do
+      Logger.warning("Input handler reader exited: #{inspect(reason)}")
+      {:noreply, %{state | input_handler_reader: nil}}
+    else
+      # Forward to root module or ignore
+      if function_exported?(state.root_module, :handle_info, 2) do
+        handle_root_info({:EXIT, pid, reason}, state)
+      else
+        {:noreply, state}
+      end
+    end
+  end
+
   # Catch-all for unknown messages - forward to root module's handle_info if it exists
   @impl true
   def handle_info(msg, state) do
     if function_exported?(state.root_module, :handle_info, 2) do
-      case state.root_module.handle_info(msg, state.root_state) do
-        {new_root_state, commands} ->
-          # Update both root_state and components[:root].state
-          components =
-            Map.update!(state.components, :root, fn comp ->
-              %{comp | state: new_root_state}
-            end)
-
-          state = %{state | root_state: new_root_state, components: components, dirty: true}
-          # Tag commands with root component_id
-          tagged_commands = Enum.map(commands, fn cmd -> {:root, cmd} end)
-          state = execute_commands(tagged_commands, state)
-          {:noreply, state}
-
-        new_root_state ->
-          # Support simple return without commands
-          # Update both root_state and components[:root].state
-          components =
-            Map.update!(state.components, :root, fn comp ->
-              %{comp | state: new_root_state}
-            end)
-
-          {:noreply, %{state | root_state: new_root_state, components: components, dirty: true}}
-      end
+      handle_root_info(msg, state)
     else
       # Ignore unknown messages if root module doesn't handle them
       {:noreply, state}
     end
   end
 
+  defp handle_root_info(msg, state) do
+    case state.root_module.handle_info(msg, state.root_state) do
+      {new_root_state, commands} ->
+        state = update_root_state(state, new_root_state)
+        tagged_commands = Enum.map(commands, fn cmd -> {:root, cmd} end)
+        state = execute_commands(tagged_commands, state)
+        {:noreply, state}
+
+      new_root_state ->
+        state = update_root_state(state, new_root_state)
+        {:noreply, state}
+    end
+  end
+
+  defp update_root_state(state, new_root_state) do
+    components =
+      Map.update!(state.components, :root, fn comp ->
+        %{comp | state: new_root_state}
+      end)
+
+    %{state | root_state: new_root_state, components: components, dirty: true}
+  end
+
   @impl true
   def handle_call(:get_state, _from, state) do
     {:reply, state, state}
+  end
+
+  @impl true
+  def handle_call(:restore_terminal, _from, state) do
+    # TTY input may have a blocking IO.getn request queued on standard_io.
+    # Bypass that IO server so signal cleanup cannot stall behind the read.
+    TerminalOutput.write_to_tty(TerminalOutput.cleanup_sequence())
+    {:reply, :ok, state}
   end
 
   @impl true
@@ -650,84 +881,181 @@ defmodule TermUI.Runtime do
 
   @impl true
   def terminate(_reason, state) do
-    # Wrap all cleanup in try/rescue to ensure we attempt all cleanup steps
-    # even if some fail
+    # Step 1: Restore logger FIRST (before any other cleanup that might log)
+    terminate_logger_restore(state)
 
-    # Stop input reader first to stop receiving events
-    try do
-      if state.input_reader do
-        InputReader.stop(state.input_reader)
-      end
-    rescue
-      _ -> :ok
+    # Step 2: Stop input reader BEFORE backend (prevents stdin contention during drain)
+    cleanup_input_reader(state)
+    cleanup_input_handler(state)
+
+    # Step 3: Backend shutdown (drain pending input, cooked mode)
+    cleanup_backend(state)
+    cleanup_buffer_manager(state)
+
+    # Step 4: Terminal restore and resize callback cleanup
+    cleanup_resize_callback(state)
+    cleanup_shutdown(state)
+    cleanup_terminal_restore(state)
+
+    # Only runtimes that initialized a physical terminal should attempt escape
+    # sequence, stty, or echo restoration. `:skip` still owns the runtime's
+    # persistent backend context, but deliberately has no terminal to restore.
+    if terminal_backend_mode?(state.backend_mode) do
+      terminate_defensive_cleanup()
+      ensure_echo_enabled(state)
     end
 
-    # Stop input handler to restore IO options (TTY mode)
-    try do
-      if state.input_handler and state.input_state do
-        state.input_handler.stop(state.input_state)
-      end
-    rescue
-      _ -> :ok
-    end
-
-    # Unregister from resize callbacks
-    try do
-      if state.terminal_started do
-        Terminal.unregister_resize_callback(self())
-      end
-    rescue
-      _ -> :ok
-    end
-
-    # Shutdown backend - this handles terminal restoration
-    try do
-      if state.backend and state.backend_state do
-        state.backend.shutdown(state.backend_state)
-      end
-    rescue
-      _ -> :ok
-    end
-
-    # Ensure clean shutdown
-    try do
-      if not state.shutting_down do
-        do_shutdown(state)
-      end
-    rescue
-      _ -> :ok
-    end
-
-    # Restore terminal via Terminal module - this is the legacy path
-    # and provides defense-in-depth if backend shutdown didn't fully restore
-    try do
-      if state.terminal_started and state.backend == nil do
-        # Only do this if backend.shutdown wasn't called (defense in depth)
-        Terminal.restore()
-      end
-    rescue
-      _ -> :ok
-    end
-
-    # Defensive cleanup: directly write mouse disable sequences to terminal
-    # This ensures cleanup even if backend shutdown is unavailable or crashed
-    try do
-      # Disable all mouse tracking modes
-      IO.write("\e[?1006l\e[?1003l\e[?1002l\e[?1000l")
-      # Show cursor
-      IO.write("\e[?25h")
-    rescue
-      _ -> :ok
-    end
-
-    # Clean up persistent_term storage to prevent memory leaks
-    try do
-      PersistentTerms.cleanup()
-    rescue
-      _ -> :ok
-    end
+    if local_backend_mode?(state.backend_mode), do: cleanup_persistent_terms()
 
     :ok
+  end
+
+  defp cleanup_input_reader(state) do
+    if state.input_reader do
+      InputReader.stop(state.input_reader)
+    end
+  rescue
+    _ -> :ok
+  end
+
+  defp cleanup_input_handler(state) do
+    # Kill the async reader process first
+    if is_pid(state[:input_handler_reader]) and Process.alive?(state[:input_handler_reader]) do
+      Process.unlink(state[:input_handler_reader])
+      Process.exit(state[:input_handler_reader], :shutdown)
+    end
+
+    # Then stop the handler (restores IO opts for TTY, etc.)
+    if state.input_handler != nil and state.input_state != nil do
+      state.input_handler.stop(state.input_state)
+    end
+  rescue
+    _ -> :ok
+  end
+
+  defp cleanup_resize_callback(state) do
+    if state.terminal_started do
+      Terminal.unregister_resize_callback(self())
+    end
+  rescue
+    _ -> :ok
+  end
+
+  defp cleanup_backend(state) do
+    if state.backend != nil and state.backend_state != nil do
+      state.backend.shutdown(state.backend_state)
+    end
+  rescue
+    _ -> :ok
+  end
+
+  defp cleanup_buffer_manager(%{buffer_manager: pid}) when is_pid(pid) do
+    if Process.alive?(pid), do: GenServer.stop(pid, :normal)
+  rescue
+    _ -> :ok
+  end
+
+  defp cleanup_buffer_manager(_state), do: :ok
+
+  defp cleanup_shutdown(state) do
+    if not state.shutting_down do
+      do_shutdown(state)
+    end
+  rescue
+    _ -> :ok
+  end
+
+  defp cleanup_terminal_restore(state) do
+    # Only restore Terminal singleton for local backends (Raw/TTY).
+    # Custom backends (SSH) handle their own cleanup in cleanup_backend/1.
+    if state.terminal_started and state.backend_mode in [:raw, :tty] do
+      Terminal.restore()
+    end
+  rescue
+    _ -> :ok
+  end
+
+  defp cleanup_persistent_terms do
+    PersistentTerms.cleanup()
+  rescue
+    _ -> :ok
+  end
+
+  defp ensure_echo_enabled(state) do
+    # Only restore echo on local terminals, not custom backends (SSH)
+    if terminal_backend_mode?(state.backend_mode) do
+      :io.setopts(echo: true)
+    end
+  rescue
+    _ -> :ok
+  end
+
+  defp terminate_logger_restore(state) do
+    restore_logger(state.logger_handler_config)
+  rescue
+    _ -> :ok
+  end
+
+  defp terminate_defensive_cleanup do
+    # Crash-safe logger restore from persistent_term
+    restore_logger_from_persistent_term()
+
+    # Direct-to-TTY cleanup (bypasses Erlang IO)
+    TerminalOutput.write_to_tty(TerminalOutput.cleanup_sequence())
+
+    # Cleanup ONLCR persistent_term
+    TerminalOutput.disable_onlcr()
+
+    # Safety net stty restore (skip on WSL where stty always fails)
+    unless TerminalOutput.needs_hard_reset?() do
+      TermUI.TermUtils.safe_stty(["sane"])
+    end
+  rescue
+    _ -> :ok
+  end
+
+  defp suppress_logger do
+    case :logger.get_handler_config(:default) do
+      {:ok, config} ->
+        _ = :logger.remove_handler(:default)
+        :persistent_term.put(:term_ui_logger_handler_config, config)
+        config
+
+      _ ->
+        nil
+    end
+  rescue
+    _ -> nil
+  end
+
+  defp restore_logger(nil), do: :ok
+
+  defp restore_logger(%{module: module} = config) do
+    # Only add if not already present (idempotent)
+    case :logger.get_handler_config(:default) do
+      {:ok, _} ->
+        :ok
+
+      _ ->
+        _ = :logger.add_handler(:default, module, config)
+        :ok
+    end
+
+    :persistent_term.erase(:term_ui_logger_handler_config)
+    :ok
+  rescue
+    _ -> :ok
+  end
+
+  defp restore_logger(_), do: :ok
+
+  defp restore_logger_from_persistent_term do
+    case :persistent_term.get(:term_ui_logger_handler_config, nil) do
+      nil -> :ok
+      config -> restore_logger(config)
+    end
+  rescue
+    _ -> :ok
   end
 
   # --- Event Dispatch ---
@@ -753,8 +1081,7 @@ defmodule TermUI.Runtime do
   end
 
   defp dispatch_event(%Event.Mouse{} = event, state) do
-    # Mouse events go to component at position
-    # For now, just send to root (spatial index will be added later)
+    # The integrated 1.0 runtime has one root and does not use SpatialIndex.
     dispatch_to_component(:root, event, state)
   end
 
@@ -799,7 +1126,7 @@ defmodule TermUI.Runtime do
               state
 
             :propagate ->
-              # Would propagate to parent, for now just ignore
+              # The single-root runtime has no parent target.
               state
           end
         rescue
@@ -904,15 +1231,43 @@ defmodule TermUI.Runtime do
       GenServer.cast(self(), :shutdown)
       %{state | shutting_down: true}
     else
-      # Track pending commands for execution
-      pending =
-        Enum.reduce(commands, state.pending_commands, fn {component_id, cmd}, acc ->
-          command_id = make_ref()
-          Map.put(acc, command_id, %{component_id: component_id, command: cmd})
-        end)
-
-      %{state | pending_commands: pending}
+      Enum.reduce(commands, state, fn {component_id, cmd}, acc ->
+        execute_command(component_id, cmd, acc)
+      end)
     end
+  end
+
+  defp execute_command(_component_id, %Command{type: :none}, state), do: state
+
+  defp execute_command(component_id, %Command{} = command, state) do
+    case Executor.execute(state.command_executor, command, self(), component_id) do
+      {:ok, command_id} ->
+        pending =
+          Map.put(state.pending_commands, command_id, %{
+            component_id: component_id,
+            command: command
+          })
+
+        %{state | pending_commands: pending}
+
+      {:error, reason} ->
+        enqueue_message(component_id, {:error, reason}, state)
+    end
+  end
+
+  defp execute_command(component_id, {:timer, ms, message}, state)
+       when is_integer(ms) and ms >= 0 do
+    execute_command(component_id, Command.timer(ms, message), state)
+  end
+
+  defp execute_command(_component_id, {:send, pid, message}, state) when is_pid(pid) do
+    send(pid, message)
+    state
+  end
+
+  defp execute_command(component_id, other, state) do
+    Logger.warning("Unknown command for #{inspect(component_id)}: #{inspect(other)}")
+    state
   end
 
   defp handle_command_result(component_id, command_id, result, state) do
@@ -920,8 +1275,17 @@ defmodule TermUI.Runtime do
     pending = Map.delete(state.pending_commands, command_id)
     state = %{state | pending_commands: pending}
 
-    # Send result as message to component
-    enqueue_message(component_id, result, state)
+    if state.shutting_down do
+      state
+    else
+      case result do
+        {:send_to, target_component, message} ->
+          enqueue_message(target_component, message, state)
+
+        _ ->
+          enqueue_message(component_id, result, state)
+      end
+    end
   end
 
   # --- Rendering ---
@@ -930,8 +1294,27 @@ defmodule TermUI.Runtime do
     Process.send_after(self(), :render, interval)
   end
 
-  defp schedule_input_poll do
-    Process.send_after(self(), :input_poll, @input_poll_interval)
+  # Spawns a linked process that runs the input handler's poll loop.
+  # Events are sent as {:input, event} messages (same format as InputReader).
+  # This prevents blocking handlers (like Input.TTY) from freezing the GenServer.
+  defp spawn_input_handler_reader(handler, input_state, target) do
+    spawn_link(fn ->
+      input_handler_loop(handler, input_state, target)
+    end)
+  end
+
+  defp input_handler_loop(handler, input_state, target) do
+    case handler.poll(input_state, @input_poll_interval) do
+      {{:ok, event}, new_input_state} ->
+        send(target, {:input, event})
+        input_handler_loop(handler, new_input_state, target)
+
+      {:timeout, new_input_state} ->
+        input_handler_loop(handler, new_input_state, target)
+
+      {:eof, _new_input_state} ->
+        send(target, :input_eof)
+    end
   end
 
   defp process_render_tick(state) do
@@ -1024,7 +1407,7 @@ defmodule TermUI.Runtime do
       end
 
     # Create temporary buffer for this frame
-    case TermUI.Renderer.Buffer.new(rows, cols) do
+    case Buffer.new(rows, cols) do
       {:ok, temp_buffer} ->
         # Render tree directly to temporary buffer (bypassing BufferManager)
         NodeRenderer.render_to_buffer_direct(render_tree, temp_buffer)
@@ -1033,7 +1416,7 @@ defmodule TermUI.Runtime do
         cells = extract_all_cells(temp_buffer)
 
         # Clean up temporary buffer
-        TermUI.Renderer.Buffer.destroy(temp_buffer)
+        Buffer.destroy(temp_buffer)
 
         {cells, state.backend_state}
 
@@ -1045,16 +1428,19 @@ defmodule TermUI.Runtime do
 
   # Extracts all non-empty cells from buffer for TTY backend
   defp extract_all_cells(buffer) do
-    {rows, _cols} = TermUI.Renderer.Buffer.dimensions(buffer)
+    {rows, _cols} = Buffer.dimensions(buffer)
 
     for row <- 1..rows, reduce: [] do
       acc ->
-        buffer_row = TermUI.Renderer.Buffer.get_row(buffer, row)
+        buffer_row = Buffer.get_row(buffer, row)
 
         cells_in_row =
           buffer_row
           |> Enum.with_index(1)
-          |> Enum.filter(fn {%TermUI.Renderer.Cell{char: char}, _col} -> char != " " end)
+          |> Enum.filter(fn {%TermUI.Renderer.Cell{} = cell, _col} ->
+            # Include non-space characters OR spaces with non-default background
+            cell.char != " " or (cell.bg != nil and cell.bg != :default)
+          end)
           |> Enum.flat_map(fn {cell, col} -> cell_to_backend_tuple(cell, row, col) end)
 
         cells_in_row ++ acc
@@ -1067,28 +1453,87 @@ defmodule TermUI.Runtime do
   defp get_changed_cells(current, previous) do
     {rows, _cols} = Buffer.dimensions(current)
 
-    # Iterate through all cells and collect changed ones
-    # For efficiency, we use the Diff module's row comparison
     for row <- 1..rows, reduce: [] do
       acc ->
         current_row = Buffer.get_row(current, row)
         previous_row = Buffer.get_row(previous, row)
 
-        # Find changed cells in this row (non-empty cells only for efficiency)
-        changed_in_row =
-          current_row
-          |> Enum.with_index(1)
-          |> Enum.filter(fn {%Cell{char: char}, _col} -> char != " " end)
-          |> Enum.filter(fn {cell, col} ->
-            prev_cell = Enum.at(previous_row, col - 1, Cell.empty())
-            not Cell.equal?(cell, prev_cell)
-          end)
-          |> Enum.flat_map(fn {cell, col} ->
-            cell_to_backend_tuple(cell, row, col)
-          end)
-
-        changed_in_row ++ acc
+        # Single O(n) zip pass instead of two O(n^2) passes with Enum.at
+        diff_row_cells(current_row, previous_row, row, 1, acc)
     end
+  end
+
+  # Zips current and previous rows in a single pass, emitting:
+  # - Changed displayable cells (new content to draw)
+  # - Clear cells (previous content that needs erasing)
+  defp diff_row_cells([], [], _row, _col, acc), do: acc
+
+  defp diff_row_cells([cur | cur_rest], [prev | prev_rest], row, col, acc) do
+    acc = diff_cell(cur, prev, row, col, acc)
+
+    diff_row_cells(cur_rest, prev_rest, row, col + 1, acc)
+  end
+
+  # Handle rows of different lengths (shouldn't happen normally, but be safe)
+  defp diff_row_cells([cur | cur_rest], [], row, col, acc) do
+    acc =
+      if displayable_cell?(cur) do
+        cell_to_backend_tuple(cur, row, col) ++ acc
+      else
+        acc
+      end
+
+    diff_row_cells(cur_rest, [], row, col + 1, acc)
+  end
+
+  defp diff_row_cells([], [prev | prev_rest], row, col, acc) do
+    acc =
+      if displayable_cell?(prev) do
+        [{{row, col}, {" ", :default, :default, []}} | acc]
+      else
+        acc
+      end
+
+    diff_row_cells([], prev_rest, row, col + 1, acc)
+  end
+
+  defp diff_cell(cur, prev, row, col, acc) do
+    if Cell.equal?(cur, prev) do
+      acc
+    else
+      cur_displayable = displayable_cell?(cur)
+      prev_displayable = displayable_cell?(prev)
+
+      acc
+      |> add_current_cell(cur, row, col, cur_displayable)
+      |> clear_previous_cell(prev, cur, row, col, prev_displayable, cur_displayable)
+    end
+  end
+
+  defp add_current_cell(acc, cur, row, col, true) do
+    cell_to_backend_tuple(cur, row, col) ++ acc
+  end
+
+  defp add_current_cell(acc, _cur, _row, _col, false), do: acc
+
+  defp clear_previous_cell(acc, prev, cur, row, col, prev_displayable, cur_displayable) do
+    if clear_previous_cell?(prev, cur, prev_displayable, cur_displayable) do
+      [{{row, col}, {" ", :default, :default, []}} | acc]
+    else
+      acc
+    end
+  end
+
+  defp clear_previous_cell?(_prev, _cur, true, false), do: true
+
+  defp clear_previous_cell?(prev, cur, true, true) do
+    prev.bg != nil and prev.bg != :default and cur.char == " "
+  end
+
+  defp clear_previous_cell?(_prev, _cur, _prev_displayable, _cur_displayable), do: false
+
+  defp displayable_cell?(%Cell{} = cell) do
+    cell.char != " " or (cell.bg != nil and cell.bg != :default)
   end
 
   # Converts a Cell struct to the backend format: {{row, col}, {char, fg, bg, attrs}}
@@ -1109,30 +1554,79 @@ defmodule TermUI.Runtime do
   # --- Resize Handling ---
 
   defp handle_resize(rows, cols, state) do
-    # Skip if terminal not available
-    if state.terminal_started do
-      # Update dimensions in state
-      new_dimensions = {cols, rows}
+    cond do
+      state.terminal_started ->
+        # Local terminal (Raw/TTY) with Terminal singleton
+        new_dimensions = {cols, rows}
 
-      # Resize buffer manager
-      if state.buffer_manager do
-        BufferManager.resize(state.buffer_manager, rows, cols)
-      end
+        if state.buffer_manager do
+          BufferManager.resize(state.buffer_manager, rows, cols)
+        end
 
-      # Clear screen to avoid artifacts
-      IO.write("\e[2J")
+        resize_event = Event.Resize.new(cols, rows)
+        state = broadcast_event(resize_event, %{state | dimensions: new_dimensions})
 
-      # Create resize event and broadcast to all components
-      resize_event = Event.Resize.new(cols, rows)
-      state = broadcast_event(resize_event, %{state | dimensions: new_dimensions})
+        # broadcast_event only enqueues; drain the queue so the upcoming
+        # render uses the new dimensions instead of the previous frame's.
+        # Without this the first frame after a resize draws stale content
+        # into the resized buffer -- visible as blanks (on grow) or
+        # clipping (on shrink) during drag-resize.
+        #
+        # We intentionally do not call backend.clear here: the diff
+        # already emits both content cells and erase cells for positions
+        # that went from content to empty, so the terminal repaints
+        # cleanly without a flicker-inducing full screen wipe.
+        state = process_messages(state)
+        finish_resize(state)
 
-      # Mark dirty and force immediate render
-      state = %{state | dirty: true}
-      do_render(state)
-    else
-      state
+      state.backend != nil ->
+        # Custom backend (SSH, etc.) — no Terminal singleton
+        new_dimensions = {cols, rows}
+
+        if state.buffer_manager do
+          BufferManager.resize(state.buffer_manager, rows, cols)
+        end
+
+        # Update backend size (no clear -- see terminal_started branch).
+        backend_state =
+          if function_exported?(state.backend, :update_size, 3) do
+            {:ok, bs} = state.backend.update_size(state.backend_state, rows, cols)
+            bs
+          else
+            state.backend_state
+          end
+
+        # The diff renderer only emits erase cells when a buffer_manager is
+        # in play. Backends without one (TTY path) need a real clear so
+        # stale pre-resize content isn't left on screen.
+        backend_state =
+          if state.buffer_manager == nil do
+            {:ok, cleared} = state.backend.clear(backend_state)
+            cleared
+          else
+            backend_state
+          end
+
+        state = %{state | backend_state: backend_state}
+
+        resize_event = Event.Resize.new(cols, rows)
+        state = broadcast_event(resize_event, %{state | dimensions: new_dimensions})
+
+        # See note on the terminal_started branch above -- drain the queue
+        # so the render uses the new dimensions, not the previous frame's.
+        state = process_messages(state)
+        finish_resize(state)
+
+      true ->
+        state
     end
   end
+
+  # process_messages can run a component's :quit command and flip
+  # shutting_down. Match process_render_tick's guard so we don't paint
+  # into a backend that's about to be torn down.
+  defp finish_resize(%{shutting_down: true} = state), do: state
+  defp finish_resize(state), do: do_render(%{state | dirty: true})
 
   # --- Shutdown ---
 
@@ -1148,8 +1642,12 @@ defmodule TermUI.Runtime do
   end
 
   defp do_shutdown(state) do
-    # Wait for pending commands to complete (with timeout)
-    # For now, just clear them
+    if state.command_executor do
+      Enum.each(Map.keys(state.pending_commands), fn command_id ->
+        _ = Executor.cancel(state.command_executor, command_id)
+      end)
+    end
+
     state = %{state | pending_commands: %{}}
 
     # Terminate components (leaf to root)

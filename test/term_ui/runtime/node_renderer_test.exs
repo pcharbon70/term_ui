@@ -1,6 +1,8 @@
 defmodule TermUI.Runtime.NodeRendererTest do
   use ExUnit.Case, async: true
 
+  alias TermUI.Component.RenderNode
+  alias TermUI.Layout.Constraint
   alias TermUI.Renderer.Buffer
   alias TermUI.Renderer.BufferManager
   alias TermUI.Runtime.NodeRenderer
@@ -8,11 +10,7 @@ defmodule TermUI.Runtime.NodeRendererTest do
   setup do
     # Generate a unique name for each test to avoid conflicts
     name = :"buffer_manager_#{System.unique_integer([:positive])}"
-    {:ok, pid} = BufferManager.start_link(rows: 30, cols: 50, name: name)
-
-    on_exit(fn ->
-      if Process.alive?(pid), do: GenServer.stop(pid)
-    end)
+    pid = start_supervised!({BufferManager, rows: 30, cols: 50, name: name})
 
     {:ok, bm: pid}
   end
@@ -35,6 +33,77 @@ defmodule TermUI.Runtime.NodeRendererTest do
       buffer = BufferManager.get_current_buffer(bm)
       assert Buffer.get_cell(buffer, 1, 1).char == "L"
       assert Buffer.get_cell(buffer, 2, 1).char == "L"
+    end
+
+    test "allocates horizontal stack children using constraints", %{bm: bm} do
+      node =
+        RenderNode.stack(:horizontal, [
+          {RenderNode.text("Fixed"), Constraint.length(10)},
+          {RenderNode.text("Rest"), Constraint.fill()}
+        ])
+
+      assert {50, 1} = NodeRenderer.render_to_buffer(node, bm, 1, 1)
+
+      buffer = BufferManager.get_current_buffer(bm)
+      assert Buffer.get_cell(buffer, 1, 1).char == "F"
+      assert Buffer.get_cell(buffer, 1, 11).char == "R"
+    end
+
+    test "allocates vertical stack children using constraints", %{bm: bm} do
+      node =
+        RenderNode.stack(:vertical, [
+          {RenderNode.text("Header"), Constraint.length(3)},
+          {RenderNode.text("Body"), Constraint.fill()}
+        ])
+
+      assert {6, 30} = NodeRenderer.render_to_buffer(node, bm, 1, 1)
+
+      buffer = BufferManager.get_current_buffer(bm)
+      assert Buffer.get_cell(buffer, 1, 1).char == "H"
+      assert Buffer.get_cell(buffer, 4, 1).char == "B"
+    end
+
+    test "clips a child to its allocated rectangle", %{bm: bm} do
+      node =
+        RenderNode.stack(:horizontal, [
+          {RenderNode.text("ABCDEFGHIJ"), Constraint.length(3)},
+          {RenderNode.text("X"), Constraint.length(2)}
+        ])
+
+      assert {5, 1} = NodeRenderer.render_to_buffer(node, bm, 1, 1)
+
+      buffer = BufferManager.get_current_buffer(bm)
+      assert Buffer.get_cell(buffer, 1, 3).char == "C"
+      assert Buffer.get_cell(buffer, 1, 4).char == "X"
+      assert Buffer.get_cell(buffer, 1, 5).char == " "
+    end
+
+    test "uses natural size for unconstrained children in a mixed stack", %{bm: bm} do
+      node =
+        RenderNode.stack(:horizontal, [
+          RenderNode.text("A"),
+          {RenderNode.text("B"), Constraint.length(3)}
+        ])
+
+      assert {4, 1} = NodeRenderer.render_to_buffer(node, bm, 1, 1)
+
+      buffer = BufferManager.get_current_buffer(bm)
+      assert Buffer.get_cell(buffer, 1, 1).char == "A"
+      assert Buffer.get_cell(buffer, 1, 2).char == "B"
+    end
+
+    test "preserves tuple-based nodes in a mixed constrained stack", %{bm: bm} do
+      node =
+        RenderNode.stack(:horizontal, [
+          {:text, "A"},
+          {RenderNode.text("B"), Constraint.length(3)}
+        ])
+
+      assert {4, 1} = NodeRenderer.render_to_buffer(node, bm, 1, 1)
+
+      buffer = BufferManager.get_current_buffer(bm)
+      assert Buffer.get_cell(buffer, 1, 1).char == "A"
+      assert Buffer.get_cell(buffer, 1, 2).char == "B"
     end
   end
 

@@ -32,14 +32,26 @@ defmodule TermUI.Widgets.Dialog do
   - Tab/Shift+Tab: Move between buttons
   - Enter/Space: Activate focused button
   - Escape: Close dialog
+
+  ## Mouse Support
+
+  In raw mode, dialog buttons can be clicked with the mouse. Clicking a button
+  produces the same result as pressing Enter on that button. Mouse events are
+  ignored in TTY mode.
+
+  - Left click on button: Activate the button
   """
 
   use TermUI.StatefulComponent
 
   alias TermUI.CharacterSet
   alias TermUI.Event
+  alias TermUI.PersistentTerms
   alias TermUI.Renderer.Style
   alias TermUI.Theme
+
+  # Dialyzer: Suppress opaque type warnings for Style helpers and contract warnings for specific map types
+  @dialyzer {:nowarn_function, bg_theme: 1, new: 1, show: 1, hide: 1, set_content: 2}
 
   @doc """
   Creates new Dialog widget props.
@@ -74,6 +86,18 @@ defmodule TermUI.Widgets.Dialog do
       focused_button_style: Keyword.get(opts, :focused_button_style)
     }
   end
+
+  # ----------------------------------------------------------------------------
+  # Style Helper Functions
+  # ----------------------------------------------------------------------------
+
+  @spec bg_theme(atom()) :: Style.t()
+  defp bg_theme(color) when is_atom(color),
+    do: Style.new() |> Style.bg(color)
+
+  # ----------------------------------------------------------------------------
+  # StatefulComponent Callbacks
+  # ----------------------------------------------------------------------------
 
   @impl true
   def init(props) do
@@ -131,23 +155,40 @@ defmodule TermUI.Widgets.Dialog do
     {:ok, state}
   end
 
-  def handle_event(%Event.Mouse{action: :click, x: x, y: y}, state) do
-    # Check if click is on a button
-    case find_button_at_position(state, x, y) do
-      nil ->
-        {:ok, state}
-
-      button_id ->
-        if state.on_confirm do
-          state.on_confirm.(button_id)
-        end
-
-        {:ok, %{state | focused_button: button_id, visible: false}}
+  def handle_event(%Event.Mouse{action: :press, button: :left, x: x, y: y}, state) do
+    # Only handle mouse events in raw mode
+    if PersistentTerms.backend_mode() == :raw do
+      handle_button_click(state, x, y)
+    else
+      # Ignore mouse events in TTY mode
+      {:ok, state}
     end
   end
 
   def handle_event(_event, state) do
     {:ok, state}
+  end
+
+  # ----------------------------------------------------------------------------
+  # Private Helpers for Event Handling
+  # ----------------------------------------------------------------------------
+
+  defp handle_button_click(state, x, y) do
+    case find_button_at_position(state, x, y) do
+      nil ->
+        {:ok, state}
+
+      button_id ->
+        activate_button(state, button_id)
+    end
+  end
+
+  defp activate_button(state, button_id) do
+    if state.on_confirm do
+      state.on_confirm.(button_id)
+    end
+
+    {:ok, %{state | focused_button: button_id, visible: false}}
   end
 
   @impl true
@@ -174,7 +215,7 @@ defmodule TermUI.Widgets.Dialog do
       # Provide dimensions and background for opaque fill
       width: dialog_width,
       height: dialog_height,
-      bg: Style.new() |> Style.bg(Theme.get_color(:background))
+      bg: bg_theme(Theme.get_color(:background))
     }
   end
 
@@ -215,9 +256,73 @@ defmodule TermUI.Widgets.Dialog do
     {:ok, %{state | visible: false}}
   end
 
-  defp find_button_at_position(_state, _x, _y) do
-    # Simplified - would need actual button positions from render
-    nil
+  defp find_button_at_position(state, click_x, click_y) do
+    button_row_y = calculate_button_row_y(state)
+
+    if click_y == button_row_y do
+      find_button_by_x_position(state, click_x)
+    else
+      nil
+    end
+  end
+
+  defp calculate_button_row_y(state) do
+    _area_width = 80
+    area_height = 24
+    _dialog_width = state.width
+    dialog_height = calculate_height(state)
+
+    dialog_y = max(0, div(area_height - dialog_height, 2))
+    content_lines = estimate_content_lines(state.content)
+    button_row_in_dialog = 4 + content_lines
+
+    dialog_y + button_row_in_dialog
+  end
+
+  defp find_button_by_x_position(state, click_x) do
+    dialog_x = calculate_dialog_x(state.width)
+    inner_width = state.width - 4
+    button_texts = build_button_texts(state)
+    left_pad = calculate_button_padding(button_texts, inner_width)
+    buttons_start_x = dialog_x + 2 + left_pad
+
+    find_button_at_x(state.buttons, button_texts, buttons_start_x, click_x)
+  end
+
+  defp calculate_dialog_x(dialog_width) do
+    max(0, div(80 - dialog_width, 2))
+  end
+
+  defp build_button_texts(state) do
+    Enum.map(state.buttons, fn button ->
+      label = button.label
+
+      if button.id == state.focused_button do
+        "[ " <> label <> " ]"
+      else
+        "  " <> label <> "  "
+      end
+    end)
+  end
+
+  defp calculate_button_padding(button_texts, inner_width) do
+    buttons_line = Enum.join(button_texts, " ")
+    max(0, div(inner_width - String.length(buttons_line), 2))
+  end
+
+  defp find_button_at_x(buttons, button_texts, start_x, click_x) do
+    # Iterate through buttons to find which one contains click_x
+    Enum.reduce_while(buttons, {button_texts, start_x}, fn button, {texts, current_x} ->
+      [button_text | remaining_texts] = texts
+      button_width = String.length(button_text)
+
+      if click_x >= current_x and click_x < current_x + button_width do
+        {:halt, button.id}
+      else
+        # +1 for space between buttons
+        {:cont, {remaining_texts, current_x + button_width + 1}}
+      end
+    end)
   end
 
   defp calculate_height(state) do

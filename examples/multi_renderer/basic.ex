@@ -1,8 +1,8 @@
 # Basic TermUI Example - List Navigation
 #
 # This example demonstrates a simple list navigation application
-# that works identically in both raw mode (full terminal control)
-# and TTY mode (line-based input with graceful degradation).
+# that handles the same normalized events in raw mode (full terminal control)
+# and TTY mode (possibly line-buffered input with graceful degradation).
 #
 # Usage:
 #   elixir -r examples/multi_renderer/basic.ex -e "Basic.run()"
@@ -43,9 +43,9 @@ defmodule Basic do
   def event_to_msg(%TermUI.Event.Key{key: :up}, _state), do: {:msg, :up}
   def event_to_msg(%TermUI.Event.Key{key: :down}, _state), do: {:msg, :down}
   def event_to_msg(%TermUI.Event.Key{key: :enter}, _state), do: {:msg, :toggle_details}
-  def event_to_msg(%TermUI.Event.Key{key: ?q}, _state), do: {:msg, :quit}
-  def event_to_msg(%TermUI.Event.Key{key: ?j}, _state), do: {:msg, :down}
-  def event_to_msg(%TermUI.Event.Key{key: ?k}, _state), do: {:msg, :up}
+  def event_to_msg(%TermUI.Event.Key{key: "q"}, _state), do: {:msg, :quit}
+  def event_to_msg(%TermUI.Event.Key{key: "j"}, _state), do: {:msg, :down}
+  def event_to_msg(%TermUI.Event.Key{key: "k"}, _state), do: {:msg, :up}
   def event_to_msg(_event, _state), do: :ignore
 
   # State updates
@@ -64,40 +64,44 @@ defmodule Basic do
   end
 
   def update(:quit, state) do
-    {state, [:quit]}
+    {state, [TermUI.Command.quit()]}
   end
 
   # View rendering
   def view(state) do
     selected_item = Enum.at(@items, state.selected_index)
 
-    box([
-      text("TermUI Basic Example - List Navigation",
+    stack(:vertical, [
+      text(
+        "TermUI Basic Example - List Navigation",
         TermUI.Renderer.Style.new()
         |> TermUI.Renderer.Style.fg(:green)
-        |> TermUI.Renderer.Style.bright()
+        |> TermUI.Renderer.Style.bold()
       ),
       text(""),
-      text("Use ↑/↓ or j/k to navigate, Enter for details, q to quit",
+      text(
+        "Use ↑/↓ or j/k to navigate, Enter for details, q to quit",
         TermUI.Renderer.Style.new()
         |> TermUI.Renderer.Style.fg(:cyan)
       ),
       text(""),
-      text("─" |> String.duplicate(40),
+      text(
+        "─" |> String.duplicate(40),
         TermUI.Renderer.Style.new()
         |> TermUI.Renderer.Style.fg(:bright_black)
       ),
       text(""),
       render_list(@items, state.selected_index),
       text(""),
-      text("─" |> String.duplicate(40),
+      text(
+        "─" |> String.duplicate(40),
         TermUI.Renderer.Style.new()
         |> TermUI.Renderer.Style.fg(:bright_black)
       ),
       text(""),
       render_details(selected_item, state.show_details),
       text(""),
-      render_footer(state)
+      render_footer()
     ])
   end
 
@@ -107,11 +111,12 @@ defmodule Basic do
     |> Enum.with_index()
     |> Enum.map(fn {item, index} ->
       prefix = if index == selected_index, do: "► ", else: "  "
+
       style =
         if index == selected_index do
           TermUI.Renderer.Style.new()
           |> TermUI.Renderer.Style.fg(:yellow)
-          |> TermUI.Renderer.Style.bright()
+          |> TermUI.Renderer.Style.bold()
         else
           TermUI.Renderer.Style.new()
         end
@@ -124,30 +129,30 @@ defmodule Basic do
   defp render_details(_item, false), do: empty()
 
   defp render_details(item, true) do
-    box([
+    stack(:vertical, [
       text("Selected:"),
-      text("  " <> item,
+      text(
+        "  " <> item,
         TermUI.Renderer.Style.new()
         |> TermUI.Renderer.Style.fg(:yellow)
       )
-    ],
-    border: :single,
-    padding: {0, 1}
-    )
+    ])
   end
 
   # Render footer with backend mode info
-  defp render_footer(state) do
+  defp render_footer do
     mode = TermUI.App.backend_mode() || :unknown
+
     mode_text =
       case mode do
         :raw -> "Raw Mode (full terminal control)"
-        :tty -> "TTY Mode (line-based input)"
+        :tty -> "TTY Mode (cooked input; delivery may be buffered)"
         :skip -> "Test Mode"
         _ -> "Unknown Mode"
       end
 
-    text("Mode: " <> mode_text,
+    text(
+      "Mode: " <> mode_text,
       TermUI.Renderer.Style.new()
       |> TermUI.Renderer.Style.fg(:bright_black)
     )

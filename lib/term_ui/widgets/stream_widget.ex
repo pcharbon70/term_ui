@@ -1,9 +1,9 @@
 defmodule TermUI.Widgets.StreamWidget do
   @moduledoc """
-  StreamWidget for displaying backpressure-aware streaming data.
+  StreamWidget for displaying bounded streaming data.
 
-  StreamWidget can integrate with GenStage for demand-based data streaming,
-  providing controls for stream management and real-time statistics.
+  StreamWidget can receive data directly through `add_item/2` or through the
+  companion GenStage consumer, providing buffer controls and stream statistics.
 
   ## Usage
 
@@ -14,11 +14,10 @@ defmodule TermUI.Widgets.StreamWidget do
 
   ## Features
 
-  - Backpressure-aware data streaming via GenStage integration
-  - Demand-based flow control
+  - Optional GenStage consumer adapter
   - Buffer management with configurable overflow strategies
   - Pause/resume stream controls
-  - Rate limiting for rendering
+  - Render-rate metadata for custom hosts
   - Real-time stream statistics (items/sec)
 
   ## Keyboard Controls
@@ -33,10 +32,21 @@ defmodule TermUI.Widgets.StreamWidget do
   ## GenStage Integration
 
   The widget provides a companion consumer module that can be started
-  separately and sends items to the widget:
+  separately and sends `{:stream_items, events}` to a process:
 
       {:ok, consumer} = StreamWidget.Consumer.start_link(widget_pid)
       GenStage.sync_subscribe(consumer, to: producer)
+
+  For an embedded widget, `widget_pid` is normally the runtime/root process;
+  its optional `handle_info/2` must forward that message to this module and
+  store the returned widget state. The adapter uses GenStage's subscription
+  demand. The widget's `:demand` and `:render_rate_ms` fields are metadata in
+  1.0 and do not reconfigure that subscription or throttle root rendering.
+
+  The `:block` overflow name is retained for compatibility, but a full buffer
+  rejects and counts new items just like `:drop_newest`; it does not block a
+  producer in 1.0. Configure `max_demand`/`min_demand` when subscribing if the
+  producer needs tighter flow control.
   """
 
   use TermUI.StatefulComponent
@@ -63,6 +73,10 @@ defmodule TermUI.Widgets.StreamWidget do
           last_update: DateTime.t() | nil
         }
 
+  # Dialyzer: Functions return specific struct types or specific map types
+  @dialyzer {:nowarn_function,
+             new: 1, add_item: 2, pause: 1, resume: 1, clear: 1, set_overflow_strategy: 2}
+
   @default_buffer_size 1000
   @default_demand 10
   @page_size 20
@@ -79,9 +93,11 @@ defmodule TermUI.Widgets.StreamWidget do
 
   - `:buffer_size` - Maximum items in buffer (default: 1000)
   - `:overflow_strategy` - What to do when buffer is full (default: :drop_oldest)
-  - `:demand` - How many items to request at a time (default: 10)
+  - `:demand` - Reserved demand metadata (default: 10); not applied to the
+    companion consumer subscription in 1.0
   - `:show_stats` - Display statistics bar (default: true)
-  - `:render_rate_ms` - Minimum time between renders (default: 100)
+  - `:render_rate_ms` - Reserved render-rate metadata (default: 100); the
+    runtime render loop does not consume it in 1.0
   - `:item_renderer` - Function to render each item (fn item -> String.t)
   - `:on_item` - Callback when item is received
   - `:on_error` - Callback when error occurs
@@ -243,7 +259,7 @@ defmodule TermUI.Widgets.StreamWidget do
   end
 
   def handle_info({:request_demand, demand}, state) do
-    # Consumer is requesting to know how much demand we want
+    # Compatibility path for custom consumers that honor :set_demand messages.
     if state.consumer_pid do
       send(state.consumer_pid, {:set_demand, calculate_demand(state, demand)})
     end
@@ -283,7 +299,8 @@ defmodule TermUI.Widgets.StreamWidget do
 
     new_state = %{new_state | stats: new_stats, stats_window: stats_window}
 
-    # Notify consumer about available demand if using block strategy
+    # Notify a custom consumer about available demand. The bundled consumer
+    # accepts this compatibility message but does not reconfigure GenStage.
     if new_state.consumer_pid && new_state.overflow_strategy == :block do
       demand = calculate_demand(new_state, new_state.demand)
 
@@ -642,7 +659,7 @@ defmodule TermUI.Widgets.StreamWidget do
       end
 
     if is_selected do
-      text(content, Style.new(background: :blue, foreground: :white))
+      text(content, Style.new(bg: :blue, fg: :white))
     else
       text(content, nil)
     end
@@ -668,7 +685,7 @@ defmodule TermUI.Widgets.StreamWidget do
     status_text =
       "[#{status}] Buffer: #{state.buffer_count}/#{state.buffer_size} | Strategy: #{overflow_label}"
 
-    text(status_text, Style.new(foreground: :cyan, bold: true))
+    text(status_text, Style.new(fg: :cyan, attrs: [:bold]))
   end
 
   defp render_stats_bar(state) do
@@ -684,6 +701,6 @@ defmodule TermUI.Widgets.StreamWidget do
     stats_text =
       "Received: #{stats.items_received} | Dropped: #{stats.items_dropped} | Rate: #{rate}"
 
-    text(stats_text, Style.new(foreground: :yellow))
+    text(stats_text, Style.new(fg: :yellow))
   end
 end

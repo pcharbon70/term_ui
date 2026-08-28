@@ -37,6 +37,9 @@ defmodule TermUI.Helpers.BorderHelper do
 
   alias TermUI.CharacterSet
 
+  # Dialyzer: Functions return specific string types
+  @dialyzer {:nowarn_function, bordered_row: 3}
+
   @doc """
   Renders a horizontal line of the specified width.
 

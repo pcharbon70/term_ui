@@ -252,8 +252,7 @@ defmodule TermUI.Widgets.LineChartTest do
 
   describe "ETS cleanup" do
     test "does not leak ETS tables after multiple renders" do
-      # Get initial table count
-      initial_count = length(:ets.all())
+      initial_tables = owned_ets_tables()
 
       # Render multiple charts
       for _ <- 1..10 do
@@ -264,9 +263,13 @@ defmodule TermUI.Widgets.LineChartTest do
         )
       end
 
-      # Table count should be same (or close, accounting for other processes)
-      final_count = length(:ets.all())
-      assert final_count <= initial_count + 2
+      assert owned_ets_tables() == initial_tables
     end
+  end
+
+  defp owned_ets_tables do
+    :ets.all()
+    |> Enum.filter(&(:ets.info(&1, :owner) == self()))
+    |> MapSet.new()
   end
 end

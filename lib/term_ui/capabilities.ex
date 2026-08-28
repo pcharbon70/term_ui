@@ -8,6 +8,12 @@ defmodule TermUI.Capabilities do
   - Conservative VT100 fallbacks
 
   Results are cached in ETS for fast concurrent access.
+
+  This is a standalone capability detector used by opt-in helpers. The
+  integrated Raw/TTY runtime publishes the map returned by
+  `TermUI.Backend.Selector` through `TermUI.PersistentTerms`; use
+  `TermUI.Runtime.capabilities/0` or `TermUI.App.supports?/1` when asking about
+  that active local runtime context.
   """
 
   @type color_mode :: :true_color | :color_256 | :color_16 | :monochrome
@@ -35,6 +41,20 @@ defmodule TermUI.Capabilities do
             terminal_program: nil
 
   @ets_table :term_ui_capabilities
+
+  # Dialyzer: Functions with unmatched return values
+  @dialyzer {:nowarn_function,
+             ensure_table_exists: 0,
+             clear_cache: 0,
+             get: 0,
+             detect_from_term: 1,
+             detect_from_colorterm: 1,
+             detect_from_term_program: 1,
+             detect_from_terminfo: 1,
+             supports_true_color?: 0,
+             supports_256_color?: 0,
+             cache_capabilities: 1,
+             get_cached: 0}
 
   # Known terminal emulators with their capabilities
   @true_color_terminals ~w(iTerm.app vscode WezTerm kitty Alacritty Hyper)

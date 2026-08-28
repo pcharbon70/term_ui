@@ -37,6 +37,9 @@ mix termui.run
 | R | Reset counter to 0 |
 | Q | Quit (returns to IEx prompt) |
 
+IEx keeps the terminal in cooked mode. Some shells deliver these keys
+immediately, while others buffer them until Enter is pressed.
+
 ## What This Demonstrates
 
 1. **No code changes needed** - The same app works in IEx and standalone

@@ -201,15 +201,16 @@ defmodule TermUI.Integration.CapabilityAccuracyTest do
 
     test "cached detection is fast" do
       # First call populates cache
-      Capabilities.detect()
+      detected = Capabilities.detect()
 
-      # Second call should be near-instant (cached)
+      # Measure enough cached reads that a scheduler pause cannot dominate a
+      # single sub-millisecond ETS lookup on slower hosted platforms.
       start = System.monotonic_time(:millisecond)
-      _caps = Capabilities.detect()
+      cached = for _ <- 1..100, do: Capabilities.get()
       elapsed = System.monotonic_time(:millisecond) - start
 
-      # Should be under 10ms for cached result
-      assert elapsed < 10, "Cached detection took #{elapsed}ms, expected < 10ms"
+      assert Enum.all?(cached, &(&1 == detected))
+      assert elapsed < 1000, "100 cached reads took #{elapsed}ms, expected < 1000ms"
     end
 
     test "cache can be cleared" do

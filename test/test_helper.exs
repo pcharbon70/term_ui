@@ -1,16 +1,16 @@
-# Conditionally exclude tests that require terminal and OTP 28+
-terminal_available? =
-  case :io.getopts(:standard_io) do
-    {:ok, opts} -> Keyword.has_key?(opts, :terminal)
-    _ -> false
-  end
-
-raw_mode_available? = function_exported?(:shell, :start_interactive, 1)
+# Terminal tests are excluded by default because they manipulate terminal state
+# in ways that can leave an interactive terminal in an unusable state.
+# Run them with: TERMUI_INCLUDE_TERMINAL_TESTS=1 mix test
 
 excludes =
-  if terminal_available? and raw_mode_available? do
-    []
+  if System.get_env("TERMUI_INCLUDE_TERMINAL_TESTS") do
+    # Only check OTP availability when explicitly requested
+    raw_mode_available? =
+      Code.ensure_loaded?(:shell) and function_exported?(:shell, :start_interactive, 1)
+
+    if raw_mode_available?, do: [], else: [:requires_terminal]
   else
+    # Always exclude by default
     [:requires_terminal]
   end
 

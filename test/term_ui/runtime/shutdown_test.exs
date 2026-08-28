@@ -59,15 +59,12 @@ defmodule TermUI.Runtime.ShutdownTest do
 
       # Verify runtime is alive
       assert Process.alive?(runtime)
+      ref = Process.monitor(runtime)
 
       # Send quit message to component
       Runtime.send_message(runtime, :root, :quit)
 
-      # Wait for shutdown
-      Process.sleep(100)
-
-      # Runtime should have stopped
-      refute Process.alive?(runtime)
+      assert_receive {:DOWN, ^ref, :process, ^runtime, :normal}, 1000
     end
 
     test "shutdown sets shutting_down flag" do
@@ -102,13 +99,11 @@ defmodule TermUI.Runtime.ShutdownTest do
       {:ok, runtime} = Runtime.start_link(root: QuitComponent, skip_terminal: true)
 
       assert Process.alive?(runtime)
+      ref = Process.monitor(runtime)
 
       Runtime.shutdown(runtime)
 
-      # Wait for shutdown
-      Process.sleep(100)
-
-      refute Process.alive?(runtime)
+      assert_receive {:DOWN, ^ref, :process, ^runtime, :normal}, 1000
     end
 
     test "shutdown clears pending commands" do
@@ -160,12 +155,12 @@ defmodule TermUI.Runtime.ShutdownTest do
 
       state = Runtime.get_state(runtime)
       assert state.input_reader == nil
+      ref = Process.monitor(runtime)
 
       # Should not crash
       Runtime.shutdown(runtime)
 
-      Process.sleep(100)
-      refute Process.alive?(runtime)
+      assert_receive {:DOWN, ^ref, :process, ^runtime, :normal}, 1000
     end
   end
 
@@ -179,8 +174,9 @@ defmodule TermUI.Runtime.ShutdownTest do
       assert trapping == true
 
       # Cleanup
+      ref = Process.monitor(runtime)
       Runtime.shutdown(runtime)
-      Process.sleep(100)
+      assert_receive {:DOWN, ^ref, :process, ^runtime, :normal}, 1000
     end
   end
 

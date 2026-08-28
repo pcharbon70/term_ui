@@ -5,6 +5,10 @@ defmodule TermUI.Component.Introspection do
   Provides visibility into the component tree structure, component states,
   and supervision metrics for debugging and monitoring purposes.
 
+  These functions inspect the standalone `ComponentRegistry`/
+  `ComponentServer` subsystem. They do not inspect the single Elm root owned by
+  `TermUI.Runtime`, and the required services must already be running.
+
   ## Usage
 
       # Get tree structure
@@ -23,6 +27,14 @@ defmodule TermUI.Component.Introspection do
   alias TermUI.Component.StatePersistence
   alias TermUI.ComponentRegistry
   alias TermUI.ComponentServer
+
+  # Dialyzer: Functions return specific map types
+  @dialyzer {:nowarn_function,
+             get_component_info: 1,
+             get_metrics: 1,
+             aggregate_stats: 0,
+             print_tree: 1,
+             format_tree: 0}
 
   @doc """
   Returns the component tree structure.

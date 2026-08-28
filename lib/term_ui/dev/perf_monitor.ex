@@ -15,6 +15,9 @@ defmodule TermUI.Dev.PerfMonitor do
 
   import TermUI.Component.Helpers
 
+  # Dialyzer: Functions return specific map types
+  @dialyzer {:nowarn_function, get_memory_breakdown: 0}
+
   @panel_width 35
   @graph_height 5
 
@@ -176,17 +179,21 @@ defmodule TermUI.Dev.PerfMonitor do
   """
   @spec get_scheduler_utilization() :: [float()]
   def get_scheduler_utilization do
-    # The :scheduler module is only available in OTP 28+
-    # Use apply/3 to avoid compile-time warnings
-    case apply(:scheduler, :utilization, [1]) do
-      [{:total, _, total} | _schedulers] ->
-        [total]
-
-      _ ->
-        []
+    # The :scheduler.utilization/1 function is only available in OTP 28+
+    # Using apply/3 to avoid compiler warning about undefined function
+    if function_exported?(:scheduler, :utilization, 1) do
+      try do
+        # credo:disable-for-next-line Credo.Check.Refactor.Apply
+        case apply(:scheduler, :utilization, [1]) do
+          [{:total, _, total} | _] -> [total]
+          _ -> []
+        end
+      rescue
+        _ -> []
+      end
+    else
+      []
     end
-  rescue
-    UndefinedFunctionError -> []
   end
 
   @doc """

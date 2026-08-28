@@ -4,9 +4,10 @@
 
 ## Overview
 
-TermUI is a direct-mode Terminal UI framework for Elixir using The Elm Architecture. Applications are built as components with:
-- `init/1` - Initialize state
-- `event_to_msg/2` - Convert terminal events to domain messages
+TermUI is a direct-mode Terminal UI framework for Elixir using The Elm Architecture. The runtime owns one root module with:
+- `init/1` - Initialize state (optional; `use TermUI.Elm` supplies `%{}`)
+- `event_to_msg/2` - Convert terminal events to domain messages (optional;
+  `use TermUI.Elm` supplies an `:ignore` catch-all)
 - `update/2` - Handle messages and return new state + commands
 - `view/1` - Render state to a render tree
 
@@ -14,7 +15,11 @@ TermUI is a direct-mode Terminal UI framework for Elixir using The Elm Architect
 
 ### Rule 1: Always Use the Elm Architecture
 
-Every TermUI component MUST use `use TermUI.Elm` and implement the required callbacks:
+The normal TermUI application root uses `TermUI.Elm`. It must implement
+`update/2` and `view/1`; it overrides the supplied `init/1` and
+`event_to_msg/2` defaults when the application needs them. Widgets use
+`TermUI.Component` or `TermUI.StatefulComponent` instead and are explicitly
+composed into root state/view:
 
 ```elixir
 defmodule MyApp do
@@ -34,7 +39,7 @@ defmodule MyApp do
 
   def update(:increment, state), do: {%{state | count: state.count + 1}, []}
   def update(:decrement, state), do: {%{state | count: state.count - 1}, []}
-  def update(:quit, state), do: {state, [:quit]}
+  def update(:quit, state), do: {state, [TermUI.Command.quit()]}
 
   def view(state) do
     stack(:vertical, [
@@ -59,7 +64,8 @@ def event_to_msg(%Event.Key{key: :enter}, _state), do: {:msg, :submit}
 # Return :ignore to discard events
 def event_to_msg(%Event.Key{key: :f1}, _state), do: :ignore
 
-# Return :propagate to pass to parent component
+# Return :propagate to leave unhandled. The 1.0 runtime has no parent target,
+# so this is currently discarded.
 def event_to_msg(%Event.Key{key: :escape}, _state), do: :propagate
 
 # Always include a catch-all clause
@@ -69,14 +75,15 @@ def event_to_msg(_event, _state), do: :ignore
 **Event Types:**
 
 ```elixir
-# Keyboard - key can be atom (:enter, :escape, :tab, :up, :down, etc.) or string ("a", "1")
-%Event.Key{key: :enter | "a", char: nil | "a", modifiers: [:ctrl, :alt, :shift]}
+# Keyboard - key can be an atom (:enter, :escape, :up, etc.) or a string
+%Event.Key{key: :enter, char: nil, modifiers: []}
+%Event.Key{key: "a", char: "a", modifiers: [:ctrl]}
 
 # Mouse - action is :click, :double_click, :press, :release, :drag, :move, :scroll_up, :scroll_down
-%Event.Mouse{action: :click, button: :left | :middle | :right, x: 0, y: 0, modifiers: []}
+%Event.Mouse{action: :click, button: :left, x: 0, y: 0, modifiers: []}
 
 # Focus changes
-%Event.Focus{action: :gained | :lost}
+%Event.Focus{action: :gained}
 
 # Terminal resize
 %Event.Resize{width: 80, height: 24}
@@ -84,7 +91,7 @@ def event_to_msg(_event, _state), do: :ignore
 # Clipboard paste
 %Event.Paste{content: "pasted text"}
 
-# Timer tick
+# Host-created timing metadata (commands deliver messages, not Tick events)
 %Event.Tick{interval: 1000}
 ```
 
@@ -98,7 +105,9 @@ Event.focus(:gained)
 
 ### Rule 3: Update Must Be Pure and Return Tuple
 
-The `update/2` function MUST be pure (no side effects) and return `{new_state, commands}`:
+The `update/2` function SHOULD remain pure (no side effects) and return
+`{new_state, commands}`. This is an application design rule, not something the
+runtime can enforce:
 
 ```elixir
 # Correct - return tuple with state and command list
@@ -107,7 +116,7 @@ def update(:save, state) do
 end
 
 def update(:quit, state) do
-  {state, [:quit]}
+  {state, [Command.quit()]}
 end
 
 # Commands are for side effects
@@ -117,9 +126,17 @@ end
 ```
 
 **Available Commands:**
-- `:quit` - Exit the application
-- `Command.timer(ms, message)` - Send message after delay
+- `Command.timer(ms, message)` - Deliver one delayed message
+- `Command.interval(ms, message)` - Deliver a repeated message (no public per-interval cancellation in 1.0)
+- `Command.file_read(path, message_tag)` - Read a file asynchronously
+- `Command.send_after(:root, message, ms)` - Deliver a delayed root message
+- `Command.quit(reason)` - Exit the application
 - `Command.none()` - No-op command
+- `Command.with_timeout(command, ms)` - Set a timeout for file reads or
+  one-shot timers (intervals and delayed sends do not enforce it in 1.0)
+
+The legacy atom `:quit` and timer/send tuples remain accepted, but new code
+should use `TermUI.Command` constructors.
 
 ### Rule 4: View Must Return Render Nodes
 
@@ -158,7 +175,7 @@ style = Style.new()
   |> Style.bold()
   |> Style.underline()
 
-# Merge styles (later overrides)
+# Merge styles (override colors win; attributes from both styles are combined)
 combined = Style.merge(base_style, override_style)
 ```
 
@@ -197,8 +214,18 @@ TermUI has two types of widgets:
 - `CommandPalette` - Command palette
 - `SplitPane` - Resizable split layouts
 - `Viewport` - Scrollable viewports
+- `Canvas` - Cell-based drawing surfaces
+- `MarkdownViewer` - Scrollable Markdown rendering
+- `ScrollBar` - Standalone scroll bars
+- `StreamWidget` - Bounded stream display with an optional GenStage adapter
 - `Toast` - Toast notifications
 - `ContextMenu` - Context menus
+
+Earlier-namespace compatibility widgets also remain public:
+`TermUI.Widget.Label`, `Button`, `List`, `Block`, `Progress`, `TextInput`, and
+`PickList`. They accept props maps directly rather than consistently exposing
+`new/1`, and they are never mounted automatically. Prefer
+`TermUI.Widgets.TextInput` over the older single-line input for new code.
 
 ### Rule 7: Simple Widget Usage
 
@@ -222,7 +249,9 @@ end
 
 ### Rule 8: Stateful Widget Usage (CRITICAL)
 
-Stateful widgets MUST follow the StatefulComponent pattern:
+Stateful widgets follow the StatefulComponent pattern. Most widgets under
+`TermUI.Widgets` expose `new/1`; always check the module API because older
+widgets such as `TermUI.Widget.PickList` accept a props map directly:
 
 ```elixir
 # 1. Widget.new(opts) - Create props map
@@ -230,6 +259,13 @@ Stateful widgets MUST follow the StatefulComponent pattern:
 # 3. Widget.handle_event(event, state) - Handle events, returns {:ok, new_state}
 # 4. Widget.render(state, area) - Render to nodes
 ```
+
+Some event handlers return `{:ok, new_state, component_commands}`. When a
+widget is embedded in an Elm root, the root owns that integration: preserve the
+new state and explicitly translate any component-specific commands into root
+messages or `TermUI.Command` values. Do not assume every component command is a
+runtime command. The separate `TermUI.ComponentServer` understands only its
+legacy `{:send, pid, message}` and `{:timer, milliseconds, message}` tuples.
 
 **Complete Example with TextInput:**
 
@@ -273,7 +309,7 @@ defmodule MyApp do
   end
 
   # 3. Handle widget events in update/2
-  def update(:quit, state), do: {state, [:quit]}
+  def update(:quit, state), do: {state, [TermUI.Command.quit()]}
 
   def update({:submit, value}, state) do
     {%{state | submitted_value: value}, []}
@@ -358,11 +394,12 @@ TextInput.new(
 ```elixir
 alias TermUI.Widgets.Table
 alias TermUI.Widgets.Table.Column
+alias TermUI.Layout.Constraint
 
 Table.new(
   columns: [
     Column.new(:name, "Name"),
-    Column.new(:age, "Age", width: 10, align: :right)
+    Column.new(:age, "Age", width: Constraint.length(10), align: :right)
   ],
   data: [
     %{name: "Alice", age: 30},
@@ -525,20 +562,15 @@ Constraint.percentage(50)
 
 ```elixir
 def init(_opts) do
-  %{status: :loading, data: nil, error: nil}
+  {%{status: :loading, data: nil, error: nil},
+   [Command.file_read("data.json", :data_loaded)]}
 end
 
-def update(:load, state) do
-  # Start loading
-  {%{state | status: :loading}, [Command.timer(0, :fetch_data)]}
-end
+def update({:data_loaded, {:ok, data}}, state),
+  do: {%{state | status: :ready, data: data}, []}
 
-def update(:fetch_data, state) do
-  case do_fetch() do
-    {:ok, data} -> {%{state | status: :ready, data: data}, []}
-    {:error, e} -> {%{state | status: :error, error: e}, []}
-  end
-end
+def update({:data_loaded, {:error, error}}, state),
+  do: {%{state | status: :error, error: error}, []}
 
 def view(state) do
   case state.status do
@@ -570,18 +602,29 @@ def update({:request_delete, item}, state) do
   {%{state | show_dialog: true, dialog: dialog_state, deleting: item}, []}
 end
 
-def event_to_msg(event, %{show_dialog: true} = state) do
+def event_to_msg(%Event.Key{key: :enter}, %{show_dialog: true} = state) do
+  {:msg, {:dialog_choice, Dialog.get_focused_button(state.dialog)}}
+end
+
+def event_to_msg(%Event.Key{key: :escape}, %{show_dialog: true}) do
+  {:msg, :dismiss_dialog}
+end
+
+def event_to_msg(event, %{show_dialog: true}) do
   {:msg, {:dialog_event, event}}
 end
 
-def update({:dialog_event, %Event.Key{key: :enter}}, state) do
-  # Check which button is focused and handle accordingly
-  if state.dialog.focused_button == 1 do  # Confirm button
+def update({:dialog_choice, button_id}, state) do
+  if button_id == :confirm do
     items = Enum.reject(state.items, &(&1.id == state.deleting.id))
     {%{state | items: items, show_dialog: false, dialog: nil}, []}
   else
     {%{state | show_dialog: false, dialog: nil}, []}
   end
+end
+
+def update(:dismiss_dialog, state) do
+  {%{state | show_dialog: false, dialog: nil}, []}
 end
 
 def update({:dialog_event, event}, state) do
@@ -693,7 +736,7 @@ defmodule ScrollableLogViewer do
   def event_to_msg(%Event.Key{key: "q"}, _state), do: {:msg, :quit}
   def event_to_msg(event, _state), do: {:msg, {:viewport_event, event}}
 
-  def update(:quit, state), do: {state, [:quit]}
+  def update(:quit, state), do: {state, [TermUI.Command.quit()]}
 
   def update({:viewport_event, event}, state) do
     {:ok, viewport} = Viewport.handle_event(event, state.viewport)
@@ -717,7 +760,7 @@ defmodule ScrollableLogViewer do
 
   defp generate_log_content do
     lines = for i <- 1..500 do
-      {:text, "[#{timestamp(i)}] Log entry ##{i}: Some log message here with details"}
+      text("[#{timestamp(i)}] Log entry ##{i}: Some log message here with details")
     end
     stack(:vertical, lines)
   end
@@ -740,18 +783,17 @@ end
 ### Rule 17: Polling/Animation
 
 ```elixir
-# Polling pattern
+# Polling a file with one-shot commands
 def init(_opts) do
-  %{data: nil}
+  {%{data: nil}, [Command.file_read("status.json", :poll_result)]}
 end
 
-def update(:start_polling, state) do
-  {state, [Command.timer(0, :poll)]}
+def update({:poll_result, {:ok, data}}, state) do
+  {%{state | data: data}, [Command.timer(5000, :poll)]}
 end
 
 def update(:poll, state) do
-  data = fetch_latest_data()
-  {%{state | data: data}, [Command.timer(5000, :poll)]}
+  {state, [Command.file_read("status.json", :poll_result)]}
 end
 
 # Animation pattern
@@ -770,7 +812,7 @@ end
 
 ## Testing Rules
 
-### Rule 17: Test Components in Isolation
+### Rule 18: Test Components in Isolation
 
 ```elixir
 defmodule MyAppTest do
@@ -795,7 +837,7 @@ defmodule MyAppTest do
 
   test "quit returns quit command" do
     {_state, commands} = MyApp.update(:quit, %{})
-    assert :quit in commands
+    assert [%TermUI.Command{type: :quit}] = commands
   end
 end
 ```
@@ -811,16 +853,16 @@ def update(:save, state) do
   {state, []}
 end
 
-# GOOD - use command for side effects
-def update(:save, state) do
-  {%{state | saving: true}, [Command.timer(0, :do_save)]}
-end
-
-def update(:do_save, state) do
-  File.write!("data.json", Jason.encode!(state.data))
-  {%{state | saving: false, saved: true}, []}
+# GOOD - use a built-in asynchronous file-read command
+def update({:load, path}, state) do
+  {%{state | loading: true}, [Command.file_read(path, :loaded)]}
 end
 ```
+
+TermUI 1.0 has no file-write, HTTP, or arbitrary-function command. Put those
+effects in an application-owned process/Task and send the result to
+`TermUI.Runtime.send_message(runtime, :root, result)`. A zero-delay timer only
+delivers another message; it does not make blocking work asynchronous.
 
 ### Never Forget to Initialize Stateful Widgets
 
@@ -875,12 +917,13 @@ Style.new(fg: :red, bg: :black, attrs: [:bold])
 Style.new() |> Style.fg(:green) |> Style.bold()
 
 # Events
-%Event.Key{key: :enter | "a", modifiers: [:ctrl]}
+%Event.Key{key: :enter, modifiers: []}
+%Event.Key{key: "a", char: "a", modifiers: [:ctrl]}
 %Event.Mouse{action: :click, button: :left, x: 0, y: 0}
-%Event.Focus{action: :gained | :lost}
+%Event.Focus{action: :gained}
 
 # Commands
-{state, [:quit]}
+{state, [Command.quit()]}
 {state, [Command.timer(1000, :tick)]}
 {state, []}
 

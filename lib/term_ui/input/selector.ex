@@ -6,6 +6,12 @@ defmodule TermUI.Input.Selector do
   providing a way to choose the correct input handler for the current
   terminal mode.
 
+  The runtime calls `select/1` after it has selected a backend. `select/0` is a
+  standalone convenience that calls `Backend.Selector.select/0`; on a capable
+  system that call may activate OTP's Raw shell, so do not use it as a
+  read-only query. Use `TermUI.Runtime.backend_mode/0` to query published local
+  runtime context.
+
   ## Relationship with Backend.Selector
 
   The `TermUI.Backend.Selector` determines which terminal backend to use
@@ -94,6 +100,13 @@ defmodule TermUI.Input.Selector do
   """
   @type handler :: module()
 
+  alias TermUI.Backend.Selector
+  alias TermUI.Input.Raw
+  alias TermUI.Input.TTY
+
+  # Dialyzer: Functions return specific module types
+  @dialyzer {:nowarn_function, select: 0, select: 1}
+
   @doc """
   Selects the appropriate input handler based on the current backend mode.
 
@@ -121,9 +134,9 @@ defmodule TermUI.Input.Selector do
   """
   @spec select() :: handler()
   def select do
-    case TermUI.Backend.Selector.select() do
-      {:raw, _state} -> TermUI.Input.Raw
-      {:tty, _capabilities} -> TermUI.Input.TTY
+    case Selector.select() do
+      {:raw, _state} -> Raw
+      {:tty, _capabilities} -> TTY
     end
   end
 
@@ -165,8 +178,8 @@ defmodule TermUI.Input.Selector do
       # ** (ArgumentError) invalid input mode: :invalid, expected :raw or :tty
   """
   @spec select(mode()) :: handler()
-  def select(:raw), do: TermUI.Input.Raw
-  def select(:tty), do: TermUI.Input.TTY
+  def select(:raw), do: Raw
+  def select(:tty), do: TTY
 
   def select(mode) do
     raise ArgumentError, "invalid input mode: #{inspect(mode)}, expected :raw or :tty"

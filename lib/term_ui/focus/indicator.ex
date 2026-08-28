@@ -5,6 +5,9 @@ defmodule TermUI.Focus.Indicator do
   Provides default and customizable styles for indicating
   which component has focus.
 
+  This is an opt-in styling utility; `TermUI.Runtime` does not apply focus
+  indicators to embedded widgets automatically.
+
   ## Usage
 
       # Get default focus style
@@ -18,6 +21,9 @@ defmodule TermUI.Focus.Indicator do
   """
 
   alias TermUI.Renderer.Style
+
+  # Dialyzer: Functions return specific atom types
+  @dialyzer {:nowarn_function, focus_border_color: 0}
 
   @type border_style :: :none | :single | :double | :rounded | :thick
 
@@ -128,7 +134,7 @@ defmodule TermUI.Focus.Indicator do
 
   Boolean indicating animation support.
   """
-  @spec animate?() :: boolean()
+  @spec animate?() :: false
   def animate? do
     # Animation disabled by default for simplicity
     false

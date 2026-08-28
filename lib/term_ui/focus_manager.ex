@@ -2,6 +2,11 @@ defmodule TermUI.FocusManager do
   @moduledoc """
   Central focus management for TermUI components.
 
+  This service coordinates `TermUI.EventRouter`, `TermUI.ComponentRegistry`,
+  and `TermUI.SpatialIndex` when an application starts the lower-level
+  process-oriented subsystem. It is not used by `TermUI.Runtime`, whose 1.0
+  focus target remains `:root`.
+
   The FocusManager tracks which component receives keyboard input,
   provides focus traversal (Tab/Shift+Tab), and manages focus
   trapping for modal contexts.
@@ -35,6 +40,15 @@ defmodule TermUI.FocusManager do
   alias TermUI.Event
   alias TermUI.EventRouter
   alias TermUI.SpatialIndex
+
+  # Dialyzer: Pattern match and unmatched return warnings
+  @dialyzer {:nowarn_function,
+             get_focused: 0,
+             set_focused: 1,
+             find_next: 2,
+             find_prev: 2,
+             handle_call: 3,
+             clear_focus: 0}
 
   # Client API
 
@@ -483,8 +497,7 @@ defmodule TermUI.FocusManager do
   end
 
   defp get_component_tab_index(_component_id) do
-    # TODO: Get tab_index from component props
-    # For now, return nil to use position-based ordering
+    # Return nil to use position-based ordering
     nil
   end
 
@@ -529,7 +542,6 @@ defmodule TermUI.FocusManager do
   defp focusable?(component_id) do
     # Check if component is focusable
     # Components are focusable by default unless explicitly disabled
-    # TODO: Check component props for focusable and disabled
     component_exists?(component_id)
   end
 

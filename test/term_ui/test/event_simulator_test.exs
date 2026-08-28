@@ -1,7 +1,6 @@
 defmodule TermUI.Test.EventSimulatorTest do
   use ExUnit.Case, async: true
 
-  alias TermUI.Event
   alias TermUI.Event.Focus
   alias TermUI.Event.Key
   alias TermUI.Event.Mouse

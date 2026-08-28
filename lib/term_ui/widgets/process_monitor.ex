@@ -16,7 +16,7 @@ defmodule TermUI.Widgets.ProcessMonitor do
   ## Features
 
   - Live process list with PID, name, reductions, memory
-  - Configurable update interval
+  - Refresh interval metadata for host scheduling
   - Message queue depth display with warnings
   - Process links/monitors visualization
   - Stack trace display
@@ -38,6 +38,14 @@ defmodule TermUI.Widgets.ProcessMonitor do
   - l: Show links/monitors
   - t: Show stack trace
   - Escape: Clear filter/close details
+
+  ## Refresh integration
+
+  `init/1` captures the first process snapshot. The Elm runtime does not invoke
+  this widget's `mount/1` or `handle_info/2` callbacks. When embedding it in a
+  root, return `Command.interval(update_interval, :refresh_monitor)` from root
+  `init/1`, then call `ProcessMonitor.refresh/1` in `update/2`. A custom host may
+  instead invoke the widget lifecycle and route `:refresh` messages itself.
   """
 
   use TermUI.StatefulComponent
@@ -46,6 +54,19 @@ defmodule TermUI.Widgets.ProcessMonitor do
   alias TermUI.Event
   alias TermUI.Renderer.Style
   alias TermUI.Theme
+
+  # Dialyzer: Suppress opaque type warnings for Style helpers and contract warnings for specific map types
+  @dialyzer {:nowarn_function,
+             fg_semantic: 1,
+             fg_color: 1,
+             fg_bold_semantic: 1,
+             fg_bold_help: 0,
+             new: 1,
+             refresh: 1,
+             set_interval: 2,
+             set_sort: 3,
+             handle_info: 2,
+             unmount: 1}
 
   @type sort_field :: :pid | :name | :reductions | :memory | :queue | :status
   @type sort_direction :: :asc | :desc
@@ -85,15 +106,40 @@ defmodule TermUI.Widgets.ProcessMonitor do
   @sort_fields [:pid, :name, :reductions, :memory, :queue, :status]
 
   # System process patterns to optionally hide
-  @system_patterns [
-    ~r/^:application_controller$/,
-    ~r/^:kernel_sup$/,
-    ~r/^:code_server$/,
-    ~r/^:file_server/,
-    ~r/^:init$/,
-    ~r/^:logger/,
-    ~r/^:erl_prim_loader$/
-  ]
+  # NOTE: Defined as a function rather than a module attribute because compiled
+  # Regex structs contain references that cannot be injected into function bodies.
+  defp system_patterns do
+    [
+      ~r/^:application_controller$/,
+      ~r/^:kernel_sup$/,
+      ~r/^:code_server$/,
+      ~r/^:file_server/,
+      ~r/^:init$/,
+      ~r/^:logger/,
+      ~r/^:erl_prim_loader$/
+    ]
+  end
+
+  # ----------------------------------------------------------------------------
+  # Style Helper Functions
+  # ----------------------------------------------------------------------------
+
+  @spec fg_semantic(atom()) :: Style.t()
+  defp fg_semantic(color) when is_atom(color),
+    do: Style.new() |> Style.fg(color)
+
+  @spec fg_color(atom()) :: Style.t()
+  defp fg_color(color) when is_atom(color),
+    do: Style.new() |> Style.fg(color)
+
+  @spec fg_bold_semantic(atom()) :: Style.t()
+  defp fg_bold_semantic(color) when is_atom(color),
+    do: Style.new() |> Style.fg(color) |> Style.bold()
+
+  @spec fg_bold_help() :: Style.t()
+  defp fg_bold_help do
+    Style.new() |> Style.fg(Theme.get_semantic(:help)) |> Style.dim()
+  end
 
   # ----------------------------------------------------------------------------
   # Props
@@ -104,7 +150,8 @@ defmodule TermUI.Widgets.ProcessMonitor do
 
   ## Options
 
-  - `:update_interval` - Refresh interval in ms (default: 1000)
+  - `:update_interval` - Refresh interval metadata in ms (default: 1000);
+    embedded roots must schedule refresh messages
   - `:show_system_processes` - Include system processes (default: false)
   - `:thresholds` - Warning thresholds map
   - `:on_select` - Callback when process is selected
@@ -263,21 +310,8 @@ defmodule TermUI.Widgets.ProcessMonitor do
   # p - pause/suspend process
   def handle_event(%Event.Key{char: "p"}, state)
       when state.filter_input == nil and state.pending_action == nil do
-    if length(state.processes) > 0 do
-      process = Enum.at(state.processes, state.selected_idx)
-
-      if process do
-        if process.status == :suspended do
-          resume_process(state, process.pid)
-        else
-          {:ok, %{state | pending_action: :suspend}}
-        end
-      else
-        {:ok, state}
-      end
-    else
-      {:ok, state}
-    end
+    process = Enum.at(state.processes, state.selected_idx)
+    handle_suspend_action(state, process)
   end
 
   # l - show links
@@ -362,6 +396,20 @@ defmodule TermUI.Widgets.ProcessMonitor do
   end
 
   # ----------------------------------------------------------------------------
+  # Private Helpers for Event Handling
+  # ----------------------------------------------------------------------------
+
+  defp handle_suspend_action(state, nil), do: {:ok, state}
+
+  defp handle_suspend_action(state, process) do
+    if process.status == :suspended do
+      resume_process(state, process.pid)
+    else
+      {:ok, %{state | pending_action: :suspend}}
+    end
+  end
+
+  # ----------------------------------------------------------------------------
   # Message Handling
   # ----------------------------------------------------------------------------
 
@@ -390,44 +438,42 @@ defmodule TermUI.Widgets.ProcessMonitor do
   end
 
   defp get_process_info(pid) do
-    try do
-      info =
-        Process.info(pid, [
-          :registered_name,
-          :initial_call,
-          :current_function,
-          :reductions,
-          :memory,
-          :message_queue_len,
-          :status,
-          :links,
-          :monitors,
-          :monitored_by
-        ])
+    info =
+      Process.info(pid, [
+        :registered_name,
+        :initial_call,
+        :current_function,
+        :reductions,
+        :memory,
+        :message_queue_len,
+        :status,
+        :links,
+        :monitors,
+        :monitored_by
+      ])
 
-      if info do
-        %{
-          pid: pid,
-          registered_name: info[:registered_name],
-          initial_call: info[:initial_call],
-          current_function: info[:current_function],
-          reductions: info[:reductions] || 0,
-          memory: info[:memory] || 0,
-          message_queue_len: info[:message_queue_len] || 0,
-          status: info[:status] || :unknown,
-          links: info[:links] || [],
-          monitors: info[:monitors] || [],
-          monitored_by: info[:monitored_by] || [],
-          stack_trace: nil
-        }
-      else
-        nil
-      end
-    rescue
-      _ -> nil
-    catch
-      _, _ -> nil
+    if info do
+      %{
+        pid: pid,
+        registered_name: info[:registered_name],
+        initial_call: info[:initial_call],
+        current_function: info[:current_function],
+        reductions: info[:reductions] || 0,
+        memory: info[:memory] || 0,
+        message_queue_len: info[:message_queue_len] || 0,
+        status: info[:status] || :unknown,
+        links: info[:links] || [],
+        monitors: info[:monitors] || [],
+        monitored_by: info[:monitored_by] || [],
+        stack_trace: nil
+      }
+    else
+      nil
     end
+  rescue
+    _ -> nil
+  catch
+    _, _ -> nil
   end
 
   defp maybe_filter_system(processes, true), do: processes
@@ -435,7 +481,7 @@ defmodule TermUI.Widgets.ProcessMonitor do
   defp maybe_filter_system(processes, false) do
     Enum.reject(processes, fn p ->
       name = process_name(p)
-      Enum.any?(@system_patterns, &Regex.match?(&1, name))
+      Enum.any?(system_patterns(), &Regex.match?(&1, name))
     end)
   end
 
@@ -533,13 +579,15 @@ defmodule TermUI.Widgets.ProcessMonitor do
 
       new_state = %{state | selected_idx: new_idx, scroll_offset: max(0, new_scroll)}
 
-      # Call on_select callback
-      if state.on_select && new_idx != state.selected_idx do
-        process = Enum.at(state.processes, new_idx)
-        if process, do: state.on_select.(process)
-      end
-
+      maybe_notify_select(state, new_idx)
       {:ok, new_state}
+    end
+  end
+
+  defp maybe_notify_select(state, new_idx) do
+    if state.on_select && new_idx != state.selected_idx do
+      process = Enum.at(state.processes, new_idx)
+      if process, do: state.on_select.(process)
     end
   end
 
@@ -548,50 +596,44 @@ defmodule TermUI.Widgets.ProcessMonitor do
   # ----------------------------------------------------------------------------
 
   defp kill_process(state, pid) do
-    try do
-      Process.exit(pid, :kill)
+    Process.exit(pid, :kill)
 
-      if state.on_action do
-        state.on_action.({:killed, pid})
-      end
-
-      # Refresh after action
-      processes = fetch_processes(state)
-      new_idx = min(state.selected_idx, max(0, length(processes) - 1))
-      {:ok, %{state | pending_action: nil, processes: processes, selected_idx: new_idx}}
-    rescue
-      _ -> {:ok, %{state | pending_action: nil}}
+    if state.on_action do
+      state.on_action.({:killed, pid})
     end
+
+    # Refresh after action
+    processes = fetch_processes(state)
+    new_idx = min(state.selected_idx, max(0, length(processes) - 1))
+    {:ok, %{state | pending_action: nil, processes: processes, selected_idx: new_idx}}
+  rescue
+    _ -> {:ok, %{state | pending_action: nil}}
   end
 
   defp suspend_process(state, pid) do
-    try do
-      :erlang.suspend_process(pid)
+    :erlang.suspend_process(pid)
 
-      if state.on_action do
-        state.on_action.({:suspended, pid})
-      end
-
-      processes = fetch_processes(state)
-      {:ok, %{state | pending_action: nil, processes: processes}}
-    rescue
-      _ -> {:ok, %{state | pending_action: nil}}
+    if state.on_action do
+      state.on_action.({:suspended, pid})
     end
+
+    processes = fetch_processes(state)
+    {:ok, %{state | pending_action: nil, processes: processes}}
+  rescue
+    _ -> {:ok, %{state | pending_action: nil}}
   end
 
   defp resume_process(state, pid) do
-    try do
-      :erlang.resume_process(pid)
+    :erlang.resume_process(pid)
 
-      if state.on_action do
-        state.on_action.({:resumed, pid})
-      end
-
-      processes = fetch_processes(state)
-      {:ok, %{state | processes: processes}}
-    rescue
-      _ -> {:ok, state}
+    if state.on_action do
+      state.on_action.({:resumed, pid})
     end
+
+    processes = fetch_processes(state)
+    {:ok, %{state | processes: processes}}
+  rescue
+    _ -> {:ok, state}
   end
 
   # ----------------------------------------------------------------------------
@@ -617,6 +659,10 @@ defmodule TermUI.Widgets.ProcessMonitor do
 
   @doc """
   Set the update interval.
+
+  This cancels/schedules a `:refresh` message in the calling process. Use it
+  only when that host routes the message to `handle_info/2`; an embedded Elm
+  root should own a `Command.interval/2` instead.
   """
   @spec set_interval(map(), non_neg_integer()) :: {:ok, map()}
   def set_interval(state, interval) when interval > 0 do
@@ -666,16 +712,14 @@ defmodule TermUI.Widgets.ProcessMonitor do
   """
   @spec get_stack_trace(pid()) :: [term()] | nil
   def get_stack_trace(pid) do
-    try do
-      case Process.info(pid, :current_stacktrace) do
-        {:current_stacktrace, trace} -> trace
-        _ -> nil
-      end
-    rescue
+    case Process.info(pid, :current_stacktrace) do
+      {:current_stacktrace, trace} -> trace
       _ -> nil
-    catch
-      _, _ -> nil
     end
+  rescue
+    _ -> nil
+  catch
+    _, _ -> nil
   end
 
   # ----------------------------------------------------------------------------
@@ -722,7 +766,7 @@ defmodule TermUI.Widgets.ProcessMonitor do
 
     header_text = "Processes: #{length(state.processes)} | Sort: #{sort_label}#{filter_label}"
 
-    header_style = Style.new() |> Style.fg(Theme.get_semantic(:info)) |> Style.bold()
+    header_style = fg_bold_semantic(Theme.get_semantic(:info))
     text(header_text, header_style)
   end
 
@@ -801,19 +845,19 @@ defmodule TermUI.Widgets.ProcessMonitor do
           Theme.get_component_style(:item, :selected)
 
         process.message_queue_len >= state.thresholds.queue_critical ->
-          Style.new() |> Style.fg(Theme.get_semantic(:error)) |> Style.bold()
+          fg_bold_semantic(Theme.get_semantic(:error))
 
         process.message_queue_len >= state.thresholds.queue_warning ->
-          Style.new() |> Style.fg(Theme.get_semantic(:warning))
+          fg_semantic(Theme.get_semantic(:warning))
 
         process.memory >= state.thresholds.memory_critical ->
-          Style.new() |> Style.fg(Theme.get_semantic(:error)) |> Style.bold()
+          fg_bold_semantic(Theme.get_semantic(:error))
 
         process.memory >= state.thresholds.memory_warning ->
-          Style.new() |> Style.fg(Theme.get_semantic(:warning))
+          fg_semantic(Theme.get_semantic(:warning))
 
         process.status == :suspended ->
-          Style.new() |> Style.fg(Theme.get_color(:accent))
+          fg_color(Theme.get_color(:accent))
 
         true ->
           nil
@@ -832,13 +876,13 @@ defmodule TermUI.Widgets.ProcessMonitor do
         :trace -> render_trace_details(process)
       end
     else
-      empty_style = Style.new() |> Style.fg(Theme.get_semantic(:muted))
+      empty_style = fg_semantic(Theme.get_semantic(:muted))
       [text("No process selected", empty_style)]
     end
   end
 
   defp render_info_details(process, _state) do
-    border = text(String.duplicate("-", 60), Style.new() |> Style.fg(Theme.get_color(:primary)))
+    border = text(String.duplicate("-", 60), fg_color(Theme.get_color(:primary)))
 
     lines = [
       border,
@@ -858,7 +902,7 @@ defmodule TermUI.Widgets.ProcessMonitor do
   end
 
   defp render_links_details(process) do
-    border = text(String.duplicate("-", 60), Style.new() |> Style.fg(Theme.get_color(:primary)))
+    border = text(String.duplicate("-", 60), fg_color(Theme.get_color(:primary)))
 
     links_text =
       if length(process.links) > 0 do
@@ -900,7 +944,7 @@ defmodule TermUI.Widgets.ProcessMonitor do
   end
 
   defp render_trace_details(process) do
-    border = text(String.duplicate("-", 60), Style.new() |> Style.fg(Theme.get_color(:primary)))
+    border = text(String.duplicate("-", 60), fg_color(Theme.get_color(:primary)))
 
     trace = get_stack_trace(process.pid)
 
@@ -914,7 +958,7 @@ defmodule TermUI.Widgets.ProcessMonitor do
           text("  #{m}.#{f}/#{a} (#{file}:#{line})", nil)
         end)
       else
-        empty_style = Style.new() |> Style.fg(Theme.get_semantic(:muted))
+        empty_style = fg_semantic(Theme.get_semantic(:muted))
         [text("  (no stack trace available)", empty_style)]
       end
 
@@ -924,7 +968,7 @@ defmodule TermUI.Widgets.ProcessMonitor do
   defp render_footer(state, chars) do
     input_line =
       if state.filter_input != nil do
-        filter_style = Style.new() |> Style.fg(Theme.get_semantic(:warning))
+        filter_style = fg_semantic(Theme.get_semantic(:warning))
         [text("Filter: #{state.filter_input}_", filter_style)]
       else
         []
@@ -933,7 +977,7 @@ defmodule TermUI.Widgets.ProcessMonitor do
     help_text =
       "[#{chars.arrow_up}#{chars.arrow_down}] Select [Enter] Details [s/S] Sort [/] Filter [k] Kill [p] Pause [l] Links [t] Trace [r] Refresh"
 
-    help_style = Style.new() |> Style.fg(Theme.get_semantic(:help)) |> Style.dim()
+    help_style = fg_bold_help()
     input_line ++ [text(help_text, help_style)]
   end
 
@@ -949,7 +993,7 @@ defmodule TermUI.Widgets.ProcessMonitor do
         end
 
       if process do
-        confirm_style = Style.new() |> Style.fg(Theme.get_semantic(:error)) |> Style.bold()
+        confirm_style = fg_bold_semantic(Theme.get_semantic(:error))
 
         [
           text("", nil),

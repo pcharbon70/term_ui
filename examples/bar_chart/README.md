@@ -28,7 +28,6 @@ The `BarChart.render/1` function accepts the following options:
 - `:show_values` - Display numeric values (default: `true`)
 - `:show_labels` - Display bar labels (default: `true`)
 - `:bar_char` - Character for filled bars (default: `"█"`)
-- `:empty_char` - Character for empty space (default: `" "`)
 - `:colors` - List of `Style` structs for bar colors (cycles through list)
 - `:style` - Overall chart style
 
@@ -87,8 +86,7 @@ BarChart.App.run()
 ```
 
 **Note:** TTY mode works inside IEx but has limitations:
-- No alternate screen buffer (output mixes with IEx prompt)
-- Character input works immediately (no Enter needed)
+- Input is read through the shell; some terminals buffer keys until Enter is pressed
 - For full TUI, use raw mode instead
 
 ## Controls

@@ -1,9 +1,12 @@
 defmodule TermUI.Input.TTYTest do
   use ExUnit.Case, async: true
 
-  alias TermUI.Input.TTY
-  alias TermUI.Input
+  import ExUnit.CaptureIO
+
   alias TermUI.Event
+  alias TermUI.Input
+  alias TermUI.Input.Raw
+  alias TermUI.Input.TTY
 
   describe "behaviour implementation" do
     test "module implements TermUI.Input behaviour" do
@@ -32,7 +35,13 @@ defmodule TermUI.Input.TTYTest do
     test "state struct has buffer, event_queue, and IO opts fields" do
       state = TTY.new()
       # Verify the struct has the expected fields (including IO opts fields)
-      assert Map.keys(state) -- [:__struct__] == [:buffer, :event_queue, :io_opts_restored, :io_opts_set]
+      assert Map.keys(state) |> List.delete(:__struct__) |> Enum.sort() == [
+               :buffer,
+               :event_queue,
+               :io_opts_restored,
+               :io_opts_set,
+               :original_opts
+             ]
     end
   end
 
@@ -264,6 +273,58 @@ defmodule TermUI.Input.TTYTest do
     end
   end
 
+  describe "poll/2 through an IO server" do
+    test "does not drop bytes from a delivered arrow-key sequence" do
+      capture_io(<<27, ?[, ?A, ?\n>>, fn ->
+        state = TTY.new()
+
+        try do
+          assert {{:ok, %Event.Key{key: :up}}, _state} = TTY.poll(state, 0)
+        after
+          TTY.stop(state)
+        end
+      end)
+    end
+
+    test "emits a submitted lone Escape without consuming later input" do
+      capture_io(<<27, ?\n>>, fn ->
+        state = TTY.new()
+
+        try do
+          assert {{:ok, %Event.Key{key: :escape}}, _state} = TTY.poll(state, 0)
+        after
+          TTY.stop(state)
+        end
+      end)
+    end
+
+    test "normalizes a cooked line ending to Enter" do
+      capture_io("\n", fn ->
+        state = TTY.new()
+
+        try do
+          assert {{:ok, %Event.Key{key: :enter}}, _state} = TTY.poll(state, 0)
+        after
+          TTY.stop(state)
+        end
+      end)
+    end
+
+    test "preserves line endings inside a multiline bracketed paste" do
+      input = "\e[200~first\nsecond\e[201~"
+
+      capture_io(input, fn ->
+        state = TTY.new()
+
+        try do
+          assert {{:ok, %Event.Paste{content: "first\nsecond"}}, _state} = TTY.poll(state, 0)
+        after
+          TTY.stop(state)
+        end
+      end)
+    end
+  end
+
   describe "state management" do
     test "state is properly updated after poll with queued events" do
       state = %TTY{buffer: "abc", event_queue: []}
@@ -330,7 +391,9 @@ defmodule TermUI.Input.TTYTest do
 
     test "moduledoc mentions :io.get_chars" do
       {:docs_v1, _, :elixir, _, %{"en" => moduledoc}, _, _} = Code.fetch_docs(TTY)
-      assert String.contains?(moduledoc, ":io.get_chars") or String.contains?(moduledoc, "get_chars")
+
+      assert String.contains?(moduledoc, ":io.get_chars") or
+               String.contains?(moduledoc, "get_chars")
     end
 
     test "moduledoc explains arrow keys work normally" do
@@ -390,24 +453,30 @@ defmodule TermUI.Input.TTYTest do
     test "moduledoc explains IEx compatibility" do
       {:docs_v1, _, :elixir, _, %{"en" => moduledoc}, _, _} = Code.fetch_docs(TTY)
       assert String.contains?(moduledoc, "IEx")
-      assert String.contains?(moduledoc, "Compatible") or String.contains?(moduledoc, "IEx compatible")
+
+      assert String.contains?(moduledoc, "Compatible") or
+               String.contains?(moduledoc, "IEx compatible")
     end
 
-    test "moduledoc mentions snake_test" do
+    test "moduledoc documents cooked-mode buffering" do
       {:docs_v1, _, :elixir, _, %{"en" => moduledoc}, _, _} = Code.fetch_docs(TTY)
-      assert String.contains?(moduledoc, "snake_test")
+      assert String.contains?(moduledoc, "cooked mode")
+      assert String.contains?(moduledoc, "buffer input until Enter")
     end
   end
 
   describe "comparison with Raw handler" do
     test "TTY and Raw have mostly the same struct fields" do
       tty_state = TTY.new()
-      raw_state = TermUI.Input.Raw.new()
+      raw_state = Raw.new()
 
-      tty_fields = Map.keys(tty_state) -- [:__struct__, :io_opts_restored, :io_opts_set]
+      # TTY has additional IO opts fields for IEx compatibility
+      tty_fields =
+        Map.keys(tty_state) -- [:__struct__, :io_opts_restored, :io_opts_set, :original_opts]
+
       raw_fields = Map.keys(raw_state) -- [:__struct__]
 
-      # TTY has additional IO opts fields, but the core fields match
+      # The core fields match
       assert tty_fields == raw_fields
     end
 
@@ -416,10 +485,10 @@ defmodule TermUI.Input.TTYTest do
       input = "a"
 
       tty_state = %TTY{buffer: input, event_queue: []}
-      raw_state = %TermUI.Input.Raw{buffer: input, event_queue: []}
+      raw_state = %Raw{buffer: input, event_queue: []}
 
       {{:ok, tty_event}, _} = TTY.poll(tty_state, 0)
-      {{:ok, raw_event}, _} = TermUI.Input.Raw.poll(raw_state, 0)
+      {{:ok, raw_event}, _} = Raw.poll(raw_state, 0)
 
       assert tty_event.key == raw_event.key
       assert tty_event.char == raw_event.char
@@ -427,10 +496,10 @@ defmodule TermUI.Input.TTYTest do
 
     test "TTY returns :tty mode, Raw returns :raw mode" do
       tty_state = TTY.new()
-      raw_state = TermUI.Input.Raw.new()
+      raw_state = Raw.new()
 
       assert TTY.mode(tty_state) == :tty
-      assert TermUI.Input.Raw.mode(raw_state) == :raw
+      assert Raw.mode(raw_state) == :raw
     end
   end
 

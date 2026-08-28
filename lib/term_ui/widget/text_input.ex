@@ -5,6 +5,11 @@ defmodule TermUI.Widget.TextInput do
   TextInput allows users to type text, navigate with arrow keys,
   and delete with backspace/delete.
 
+  This is the earlier single-line widget retained under `TermUI.Widget`. It
+  accepts a props map directly and must be embedded explicitly. New code should
+  normally use `TermUI.Widgets.TextInput`, which provides the current
+  single-line/multiline API and a `new/1` constructor.
+
   ## Usage
 
       TextInput.render(%{
@@ -29,6 +34,10 @@ defmodule TermUI.Widget.TextInput do
   alias TermUI.Component.RenderNode
   alias TermUI.Event
   alias TermUI.Renderer.Style
+
+  # Dialyzer: Suppress opaque type warnings for Style helpers
+  # no_opaque: Style contains MapSet which triggers false positive call_without_opaque warnings
+  @dialyzer [:no_opaque, nowarn_function: [build_style: 1, positioned_cell_safe: 4]]
 
   @doc """
   Initializes the text input state.
@@ -69,16 +78,31 @@ defmodule TermUI.Widget.TextInput do
     {:ok, %{state | cursor: String.length(state.value)}}
   end
 
-  def handle_event(%Event.Key{key: :backspace}, state) do
-    if state.cursor > 0 do
-      {before, after_cursor} = String.split_at(state.value, state.cursor)
-      new_value = String.slice(before, 0..-2//1) <> after_cursor
-      new_cursor = state.cursor - 1
+  def handle_event(%Event.Key{key: :backspace, modifiers: modifiers}, state) do
+    cond do
+      :alt in modifiers and state.cursor > 0 ->
+        {before, after_cursor} = String.split_at(state.value, state.cursor)
 
-      {:ok, %{state | value: new_value, cursor: new_cursor},
-       [{:send, self(), {:changed, new_value}}]}
-    else
-      {:ok, state}
+        remaining =
+          before
+          |> String.replace(~r/\s+\z/u, "")
+          |> String.replace(~r/\S+\z/u, "")
+
+        new_value = remaining <> after_cursor
+
+        {:ok, %{state | value: new_value, cursor: String.length(remaining)},
+         [{:send, self(), {:changed, new_value}}]}
+
+      state.cursor > 0 ->
+        {before, after_cursor} = String.split_at(state.value, state.cursor)
+        new_value = String.slice(before, 0..-2//1) <> after_cursor
+        new_cursor = state.cursor - 1
+
+        {:ok, %{state | value: new_value, cursor: new_cursor},
+         [{:send, self(), {:changed, new_value}}]}
+
+      true ->
+        {:ok, state}
     end
   end
 
@@ -197,7 +221,7 @@ defmodule TermUI.Widget.TextInput do
       |> Enum.with_index()
       |> Enum.map(fn {char, x} ->
         cell_style = get_cell_style(x, cursor_pos, show_cursor, cursor_style, state.value, style)
-        positioned_cell(x, 0, char, cell_style)
+        positioned_cell_safe(x, 0, char, cell_style)
       end)
 
     RenderNode.cells(cells)
@@ -217,6 +241,18 @@ defmodule TermUI.Widget.TextInput do
   defp get_cell_style(_x, _cursor_pos, _show_cursor, _cursor_style, _value, style) do
     style
   end
+
+  # ----------------------------------------------------------------------------
+  # Style Helper Functions
+  # ----------------------------------------------------------------------------
+
+  @spec positioned_cell_safe(integer(), integer(), String.t(), Style.t()) :: RenderNode.t()
+  defp positioned_cell_safe(x, y, char, style),
+    do: positioned_cell(x, y, char, style)
+
+  # ----------------------------------------------------------------------------
+  # Utility Functions
+  # ----------------------------------------------------------------------------
 
   defp calculate_scroll(cursor, current_scroll, visible_width) do
     cond do

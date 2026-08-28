@@ -20,6 +20,10 @@ defmodule TermUI.Platform.Windows do
   - Console event loop for input
   """
 
+  # Dialyzer: Functions return specific map types
+  @dialyzer {:nowarn_function,
+             info: 0, vt_support_available?: 0, capability_hints: 0, minimum_version: 0}
+
   @doc """
   Returns Windows-specific terminal information.
 
@@ -39,9 +43,10 @@ defmodule TermUI.Platform.Windows do
   end
 
   @doc """
-  Checks if Windows VT sequence support is available.
+  Returns an OS-version eligibility heuristic for Windows VT sequences.
 
-  Note: Currently a stub. Would need to call GetConsoleMode to check.
+  This stub does not call `GetConsoleMode`, confirm that VT processing is
+  enabled, or indicate that TermUI's native input/resize paths are implemented.
   """
   @spec vt_support_available?() :: boolean()
   def vt_support_available? do
@@ -65,9 +70,10 @@ defmodule TermUI.Platform.Windows do
   end
 
   @doc """
-  Enables VT sequence processing for the console.
+  Stub for enabling VT sequence processing for the console.
 
-  Note: Stub implementation. Would need NIF to call SetConsoleMode.
+  It does not change console mode. `{:ok, :stub}` only means the OS version
+  meets the intended baseline; a future NIF/port must call `SetConsoleMode`.
   """
   @spec enable_vt_processing() :: {:ok, :stub} | {:error, String.t()}
   def enable_vt_processing do
@@ -89,7 +95,10 @@ defmodule TermUI.Platform.Windows do
   end
 
   @doc """
-  Returns hints for Windows-specific capability detection.
+  Returns terminal capability hints based only on the OS-version heuristic.
+
+  These hints describe possible VT-sequence support, not implemented native
+  TermUI input, mouse, paste, focus, or resize support.
   """
   @spec capability_hints() :: map()
   def capability_hints do
@@ -127,7 +136,8 @@ defmodule TermUI.Platform.Windows do
   end
 
   @doc """
-  Returns the minimum Windows version required for full support.
+  Returns the intended minimum Windows version for a future full
+  implementation. Full native Windows support is not present in 1.0.
   """
   @spec minimum_version() :: {non_neg_integer(), non_neg_integer(), non_neg_integer()}
   def minimum_version do

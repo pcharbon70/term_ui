@@ -3,6 +3,11 @@ defmodule TermUI.Input.LineReaderTest do
 
   alias TermUI.Input.LineReader
 
+  setup_all do
+    assert Code.ensure_loaded?(LineReader)
+    :ok
+  end
+
   # Note: Testing IO.gets directly is tricky because it reads from stdin.
   # These tests use ExUnit's capture_io to simulate input.
   # Integration tests that actually read from stdin are tagged :requires_terminal.

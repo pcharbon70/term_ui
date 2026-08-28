@@ -137,7 +137,8 @@ defmodule TermUI.TermUtilsTest do
 
     test "test argument validation blocks dangerous inputs" do
       bad_inputs = [
-        ["-t", "1000"],  # FD too large
+        # FD too large
+        ["-t", "1000"],
         ["-t", "$(whoami)"],
         [";rm"],
         ["$(echo", "pwn)"]
@@ -163,12 +164,16 @@ defmodule TermUI.TermUtilsTest do
           assert {:ok, _} = TermUtils.safe_stty([settings])
 
         {:error, :command_not_found} ->
-          # stty not available - skip test
-          :skip
+          # stty is unavailable in this environment.
+          :ok
+
+        {:error, :not_tty} ->
+          # CI and non-interactive shells may not have a controlling terminal.
+          :ok
 
         {:error, {:exit_code, _}} ->
-          # stty failed (no TTY) - skip but it's okay
-          :skip
+          # Older command paths may report the non-TTY condition as an exit code.
+          :ok
 
         {:error, reason} ->
           flunk("Unexpected error: #{inspect(reason)}")

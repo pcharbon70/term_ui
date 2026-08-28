@@ -89,7 +89,7 @@ defmodule Menu.App do
   Update state based on messages.
   """
   def update(:quit, state) do
-    {state, [:quit]}
+    {state, [TermUI.Command.quit()]}
   end
 
   def update({:menu_event, %Event.Key{key: key} = event}, state) when key in [:enter, " "] do

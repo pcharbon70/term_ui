@@ -18,7 +18,8 @@ defmodule CapabilitiesExample do
   - Color support (true_color, color_256, color_16, monochrome)
   - Unicode support
   - Terminal dimensions
-  - Mouse support
+  - The published mouse-capability flag (which does not indicate whether mouse
+    reporting is currently enabled)
   """
 
   use TermUI.Elm
@@ -36,13 +37,13 @@ defmodule CapabilitiesExample do
   end
 
   # Event handling
-  def event_to_msg(%TermUI.Event.Key{key: :tab}, state), do: {:msg, :next_tab}
-  def event_to_msg(%TermUI.Event.Key{key: ?1}, _state), do: {:msg, :show_overview}
-  def event_to_msg(%TermUI.Event.Key{key: ?2}, _state), do: {:msg, :show_colors}
-  def event_to_msg(%TermUI.Event.Key{key: ?3}, _state), do: {:msg, :show_unicode}
-  def event_to_msg(%TermUI.Event.Key{key: ?4}, _state), do: {:msg, :show_dimensions}
+  def event_to_msg(%TermUI.Event.Key{key: :tab}, _state), do: {:msg, :next_tab}
+  def event_to_msg(%TermUI.Event.Key{key: "1"}, _state), do: {:msg, :show_overview}
+  def event_to_msg(%TermUI.Event.Key{key: "2"}, _state), do: {:msg, :show_colors}
+  def event_to_msg(%TermUI.Event.Key{key: "3"}, _state), do: {:msg, :show_unicode}
+  def event_to_msg(%TermUI.Event.Key{key: "4"}, _state), do: {:msg, :show_dimensions}
   def event_to_msg(%TermUI.Event.Key{key: :enter}, _state), do: {:msg, :refresh}
-  def event_to_msg(%TermUI.Event.Key{key: ?q}, _state), do: {:msg, :quit}
+  def event_to_msg(%TermUI.Event.Key{key: "q"}, _state), do: {:msg, :quit}
   def event_to_msg(_event, _state), do: :ignore
 
   # State updates
@@ -58,7 +59,7 @@ defmodule CapabilitiesExample do
   def update(:show_unicode, state), do: {%{state | current_tab: :unicode}, []}
   def update(:show_dimensions, state), do: {%{state | current_tab: :dimensions}, []}
   def update(:refresh, state), do: {%{state | capabilities: get_capabilities()}, []}
-  def update(:quit, state), do: {state, [:quit]}
+  def update(:quit, state), do: {state, [TermUI.Command.quit()]}
 
   # View rendering
   def view(state) do
@@ -75,10 +76,11 @@ defmodule CapabilitiesExample do
 
   defp header do
     box([
-      text("TermUI Capabilities Detection",
+      text(
+        "TermUI Capabilities Detection",
         TermUI.Renderer.Style.new()
         |> TermUI.Renderer.Style.fg(:green)
-        |> TermUI.Renderer.Style.bright()
+        |> TermUI.Renderer.Style.bold()
       ),
       text("Displays detected terminal features and backend mode")
     ])
@@ -86,12 +88,12 @@ defmodule CapabilitiesExample do
 
   defp render_tab_content(%{current_tab: :overview, capabilities: caps}) do
     box([
-      text("Backend Mode: " <> format_backend_mode(caps),
+      text("Backend Mode: " <> format_backend_mode(caps)),
       text("Terminal: " <> format_terminal(caps)),
-      text("Color Support: " <> format_colors(caps),
+      text("Color Support: " <> format_colors(caps)),
       text("Unicode: " <> format_unicode(caps)),
       text("Dimensions: " <> format_dimensions(caps)),
-      text("Mouse: " <> format_mouse(caps))
+      text("Mouse capability flag: " <> format_mouse(caps))
     ])
   end
 
@@ -99,7 +101,8 @@ defmodule CapabilitiesExample do
     color_mode = get_in(caps, [:colors]) || :unknown
 
     box([
-      text("Color Capabilities",
+      text(
+        "Color Capabilities",
         TermUI.Renderer.Style.new()
         |> TermUI.Renderer.Style.fg(:green)
       ),
@@ -120,12 +123,13 @@ defmodule CapabilitiesExample do
     unicode_supported = get_in(caps, [:unicode]) == true
 
     box([
-      text("Unicode Support",
+      text(
+        "Unicode Support",
         TermUI.Renderer.Style.new()
         |> TermUI.Renderer.Style.fg(:green)
       ),
       text(""),
-      text("Detected: " <> if(unicode_supported, do: "Yes ✓", else: "No ✗"),
+      text("Detected: " <> if(unicode_supported, do: "Yes ✓", else: "No ✗")),
       text(""),
       if(unicode_supported,
         do: text("  Box drawing: ┌─┐│└┘"),
@@ -141,7 +145,8 @@ defmodule CapabilitiesExample do
     {rows, cols} = get_in(caps, [:dimensions]) || {nil, nil}
 
     box([
-      text("Terminal Dimensions",
+      text(
+        "Terminal Dimensions",
         TermUI.Renderer.Style.new()
         |> TermUI.Renderer.Style.fg(:green)
       ),
@@ -173,7 +178,7 @@ defmodule CapabilitiesExample do
           if state.current_tab == tab do
             TermUI.Renderer.Style.new()
             |> TermUI.Renderer.Style.fg(:yellow)
-            |> TermUI.Renderer.Style.bright()
+            |> TermUI.Renderer.Style.bold()
             |> TermUI.Renderer.Style.underline()
           else
             TermUI.Renderer.Style.new()
@@ -187,17 +192,26 @@ defmodule CapabilitiesExample do
   end
 
   defp footer do
-    text("Tab=switch | 1-4=jump | Enter=refresh | q=quit",
+    text(
+      "Tab=switch | 1-4=jump | Enter=refresh | q=quit",
       TermUI.Renderer.Style.new()
       |> TermUI.Renderer.Style.fg(:bright_black)
     )
   end
 
   # Color formatting helpers
-  defp get_color_style(:true_color), do: TermUI.Renderer.Style.new() |> TermUI.Renderer.Style.fg(:bright_green)
-  defp get_color_style(:color_256), do: TermUI.Renderer.Style.new() |> TermUI.Renderer.Style.fg(:green)
-  defp get_color_style(:color_16), do: TermUI.Renderer.Style.new() |> TermUI.Renderer.Style.fg(:yellow)
-  defp get_color_style(:monochrome), do: TermUI.Renderer.Style.new() |> TermUI.Renderer.Style.fg(:white)
+  defp get_color_style(:true_color),
+    do: TermUI.Renderer.Style.new() |> TermUI.Renderer.Style.fg(:bright_green)
+
+  defp get_color_style(:color_256),
+    do: TermUI.Renderer.Style.new() |> TermUI.Renderer.Style.fg(:green)
+
+  defp get_color_style(:color_16),
+    do: TermUI.Renderer.Style.new() |> TermUI.Renderer.Style.fg(:yellow)
+
+  defp get_color_style(:monochrome),
+    do: TermUI.Renderer.Style.new() |> TermUI.Renderer.Style.fg(:white)
+
   defp get_color_style(_), do: TermUI.Renderer.Style.new()
 
   defp color_capability_row(label, value, style) do
@@ -252,22 +266,25 @@ defmodule CapabilitiesExample do
   defp rainbow_gradient(label) do
     colors = [:red, :yellow, :green, :cyan, :blue, :magenta]
 
-    colors
-    |> Enum.map(fn color ->
-      styled("■ ", TermUI.Renderer.Style.new() |> TermUI.Renderer.Style.fg(color))
-    end)
-    |> prepend_text(label <> ": ")
+    nodes =
+      Enum.map(colors, fn color ->
+        text("■ ", TermUI.Renderer.Style.new() |> TermUI.Renderer.Style.fg(color))
+      end)
+
+    stack(:horizontal, [text(label <> ": ") | nodes])
   end
 
   defp sample_palette_256 do
     # Sample of the 256-color palette
     indices = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
 
-    indices
-    |> Enum.map(fn i ->
-      style = TermUI.Renderer.Style.new() |> TermUI.Renderer.Style.bg(i)
-      styled("  ", style)
-    end)
+    nodes =
+      Enum.map(indices, fn i ->
+        style = TermUI.Renderer.Style.new() |> TermUI.Renderer.Style.bg(i)
+        text("  ", style)
+      end)
+
+    stack(:horizontal, nodes)
   end
 
   defp sample_colors_16 do
@@ -282,10 +299,12 @@ defmodule CapabilitiesExample do
       {:white, "W "}
     ]
 
-    colors
-    |> Enum.map(fn {color, label} ->
-      styled(label, TermUI.Renderer.Style.new() |> TermUI.Renderer.Style.bg(color))
-    end)
+    nodes =
+      Enum.map(colors, fn {color, label} ->
+        text(label, TermUI.Renderer.Style.new() |> TermUI.Renderer.Style.bg(color))
+      end)
+
+    stack(:horizontal, nodes)
   end
 
   # Formatting helpers
@@ -309,8 +328,8 @@ defmodule CapabilitiesExample do
 
   defp format_dimensions(_), do: "unknown"
 
-  defp format_mouse(%{mouse: true}), do: "Available"
-  defp format_mouse(%{mouse: false}), do: "Not available"
+  defp format_mouse(%{mouse: true}), do: "true"
+  defp format_mouse(%{mouse: false}), do: "false"
   defp format_mouse(_), do: "unknown"
 
   defp format_value(nil), do: "N/A"
@@ -343,14 +362,14 @@ defmodule CapabilitiesExample do
   end
 
   defp get_dimensions do
-    case TermUI.App.capabilities() do
+    case TermUI.PersistentTerms.capabilities() do
       %{dimensions: dims} -> dims
       _ -> nil
     end
   end
 
   defp get_terminal do
-    case TermUI.App.capabilities() do
+    case TermUI.PersistentTerms.capabilities() do
       %{terminal: term} when is_boolean(term) -> term
       _ -> nil
     end
@@ -388,7 +407,7 @@ defmodule CapabilitiesExample do
     Color Support: #{format_colors(caps)}
     Unicode: #{format_unicode(caps)}
     Dimensions: #{format_dimensions(caps)}
-    Mouse: #{format_mouse(caps)}
+    Mouse capability flag: #{format_mouse(caps)}
 
     This demo shows the capabilities that would be detected
     when running a full TermUI application.

@@ -1,13 +1,17 @@
 defmodule TermUI.Widgets.ClusterDashboardTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias TermUI.Event
   alias TermUI.Theme
   alias TermUI.Widgets.ClusterDashboard
 
   setup do
-    # Start Theme server for color support
-    {:ok, _theme_pid} = Theme.start_link(theme: :dark)
+    # Start Theme server for color support if not already started
+    case Process.whereis(TermUI.Theme) do
+      nil -> Theme.start_link(theme: :dark)
+      pid -> {:ok, pid}
+    end
+
     :ok
   end
 

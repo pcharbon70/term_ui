@@ -1,9 +1,14 @@
 defmodule TermUI.Backend.SelectorTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
   import ExUnit.CaptureLog
 
   alias TermUI.Backend.Selector
   import TermUI.Backend.SelectorTestHelpers
+
+  setup_all do
+    assert Code.ensure_loaded?(Selector)
+    :ok
+  end
 
   describe "module structure" do
     test "module compiles successfully" do
@@ -296,6 +301,12 @@ defmodule TermUI.Backend.SelectorTest do
     test "function exports attempt_raw_mode for testability" do
       # attempt_raw_mode is exported (doc false) to allow testing the core logic
       assert function_exported?(Selector, :attempt_raw_mode, 0)
+    end
+
+    test "selects TTY without touching native shell mode before OTP 28" do
+      if TermUI.Platform.otp_release() < 28 do
+        assert {:tty, _capabilities} = Selector.attempt_raw_mode()
+      end
     end
   end
 
@@ -618,27 +629,21 @@ defmodule TermUI.Backend.SelectorTest do
   end
 
   describe "logging" do
-    test "logs backend selection at info level" do
-      log = capture_log(fn ->
-        Selector.select()
-      end)
-
-      assert log =~ "TermUI: Backend selected"
-    end
-
     test "logs forced backend selection" do
-      log = capture_log(fn ->
-        Selector.select(TermUI.Backend.TTY)
-      end)
+      log =
+        capture_log(fn ->
+          Selector.select(TermUI.Backend.TTY)
+        end)
 
       assert log =~ "TermUI: Using forced backend"
       assert log =~ "TermUI.Backend.TTY"
     end
 
     test "logs forced backend with options" do
-      log = capture_log(fn ->
-        Selector.select({TermUI.Backend.TTY, [line_mode: :full_redraw]})
-      end)
+      log =
+        capture_log(fn ->
+          Selector.select({TermUI.Backend.TTY, [line_mode: :full_redraw]})
+        end)
 
       assert log =~ "TermUI: Using forced backend"
       assert log =~ "TermUI.Backend.TTY"

@@ -6,6 +6,10 @@ This guide explains how to create new widgets for TermUI and contribute them to 
 
 TermUI supports two types of widgets:
 
+The default Elm runtime does not mount either type automatically. Applications
+call stateless render functions from the root view and keep stateful widget
+state inside the root Elm state.
+
 ### 1. Stateless Widgets (Display Only)
 
 Simple widgets that render based on input props without maintaining internal state.
@@ -111,16 +115,12 @@ defmodule TermUI.Widgets.MyStatefulWidget do
 
   ## Usage
 
-      MyStatefulWidget.new(
-        items: ["one", "two", "three"],
-        on_select: fn item -> handle_selection(item) end
-      )
+      MyStatefulWidget.new(items: ["one", "two", "three"])
 
   ## Keyboard Controls
 
   - Up/Down: Navigate items
   - Enter: Select current item
-  - Escape: Close
   """
 
   use TermUI.StatefulComponent
@@ -134,7 +134,6 @@ defmodule TermUI.Widgets.MyStatefulWidget do
   ## Options
 
   - `:items` - List of items (required)
-  - `:on_select` - Callback when item is selected
   - `:style` - Style for normal items
   - `:selected_style` - Style for selected item
   """
@@ -142,7 +141,6 @@ defmodule TermUI.Widgets.MyStatefulWidget do
   def new(opts) do
     %{
       items: Keyword.fetch!(opts, :items),
-      on_select: Keyword.get(opts, :on_select),
       style: Keyword.get(opts, :style),
       selected_style: Keyword.get(opts, :selected_style)
     }
@@ -154,7 +152,7 @@ defmodule TermUI.Widgets.MyStatefulWidget do
     state = %{
       items: props.items,
       cursor: 0,
-      on_select: props.on_select,
+      selected: nil,
       style: props.style,
       selected_style: props.selected_style
     }
@@ -170,18 +168,13 @@ defmodule TermUI.Widgets.MyStatefulWidget do
   end
 
   def handle_event(%Event.Key{key: :down}, state) do
-    max_index = length(state.items) - 1
+    max_index = max(0, length(state.items) - 1)
     new_cursor = min(max_index, state.cursor + 1)
     {:ok, %{state | cursor: new_cursor}}
   end
 
   def handle_event(%Event.Key{key: :enter}, state) do
-    if state.on_select do
-      item = Enum.at(state.items, state.cursor)
-      state.on_select.(item)
-    end
-
-    {:ok, state}
+    {:ok, %{state | selected: Enum.at(state.items, state.cursor)}}
   end
 
   def handle_event(_event, state) do
@@ -211,6 +204,9 @@ defmodule TermUI.Widgets.MyStatefulWidget do
       text(item)
     end
   end
+
+  @doc "Returns the most recently selected item."
+  def get_selected(state), do: state.selected
 end
 ```
 
@@ -222,6 +218,12 @@ end
 4. **Implement `handle_event/2`** for user interactions
 5. **Implement `render/2`** to produce the render tree
 6. **Return `{:ok, state}` or `{:ok, state, commands}`** from event handlers
+
+The normal Elm runtime embeds this state in the root. If an event handler
+returns component commands, the root must translate them explicitly into root
+messages or `TermUI.Command` values. Also avoid effectful widget callbacks when
+calling `handle_event/2` from the root's pure `update/2`; record an action in
+widget state (as above) and let the root return an appropriate command instead.
 
 ## Writing Tests
 

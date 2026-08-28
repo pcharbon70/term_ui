@@ -17,6 +17,23 @@ This directory contains example applications demonstrating TermUI widgets and pa
 | [dialog](./dialog/) | Modal dialogs | Confirmation, info, warning, error dialogs |
 | [viewport](./viewport/) | Scrollable content areas | Keyboard/mouse scrolling, scrollbars |
 | [canvas](./canvas/) | Custom drawing | Primitives, rectangles, Braille graphics |
+| [alert_dialog](./alert_dialog/) | Standard confirmation alerts | Modal overlays, keyboard selection |
+| [cluster_dashboard](./cluster_dashboard/) | Distributed Erlang status | Nodes, global names, process groups |
+| [command_palette](./command_palette/) | Searchable commands | Substring filtering, shortcuts |
+| [context_menu](./context_menu/) | Context actions | Keyboard and mouse alternatives |
+| [form_builder](./form_builder/) | Validated forms | Multiple fields, submission |
+| [iex_counter](./iex_counter/) | Minimal IEx counter | TTY/cooked input |
+| [log_viewer](./log_viewer/) | Large log streams | Filtering, search, tail mode |
+| [markdown_viewer](./markdown_viewer/) | Markdown content | Parsing and scrolling |
+| [multi_renderer](./multi_renderer/) | Backend capabilities | Raw/TTY selection and degradation |
+| [pick_list](./pick_list/) | Type-ahead selection | Filtering and modal navigation |
+| [process_monitor](./process_monitor/) | BEAM process metrics | Sorting and refresh |
+| [split_pane](./split_pane/) | Resizable panes | Constraints and keyboard resizing |
+| [stream_widget](./stream_widget/) | GenStage streams | Consumer integration and bounded buffers |
+| [supervision_tree_viewer](./supervision_tree_viewer/) | OTP supervision tree | Introspection and refresh |
+| [text_input](./text_input/) | Text editing | Single/multiline input |
+| [toast](./toast/) | Notifications | Timed stacking and dismissal |
+| [tree_view](./tree_view/) | Hierarchical data | Expand/collapse navigation |
 
 ## Running Examples
 
@@ -30,14 +47,14 @@ cd examples/<example_name>
 mix deps.get
 
 # Run the example
-mix run run.exs
+mix termui.run
 ```
 
 ## Requirements
 
 - Elixir 1.15+
-- OTP 28+
-- Terminal with Unicode support
+- OTP 26+ for TTY mode; OTP 28+ for native Raw mode
+- An ANSI-capable terminal; examples degrade to ASCII where supported
 
 ## Example Structure
 
@@ -59,7 +76,7 @@ example_name/
 All examples use TermUI's Elm Architecture pattern with four callbacks:
 
 ```elixir
-@behaviour TermUI.Component
+use TermUI.Elm
 
 # Initialize component state
 @impl true

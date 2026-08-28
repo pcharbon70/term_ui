@@ -5,6 +5,10 @@ defmodule TermUI.Dev.HotReload do
   Watches .ex files for changes and reloads modules without restarting
   the application. State is preserved across reloads where possible.
 
+  This server is not started by TermUI or by `DevMode.start_link/1`. A custom
+  development integration must start `HotReload` before calling `start/0` or
+  enabling DevMode's hot-reload toggle.
+
   ## Usage
 
       # Start hot reload
@@ -40,6 +44,10 @@ defmodule TermUI.Dev.HotReload do
           file_mtimes: %{String.t() => integer()},
           on_reload: (module() -> any()) | nil
         }
+
+  # Dialyzer: Pattern match coverage warnings
+  @dialyzer {:nowarn_function,
+             handle_info: 2, reload_module: 1, check_for_changes: 1, recompile_file: 1}
 
   # Client API
 

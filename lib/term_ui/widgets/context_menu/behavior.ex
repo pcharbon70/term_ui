@@ -37,6 +37,9 @@ defmodule TermUI.Widgets.ContextMenu.Behavior do
       end
   """
 
+  # Dialyzer: Functions return specific map types
+  @dialyzer {:nowarn_function, close_menu: 1, select_at_cursor: 1}
+
   # ----------------------------------------------------------------------------
   # Item Selection
   # ----------------------------------------------------------------------------
@@ -171,9 +174,9 @@ defmodule TermUI.Widgets.ContextMenu.Behavior do
 
   ## Callback Execution
 
-  The `on_select` callback is executed synchronously. If the callback raises an
-  exception, the widget process will crash and restart. Callbacks should handle
-  their own errors to avoid disrupting the UI.
+  The `on_select` callback is executed synchronously. Callback exceptions are
+  rescued, logged, and returned internally as errors without crashing the
+  caller.
 
   ## Examples
 
@@ -230,7 +233,7 @@ defmodule TermUI.Widgets.ContextMenu.Behavior do
   ## Callback Execution
 
   The `on_close` callback is executed synchronously before setting visibility.
-  If the callback raises an exception, the widget process will crash and restart.
+  Callback exceptions are rescued and logged.
 
   ## Examples
 
@@ -259,16 +262,14 @@ defmodule TermUI.Widgets.ContextMenu.Behavior do
   @doc false
   @spec safe_callback(function(), list(), String.t()) :: :ok | {:error, term()}
   defp safe_callback(callback, args, callback_name) do
-    try do
-      apply(callback, args)
-      :ok
-    rescue
-      e ->
-        require Logger
+    apply(callback, args)
+    :ok
+  rescue
+    e ->
+      require Logger
 
-        Logger.error("ContextMenu #{callback_name} callback error: #{inspect(e)}")
+      Logger.error("ContextMenu #{callback_name} callback error: #{inspect(e)}")
 
-        {:error, e}
-    end
+      {:error, e}
   end
 end

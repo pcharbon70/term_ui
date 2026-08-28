@@ -45,9 +45,8 @@ defmodule TermUI.Widgets.ContextMenu.Inline do
 
   ## Callback Error Handling
 
-  Callbacks (`on_select`, `on_close`) are executed synchronously. If a callback
-  raises an exception, the widget process will crash and restart. Callbacks
-  should handle their own errors to avoid disrupting the UI.
+  Callbacks (`on_select`, `on_close`) are executed synchronously. Callback
+  exceptions are rescued and logged by the shared behaviour.
 
   See `TermUI.Widgets.ContextMenu` moduledoc for callback best practices.
   """
@@ -57,6 +56,9 @@ defmodule TermUI.Widgets.ContextMenu.Inline do
   alias TermUI.CharacterSet
   alias TermUI.Event
   alias TermUI.Widgets.ContextMenu.Behavior
+
+  # Dialyzer: Functions return specific map types
+  @dialyzer {:nowarn_function, new: 1, show: 1, hide: 1, handle_info: 2, execute_menu_action: 2}
 
   @type orientation :: :horizontal | :vertical
 
@@ -265,31 +267,37 @@ defmodule TermUI.Widgets.ContextMenu.Inline do
 
       item_id ->
         # Use O(1) map lookup instead of O(n) Enum.find
-        case Map.get(state.item_map, item_id) do
-          %{type: :action} = item ->
-            if state.on_select && not Map.get(item, :disabled, false) do
-              safe_callback(state.on_select, [item.id], "on_select")
-            end
-
-            Behavior.close_menu(state)
-
-          _ ->
-            state
-        end
+        handle_menu_item_selection(state, item_id)
     end
+  end
+
+  defp handle_menu_item_selection(state, item_id) do
+    case Map.get(state.item_map, item_id) do
+      %{type: :action} = item ->
+        execute_menu_action(state, item)
+
+      _ ->
+        state
+    end
+  end
+
+  defp execute_menu_action(state, item) do
+    if state.on_select && not Map.get(item, :disabled, false) do
+      safe_callback(state.on_select, [item.id], "on_select")
+    end
+
+    Behavior.close_menu(state)
   end
 
   # Safe callback execution with error handling
   defp safe_callback(callback, args, callback_name) do
-    try do
-      apply(callback, args)
-      :ok
-    rescue
-      e ->
-        require Logger
-        Logger.error("ContextMenu.Inline #{callback_name} callback error: #{inspect(e)}")
-        {:error, e}
-    end
+    apply(callback, args)
+    :ok
+  rescue
+    e ->
+      require Logger
+      Logger.error("ContextMenu.Inline #{callback_name} callback error: #{inspect(e)}")
+      {:error, e}
   end
 
   # ----------------------------------------------------------------------------

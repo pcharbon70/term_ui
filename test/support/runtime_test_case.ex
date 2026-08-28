@@ -35,17 +35,7 @@ defmodule TermUI.RuntimeTestCase do
       alias TermUI.Event
       alias TermUI.Runtime
 
-      @doc """
-      Starts a runtime with the given component and automatic cleanup.
-
-      The runtime is automatically shut down when the test exits, even if
-      the test fails. This ensures no zombie processes are left behind.
-
-      ## Example
-
-          runtime = start_test_runtime(MyComponent)
-          # runtime will be cleaned up automatically
-      """
+      # Starts a runtime with the given component and automatic cleanup.
       defp start_test_runtime(component) do
         {:ok, runtime} = Runtime.start_link(root: component, skip_terminal: true)
 

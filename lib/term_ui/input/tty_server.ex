@@ -3,8 +3,12 @@ defmodule TermUI.Input.TTY.Server do
   GenServer that manages IEx-compatible TTY input using a separate process.
 
   This server spawns a separate process that continuously polls for input using
-  `:io.get_chars/2`. This approach allows TUI applications to work correctly
-  inside IEx, bypassing IEx's input interception.
+  `:io.get_chars/2`. This approach lets TUI applications read through the
+  active IEx IO server without replacing its shell. Because the terminal stays
+  in cooked mode, delivery may still be buffered until Enter.
+
+  This is a standalone alternative and is not used by `TermUI.Runtime`, which
+  runs `TermUI.Input.TTY.poll/2` in its own dedicated reader process.
 
   ## Architecture
 
@@ -22,7 +26,7 @@ defmodule TermUI.Input.TTY.Server do
   ## Usage
 
       {:ok, server} = TermUI.Input.TTY.Server.start_link(receiver: self())
-      {:ok, event} = TermUI.Input.TTY.Server.poll(server, 100)
+      {:ok, event} = TermUI.Input.TTY.Server.poll(server)
       :ok = TermUI.Input.TTY.Server.stop(server)
 
   ## IO Server Configuration
@@ -38,8 +42,18 @@ defmodule TermUI.Input.TTY.Server do
   use GenServer
   require Logger
 
-  alias TermUI.Event
   alias TermUI.Terminal.EscapeParser
+
+  # Dialyzer: Complex guard patterns in handle_escape_timeout/3 and parse_buffer/1
+  # Dialyzer: input_loop/4 is called in spawn, Dialyzer cannot prove safety
+  @dialyzer {:nowarn_function,
+             handle_escape_timeout: 3,
+             parse_buffer: 1,
+             input_loop: 4,
+             handle_info: 2,
+             terminate: 2,
+             setup_io_opts: 0,
+             restore_io_opts: 1}
 
   @escape_timeout 100
   @max_queue_size 1000
@@ -57,12 +71,13 @@ defmodule TermUI.Input.TTY.Server do
 
   ## Options
 
-  - `:receiver` - PID to send key events to (defaults to `self()`)
+  - `:receiver` - PID to receive `{:input_event, event}` messages. Supply this
+    when using push delivery; omitting it is only safe if no input will arrive
+    before shutdown.
   - `:name` - Name for GenServer registration (optional)
 
   ## Examples
 
-      {:ok, server} = TermUI.Input.TTY.Server.start_link()
       {:ok, server} = TermUI.Input.TTY.Server.start_link(receiver: some_pid)
   """
   def start_link(opts \\ []) do
@@ -80,19 +95,21 @@ defmodule TermUI.Input.TTY.Server do
   @doc """
   Polls for a key event.
 
-  Returns the next queued event, or waits for one if none is available.
-  The timeout is in milliseconds.
+  Returns the next queued event. The timeout argument is retained for API
+  compatibility but is not used to wait; callers receive `{:error, :no_event}`
+  immediately while the reader is alive and the queue is empty.
 
   ## Returns
 
   - `{:ok, event}` - A key event was received
   - `{:error, :eof}` - End of input stream
-  - `{:error, :timeout}` - No event within timeout (rare in TTY mode)
+  - `{:error, :no_event}` - Reader is alive but no event is queued
 
   ## Examples
 
-      case TermUI.Input.TTY.Server.poll(server, 100) do
+      case TermUI.Input.TTY.Server.poll(server) do
         {:ok, %Event.Key{} = event} -> handle_key(event)
+        {:error, :no_event} -> try_again_later()
         {:error, :eof} -> handle_shutdown()
       end
   """
@@ -225,45 +242,44 @@ defmodule TermUI.Input.TTY.Server do
     receive do
       :stop ->
         :ok
+    after
+      0 ->
+        # Try to read input
+        case :io.get_chars(~c"", 1) do
+          :eof ->
+            # End of input
+            GenServer.cast(server, :eof)
+            :ok
 
-      after
-        0 ->
-          # Try to read input
-          case :io.get_chars(~c"", 1) do
-            :eof ->
-              # End of input
-              GenServer.cast(server, :eof)
-              :ok
+          chars when is_list(chars) ->
+            now = System.monotonic_time(:millisecond)
+            dt = now - last_read_time
 
-            chars when is_list(chars) ->
-              now = System.monotonic_time(:millisecond)
-              dt = now - last_read_time
+            # Handle escape sequence timeout
+            {new_buffer, events} = handle_escape_timeout(buffer, chars, dt)
 
-              # Handle escape sequence timeout
-              {new_buffer, events} = handle_escape_timeout(buffer, chars, dt)
+            # Parse complete sequences
+            {remaining_buffer, parsed_events} = parse_buffer(new_buffer)
 
-              # Parse complete sequences
-              {remaining_buffer, parsed_events} = parse_buffer(new_buffer)
+            # Combine events from timeout handling and parsing
+            all_events = events ++ parsed_events
 
-              # Combine events from timeout handling and parsing
-              all_events = events ++ parsed_events
+            # Send events to receiver
+            Enum.each(all_events, fn event ->
+              send(receiver, {:input_event, event})
+            end)
 
-              # Send events to receiver
-              Enum.each(all_events, fn event ->
-                send(receiver, {:input_event, event})
-              end)
+            # Also queue them in the server for poll/2
+            if all_events != [] do
+              GenServer.cast(server, {:input, all_events})
+            end
 
-              # Also queue them in the server for poll/2
-              if all_events != [] do
-                GenServer.cast(server, {:input, all_events})
-              end
+            input_loop(server, receiver, remaining_buffer, now)
 
-              input_loop(server, receiver, remaining_buffer, now)
-
-            other ->
-              Logger.debug("TTY.Server: Unexpected input: #{inspect(other)}")
-              input_loop(server, receiver, buffer, System.monotonic_time(:millisecond))
-          end
+          other ->
+            Logger.debug("TTY.Server: Unexpected input: #{inspect(other)}")
+            input_loop(server, receiver, buffer, System.monotonic_time(:millisecond))
+        end
     end
   end
 

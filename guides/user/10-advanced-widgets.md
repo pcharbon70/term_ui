@@ -2,7 +2,9 @@
 
 TermUI includes advanced widgets for complex UI patterns including navigation, overlays, visualization, data streaming, and BEAM introspection. This guide covers these widgets and how to use them.
 
-All advanced widgets use the StatefulComponent pattern:
+Most interactive advanced widgets use the StatefulComponent pattern. The
+`BarChart` and `LineChart` visualization widgets are stateless and render
+directly from keyword options.
 
 ```elixir
 # 1. Create props with Widget.new(opts)
@@ -18,11 +20,16 @@ props = Widget.new(option: value)
 node = Widget.render(widget_state, %{width: 80, height: 24})
 ```
 
+The Elm runtime does not invoke a widget's `mount/1` callback. For widgets with
+refresh intervals, schedule a root `TermUI.Command.interval/2` and call the
+widget's public `refresh/1` function from `update/2`.
+
 ## Navigation Widgets
 
 ### Tabs
 
-> **Example:** See [`examples/tabs/`](../../examples/tabs/) for a complete demonstration.
+> **Example:** [`examples/tabs/`](https://github.com/pcharbon70/term_ui/tree/main/examples/tabs/)
+> demonstrates the interaction manually; the widget API below is canonical.
 
 Tabbed interface for organizing content into switchable panels.
 
@@ -31,8 +38,12 @@ alias TermUI.Widgets.Tabs
 
 # Create props
 props = Tabs.new(
-  tabs: ["Overview", "Details", "Settings"],
-  on_change: fn index -> handle_tab_change(index) end
+  tabs: [
+    %{id: :overview, label: "Overview", content: overview_view()},
+    %{id: :details, label: "Details", content: details_view()},
+    %{id: :settings, label: "Settings", content: settings_view()}
+  ],
+  on_change: fn tab_id -> handle_tab_change(tab_id) end
 )
 
 # Initialize and use
@@ -45,15 +56,20 @@ Tabs.render(tabs_state, %{width: 60, height: 1})
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `tabs` | list | required | Tab labels |
+| `tabs` | list | required | Maps containing at least `:id` and `:label` |
+| `selected` | term | first enabled tab | Initially selected tab ID |
 | `on_change` | function | `nil` | Tab change callback |
-| `style` | Style | default | Tab bar style |
-| `selected_style` | Style | reverse | Selected tab style |
-| `closeable` | boolean | `false` | Show close buttons |
+| `on_close` | function | `nil` | Callback for closing a closeable tab |
+| `tab_style` | Style | theme default | Inactive tab style |
+| `selected_style` | Style | theme default | Selected tab style |
+| `disabled_style` | Style | theme default | Disabled tab style |
+
+`content`, `disabled`, and `closeable` are per-tab fields, not options to
+`Tabs.new/1`.
 
 ### Context Menu
 
-> **Example:** See [`examples/context_menu/`](../../examples/context_menu/) for a complete demonstration.
+> **Example:** See [`examples/context_menu/`](https://github.com/pcharbon70/term_ui/tree/main/examples/context_menu/) for a complete demonstration.
 
 Right-click context menu that appears at cursor position.
 
@@ -63,11 +79,11 @@ alias TermUI.Widgets.ContextMenu
 # Create props
 props = ContextMenu.new(
   items: [
-    %{label: "Cut", shortcut: "Ctrl+X", action: :cut},
-    %{label: "Copy", shortcut: "Ctrl+C", action: :copy},
-    %{label: "Paste", shortcut: "Ctrl+V", action: :paste},
-    :separator,
-    %{label: "Delete", action: :delete}
+    ContextMenu.action(:cut, "Cut", shortcut: "Ctrl+X"),
+    ContextMenu.action(:copy, "Copy", shortcut: "Ctrl+C"),
+    ContextMenu.action(:paste, "Paste", shortcut: "Ctrl+V"),
+    ContextMenu.separator(),
+    ContextMenu.action(:delete, "Delete")
   ],
   position: {10, 5},
   on_select: fn action -> handle_menu_action(action) end
@@ -82,9 +98,10 @@ ContextMenu.render(menu_state, %{width: 30, height: 10})
 **Item Structure:**
 ```elixir
 %{
+  type: :action,
+  id: :cut,             # Identifier passed to on_select
   label: "Menu Item",    # Display text
   shortcut: "Ctrl+X",    # Optional shortcut hint
-  action: :action_atom,  # Action identifier
   disabled: false        # Optional disabled state
 }
 ```
@@ -93,19 +110,30 @@ ContextMenu.render(menu_state, %{width: 30, height: 10})
 
 ### Alert Dialog
 
-> **Example:** See [`examples/alert_dialog/`](../../examples/alert_dialog/) for a complete demonstration.
+> **Example:** See [`examples/alert_dialog/`](https://github.com/pcharbon70/term_ui/tree/main/examples/alert_dialog/) for a complete demonstration.
 
 Modal dialog for confirmations and messages with standard button configurations.
 
 ```elixir
 alias TermUI.Widgets.AlertDialog
+alias TermUI.Renderer.Style
 
 # Create props
 props = AlertDialog.new(
   type: :confirm,
   title: "Delete File",
   message: "Are you sure you want to delete this file?",
-  buttons: :yes_no,
+  on_result: fn result -> handle_result(result) end
+)
+
+# With custom styling
+props = AlertDialog.new(
+  type: :error,
+  title: "Error",
+  message: "Something went wrong",
+  background_style: Style.new(bg: :bright_black),
+  border_style: Style.new(fg: :red, attrs: [:bold]),
+  message_style: Style.new(fg: :white),
   on_result: fn result -> handle_result(result) end
 )
 
@@ -119,37 +147,54 @@ AlertDialog.render(dialog_state, %{width: 80, height: 24})
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `type` | atom | `:info` | `:info`, `:warning`, `:error`, `:success`, `:confirm` |
-| `title` | string | `""` | Dialog title |
+| `type` | atom | required | `:info`, `:success`, `:warning`, `:error`, `:confirm`, `:ok_cancel` |
+| `title` | string | required | Dialog title |
 | `message` | string | required | Dialog message |
-| `buttons` | atom/list | `:ok` | `:ok`, `:ok_cancel`, `:yes_no`, or custom list |
-| `on_result` | function | `nil` | Result callback |
+| `on_result` | function | `nil` | Callback with result (`:ok`, `:cancel`, `:yes`, `:no`) |
+| `width` | integer | `50` | Dialog width |
+| `background_style` | `Style.t()` | `Style.new(bg: :black)` | Dialog background style |
+| `border_style` | `Style.t()` | `Style.new(fg: :cyan)` | Border and title style |
+| `icon_style` | `Style.t()` | `nil` | Style for the icon |
+| `message_style` | `Style.t()` | `nil` | Style for the message |
+| `button_style` | `Style.t()` | `nil` | Style for buttons |
+| `focused_button_style` | `Style.t()` | `nil` | Style for focused button |
 
-**Type Icons:**
-- `:info` - ℹ (blue)
-- `:warning` - ⚠ (yellow)
-- `:error` - ✖ (red)
-- `:success` - ✔ (green)
-- `:confirm` - ? (cyan)
+**Representative Unicode type icons:**
+- `:info` - ℹ (information)
+- `:warning` - ⚠ (warning)
+- `:error` - ✖ (error)
+- `:success` - ✔ (success)
+- `:confirm` - ? (confirmation)
+- `:ok_cancel` - ? (OK/Cancel)
+
+**Keyboard Navigation:**
+- `Tab` / `Shift+Tab` - Move between buttons
+- `Enter` / `Space` - Activate focused button
+- `Escape` - Close (same as Cancel/No)
+- `Y` / `N` - Yes/No (in confirm dialogs)
 
 ### Toast
 
-> **Example:** See [`examples/toast/`](../../examples/toast/) for a complete demonstration.
+> **Example:** See [`examples/toast/`](https://github.com/pcharbon70/term_ui/tree/main/examples/toast/) for a complete demonstration.
 
-Non-blocking notification that auto-dismisses. Use `ToastManager` to manage multiple toasts with stacking.
+Non-blocking notification with tick-driven expiration. Use `ToastManager` to
+manage multiple toasts with stacking, schedule a root interval, and call
+`ToastManager.tick/1` when it fires.
 
 ```elixir
 alias TermUI.Widgets.ToastManager
 
 # Create manager in your init
 def init(_opts) do
-  %{
+  state = %{
     toast_manager: ToastManager.new(
       position: :bottom_right,
       default_duration: 3000,
       max_toasts: 5
     )
   }
+
+  {state, [TermUI.Command.interval(100, :tick)]}
 end
 
 # Add toasts
@@ -207,7 +252,7 @@ manager = ToastManager.clear_all(manager)
 
 ### Bar Chart
 
-> **Example:** See [`examples/bar_chart/`](../../examples/bar_chart/) for a complete demonstration.
+> **Example:** See [`examples/bar_chart/`](https://github.com/pcharbon70/term_ui/tree/main/examples/bar_chart/) for a complete demonstration.
 
 Horizontal or vertical bar chart for categorical data.
 
@@ -247,7 +292,7 @@ Engineering █████████████████████ 200
 
 ### Line Chart
 
-> **Example:** See [`examples/line_chart/`](../../examples/line_chart/) for a complete demonstration.
+> **Example:** See [`examples/line_chart/`](https://github.com/pcharbon70/term_ui/tree/main/examples/line_chart/) for a complete demonstration.
 
 Line chart using Braille characters for sub-character resolution.
 
@@ -264,13 +309,14 @@ LineChart.render(
 # Multiple series
 LineChart.render(
   series: [
-    %{data: cpu_history, style: Style.new(fg: :green)},
-    %{data: mem_history, style: Style.new(fg: :yellow)}
+    %{data: cpu_history},
+    %{data: mem_history}
   ],
   width: 60,
   height: 10,
   min: 0,
-  max: 100
+  max: 100,
+  style: Style.new(fg: :green)
 )
 ```
 
@@ -279,15 +325,20 @@ LineChart.render(
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `data` | list | - | Single series data |
-| `series` | list | - | Multiple series with styles |
+| `series` | list | - | Multiple `%{data: [...]}` series overlaid on one canvas |
 | `width` | integer | 40 | Chart width |
-| `height` | integer | 8 | Chart height |
+| `height` | integer | 10 | Chart height |
 | `min` | number | auto | Y-axis minimum |
 | `max` | number | auto | Y-axis maximum |
+| `show_axis` | boolean | `false` | Draw the bottom axis |
+| `style` | Style | `nil` | Style applied to the complete chart |
+
+Multiple series share one Braille canvas. The 1.0 renderer applies one global
+`:style`; it does not render each series in a separate color.
 
 ### Canvas
 
-> **Example:** See [`examples/canvas/`](../../examples/canvas/) for a complete demonstration.
+> **Example:** See [`examples/canvas/`](https://github.com/pcharbon70/term_ui/tree/main/examples/canvas/) for a complete demonstration.
 
 Direct drawing surface for custom visualizations.
 
@@ -306,7 +357,7 @@ props = Canvas.new(
 canvas_state = canvas_state
   |> Canvas.draw_rect(0, 0, 59, 19)
   |> Canvas.draw_line(0, 10, 59, 10)
-  |> Canvas.draw_text(25, 0, "Title", Style.new(fg: :cyan))
+  |> Canvas.draw_text(25, 0, "Title")
 
 Canvas.render(canvas_state, %{width: 60, height: 20})
 ```
@@ -315,17 +366,17 @@ Canvas.render(canvas_state, %{width: 60, height: 20})
 
 | Function | Description |
 |----------|-------------|
-| `draw_text(x, y, text, style)` | Draw text at position |
-| `draw_line(x1, y1, x2, y2)` | Draw line between points |
-| `draw_rect(x, y, w, h, opts)` | Draw rectangle |
-| `fill_rect(x, y, w, h, char)` | Fill rectangle with character |
-| `clear()` | Clear canvas |
+| `draw_text(state, x, y, text)` | Draw text at position |
+| `draw_line(state, x1, y1, x2, y2, char \\ nil)` | Draw a line between points |
+| `draw_rect(state, x, y, w, h, border \\ %{})` | Draw a rectangle |
+| `fill_rect(state, x, y, w, h, char)` | Fill a rectangle with a character |
+| `clear(state)` | Clear the canvas |
 
 ## Layout Widgets
 
 ### Markdown Viewer
 
-> **Example:** See [`examples/markdown_viewer/`](../../examples/markdown_viewer/) for a complete demonstration.
+> **Example:** See [`examples/markdown_viewer/`](https://github.com/pcharbon70/term_ui/tree/main/examples/markdown_viewer/) for a complete demonstration.
 
 Scrollable markdown viewer with syntax highlighting for code blocks.
 
@@ -347,13 +398,14 @@ props = MarkdownViewer.new(
 {:ok, viewer_state} = MarkdownViewer.handle_event(event, viewer_state)
 MarkdownViewer.render(viewer_state, %{width: 80, height: 24})
 
-# Update content dynamically
-MarkdownViewer.set_content(viewer_pid, "# New content")
+# Update embedded content through the normal props update callback
+new_props = MarkdownViewer.new(content: "# New content", width: 80, height: 24)
+{:ok, viewer_state} = MarkdownViewer.update(new_props, viewer_state)
 ```
 
 **Features:**
-- CommonMark compliant markdown rendering via mdex
-- Syntax highlighting for code blocks (Elixir, Erlang, and many more)
+- CommonMark parsing through MDEx with the rendered subset listed below
+- Syntax highlighting for Elixir and Erlang code blocks
 - Scrollable viewport with keyboard navigation
 - Focusable code blocks with copy functionality
 
@@ -363,7 +415,7 @@ MarkdownViewer.set_content(viewer_pid, "# New content")
 - `Home/End` - Jump to top/bottom
 - `Tab` - Cycle focus through code blocks
 - `Shift+Tab` - Reverse cycle through code blocks
-- `Enter` / `c` - Copy focused code block
+- `Enter` / `c` - Invoke `on_copy` for the focused code block
 - Mouse wheel - Scroll
 
 **Supported Markdown:**
@@ -372,13 +424,13 @@ MarkdownViewer.set_content(viewer_pid, "# New content")
 - Code (`` `inline` ``) and code blocks (fenced with ` ``` `)
 - Lists (ordered and unordered)
 - Blockquotes (`>`)
-- Links and images
+- Links (displayed with their URL) and image alt text
 
 **Options:**
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `content` | string | required | Markdown content to display |
+| `content` | string | `""` | Markdown content to display |
 | `width` | integer | 80 | Display width |
 | `height` | integer | 24 | Display height |
 | `on_copy` | function | `nil` | Callback when code block copied |
@@ -386,13 +438,14 @@ MarkdownViewer.set_content(viewer_pid, "# New content")
 **Helper Functions:**
 
 ```elixir
-# Update content dynamically (from another process)
-MarkdownViewer.set_content(viewer_pid, "# Updated content")
+# Update content in an embedded widget
+props = MarkdownViewer.new(content: "# Updated content", width: 80, height: 24)
+{:ok, state} = MarkdownViewer.update(props, state)
 ```
 
 ### Viewport
 
-> **Example:** See [`examples/viewport/`](../../examples/viewport/) for a complete demonstration.
+> **Example:** See [`examples/viewport/`](https://github.com/pcharbon70/term_ui/tree/main/examples/viewport/) for a complete demonstration.
 
 Scrollable view of content larger than the display area. The Viewport widget clips content to a visible region and supports both keyboard and mouse scrolling.
 
@@ -498,7 +551,7 @@ end
 
 ### Split Pane
 
-> **Example:** See [`examples/split_pane/`](../../examples/split_pane/) for a complete demonstration.
+> **Example:** See [`examples/split_pane/`](https://github.com/pcharbon70/term_ui/tree/main/examples/split_pane/) for a complete demonstration.
 
 Resizable split layout for IDE-style interfaces.
 
@@ -507,11 +560,12 @@ alias TermUI.Widgets.SplitPane
 
 # Create props
 props = SplitPane.new(
-  direction: :horizontal,
-  initial_ratio: 0.3,
-  min_size: 10,
-  max_size: 50,
-  on_resize: fn ratio -> handle_resize(ratio) end
+  orientation: :horizontal,
+  panes: [
+    SplitPane.pane(:sidebar, sidebar_view(), size: 0.3, min_size: 10),
+    SplitPane.pane(:main, main_view(), size: 0.7, max_size: 80)
+  ],
+  on_resize: fn panes -> handle_resize(panes) end
 )
 
 {:ok, pane_state} = SplitPane.init(props)
@@ -523,15 +577,21 @@ SplitPane.render(pane_state, %{width: 100, height: 30})
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `direction` | atom | `:horizontal` | `:horizontal` or `:vertical` |
-| `initial_ratio` | float | 0.5 | Split ratio (0.0-1.0) |
-| `min_size` | integer | 5 | Minimum pane size |
-| `max_size` | integer | `nil` | Maximum pane size |
-| `draggable` | boolean | `true` | Allow resize |
+| `orientation` | atom | `:horizontal` | `:horizontal` or `:vertical` |
+| `panes` | list | required | Pane maps, normally built with `pane/3` |
+| `divider_size` | integer | `1` | Divider thickness |
+| `resizable` | boolean | `true` | Allow keyboard/mouse resizing |
+| `on_resize` | function | `nil` | Callback receiving updated panes |
+| `on_collapse` | function | `nil` | Callback receiving `{id, collapsed}` |
+| `persist_key` | term | `nil` | Reserved application metadata; no automatic persistence in 1.0 |
+
+Pane-level `:size`, `:min_size`, `:max_size`, and `:collapsed` values belong to
+`SplitPane.pane/3`. Applications can save `SplitPane.get_layout/1` and later
+restore it with `SplitPane.set_layout/2`; `persist_key` alone does not do this.
 
 ### Tree View
 
-> **Example:** See [`examples/tree_view/`](../../examples/tree_view/) for a complete demonstration.
+> **Example:** See [`examples/tree_view/`](https://github.com/pcharbon70/term_ui/tree/main/examples/tree_view/) for a complete demonstration.
 
 Hierarchical data with expand/collapse.
 
@@ -540,19 +600,14 @@ alias TermUI.Widgets.TreeView
 
 # Create props
 props = TreeView.new(
-  data: [
-    %{
-      id: :src,
-      label: "src",
-      icon: "📁",
-      children: [
-        %{id: :main, label: "main.ex", icon: "📄"},
-        %{id: :utils, label: "utils.ex", icon: "📄"}
-      ]
-    },
-    %{id: :readme, label: "README.md", icon: "📄"}
+  nodes: [
+    TreeView.branch(:src, "src", [
+      TreeView.leaf(:main, "main.ex"),
+      TreeView.leaf(:utils, "utils.ex")
+    ]),
+    TreeView.leaf(:readme, "README.md")
   ],
-  on_select: fn node_id -> handle_select(node_id) end
+  on_select: fn node -> handle_select(node) end
 )
 
 {:ok, tree_state} = TreeView.init(props)
@@ -574,7 +629,7 @@ TreeView.render(tree_state, %{width: 40, height: 20})
 
 ### Form Builder
 
-> **Example:** See [`examples/form_builder/`](../../examples/form_builder/) for a complete demonstration.
+> **Example:** See [`examples/form_builder/`](https://github.com/pcharbon70/term_ui/tree/main/examples/form_builder/) for a complete demonstration.
 
 Structured forms with validation and multiple field types.
 
@@ -636,9 +691,9 @@ FormBuilder.render(form_state, %{width: 60, height: 20})
 
 ### Command Palette
 
-> **Example:** See [`examples/command_palette/`](../../examples/command_palette/) for a complete demonstration.
+> **Example:** See [`examples/command_palette/`](https://github.com/pcharbon70/term_ui/tree/main/examples/command_palette/) for a complete demonstration.
 
-VS Code-style command interface with fuzzy search.
+Searchable command interface with case-insensitive substring filtering.
 
 ```elixir
 alias TermUI.Widgets.CommandPalette
@@ -646,14 +701,11 @@ alias TermUI.Widgets.CommandPalette
 # Create props
 props = CommandPalette.new(
   commands: [
-    %{id: :save, label: "Save File", shortcut: "Ctrl+S", category: :file},
-    %{id: :open, label: "Open File", shortcut: "Ctrl+O", category: :file},
-    %{id: :find, label: "Find", shortcut: "Ctrl+F", category: :edit},
-    %{id: :replace, label: "Find and Replace", shortcut: "Ctrl+H", category: :edit}
+    %{id: :save, label: "/save", action: fn -> save_file() end},
+    %{id: :open, label: "/open", action: fn -> open_file() end},
+    %{id: :find, label: "/find", action: fn -> find_text() end}
   ],
-  on_select: fn command_id -> execute_command(command_id) end,
-  on_close: fn -> hide_palette() end,
-  placeholder: "Type a command..."
+  max_visible: 8
 )
 
 {:ok, palette_state} = CommandPalette.init(props)
@@ -661,14 +713,17 @@ props = CommandPalette.new(
 CommandPalette.render(palette_state, %{width: 80, height: 24})
 ```
 
+Typing filters by case-insensitive label substring. Enter stores the selected label as the query
+and hides the palette; it does not invoke `:action` itself. Read the selection
+with `CommandPalette.get_selected/1` before forwarding Enter, or interpret the
+resulting query in the root, as the example does.
+
 **Command Structure:**
 ```elixir
 %{
   id: :command_id,
   label: "Command Label",
-  shortcut: "Ctrl+K",      # Optional
-  category: :file,         # Optional, for grouping
-  description: "Details"   # Optional
+  action: fn -> :ok end     # Application-owned metadata; widget does not call it
 }
 ```
 
@@ -676,7 +731,7 @@ CommandPalette.render(palette_state, %{width: 80, height: 24})
 
 ### Log Viewer
 
-> **Example:** See [`examples/log_viewer/`](../../examples/log_viewer/) for a complete demonstration.
+> **Example:** See [`examples/log_viewer/`](https://github.com/pcharbon70/term_ui/tree/main/examples/log_viewer/) for a complete demonstration.
 
 High-performance log viewer with virtual scrolling, search, and filtering.
 
@@ -694,7 +749,7 @@ props = LogViewer.new(
 {:ok, viewer_state} = LogViewer.init(props)
 
 # Add log lines
-viewer_state = LogViewer.append_line(viewer_state, %{
+viewer_state = LogViewer.add_line(viewer_state, %{
   timestamp: DateTime.utc_now(),
   level: :info,
   message: "Application started",
@@ -727,9 +782,9 @@ LogViewer.render(viewer_state, %{width: 100, height: 30})
 
 ### Stream Widget
 
-> **Example:** See [`examples/stream_widget/`](../../examples/stream_widget/) for a complete demonstration.
+> **Example:** See [`examples/stream_widget/`](https://github.com/pcharbon70/term_ui/tree/main/examples/stream_widget/) for a complete demonstration.
 
-GenStage-integrated widget for real-time data streams with backpressure.
+Bounded stream display with an optional GenStage consumer adapter.
 
 ```elixir
 alias TermUI.Widgets.StreamWidget
@@ -737,14 +792,15 @@ alias TermUI.Widgets.StreamWidget
 # Create props
 props = StreamWidget.new(
   buffer_size: 1000,
-  rate_limit: 60,  # updates per second
-  overflow: :drop_oldest
+  render_rate_ms: 100,
+  overflow_strategy: :drop_oldest,
+  demand: 10
 )
 
 {:ok, stream_state} = StreamWidget.init(props)
 
 # Push data to stream
-stream_state = StreamWidget.push(stream_state, data_item)
+{:ok, stream_state} = StreamWidget.add_item(stream_state, data_item)
 
 # Handle events and render
 {:ok, stream_state} = StreamWidget.handle_event(event, stream_state)
@@ -756,8 +812,19 @@ StreamWidget.render(stream_state, %{width: 80, height: 20})
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `buffer_size` | integer | 1000 | Maximum buffered items |
-| `rate_limit` | integer | 60 | Max renders per second |
-| `overflow` | atom | `:drop_oldest` | `:drop_oldest`, `:drop_newest` |
+| `overflow_strategy` | atom | `:drop_oldest` | `:drop_oldest`, `:drop_newest`, `:block`, or `:sliding`; `:block` rejects new items when full in 1.0 |
+| `demand` | integer | `10` | Reserved metadata; configure subscription demand on the consumer |
+| `show_stats` | boolean | `true` | Show the statistics row |
+| `render_rate_ms` | integer | `100` | Reserved metadata; it does not throttle runtime rendering in 1.0 |
+| `item_renderer` | function | built in | Converts an item to display text |
+| `on_item` | function | `nil` | Synchronous item callback |
+| `on_error` | function | `nil` | Synchronous stream-error callback |
+
+`StreamWidget.Consumer` forwards `{:stream_items, items}` to the PID it is
+given. For an embedded widget, pass the runtime/root PID and delegate that
+message from the root's optional `handle_info/2` to `StreamWidget.handle_info/2`.
+Set `max_demand`/`min_demand` on `Consumer.subscribe/3`; widget buffer occupancy
+does not dynamically reconfigure GenStage demand.
 
 ## BEAM Introspection Widgets
 
@@ -765,7 +832,7 @@ These widgets leverage Erlang's runtime introspection capabilities for live syst
 
 ### Process Monitor
 
-> **Example:** See [`examples/process_monitor/`](../../examples/process_monitor/) for a complete demonstration.
+> **Example:** See [`examples/process_monitor/`](https://github.com/pcharbon70/term_ui/tree/main/examples/process_monitor/) for a complete demonstration.
 
 Live BEAM process inspection with sorting, filtering, and process control.
 
@@ -785,8 +852,8 @@ props = ProcessMonitor.new(
 
 {:ok, monitor_state} = ProcessMonitor.init(props)
 
-# Handle timer messages for auto-refresh
-{:ok, monitor_state} = ProcessMonitor.handle_info(:refresh, monitor_state)
+# Refresh when the root receives its scheduled message
+{:ok, monitor_state} = ProcessMonitor.refresh(monitor_state)
 
 # Handle events and render
 {:ok, monitor_state} = ProcessMonitor.handle_event(event, monitor_state)
@@ -811,7 +878,7 @@ ProcessMonitor.render(monitor_state, %{width: 100, height: 30})
 
 ### Supervision Tree Viewer
 
-> **Example:** See [`examples/supervision_tree_viewer/`](../../examples/supervision_tree_viewer/) for a complete demonstration.
+> **Example:** See [`examples/supervision_tree_viewer/`](https://github.com/pcharbon70/term_ui/tree/main/examples/supervision_tree_viewer/) for a complete demonstration.
 
 Visualize supervision hierarchies with live status.
 
@@ -821,14 +888,14 @@ alias TermUI.Widgets.SupervisionTreeViewer
 props = SupervisionTreeViewer.new(
   root: MyApp.Supervisor,
   update_interval: 2000,
-  show_pids: true,
-  expand_all: false
+  show_workers: true,
+  auto_expand: false
 )
 
 {:ok, tree_state} = SupervisionTreeViewer.init(props)
 
-# Handle timer messages for auto-refresh
-{:ok, tree_state} = SupervisionTreeViewer.handle_info(:refresh, tree_state)
+# Refresh when the root receives its scheduled message
+{:ok, tree_state} = SupervisionTreeViewer.refresh(tree_state)
 
 # Handle events and render
 {:ok, tree_state} = SupervisionTreeViewer.handle_event(event, tree_state)
@@ -837,18 +904,20 @@ SupervisionTreeViewer.render(tree_state, %{width: 80, height: 25})
 
 **Keyboard Controls:**
 - `↑/↓` - Navigate tree
-- `Enter` - Expand/collapse node
-- `e/c` - Expand/collapse all
+- `Left/Right` - Collapse/expand or move through the hierarchy
+- `Enter` - Expand/collapse a supervisor or toggle worker details
 - `i` - Inspect process state
 - `r` - Restart process (with confirmation)
+- `R` - Refresh immediately
+- `k` - Terminate process (with confirmation)
 - `/` - Filter tree
 - `Escape` - Clear filter
 
 **Status Indicators:**
-- `●` Running (green)
-- `↻` Restarting (yellow)
-- `✖` Terminated (red)
-- `?` Undefined (gray)
+- `o [R]` - Running
+- `~ [Y]` - Restarting
+- `x [T]` - Terminated
+- `? [U]` - Undefined
 
 **Strategy Display:**
 - `1:1` - one_for_one
@@ -857,7 +926,7 @@ SupervisionTreeViewer.render(tree_state, %{width: 80, height: 25})
 
 ### Cluster Dashboard
 
-> **Example:** See [`examples/cluster_dashboard/`](../../examples/cluster_dashboard/) for a complete demonstration.
+> **Example:** See [`examples/cluster_dashboard/`](https://github.com/pcharbon70/term_ui/tree/main/examples/cluster_dashboard/) for a complete demonstration.
 
 Distributed Erlang cluster visualization.
 
@@ -873,8 +942,8 @@ props = ClusterDashboard.new(
 
 {:ok, dashboard_state} = ClusterDashboard.init(props)
 
-# Handle timer messages for auto-refresh
-{:ok, dashboard_state} = ClusterDashboard.handle_info(:refresh, dashboard_state)
+# Refresh when the root receives its scheduled message
+{:ok, dashboard_state} = ClusterDashboard.refresh(dashboard_state)
 
 # Handle events and render
 {:ok, dashboard_state} = ClusterDashboard.handle_event(event, dashboard_state)
@@ -918,33 +987,33 @@ defmodule MyApp.SystemMonitor do
     )
     {:ok, monitor_state} = ProcessMonitor.init(props)
 
-    %{
+    state = %{
       monitor: monitor_state,
       last_refresh: DateTime.utc_now()
     }
+
+    {state, [TermUI.Command.interval(1000, :tick)]}
   end
 
   def event_to_msg(%Event.Key{key: "q"}, _state), do: {:msg, :quit}
   def event_to_msg(%Event.Key{key: "r"}, _state), do: {:msg, :refresh}
   def event_to_msg(event, _state), do: {:msg, {:monitor_event, event}}
 
-  def update(:quit, state), do: {state, [:quit]}
+  def update(:quit, state), do: {state, [TermUI.Command.quit()]}
 
   def update(:refresh, state) do
-    {:ok, monitor} = ProcessMonitor.handle_info(:refresh, state.monitor)
+    {:ok, monitor} = ProcessMonitor.refresh(state.monitor)
+    {%{state | monitor: monitor, last_refresh: DateTime.utc_now()}, []}
+  end
+
+  def update(:tick, state) do
+    {:ok, monitor} = ProcessMonitor.refresh(state.monitor)
     {%{state | monitor: monitor, last_refresh: DateTime.utc_now()}, []}
   end
 
   def update({:monitor_event, event}, state) do
     {:ok, monitor} = ProcessMonitor.handle_event(event, state.monitor)
     {%{state | monitor: monitor}, []}
-  end
-
-  # Auto-refresh timer
-  def handle_info(:tick, state) do
-    {:ok, monitor} = ProcessMonitor.handle_info(:refresh, state.monitor)
-    {%{state | monitor: monitor, last_refresh: DateTime.utc_now()},
-     [Command.timer(1000, :tick)]}
   end
 
   def view(state) do

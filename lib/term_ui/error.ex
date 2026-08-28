@@ -52,22 +52,22 @@ defmodule TermUI.Error do
   """
 
   @type error_reason ::
-          :invalid_argument |
-          :not_found |
-          :not_supported |
-          :timeout |
-          :terminal_setup_failed |
-          :size_detection_failed |
-          :invalid_size |
-          :out_of_bounds |
-          :backend_unavailable |
-          :command_failed |
-          :command_not_found |
-          :command_not_allowed |
-          :invalid_configuration |
-          :component_crashed |
-          :component_unavailable |
-          {atom(), term()}
+          :invalid_argument
+          | :not_found
+          | :not_supported
+          | :timeout
+          | :terminal_setup_failed
+          | :size_detection_failed
+          | :invalid_size
+          | :out_of_bounds
+          | :backend_unavailable
+          | :command_failed
+          | :command_not_found
+          | :command_not_allowed
+          | :invalid_configuration
+          | :component_crashed
+          | :component_unavailable
+          | {atom(), term()}
 
   @type result :: {:ok, term()} | {:error, error_reason()}
 
@@ -119,7 +119,7 @@ defmodule TermUI.Error do
       {:invalid_size, "dimensions must be positive"}
 
   """
-  @spec error(atom(), term()) :: error_reason()
+  @spec error(atom(), term()) :: {atom(), term()}
   def error(type, details), do: {type, details}
 
   @doc """
@@ -127,41 +127,41 @@ defmodule TermUI.Error do
 
   ## Examples
 
-      iex> TermUI.Error.is_error_reason(:not_found)
+      iex> TermUI.Error.error_reason?(:not_found)
       true
 
-      iex> TermUI.Error.is_error_reason({:invalid_size, "too small"})
+      iex> TermUI.Error.error_reason?({:invalid_size, "too small"})
       true
 
-      iex> TermUI.Error.is_error_reason(:ok)
+      iex> TermUI.Error.error_reason?(:ok)
       false
 
-      iex> TermUI.Error.is_error_reason({:ok, "result"})
+      iex> TermUI.Error.error_reason?({:ok, "result"})
       false
 
   """
-  @spec is_error_reason(term()) :: boolean()
-  def is_error_reason(:invalid_argument), do: true
-  def is_error_reason(:not_found), do: true
-  def is_error_reason(:not_supported), do: true
-  def is_error_reason(:timeout), do: true
-  def is_error_reason(:terminal_setup_failed), do: true
-  def is_error_reason(:size_detection_failed), do: true
-  def is_error_reason(:invalid_size), do: true
-  def is_error_reason(:out_of_bounds), do: true
-  def is_error_reason(:backend_unavailable), do: true
-  def is_error_reason(:command_failed), do: true
-  def is_error_reason(:command_not_found), do: true
-  def is_error_reason(:command_not_allowed), do: true
-  def is_error_reason(:invalid_configuration), do: true
-  def is_error_reason(:component_crashed), do: true
-  def is_error_reason(:component_unavailable), do: true
+  @spec error_reason?(term()) :: boolean()
+  def error_reason?(:invalid_argument), do: true
+  def error_reason?(:not_found), do: true
+  def error_reason?(:not_supported), do: true
+  def error_reason?(:timeout), do: true
+  def error_reason?(:terminal_setup_failed), do: true
+  def error_reason?(:size_detection_failed), do: true
+  def error_reason?(:invalid_size), do: true
+  def error_reason?(:out_of_bounds), do: true
+  def error_reason?(:backend_unavailable), do: true
+  def error_reason?(:command_failed), do: true
+  def error_reason?(:command_not_found), do: true
+  def error_reason?(:command_not_allowed), do: true
+  def error_reason?(:invalid_configuration), do: true
+  def error_reason?(:component_crashed), do: true
+  def error_reason?(:component_unavailable), do: true
 
-  def is_error_reason({type, _}) when is_atom(type) do
-    is_error_reason(type)
+  def error_reason?({type, _}) when is_atom(type) do
+    error_reason?(type)
   end
 
-  def is_error_reason(_), do: false
+  def error_reason?(_), do: false
 
   @doc """
   Returns the error type from an error reason.

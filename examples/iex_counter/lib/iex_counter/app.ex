@@ -24,12 +24,12 @@ defmodule IExCounter.App do
 
   ## Running Standalone
 
-      mix run run.exs
+      mix termui.run
 
   ## What Works in IEx
 
-  - All keyboard input is received by the TUI application
-  - Arrow keys work immediately (no Enter required)
+  - Character and navigation input is parsed after the shell delivers it
+  - Arrow keys work once the shell delivers them (some terminals require Enter)
   - Terminal state is restored when you quit
   - You return to the IEx prompt ready for next command
 
@@ -96,7 +96,7 @@ defmodule IExCounter.App do
   end
 
   def update(:quit, state) do
-    {state, [:quit]}
+    {state, [TermUI.Command.quit()]}
   end
 
   @impl true
@@ -120,7 +120,7 @@ defmodule IExCounter.App do
       text("Controls:", Style.new(fg: :yellow, attrs: [:bold])),
       text("  ↑/↓ : Increment/Decrement", nil),
       text("  R   : Reset", nil),
-      text("  Q   : Quit to IEx prompt", nil),
+      text("  Q   : Quit to IEx prompt", nil)
     ])
   end
 

@@ -3,12 +3,12 @@ defmodule TermUI.Backend.Selector do
   Determines which terminal backend to use at runtime.
 
   The Selector module implements a "try raw mode first" strategy for backend
-  selection. This approach is the **only reliable method** for determining
-  whether raw terminal mode is available.
+  selection. After the platform/version guard, attempting acquisition is the
+  authoritative check for whether native Raw mode is available.
 
   ## Why Not Use Heuristics?
 
-  Environment-based detection (checking `$TERM`, `IO.getopts/0`, etc.) cannot
+  Environment-based detection (checking `$TERM`, current I/O device options, etc.) cannot
   reliably detect all cases where raw mode is unavailable:
 
   - **Nerves devices**: The erlinit process may have already started a shell,
@@ -61,35 +61,32 @@ defmodule TermUI.Backend.Selector do
 
   For testing or configuration override, use `select/1`:
 
-      # Force TTY mode
-      {:tty, caps} = Selector.select(TermUI.Backend.TTY)
+      # Select a module explicitly (initialization is performed by Runtime)
+      {:explicit, TermUI.Backend.TTY, []} = Selector.select(TermUI.Backend.TTY)
 
-      # Force raw mode (will fail if unavailable)
-      {:raw, state} = Selector.select(TermUI.Backend.Raw)
+      {:explicit, TermUI.Backend.Raw, []} = Selector.select(TermUI.Backend.Raw)
 
       # Auto-detect (same as select/0)
       result = Selector.select(:auto)
 
   ## Examples
 
-      # Typical usage in runtime initialization
+      # Inspect the selected local mode. Runtime owns backend initialization.
       case TermUI.Backend.Selector.select() do
-        {:raw, state} ->
-          # Initialize raw backend
-          TermUI.Backend.Raw.init(state)
-
-        {:tty, capabilities} ->
-          # Initialize TTY backend with detected capabilities
-          TermUI.Backend.TTY.init(capabilities: capabilities)
+        {:raw, _state} -> :raw
+        {:tty, _capabilities} -> :tty
       end
 
   ## OTP Version Requirements
 
-  - **OTP 28+**: Full support with `:shell.start_interactive/1`
+  - **OTP 28+ on a supported Unix platform**: Native Raw selection with
+    `:shell.start_interactive/1`
   - **OTP 27 and earlier**: Automatic fallback to TTY mode
   """
 
   require Logger
+
+  alias TermUI.Platform
 
   @typedoc """
   Result of backend selection.
@@ -143,8 +140,6 @@ defmodule TermUI.Backend.Selector do
   """
   @spec select() :: {:raw, raw_state()} | {:tty, capabilities()}
   def select do
-    # Implementation in task 1.2.2
-    # Placeholder: attempt raw mode, fall back to TTY with capabilities
     try_raw_mode()
   end
 
@@ -186,14 +181,11 @@ defmodule TermUI.Backend.Selector do
   @doc false
   @spec try_raw_mode() :: {:raw, raw_state()} | {:tty, capabilities()}
   def try_raw_mode do
-    try do
-      attempt_raw_mode()
-    rescue
-      # Handle pre-OTP 28 systems where :shell.start_interactive/1 doesn't exist
-      UndefinedFunctionError ->
-        Logger.info("TermUI: Backend selected: :tty (OTP < 28, raw mode unavailable)")
-        {:tty, detect_capabilities()}
-    end
+    attempt_raw_mode()
+  rescue
+    # Handle pre-OTP 28 systems where :shell.start_interactive/1 doesn't exist
+    UndefinedFunctionError ->
+      {:tty, detect_capabilities()}
   end
 
   # Attempts to start raw mode using OTP 28's shell.start_interactive/1
@@ -201,24 +193,22 @@ defmodule TermUI.Backend.Selector do
   @doc false
   @spec attempt_raw_mode() :: {:raw, raw_state()} | {:tty, capabilities()}
   def attempt_raw_mode do
-    case :shell.start_interactive({:noshell, :raw}) do
-      :ok ->
-        # Raw mode successfully activated
-        Logger.info("TermUI: Backend selected: :raw (full terminal control)")
-        {:raw, %{raw_mode_started: true}}
+    if Platform.native_raw_mode_supported?() do
+      case :shell.start_interactive({:noshell, :raw}) do
+        :ok ->
+          # Raw mode successfully activated
+          {:raw, %{raw_mode_started: true}}
 
-      {:error, :already_started} ->
-        # A shell is already running, fall back to TTY mode
-        Logger.info("TermUI: Backend selected: :tty (shell already running)")
-        {:tty, detect_capabilities()}
+        {:error, :already_started} ->
+          # A shell is already running, fall back to TTY mode
+          {:tty, detect_capabilities()}
 
-      {:error, reason} ->
-        # Defensive programming: handle unexpected errors from :shell.start_interactive/1.
-        # While OTP 28 documentation only specifies :ok and {:error, :already_started},
-        # we gracefully handle other error conditions for forward compatibility and
-        # robustness. The error reason is preserved in the capabilities map for debugging.
-        Logger.info("TermUI: Backend selected: :tty (raw mode failed: #{inspect(reason)})")
-        {:tty, Map.put(detect_capabilities(), :raw_mode_error, reason)}
+        {:error, reason} ->
+          # Preserve unexpected failures in the capabilities map for debugging.
+          {:tty, Map.put(detect_capabilities(), :raw_mode_error, reason)}
+      end
+    else
+      {:tty, detect_capabilities()}
     end
   end
 
@@ -241,26 +231,37 @@ defmodule TermUI.Backend.Selector do
     term = System.get_env("TERM") || ""
 
     cond do
-      # COLORTERM is the most reliable indicator for true color
-      colorterm in ["truecolor", "24bit"] ->
+      true_color_colorterm?(colorterm) ->
         :true_color
 
-      # TERM patterns for true color
-      String.contains?(term, "-direct") ->
+      true_color_term?(term) ->
         :true_color
 
-      # 256 color support
-      String.contains?(term, "-256color") or String.contains?(term, "256color") ->
+      color_256_term?(term) ->
         :color_256
 
-      # Standard terminals with 16 color support
-      term != "" and basic_terminal?(term) ->
+      basic_16_color_term?(term) ->
         :color_16
 
-      # Unknown or no terminal
       true ->
         :monochrome
     end
+  end
+
+  defp true_color_colorterm?(colorterm) do
+    colorterm in ["truecolor", "24bit"]
+  end
+
+  defp true_color_term?(term) do
+    String.contains?(term, "-direct")
+  end
+
+  defp color_256_term?(term) do
+    String.contains?(term, "-256color") or String.contains?(term, "256color")
+  end
+
+  defp basic_16_color_term?(term) do
+    term != "" and basic_terminal?(term)
   end
 
   # Checks if TERM indicates a basic terminal with at least 16 colors.
@@ -304,7 +305,14 @@ defmodule TermUI.Backend.Selector do
   end
 
   # Detects if we're connected to a terminal
-  @spec detect_terminal_presence() :: boolean()
+  @dialyzer {:nowarn_function,
+             detect_terminal_presence: 0,
+             select: 0,
+             select: 1,
+             try_raw_mode: 0,
+             attempt_raw_mode: 0,
+             detect_capabilities: 0}
+  @spec detect_terminal_presence() :: term()
   defp detect_terminal_presence do
     case :io.getopts() do
       {:ok, opts} ->

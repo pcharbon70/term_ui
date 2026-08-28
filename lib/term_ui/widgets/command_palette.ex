@@ -2,16 +2,17 @@ defmodule TermUI.Widgets.CommandPalette do
   @moduledoc """
   Simple command dropdown for filtering and selecting commands.
 
-  Shows a list of commands filtered by prefix as the user types.
+  Shows a list of commands filtered by case-insensitive substring as the user
+  types.
   Similar to typing `/` in Claude Code to see available slash commands.
 
   ## Usage
 
       # Define commands
       commands = [
-        %{id: :help, label: "/help", action: fn -> :ok end},
-        %{id: :save, label: "/save", action: fn -> :ok end},
-        %{id: :quit, label: "/quit", action: fn -> :ok end}
+        %{id: :help, label: "/help"},
+        %{id: :save, label: "/save"},
+        %{id: :quit, label: "/quit"}
       ]
 
       # Create and show palette
@@ -25,9 +26,9 @@ defmodule TermUI.Widgets.CommandPalette do
 
   ## Keyboard Navigation
 
-  - Type to filter by prefix
+  - Type to filter by case-insensitive substring
   - Up/Down: Navigate through results
-  - Enter: Execute selected command
+  - Enter: Select the highlighted command and close the palette
   - Escape: Close dropdown
   - Backspace: Delete character
 
@@ -48,6 +49,9 @@ defmodule TermUI.Widgets.CommandPalette do
   alias TermUI.Renderer.Style
   alias TermUI.Theme
 
+  # Dialyzer: Functions return specific map types
+  @dialyzer {:nowarn_function, new: 1, show: 1, hide: 1, toggle: 1}
+
   @doc """
   Creates new CommandPalette widget props.
 
@@ -56,7 +60,8 @@ defmodule TermUI.Widgets.CommandPalette do
   - `:commands` - List of command maps (required). Each command has:
     - `:id` - Unique identifier (atom)
     - `:label` - Display text (string)
-    - `:action` - Function to execute (fn -> ... end)
+    - Any other fields are application-owned metadata. The widget never invokes
+      an `:action` function; the root application interprets the selection.
   - `:max_visible` - Maximum visible results (default: 8)
   """
   @spec new(keyword()) :: map()
@@ -125,14 +130,14 @@ defmodule TermUI.Widgets.CommandPalette do
 
   @impl true
   def render(state, _area) do
-    unless state.visible do
-      empty()
-    else
+    if state.visible do
       render_dropdown(state)
+    else
+      empty()
     end
   end
 
-  # Filter commands by prefix match
+  # Filter commands by case-insensitive substring match
   defp filter_commands(state) do
     filtered =
       if state.query == "" do
@@ -188,18 +193,21 @@ defmodule TermUI.Widgets.CommandPalette do
 
       rows =
         Enum.map(visible_commands, fn {cmd, idx} ->
-          is_selected = idx == state.selected
-          # Pad label to consistent width
-          padded_label = String.pad_trailing(cmd.label, min_width)
-
-          if is_selected do
-            text("  " <> padded_label, Theme.get_component_style(:item, :selected))
-          else
-            text("  " <> padded_label, nil)
-          end
+          render_command_row(cmd, idx, state.selected, min_width)
         end)
 
       stack(:vertical, rows)
+    end
+  end
+
+  defp render_command_row(cmd, idx, selected_idx, min_width) do
+    padded_label = String.pad_trailing(cmd.label, min_width)
+    text_line = "  " <> padded_label
+
+    if idx == selected_idx do
+      text(text_line, Theme.get_component_style(:item, :selected))
+    else
+      text(text_line, nil)
     end
   end
 

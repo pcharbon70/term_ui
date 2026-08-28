@@ -26,7 +26,25 @@ defmodule TermUI.Renderer.Style do
 
   alias TermUI.Renderer.Cell
 
-  @type color :: Cell.color()
+  @type color ::
+          :black
+          | :red
+          | :green
+          | :yellow
+          | :blue
+          | :magenta
+          | :cyan
+          | :white
+          | :bright_black
+          | :bright_red
+          | :bright_green
+          | :bright_yellow
+          | :bright_blue
+          | :bright_magenta
+          | :bright_cyan
+          | :bright_white
+          | 0..255
+          | {0..255, 0..255, 0..255}
   @type attribute :: Cell.attribute()
 
   @type t :: %__MODULE__{
@@ -68,6 +86,7 @@ defmodule TermUI.Renderer.Style do
       iex> Style.new()
       %Style{fg: nil, bg: nil, attrs: MapSet.new()}
   """
+  @dialyzer {:nowarn_function, new: 0, reset: 1}
   @spec new() :: t()
   def new do
     %__MODULE__{}

@@ -10,9 +10,11 @@ defmodule TermUI.Backend do
     keystroke detection, used when `:shell.start_interactive({:noshell, :raw})`
     succeeds (OTP 28+)
 
-  - **TTY mode** (`TermUI.Backend.TTY`): Fallback rendering for constrained
-    environments where raw mode is unavailable (Nerves devices, SSH sessions,
-    remote IEx consoles)
+  - **TTY mode** (`TermUI.Backend.TTY`): Cooked local I/O for constrained
+    environments where raw mode is unavailable (Nerves devices and IEx/remsh)
+
+  - **SSH** (`TermUI.Backend.SSH`): Explicit per-session rendering to an OTP SSH
+    channel device; it is a custom backend rather than the local TTY fallback
 
   ## Implementing a Backend
 
@@ -265,7 +267,8 @@ defmodule TermUI.Backend do
   ## Implementation Notes
 
   - Raw backend provides immediate keystroke detection
-  - TTY backend uses `IO.getn/2` for character-by-character input
+  - TTY backend uses blocking `IO.getn/2`; cooked-mode delivery may wait for
+    Enter
   - Timeout may not be honored precisely in TTY mode (blocking IO)
   - Events should be parsed into `TermUI.Event` structs
   """

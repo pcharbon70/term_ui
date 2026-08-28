@@ -5,6 +5,9 @@ defmodule TermUI.Widget.Button do
   Button responds to Enter/Space keys when focused and mouse clicks.
   It displays visual feedback for different states.
 
+  This module uses the earlier `TermUI.Widget` namespace, accepts a props map
+  directly, and must be embedded as an explicit state machine in the Elm root.
+
   ## Usage
 
       Button.render(%{
@@ -27,6 +30,9 @@ defmodule TermUI.Widget.Button do
   alias TermUI.Component.RenderNode
   alias TermUI.Event
   alias TermUI.Renderer.Style
+
+  # Dialyzer: Suppress opaque type warnings for Style helpers
+  @dialyzer {:nowarn_function, build_style: 1, positioned_cell_safe: 4, render: 2}
 
   @doc """
   Initializes the button state.
@@ -129,12 +135,12 @@ defmodule TermUI.Widget.Button do
       |> Enum.map(fn {char, x} ->
         cell_style =
           if disabled do
-            Style.new(fg: :bright_black)
+            build_style(%{fg: :bright_black})
           else
             style
           end
 
-        positioned_cell(x, 0, char, cell_style)
+        positioned_cell_safe(x, 0, char, cell_style)
       end)
 
     RenderNode.cells(cells)
@@ -165,6 +171,18 @@ defmodule TermUI.Widget.Button do
   end
 
   defp build_style(_), do: Style.new()
+
+  # ----------------------------------------------------------------------------
+  # Style Helper Functions
+  # ----------------------------------------------------------------------------
+
+  @spec positioned_cell_safe(integer(), integer(), String.t(), Style.t()) :: RenderNode.t()
+  defp positioned_cell_safe(x, y, char, style),
+    do: positioned_cell(x, y, char, style)
+
+  # ----------------------------------------------------------------------------
+  # Utility Functions
+  # ----------------------------------------------------------------------------
 
   defp center_text(text, width) do
     len = String.length(text)

@@ -6,6 +6,10 @@ defmodule TermUI.Clipboard do
   paste event handling. Clipboard operations work across terminals
   that support these features.
 
+  `TermUI.Runtime` parses bracketed-paste input but does not enable bracketed
+  paste mode automatically. A custom host must enable it and always write the
+  corresponding off sequence during cleanup.
+
   ## Usage
 
       # Write to clipboard

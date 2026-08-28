@@ -5,6 +5,9 @@ defmodule TermUI.Widget.Label do
   Label is the simplest widget - it renders text with optional styling,
   alignment, wrapping, and truncation.
 
+  This module uses the earlier `TermUI.Widget` namespace and accepts a props map
+  directly. Call `render/2` from the root view; the runtime does not mount it.
+
   ## Usage
 
       Label.render(%{text: "Hello, World!"}, area)
@@ -28,6 +31,10 @@ defmodule TermUI.Widget.Label do
 
   alias TermUI.Component.RenderNode
   alias TermUI.Renderer.Style
+
+  # Dialyzer: Suppress opaque type warnings for Style helpers
+  # no_opaque: Style contains MapSet which triggers false positive call_without_opaque warnings
+  @dialyzer [:no_opaque, nowarn_function: [build_style: 1, positioned_cell_safe: 4, describe: 0]]
 
   @doc """
   Renders the label text within the given area.
@@ -91,6 +98,18 @@ defmodule TermUI.Widget.Label do
 
   defp build_style(_), do: Style.new()
 
+  # ----------------------------------------------------------------------------
+  # Style Helper Functions
+  # ----------------------------------------------------------------------------
+
+  @spec positioned_cell_safe(integer(), integer(), String.t(), Style.t()) :: RenderNode.t()
+  defp positioned_cell_safe(x, y, char, style),
+    do: positioned_cell(x, y, char, style)
+
+  # ----------------------------------------------------------------------------
+  # Rendering
+  # ----------------------------------------------------------------------------
+
   defp render_line(text, y, width, align, truncate, style) do
     # Process the text for display
     display_text =
@@ -108,7 +127,7 @@ defmodule TermUI.Widget.Label do
     |> String.graphemes()
     |> Enum.with_index()
     |> Enum.map(fn {char, x} ->
-      positioned_cell(x, y, char, style)
+      positioned_cell_safe(x, y, char, style)
     end)
   end
 

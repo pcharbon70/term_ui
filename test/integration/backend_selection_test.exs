@@ -26,6 +26,8 @@ defmodule TermUI.Integration.BackendSelectionTest do
     original_colorterm = System.get_env("COLORTERM")
     original_term = System.get_env("TERM")
     original_lang = System.get_env("LANG")
+    original_lc_all = System.get_env("LC_ALL")
+    original_lc_ctype = System.get_env("LC_CTYPE")
 
     on_exit(fn ->
       # Restore Application env
@@ -39,6 +41,8 @@ defmodule TermUI.Integration.BackendSelectionTest do
       restore_sys_env("COLORTERM", original_colorterm)
       restore_sys_env("TERM", original_term)
       restore_sys_env("LANG", original_lang)
+      restore_sys_env("LC_ALL", original_lc_all)
+      restore_sys_env("LC_CTYPE", original_lc_ctype)
     end)
 
     # Clear Application env for clean test state
@@ -168,7 +172,7 @@ defmodule TermUI.Integration.BackendSelectionTest do
       # Should successfully create state with detected capabilities
       state = State.new_tty(capabilities)
 
-      assert state.mode == :tty
+      assert state.backend_mode == :tty
       assert state.backend_module == TermUI.Backend.TTY
       assert state.capabilities == capabilities
     end
@@ -204,6 +208,9 @@ defmodule TermUI.Integration.BackendSelectionTest do
 
     test "environment variable changes affect unicode detection" do
       # 1.5.2.3 continued - LANG affects unicode detection
+      System.delete_env("LC_ALL")
+      System.delete_env("LC_CTYPE")
+
       System.put_env("LANG", "en_US.UTF-8")
       caps = Selector.detect_capabilities()
       assert caps.unicode == true
@@ -223,12 +230,12 @@ defmodule TermUI.Integration.BackendSelectionTest do
         {:tty, capabilities} ->
           state = State.new_tty(capabilities)
           assert state.capabilities == capabilities
-          assert state.mode == :tty
+          assert state.backend_mode == :tty
 
         {:raw, raw_state} ->
           state = State.new_raw(raw_state)
           assert state.backend_state == raw_state
-          assert state.mode == :raw
+          assert state.backend_mode == :raw
       end
     end
   end
@@ -245,7 +252,7 @@ defmodule TermUI.Integration.BackendSelectionTest do
 
       assert state.backend_module == TermUI.Backend.Raw
       assert state.backend_state == raw_state
-      assert state.mode == :raw
+      assert state.backend_mode == :raw
       assert state.capabilities == %{}
       assert state.initialized == false
     end
@@ -263,7 +270,7 @@ defmodule TermUI.Integration.BackendSelectionTest do
 
       assert state.backend_module == TermUI.Backend.TTY
       assert state.backend_state == nil
-      assert state.mode == :tty
+      assert state.backend_mode == :tty
       assert state.capabilities == capabilities
       assert state.initialized == false
     end
@@ -299,26 +306,26 @@ defmodule TermUI.Integration.BackendSelectionTest do
       state = State.put_backend_state(state, new_backend_state)
 
       assert state.backend_state == new_backend_state
-      assert state.mode == :raw
+      assert state.backend_mode == :raw
       assert state.backend_module == TermUI.Backend.Raw
     end
 
     test "mode field correctly reflects raw selection result" do
       # 1.5.3.3 - Mode is :raw for raw mode state
       state = State.new_raw()
-      assert state.mode == :raw
+      assert state.backend_mode == :raw
 
       state = State.new_raw(%{raw_mode_started: true})
-      assert state.mode == :raw
+      assert state.backend_mode == :raw
     end
 
     test "mode field correctly reflects tty selection result" do
       # 1.5.3.3 continued - Mode is :tty for TTY mode state
       state = State.new_tty(%{colors: :color_256})
-      assert state.mode == :tty
+      assert state.backend_mode == :tty
 
       state = State.new_tty(%{}, %{some: :state})
-      assert state.mode == :tty
+      assert state.backend_mode == :tty
     end
 
     test "complete selection to state workflow" do
@@ -358,7 +365,7 @@ defmodule TermUI.Integration.BackendSelectionTest do
       # Verify final state
       assert state.size == {30, 120}
       assert state.initialized == true
-      assert state.mode in [:raw, :tty]
+      assert state.backend_mode in [:raw, :tty]
     end
   end
 
@@ -383,10 +390,10 @@ defmodule TermUI.Integration.BackendSelectionTest do
 
     test "State.new with explicit module and mode" do
       # Test the general constructor with different backends
-      state = State.new(TermUI.Backend.Test, mode: :tty, capabilities: %{test: true})
+      state = State.new(TermUI.Backend.Test, backend_mode: :tty, capabilities: %{test: true})
 
       assert state.backend_module == TermUI.Backend.Test
-      assert state.mode == :tty
+      assert state.backend_mode == :tty
       assert state.capabilities == %{test: true}
     end
 

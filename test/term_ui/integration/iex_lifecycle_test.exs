@@ -64,6 +64,26 @@ defmodule TermUI.Integration.IExLifecycleTest do
     def view(state), do: {:text, "Count: #{state.count}"}
   end
 
+  defmodule ModeTracker do
+    @moduledoc false
+
+    use TermUI.Elm
+
+    @impl true
+    def init(opts) do
+      %{
+        backend: Keyword.get(opts, :backend),
+        iex_mode: TermUI.iex_mode?()
+      }
+    end
+
+    @impl true
+    def update(_message, state), do: {state, []}
+
+    @impl true
+    def view(_state), do: {:text, "mode tracker"}
+  end
+
   # Component that tracks lifecycle events
   defmodule LifecycleTracker do
     @moduledoc """
@@ -212,6 +232,7 @@ defmodule TermUI.Integration.IExLifecycleTest do
       for _ <- 1..5 do
         Runtime.send_event(runtime, Event.key(:up))
       end
+
       Runtime.sync(runtime)
       state = Runtime.get_state(runtime)
       assert state.root_state.count == 6
@@ -285,6 +306,7 @@ defmodule TermUI.Integration.IExLifecycleTest do
         for _ <- 1..cycle do
           Runtime.send_event(runtime, Event.key(:up))
         end
+
         Runtime.sync(runtime)
 
         state = Runtime.get_state(runtime)
@@ -390,6 +412,7 @@ defmodule TermUI.Integration.IExLifecycleTest do
       for _ <- 1..5 do
         Runtime.send_event(runtime, Event.key("t"))
       end
+
       Runtime.sync(runtime)
 
       state = Runtime.get_state(runtime)
@@ -432,24 +455,67 @@ defmodule TermUI.Integration.IExLifecycleTest do
       :ok
     end
 
-    test "runtime starts with TTY backend when in IEx mode" do
-      # In IEx mode, the backend selector should prefer TTY
-      # Start runtime with backend: :auto (default)
-      {:ok, runtime} = Runtime.start_link(root: Counter, skip_terminal: true)
+    test "runtime resolves the automatic backend to TTY in IEx mode" do
+      {:ok, runtime} = Runtime.start_link(root: ModeTracker, skip_terminal: true)
 
       on_exit(fn ->
         if Process.alive?(runtime), do: Runtime.shutdown(runtime)
       end)
 
-      # Runtime should be alive and functional
-      assert Process.alive?(runtime)
+      state = Runtime.get_state(runtime)
+      assert state.backend_mode == :skip
+      assert state.root_state.backend == :tty
+      assert state.root_state.iex_mode
+    end
 
-      # Send an event to verify it's working
-      Runtime.send_event(runtime, Event.key(:up))
-      Runtime.sync(runtime)
+    test "runtime preserves an explicit Raw backend in IEx mode" do
+      {:ok, runtime} =
+        Runtime.start_link(root: ModeTracker, backend: :raw, skip_terminal: true)
+
+      on_exit(fn ->
+        if Process.alive?(runtime), do: Runtime.shutdown(runtime)
+      end)
 
       state = Runtime.get_state(runtime)
-      assert state.root_state.count == 1
+      assert state.root_state.backend == :raw
+      assert state.root_state.iex_mode
+    end
+
+    test "runtime inherits auto-detected IEx mode from the evaluator process" do
+      original_config = Application.get_env(:term_ui, :iex_compatible)
+      original_env = System.get_env("TERM_UI_IEX_MODE")
+      original_server = Process.get(:iex_server, :not_set)
+
+      Application.delete_env(:term_ui, :iex_compatible)
+      System.delete_env("TERM_UI_IEX_MODE")
+      Process.put(:iex_server, self())
+
+      try do
+        {:ok, runtime} = Runtime.start_link(root: ModeTracker, skip_terminal: true)
+
+        try do
+          state = Runtime.get_state(runtime)
+          assert state.root_state.backend == :tty
+          assert state.root_state.iex_mode
+        after
+          if Process.alive?(runtime), do: Runtime.shutdown(runtime)
+        end
+      after
+        case original_config do
+          nil -> Application.delete_env(:term_ui, :iex_compatible)
+          value -> Application.put_env(:term_ui, :iex_compatible, value)
+        end
+
+        case original_env do
+          nil -> System.delete_env("TERM_UI_IEX_MODE")
+          value -> System.put_env("TERM_UI_IEX_MODE", value)
+        end
+
+        case original_server do
+          :not_set -> Process.delete(:iex_server)
+          value -> Process.put(:iex_server, value)
+        end
+      end
     end
 
     test "runtime can be explicitly set to TTY backend" do

@@ -78,13 +78,11 @@ defmodule TermUI.Widgets.SupervisionTreeViewerTest do
   end
 
   setup do
-    # Start Theme server for color support
-    {:ok, _theme_pid} = Theme.start_link(theme: :dark)
-
-    on_exit(fn ->
-      # Theme server will be automatically stopped when test process exits
-      :ok
-    end)
+    # Start the shared Theme server if another test has not already done so.
+    case Theme.start_link(theme: :dark) do
+      {:ok, _theme_pid} -> :ok
+      {:error, {:already_started, _theme_pid}} -> :ok
+    end
 
     # Each test will start its own supervisor
     :ok

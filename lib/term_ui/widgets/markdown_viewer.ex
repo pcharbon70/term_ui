@@ -19,7 +19,7 @@ defmodule TermUI.Widgets.MarkdownViewer do
 
   ## Props
 
-  - `:content` - Markdown content to display (required)
+  - `:content` - Markdown content to display (default: `""`)
   - `:width` - Display width (default: 80)
   - `:height` - Display height (default: 24)
   - `:on_copy` - Callback called when code block is copied (optional)
@@ -28,9 +28,12 @@ defmodule TermUI.Widgets.MarkdownViewer do
 
   use TermUI.StatefulComponent
 
+  alias TermUI.Component.RenderNode
   alias TermUI.Event
   alias TermUI.Markdown
-  alias TermUI.Component.RenderNode
+
+  # Dialyzer: Functions return specific map types
+  @dialyzer {:nowarn_function, new: 1}
 
   @doc """
   Creates new MarkdownViewer props.
@@ -111,7 +114,7 @@ defmodule TermUI.Widgets.MarkdownViewer do
     copy_focused_code_block(state)
   end
 
-  def handle_event(%Event.Key{char: ?c}, state) do
+  def handle_event(%Event.Key{char: "c"}, state) do
     copy_focused_code_block(state)
   end
 
@@ -188,6 +191,7 @@ defmodule TermUI.Widgets.MarkdownViewer do
 
     if width != state.width or height != state.height do
       state = %{state | width: width, height: height}
+
       if width != state.width do
         refresh_render_cache(state)
       else
@@ -261,16 +265,17 @@ defmodule TermUI.Widgets.MarkdownViewer do
       state = %{state | focused_element_index: index}
       element_id = element.id
 
-      state = if state.focused_element_id != element_id do
-        new_cache =
-          Markdown.render_with_elements(state.content, state.width,
-            focused_element_id: element_id
-          )
+      state =
+        if state.focused_element_id != element_id do
+          new_cache =
+            Markdown.render_with_elements(state.content, state.width,
+              focused_element_id: element_id
+            )
 
-        %{state | focused_element_id: element_id, render_cache: new_cache}
-      else
-        state
-      end
+          %{state | focused_element_id: element_id, render_cache: new_cache}
+        else
+          state
+        end
 
       target_line = element.start_line
       scroll_to_line(state, target_line)

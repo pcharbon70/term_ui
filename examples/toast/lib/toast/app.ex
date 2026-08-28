@@ -56,13 +56,15 @@ defmodule Toast.App do
   Initialize the component state.
   """
   def init(_opts) do
-    %{
+    state = %{
       toast_manager: ToastManager.new(position: :bottom_right, default_duration: 3000),
       current_position: :bottom_right,
       position_index: 0,
       toast_count: 0,
       last_action: nil
     }
+
+    {state, [TermUI.Command.interval(100, :tick)]}
   end
 
   @doc """
@@ -73,12 +75,12 @@ defmodule Toast.App do
   def event_to_msg(%Event.Key{key: "3"}, _state), do: {:msg, {:show_toast, :warning}}
   def event_to_msg(%Event.Key{key: "4"}, _state), do: {:msg, {:show_toast, :error}}
   def event_to_msg(%Event.Key{key: "5"}, _state), do: {:msg, :show_multiple}
-  def event_to_msg(%Event.Key{key: key}, _state) when key in ["p", "P"], do: {:msg, :cycle_position}
+
+  def event_to_msg(%Event.Key{key: key}, _state) when key in ["p", "P"],
+    do: {:msg, :cycle_position}
+
   def event_to_msg(%Event.Key{key: key}, _state) when key in ["c", "C"], do: {:msg, :clear_toasts}
   def event_to_msg(%Event.Key{key: key}, _state) when key in ["q", "Q"], do: {:msg, :quit}
-
-  # Tick event for auto-dismiss
-  def event_to_msg(%Event.Tick{}, _state), do: {:msg, :tick}
 
   def event_to_msg(_event, _state), do: :ignore
 
@@ -89,11 +91,12 @@ defmodule Toast.App do
     message = get_message_for_type(type)
     manager = ToastManager.add_toast(state.toast_manager, message, type)
 
-    {%{state |
-      toast_manager: manager,
-      toast_count: state.toast_count + 1,
-      last_action: "Showed #{type} toast"
-    }, []}
+    {%{
+       state
+       | toast_manager: manager,
+         toast_count: state.toast_count + 1,
+         last_action: "Showed #{type} toast"
+     }, []}
   end
 
   def update(:show_multiple, state) do
@@ -103,11 +106,12 @@ defmodule Toast.App do
     manager = ToastManager.add_toast(manager, "Second notification", :success)
     manager = ToastManager.add_toast(manager, "Third notification", :warning)
 
-    {%{state |
-      toast_manager: manager,
-      toast_count: state.toast_count + 3,
-      last_action: "Showed 3 stacked toasts"
-    }, []}
+    {%{
+       state
+       | toast_manager: manager,
+         toast_count: state.toast_count + 3,
+         last_action: "Showed 3 stacked toasts"
+     }, []}
   end
 
   def update(:cycle_position, state) do
@@ -117,21 +121,19 @@ defmodule Toast.App do
     # Update manager position
     manager = %{state.toast_manager | position: new_position}
 
-    {%{state |
-      toast_manager: manager,
-      current_position: new_position,
-      position_index: new_index,
-      last_action: "Changed position to #{@position_names[new_position]}"
-    }, []}
+    {%{
+       state
+       | toast_manager: manager,
+         current_position: new_position,
+         position_index: new_index,
+         last_action: "Changed position to #{@position_names[new_position]}"
+     }, []}
   end
 
   def update(:clear_toasts, state) do
     manager = ToastManager.clear_all(state.toast_manager)
 
-    {%{state |
-      toast_manager: manager,
-      last_action: "Cleared all toasts"
-    }, []}
+    {%{state | toast_manager: manager, last_action: "Cleared all toasts"}, []}
   end
 
   def update(:tick, state) do
@@ -141,7 +143,7 @@ defmodule Toast.App do
   end
 
   def update(:quit, state) do
-    {state, [:quit]}
+    {state, [TermUI.Command.quit()]}
   end
 
   @doc """
@@ -203,12 +205,26 @@ defmodule Toast.App do
       text("│" <> String.pad_trailing("  Q         Quit", inner_width) <> "│", nil),
       text("│" <> String.pad_trailing("", inner_width) <> "│", nil),
       text("│" <> String.pad_trailing("  Position: #{position_name}", inner_width) <> "│", nil),
-      text("│" <> String.pad_trailing("  Active toasts: #{active_toasts}", inner_width) <> "│", nil),
-      text("│" <> String.pad_trailing("  Total shown: #{state.toast_count}", inner_width) <> "│", nil),
-      text("│" <> String.pad_trailing("  Last action: #{state.last_action || "(none)"}", inner_width) <> "│", nil),
+      text(
+        "│" <> String.pad_trailing("  Active toasts: #{active_toasts}", inner_width) <> "│",
+        nil
+      ),
+      text(
+        "│" <> String.pad_trailing("  Total shown: #{state.toast_count}", inner_width) <> "│",
+        nil
+      ),
+      text(
+        "│" <>
+          String.pad_trailing("  Last action: #{state.last_action || "(none)"}", inner_width) <>
+          "│",
+        nil
+      ),
       text(bottom_border, Style.new(fg: :yellow)),
       text("", nil),
-      text("Toasts auto-dismiss after 3 seconds. Click or Escape to dismiss early.", Style.new(fg: :white, attrs: [:dim]))
+      text(
+        "Toasts auto-dismiss after 3 seconds. Click or Escape to dismiss early.",
+        Style.new(fg: :white, attrs: [:dim])
+      )
     ])
   end
 

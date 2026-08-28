@@ -6,11 +6,15 @@ defmodule TermUI.PersistentTerms do
   like backend mode, capabilities, and character set. This module provides a
   single interface for managing the lifecycle of these terms.
 
+  These values are node-global context for the active local Raw/TTY runtime.
+  Explicit custom/SSH runtimes keep capabilities in their own state and do not
+  overwrite these terms.
+
   ## Persistent Term Keys
 
   The following keys are used by TermUI:
 
-  - `:term_ui_backend_mode` - Current backend mode (:raw, :tty, or nil)
+  - `:term_ui_backend_mode` - Current local backend mode (`:raw`, `:tty`, `:skip`, or `nil`)
   - `:term_ui_capabilities` - Detected terminal capabilities map
   - `term_ui_character_set` - Character set (:unicode or :ascii)
 
@@ -36,7 +40,15 @@ defmodule TermUI.PersistentTerms do
       PersistentTerms.cleanup()
   """
 
+  alias TermUI.Backend.Selector
   require Logger
+
+  # Dialyzer: Pattern match coverage warnings
+  @dialyzer {:nowarn_function,
+             cleanup: 0,
+             store_backend_context: 2,
+             determine_character_set: 1,
+             detect_capabilities: 0}
 
   @doc """
   Stores backend context in persistent_term.
@@ -46,10 +58,10 @@ defmodule TermUI.PersistentTerms do
 
   ## Parameters
 
-  - `backend_mode` - The backend mode (:raw, :tty, etc.)
+  - `backend_mode` - The local backend mode (`:raw`, `:tty`, or `:skip`)
   - `capabilities` - The detected capabilities map
   """
-  @spec store_backend_context(:raw | :tty | nil, map() | nil) :: :ok
+  @spec store_backend_context(:raw | :tty | :skip | nil, map() | nil) :: :ok
   def store_backend_context(backend_mode, capabilities) do
     :persistent_term.put(:term_ui_backend_mode, backend_mode)
 
@@ -76,9 +88,10 @@ defmodule TermUI.PersistentTerms do
   @doc """
   Gets the current backend mode from persistent_term.
 
-  Returns `:raw`, `:tty`, or `nil` if not set.
+  Returns `:raw`, `:tty`, `:skip`, or `nil` if not set. Explicit custom
+  backends do not publish a process-global backend context.
   """
-  @spec backend_mode() :: :raw | :tty | nil
+  @spec backend_mode() :: :raw | :tty | :skip | nil
   def backend_mode do
     :persistent_term.get(:term_ui_backend_mode, nil)
   end
@@ -152,7 +165,7 @@ defmodule TermUI.PersistentTerms do
 
   defp detect_capabilities do
     # Defer to Backend.Selector for capability detection
-    case TermUI.Backend.Selector.detect_capabilities() do
+    case Selector.detect_capabilities() do
       caps when is_map(caps) -> caps
       _ -> %{}
     end
@@ -170,24 +183,6 @@ defmodule TermUI.PersistentTerms do
 
   defp determine_character_set(_capabilities), do: :unicode
 
-  # Logs detected capabilities at debug level
-  defp log_capabilities(capabilities, charset) when is_map(capabilities) do
-    color_mode = Map.get(capabilities, :colors, :unknown)
-    unicode = Map.get(capabilities, :unicode, :unknown)
-    dimensions = Map.get(capabilities, :dimensions, :unknown)
-    terminal = Map.get(capabilities, :terminal, :unknown)
-
-    Logger.debug("""
-    TermUI: Capabilities detected:\
-    \n  Color mode: #{inspect(color_mode)}\
-    \n  Character set: #{inspect(charset)}\
-    \n  Unicode: #{inspect(unicode)}\
-    \n  Terminal size: #{inspect(dimensions)}\
-    \n  Terminal: #{inspect(terminal)}\
-    """)
-  end
-
-  defp log_capabilities(_capabilities, charset) do
-    Logger.debug("TermUI: Character set: #{inspect(charset)}")
-  end
+  # No-op - capabilities logging removed for cleaner console output
+  defp log_capabilities(_capabilities, _charset), do: :ok
 end

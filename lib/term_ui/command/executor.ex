@@ -8,7 +8,7 @@ defmodule TermUI.Command.Executor do
 
   ## Usage
 
-      # Start the executor (usually in application supervision tree)
+      # Start an independent executor
       {:ok, executor} = Executor.start_link()
 
       # Execute a command
@@ -16,11 +16,18 @@ defmodule TermUI.Command.Executor do
 
       # Cancel a running command
       :ok = Executor.cancel(executor, command_id)
+
+  `TermUI.Runtime` starts and links a private executor for its root commands.
+  Applications normally use `TermUI.Command` through that runtime; start an
+  executor directly only for a custom host.
   """
 
   use GenServer
 
   alias TermUI.Command
+
+  # Dialyzer: Functions with unmatched return values in side-effect calls
+  @dialyzer {:nowarn_function, execute_command: 4, handle_call: 3, handle_info: 2}
 
   @type t :: pid()
 

@@ -57,7 +57,7 @@ defmodule TermUI.Component.Helpers do
       stack(:vertical, [text("Top"), text("Bottom")])
       stack(:horizontal, [text("Left"), text("Right")])
   """
-  @spec stack(RenderNode.direction(), [RenderNode.t()], keyword()) :: RenderNode.t()
+  @spec stack(RenderNode.direction(), [RenderNode.stack_child()], keyword()) :: RenderNode.t()
   defdelegate stack(direction, children, opts \\ []), to: RenderNode
 
   @doc """

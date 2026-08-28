@@ -150,7 +150,7 @@ defmodule TermUI.Integration.PropertyTest do
     one_of([key_event(), mouse_event(), resize_event()])
   end
 
-  defp event_sequence(max_length \\ 50) do
+  defp event_sequence(max_length) do
     list_of(any_event(), max_length: max_length)
   end
 

@@ -23,7 +23,9 @@ text("Hello, World!", style)
 
 ### Named Colors (16 colors)
 
-Standard terminal colors supported everywhere:
+TermUI accepts the standard 16 named colors. Their visible result still
+depends on the backend and terminal; monochrome output drops color, and a
+terminal may approximate unsupported color depth.
 
 | Color | Normal | Bright |
 |-------|--------|--------|
@@ -67,12 +69,14 @@ Style.new(bg: {30, 30, 30})      # Dark gray
 
 ### Default Color
 
-Use terminal's default foreground/background:
+Leave a renderer style color unset to use the terminal default for a new cell:
 
 ```elixir
-Style.new(fg: :default)
-Style.new(bg: :default)
+Style.new()
 ```
+
+`TermUI.Renderer.Style` does not accept `:default` as an explicit color in 1.0;
+an unset child color inherits its parent during render-tree style merging.
 
 ## Text Attributes
 

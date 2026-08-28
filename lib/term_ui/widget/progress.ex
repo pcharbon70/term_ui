@@ -6,6 +6,10 @@ defmodule TermUI.Widget.Progress do
   - Bar mode: Shows a filled bar proportional to progress value
   - Spinner mode: Shows an animated indicator for indeterminate progress
 
+  This module uses the earlier `TermUI.Widget` namespace, accepts a props map
+  directly, and must be embedded as an explicit state machine in the Elm root.
+  A host must call `handle_event(:tick, state)` to advance its spinner.
+
   ## Usage
 
       # Bar mode
@@ -31,6 +35,10 @@ defmodule TermUI.Widget.Progress do
 
   alias TermUI.Component.RenderNode
   alias TermUI.Renderer.Style
+
+  # Dialyzer: Suppress opaque type warnings for Style helpers
+  # no_opaque: Style contains MapSet which triggers false positive call_without_opaque warnings
+  @dialyzer [:no_opaque, nowarn_function: [build_style: 1, positioned_cell_safe: 4]]
 
   @spinner_frames ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
 
@@ -126,7 +134,7 @@ defmodule TermUI.Widget.Progress do
     |> Enum.with_index()
     |> Enum.filter(fn {_char, x} -> x < area.width end)
     |> Enum.map(fn {char, x} ->
-      positioned_cell(x, 0, char, style)
+      positioned_cell_safe(x, 0, char, style)
     end)
   end
 
@@ -134,11 +142,23 @@ defmodule TermUI.Widget.Progress do
     frame = Enum.at(@spinner_frames, state.spinner_frame)
 
     if area.width > 0 do
-      [positioned_cell(0, 0, frame, style)]
+      [positioned_cell_safe(0, 0, frame, style)]
     else
       []
     end
   end
+
+  # ----------------------------------------------------------------------------
+  # Style Helper Functions
+  # ----------------------------------------------------------------------------
+
+  @spec positioned_cell_safe(integer(), integer(), String.t(), Style.t()) :: RenderNode.t()
+  defp positioned_cell_safe(x, y, char, style),
+    do: positioned_cell(x, y, char, style)
+
+  # ----------------------------------------------------------------------------
+  # Style Building
+  # ----------------------------------------------------------------------------
 
   defp build_style(opts) when is_map(opts) do
     style_list =

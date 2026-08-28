@@ -36,13 +36,35 @@ defmodule TermUI.Widgets.ClusterDashboard do
   - e: Show events view
   - i: Inspect selected node (RPC details)
   - Escape: Close details
+
+  ## Refresh and node-event integration
+
+  `init/1` captures an initial snapshot. The Elm runtime does not invoke this
+  widget's `mount/1` or `handle_info/2`. An embedded root should schedule a
+  `Command.interval/2`, call `ClusterDashboard.refresh/1` from `update/2`, and
+  explicitly forward node events if it enables `:net_kernel` monitoring. A
+  custom host can instead own the widget lifecycle and message routing.
   """
 
   use TermUI.StatefulComponent
 
   alias TermUI.CharacterSet
   alias TermUI.Event
+  alias TermUI.Renderer.Style
   alias TermUI.Theme
+
+  # Dialyzer: Suppress opaque type warnings for Style helpers and contract warnings for specific types
+  @dialyzer {:nowarn_function,
+             fg_semantic: 1,
+             fg_color: 1,
+             fg_bold_semantic: 1,
+             fg_bg_bold_semantic: 2,
+             fg_bold_help: 0,
+             new: 1,
+             refresh: 1,
+             set_interval: 2,
+             handle_info: 2,
+             unmount: 1}
 
   @type view_mode :: :nodes | :globals | :pg_groups | :events
   @type node_status :: :connected | :disconnected | :local
@@ -66,6 +88,31 @@ defmodule TermUI.Widgets.ClusterDashboard do
   @rpc_timeout 5000
 
   # ----------------------------------------------------------------------------
+  # Style Helper Functions
+  # ----------------------------------------------------------------------------
+
+  @spec fg_semantic(atom()) :: Style.t()
+  defp fg_semantic(color) when is_atom(color),
+    do: Style.new() |> Style.fg(color)
+
+  @spec fg_color(atom()) :: Style.t()
+  defp fg_color(color) when is_atom(color),
+    do: Style.new() |> Style.fg(color)
+
+  @spec fg_bold_semantic(atom()) :: Style.t()
+  defp fg_bold_semantic(color) when is_atom(color),
+    do: Style.new() |> Style.fg(color) |> Style.bold()
+
+  @spec fg_bg_bold_semantic(atom(), atom()) :: Style.t()
+  defp fg_bg_bold_semantic(fg, bg) when is_atom(fg) and is_atom(bg),
+    do: Style.new() |> Style.fg(fg) |> Style.bg(bg) |> Style.bold()
+
+  @spec fg_bold_help() :: Style.t()
+  defp fg_bold_help do
+    Style.new() |> Style.fg(Theme.get_semantic(:help)) |> Style.dim()
+  end
+
+  # ----------------------------------------------------------------------------
   # Props
   # ----------------------------------------------------------------------------
 
@@ -74,7 +121,8 @@ defmodule TermUI.Widgets.ClusterDashboard do
 
   ## Options
 
-  - `:update_interval` - Refresh interval in ms (default: 2000)
+  - `:update_interval` - Refresh interval metadata in ms (default: 2000);
+    embedded roots must schedule refresh messages
   - `:show_health_metrics` - Fetch and show CPU/memory/load (default: true)
   - `:show_pg_groups` - Show :pg process groups (default: true)
   - `:show_global_names` - Show :global registered names (default: true)
@@ -354,92 +402,86 @@ defmodule TermUI.Widgets.ClusterDashboard do
   end
 
   defp fetch_remote_metrics(node) do
-    try do
-      case :rpc.call(node, :erlang, :memory, [], @rpc_timeout) do
-        {:badrpc, _reason} ->
-          nil
+    case :rpc.call(node, :erlang, :memory, [], @rpc_timeout) do
+      {:badrpc, _reason} ->
+        nil
 
-        memory ->
-          process_count =
-            case :rpc.call(node, Process, :list, [], @rpc_timeout) do
-              {:badrpc, _} -> 0
-              list -> length(list)
-            end
+      memory ->
+        process_count =
+          case :rpc.call(node, Process, :list, [], @rpc_timeout) do
+            {:badrpc, _} -> 0
+            list -> length(list)
+          end
 
-          scheduler_count =
-            case :rpc.call(node, :erlang, :system_info, [:schedulers_online], @rpc_timeout) do
-              {:badrpc, _} -> 0
-              count -> count
-            end
+        scheduler_count =
+          case :rpc.call(node, :erlang, :system_info, [:schedulers_online], @rpc_timeout) do
+            {:badrpc, _} -> 0
+            count -> count
+          end
 
-          %{
-            memory: memory,
-            process_count: process_count,
-            scheduler_count: scheduler_count,
-            uptime: nil,
-            otp_release: nil
-          }
-      end
-    rescue
-      _ -> nil
-    catch
-      _, _ -> nil
+        %{
+          memory: memory,
+          process_count: process_count,
+          scheduler_count: scheduler_count,
+          uptime: nil,
+          otp_release: nil
+        }
     end
+  rescue
+    _ -> nil
+  catch
+    _, _ -> nil
   end
 
   defp fetch_global_names do
-    try do
-      :global.registered_names()
-      |> Enum.map(fn name ->
-        pid = :global.whereis_name(name)
+    :global.registered_names()
+    |> Enum.map(fn name ->
+      pid = :global.whereis_name(name)
 
-        node =
-          if is_pid(pid) do
-            node(pid)
-          else
-            :unknown
-          end
+      node =
+        if is_pid(pid) do
+          node(pid)
+        else
+          :unknown
+        end
 
-        %{name: name, pid: pid, node: node}
-      end)
-      |> Enum.sort_by(& &1.name)
-    rescue
-      _ -> []
-    catch
-      _, _ -> []
-    end
+      %{name: name, pid: pid, node: node}
+    end)
+    |> Enum.sort_by(& &1.name)
+  rescue
+    _ -> []
+  catch
+    _, _ -> []
   end
 
   defp fetch_pg_groups do
-    try do
-      # Try OTP 23+ :pg module
-      groups = :pg.which_groups()
+    # Try OTP 23+ :pg module
+    groups = :pg.which_groups()
 
-      Enum.map(groups, fn group ->
-        members = :pg.get_members(group)
+    Enum.map(groups, fn group ->
+      members = :pg.get_members(group)
 
-        nodes =
-          members
-          |> Enum.map(&node/1)
-          |> Enum.uniq()
+      nodes =
+        members
+        |> Enum.map(&node/1)
+        |> Enum.uniq()
 
-        %{
-          group: group,
-          member_count: length(members),
-          nodes: nodes
-        }
-      end)
-      |> Enum.sort_by(& &1.group)
-    rescue
-      _ -> []
-    catch
-      :exit, {:noproc, _} ->
-        # :pg not started
-        []
+      %{
+        group: group,
+        member_count: length(members),
+        nodes: nodes
+      }
+    end)
+    |> Enum.sort_by(& &1.group)
+  rescue
+    _ -> []
+  catch
+    :exit, {:noproc, _} ->
+      # :pg not started
+      []
 
-      _, _ ->
-        []
-    end
+    _, _ ->
+      []
   end
 
   defp get_uptime do
@@ -452,23 +494,19 @@ defmodule TermUI.Widgets.ClusterDashboard do
   # ----------------------------------------------------------------------------
 
   defp start_node_monitoring do
-    try do
-      :net_kernel.monitor_nodes(true)
-    rescue
-      _ -> :ok
-    catch
-      _, _ -> :ok
-    end
+    :net_kernel.monitor_nodes(true)
+  rescue
+    _ -> :ok
+  catch
+    _, _ -> :ok
   end
 
   defp stop_node_monitoring do
-    try do
-      :net_kernel.monitor_nodes(false)
-    rescue
-      _ -> :ok
-    catch
-      _, _ -> :ok
-    end
+    :net_kernel.monitor_nodes(false)
+  rescue
+    _ -> :ok
+  catch
+    _, _ -> :ok
   end
 
   # ----------------------------------------------------------------------------
@@ -499,12 +537,16 @@ defmodule TermUI.Widgets.ClusterDashboard do
       new_state = %{state | selected_idx: new_idx, scroll_offset: max(0, new_scroll)}
 
       # Call on_node_select callback for nodes view
-      if state.view_mode == :nodes && state.on_node_select && new_idx != state.selected_idx do
-        node_info = Enum.at(state.nodes, new_idx)
-        if node_info, do: state.on_node_select.(node_info)
-      end
+      maybe_notify_node_select(state, new_idx)
 
       {:ok, new_state}
+    end
+  end
+
+  defp maybe_notify_node_select(state, new_idx) do
+    if state.view_mode == :nodes && state.on_node_select && new_idx != state.selected_idx do
+      node_info = Enum.at(state.nodes, new_idx)
+      if node_info, do: state.on_node_select.(node_info)
     end
   end
 
@@ -554,6 +596,10 @@ defmodule TermUI.Widgets.ClusterDashboard do
 
   @doc """
   Set the update interval.
+
+  This cancels/schedules a `:refresh` message in the calling process. Use it
+  only when that host routes the message to `handle_info/2`; an embedded Elm
+  root should own a `Command.interval/2` instead.
   """
   @spec set_interval(map(), non_neg_integer()) :: {:ok, map()}
   def set_interval(state, interval) when interval > 0 do
@@ -635,10 +681,7 @@ defmodule TermUI.Widgets.ClusterDashboard do
   defp render_alert(state) do
     if state.partition_alert do
       alert_style =
-        Style.new()
-        |> Style.bg(Theme.get_semantic(:error))
-        |> Style.fg(Theme.get_color(:background))
-        |> Style.bold()
+        fg_bg_bold_semantic(Theme.get_color(:background), Theme.get_semantic(:error))
 
       [text(state.partition_alert, alert_style)]
     else
@@ -663,7 +706,7 @@ defmodule TermUI.Widgets.ClusterDashboard do
     header_text =
       "Cluster: #{local}#{dist_status} | Connected: #{connected_count} | View: #{mode_label}"
 
-    header_style = Style.new() |> Style.fg(Theme.get_semantic(:info)) |> Style.bold()
+    header_style = fg_bold_semantic(Theme.get_semantic(:info))
     text(header_text, header_style)
   end
 
@@ -710,46 +753,56 @@ defmodule TermUI.Widgets.ClusterDashboard do
   defp render_node_row(node_info, idx, state) do
     is_selected = idx == state.selected_idx
 
-    # Format fields
-    node_name = truncate(to_string(node_info.node), 29)
-    node_str = String.pad_trailing(node_name, 30)
-
-    status_str =
-      case node_info.status do
-        :local -> String.pad_trailing("[local]", 12)
-        :connected -> String.pad_trailing("connected", 12)
-        :disconnected -> String.pad_trailing("DOWN", 12)
-      end
-
-    {proc_str, mem_str} =
-      if node_info.metrics do
-        proc = String.pad_leading(Integer.to_string(node_info.metrics.process_count), 12)
-        mem = String.pad_leading(format_bytes(node_info.metrics.memory[:total] || 0), 12)
-        {proc, mem}
-      else
-        {String.pad_leading("-", 12), String.pad_leading("-", 12)}
-      end
-
-    line = node_str <> status_str <> proc_str <> mem_str
-
-    # Determine style
-    style =
-      cond do
-        is_selected ->
-          Theme.get_component_style(:item, :selected)
-
-        node_info.status == :local ->
-          Style.new() |> Style.fg(Theme.get_semantic(:success))
-
-        node_info.status == :disconnected ->
-          Style.new() |> Style.fg(Theme.get_semantic(:error))
-
-        true ->
-          nil
-      end
+    line = format_node_line(node_info)
+    style = node_row_style(node_info.status, is_selected)
 
     text(line, style)
   end
+
+  defp format_node_line(node_info) do
+    node_str = format_node_name(node_info.node)
+    status_str = format_node_status(node_info.status)
+    {proc_str, mem_str} = format_node_metrics(node_info.metrics)
+
+    node_str <> status_str <> proc_str <> mem_str
+  end
+
+  defp format_node_name(node) do
+    node_name = truncate(to_string(node), 29)
+    String.pad_trailing(node_name, 30)
+  end
+
+  defp format_node_status(status) do
+    case status do
+      :local -> String.pad_trailing("[local]", 12)
+      :connected -> String.pad_trailing("connected", 12)
+      :disconnected -> String.pad_trailing("DOWN", 12)
+    end
+  end
+
+  defp format_node_metrics(nil) do
+    {String.pad_leading("-", 12), String.pad_leading("-", 12)}
+  end
+
+  defp format_node_metrics(metrics) do
+    proc = String.pad_leading(Integer.to_string(metrics.process_count), 12)
+    mem = String.pad_leading(format_bytes(metrics.memory[:total] || 0), 12)
+    {proc, mem}
+  end
+
+  defp node_row_style(:local, false) do
+    fg_semantic(Theme.get_semantic(:success))
+  end
+
+  defp node_row_style(:disconnected, _is_selected) do
+    fg_semantic(Theme.get_semantic(:error))
+  end
+
+  defp node_row_style(_status, true) do
+    Theme.get_component_style(:item, :selected)
+  end
+
+  defp node_row_style(_status, false), do: nil
 
   defp render_globals_view(state) do
     header_line =
@@ -760,7 +813,7 @@ defmodule TermUI.Widgets.ClusterDashboard do
     header = text(header_line, Style.new(attrs: [:bold, :underline]))
 
     if Enum.empty?(state.global_names) do
-      empty_style = Style.new() |> Style.fg(Theme.get_semantic(:muted))
+      empty_style = fg_semantic(Theme.get_semantic(:muted))
       [header, text("  (no global names registered)", empty_style)]
     else
       visible =
@@ -772,22 +825,28 @@ defmodule TermUI.Widgets.ClusterDashboard do
         visible
         |> Enum.with_index()
         |> Enum.map(fn {item, idx} ->
-          actual_idx = idx + state.scroll_offset
-          is_selected = actual_idx == state.selected_idx
-
-          name_str = String.pad_trailing(truncate(inspect(item.name), 29), 30)
-          node_str = String.pad_trailing(truncate(to_string(item.node), 24), 25)
-          pid_str = String.pad_trailing(inspect(item.pid), 20)
-
-          line = name_str <> node_str <> pid_str
-
-          style = if is_selected, do: Theme.get_component_style(:item, :selected), else: nil
-          text(line, style)
+          render_global_row(item, idx, state.scroll_offset, state.selected_idx)
         end)
 
       [header | rows]
     end
   end
+
+  defp render_global_row(item, idx, scroll_offset, selected_idx) do
+    actual_idx = idx + scroll_offset
+    is_selected = actual_idx == selected_idx
+
+    name_str = String.pad_trailing(truncate(inspect(item.name), 29), 30)
+    node_str = String.pad_trailing(truncate(to_string(item.node), 24), 25)
+    pid_str = String.pad_trailing(inspect(item.pid), 20)
+
+    line = name_str <> node_str <> pid_str
+    style = row_style(is_selected)
+    text(line, style)
+  end
+
+  defp row_style(true), do: Theme.get_component_style(:item, :selected)
+  defp row_style(false), do: nil
 
   defp render_pg_groups_view(state) do
     header_line =
@@ -798,7 +857,7 @@ defmodule TermUI.Widgets.ClusterDashboard do
     header = text(header_line, Style.new(attrs: [:bold, :underline]))
 
     if Enum.empty?(state.pg_groups) do
-      empty_style = Style.new() |> Style.fg(Theme.get_semantic(:muted))
+      empty_style = fg_semantic(Theme.get_semantic(:muted))
       [header, text("  (no :pg groups - is :pg started?)", empty_style)]
     else
       visible =
@@ -810,22 +869,25 @@ defmodule TermUI.Widgets.ClusterDashboard do
         visible
         |> Enum.with_index()
         |> Enum.map(fn {item, idx} ->
-          actual_idx = idx + state.scroll_offset
-          is_selected = actual_idx == state.selected_idx
-
-          group_str = String.pad_trailing(truncate(inspect(item.group), 29), 30)
-          count_str = String.pad_leading(Integer.to_string(item.member_count), 10)
-          nodes_str = Enum.map_join(item.nodes, ", ", &to_string/1)
-          nodes_str = "  " <> truncate(nodes_str, 33)
-
-          line = group_str <> count_str <> nodes_str
-
-          style = if is_selected, do: Theme.get_component_style(:item, :selected), else: nil
-          text(line, style)
+          render_pg_group_row(item, idx, state.scroll_offset, state.selected_idx)
         end)
 
       [header | rows]
     end
+  end
+
+  defp render_pg_group_row(item, idx, scroll_offset, selected_idx) do
+    actual_idx = idx + scroll_offset
+    is_selected = actual_idx == selected_idx
+
+    group_str = String.pad_trailing(truncate(inspect(item.group), 29), 30)
+    count_str = String.pad_leading(Integer.to_string(item.member_count), 10)
+    nodes_str = Enum.map_join(item.nodes, ", ", &to_string/1)
+    nodes_str = "  " <> truncate(nodes_str, 33)
+
+    line = group_str <> count_str <> nodes_str
+    style = row_style(is_selected)
+    text(line, style)
   end
 
   defp render_events_view(state) do
@@ -837,7 +899,7 @@ defmodule TermUI.Widgets.ClusterDashboard do
     header = text(header_line, Style.new(attrs: [:bold, :underline]))
 
     if Enum.empty?(state.events) do
-      empty_style = Style.new() |> Style.fg(Theme.get_semantic(:muted))
+      empty_style = fg_semantic(Theme.get_semantic(:muted))
       [header, text("  (no events yet)", empty_style)]
     else
       visible =
@@ -849,39 +911,40 @@ defmodule TermUI.Widgets.ClusterDashboard do
         visible
         |> Enum.with_index()
         |> Enum.map(fn {event, idx} ->
-          actual_idx = idx + state.scroll_offset
-          is_selected = actual_idx == state.selected_idx
-
-          time_str = format_time(event.timestamp)
-          time_str = String.pad_trailing(time_str, 12)
-
-          event_str =
-            case event.event do
-              :nodeup -> String.pad_trailing("UP", 12)
-              :nodedown -> String.pad_trailing("DOWN", 12)
-            end
-
-          node_str = String.pad_trailing(truncate(to_string(event.node), 39), 40)
-
-          line = time_str <> event_str <> node_str
-
-          style =
-            cond do
-              is_selected -> Theme.get_component_style(:item, :selected)
-              event.event == :nodedown -> Style.new() |> Style.fg(Theme.get_semantic(:error))
-              event.event == :nodeup -> Style.new() |> Style.fg(Theme.get_semantic(:success))
-              true -> nil
-            end
-
-          text(line, style)
+          render_event_row(event, idx, state.scroll_offset, state.selected_idx)
         end)
 
       [header | rows]
     end
   end
 
+  defp render_event_row(event, idx, scroll_offset, selected_idx) do
+    actual_idx = idx + scroll_offset
+    is_selected = actual_idx == selected_idx
+
+    time_str = format_time(event.timestamp)
+    time_str = String.pad_trailing(time_str, 12)
+
+    event_str =
+      case event.event do
+        :nodeup -> String.pad_trailing("UP", 12)
+        :nodedown -> String.pad_trailing("DOWN", 12)
+      end
+
+    node_str = String.pad_trailing(truncate(to_string(event.node), 39), 40)
+
+    line = time_str <> event_str <> node_str
+    style = event_row_style(is_selected, event.event)
+    text(line, style)
+  end
+
+  defp event_row_style(true, _event_type), do: Theme.get_component_style(:item, :selected)
+  defp event_row_style(false, :nodedown), do: fg_semantic(Theme.get_semantic(:error))
+  defp event_row_style(false, :nodeup), do: fg_semantic(Theme.get_semantic(:success))
+  defp event_row_style(_, _), do: nil
+
   defp render_details(state) do
-    border_style = Style.new() |> Style.fg(Theme.get_color(:primary))
+    border_style = fg_color(Theme.get_color(:primary))
     border = text(String.duplicate("-", 60), border_style)
 
     case state.view_mode do
@@ -919,7 +982,7 @@ defmodule TermUI.Widgets.ClusterDashboard do
         border
       ]
     else
-      empty_style = Style.new() |> Style.fg(Theme.get_semantic(:muted))
+      empty_style = fg_semantic(Theme.get_semantic(:muted))
 
       [
         border,
@@ -998,7 +1061,7 @@ defmodule TermUI.Widgets.ClusterDashboard do
   end
 
   defp render_empty_details(border) do
-    empty_style = Style.new() |> Style.fg(Theme.get_semantic(:muted))
+    empty_style = fg_semantic(Theme.get_semantic(:muted))
 
     [
       border,
@@ -1017,7 +1080,7 @@ defmodule TermUI.Widgets.ClusterDashboard do
     help_text =
       "[#{chars.arrow_up}#{chars.arrow_down}] Select [Enter] Details [n] Nodes [g] Globals [p] PG [e] Events [r] Refresh"
 
-    help_style = Style.new() |> Style.fg(Theme.get_semantic(:help)) |> Style.dim()
+    help_style = fg_bold_help()
     [text(help_text, help_style)]
   end
 

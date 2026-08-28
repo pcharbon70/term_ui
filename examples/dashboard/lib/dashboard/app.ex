@@ -4,9 +4,30 @@ defmodule Dashboard.App do
 
   Displays system metrics including CPU, memory, network, and processes
   in a terminal-based dashboard layout.
+
+  ## Running
+
+      cd examples/dashboard
+      mix deps.get
+      mix termui.run
+
+  ## Controls
+
+  - `q` - Quit the application
+  - `r` - Force refresh data
+  - `t` - Toggle theme (dark/light)
+  - `Tab` - Navigate between focusable widgets
+  - `↑/↓` - Scroll process table
   """
 
   use TermUI.Elm
+
+  @doc """
+  Run the dashboard example application.
+  """
+  def run do
+    TermUI.Runtime.run(root: __MODULE__)
+  end
 
   alias Dashboard.Data.Metrics
   alias TermUI.Event
@@ -34,7 +55,7 @@ defmodule Dashboard.App do
 
   def update(:quit, state) do
     # Return :quit command to trigger runtime shutdown
-    {state, [:quit]}
+    {state, [TermUI.Command.quit()]}
   end
 
   def update(:refresh, state) do

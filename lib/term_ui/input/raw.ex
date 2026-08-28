@@ -6,6 +6,10 @@ defmodule TermUI.Input.Raw do
   applications running with the Raw backend. It reads single characters
   from stdin and parses escape sequences into `TermUI.Event` structs.
 
+  `TermUI.Runtime` selects this handler for Raw mode only when
+  `use_input_handler: true`. The default Raw path uses the asynchronous
+  `TermUI.Terminal.InputReader` instead.
+
   ## Features
 
   - **Non-blocking input**: Supports timeout-based polling (including 0ms for
@@ -29,9 +33,14 @@ defmodule TermUI.Input.Raw do
 
   ## How It Works
 
-  The module spawns a Task to read from stdin using `IO.getn/2`. Since `IO.getn`
-  blocks until input is available, using a Task allows us to implement timeout
-  semantics via `Task.yield/2`.
+  The module spawns a Task to read from stdin using `:io.get_chars/2` (Erlang's
+  IO module directly). This is critical for compatibility with raw mode activated
+  via `:shell.start_interactive({:noshell, :raw})`, which redirects standard
+  input. Elixir's `IO.getn/2` wrapper cannot access the redirected input, but
+  `:io.get_chars/2` works correctly.
+
+  Since `:io.get_chars/2` blocks until input is available, using a Task allows
+  us to implement timeout semantics via `Task.yield/2`.
 
   When an escape sequence spans multiple reads (e.g., arrow keys send multiple
   bytes), the partial sequence is buffered and completed on subsequent polls.
@@ -48,18 +57,32 @@ defmodule TermUI.Input.Raw do
   Unlike `TermUI.Terminal.InputReader` which is a GenServer that asynchronously
   sends events to a target process, this module provides synchronous polling
   suitable for use with the `TermUI.Input` behaviour interface. This module
-  uses direct `IO.getn/2` calls wrapped in Tasks for timeout support, rather
+  uses direct `:io.get_chars/2` calls wrapped in Tasks for timeout support, rather
   than delegating to InputReader, because InputReader's async message-based
   design is incompatible with the synchronous polling contract.
+
+  Both modules use the same underlying approach (`:io.get_chars/2`) for reading
+  from stdin, ensuring compatibility with raw mode's redirected input.
   """
 
   @behaviour TermUI.Input
 
   require Logger
 
+  alias TermUI.Backend.InputBuffer
   alias TermUI.Event
   alias TermUI.Terminal.EscapeParser
-  alias TermUI.Backend.InputBuffer
+
+  # Dialyzer: Functions return specific struct types
+  # Dialyzer: emit_partial_escape/2 calls Event.key with string args for partial escape chars
+  # Key.new/2 spec says atom() but the function works with strings too
+  @dialyzer {:nowarn_function,
+             new: 0,
+             emit_partial_escape: 2,
+             read_char: 0,
+             poll: 2,
+             handle_escape_timeout: 2,
+             do_read_with_timeout: 2}
 
   # Escape sequence bytes
   @esc 0x1B
@@ -234,13 +257,14 @@ defmodule TermUI.Input.Raw do
   @spec handle_escape_timeout(t(), non_neg_integer()) :: TermUI.Input.poll_result()
   defp handle_escape_timeout(%__MODULE__{} = state, timeout) do
     # First try to complete the escape sequence with a short timeout
-    # Using `with` for cleaner flow control
-    with {:timeout, state_after_short} <- do_read_with_timeout(state, @escape_timeout) do
-      # Escape sequence didn't complete, emit what we have
-      emit_partial_escape(state_after_short, timeout - @escape_timeout)
-    else
+    case do_read_with_timeout(state, @escape_timeout) do
+      {:timeout, state_after_short} ->
+        # Escape sequence didn't complete, emit what we have
+        emit_partial_escape(state_after_short, timeout - @escape_timeout)
+
       # Success or EOF - return as-is
-      result -> result
+      result ->
+        result
     end
   end
 
@@ -328,14 +352,30 @@ defmodule TermUI.Input.Raw do
   end
 
   # Read a single character from stdin
+  # Uses :io.get_chars/2 (Erlang's IO module) for compatibility with
+  # :shell.start_interactive({:noshell, :raw}) which redirects standard input.
+  # Elixir's IO.getn/2 cannot access the redirected input.
   @spec read_char() :: {:ok, binary()} | :eof | {:error, term()}
   defp read_char do
-    case IO.getn("", 1) do
-      :eof -> :eof
-      {:error, reason} -> {:error, reason}
-      data when is_binary(data) -> {:ok, data}
-      # Handle unexpected return types
-      other -> {:error, {:unexpected_io_return, other}}
+    case :io.get_chars(~c"", 1) do
+      :eof ->
+        :eof
+
+      chars when is_list(chars) ->
+        # Convert charlist to binary
+        case :unicode.characters_to_binary(chars) do
+          binary when is_binary(binary) ->
+            {:ok, binary}
+
+          :error ->
+            {:error, :invalid_unicode}
+        end
+
+      {:error, reason} ->
+        {:error, reason}
+
+      other ->
+        {:error, {:unexpected_io_return, other}}
     end
   end
 end

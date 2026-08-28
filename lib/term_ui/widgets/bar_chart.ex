@@ -27,7 +27,6 @@ defmodule TermUI.Widgets.BarChart do
   - `:show_values` - Display value labels (default: true)
   - `:show_labels` - Display bar labels (default: true)
   - `:bar_char` - Character for bars (default: "█")
-  - `:empty_char` - Character for empty space (default: " ")
   - `:colors` - List of colors for series
   """
 
@@ -98,10 +97,6 @@ defmodule TermUI.Widgets.BarChart do
   end
 
   defp render_horizontal(data, width, show_values, show_labels, bar_char, colors, style) do
-    # Get character set for empty character
-    chars = CharacterSet.current_charset()
-    empty_char = chars.bar_empty
-
     values = Enum.map(data, & &1.value)
     max_value = Enum.max(values, fn -> 0 end)
 
@@ -220,12 +215,13 @@ defmodule TermUI.Widgets.BarChart do
     VizHelper.maybe_style(result, style)
   end
 
-  defp build_bar_char(row, bar_height, index, bar_char, _empty_char, colors) when row < bar_height do
+  defp build_bar_char(row, bar_height, index, bar_char, _empty_char, colors)
+       when row < bar_height do
     color = VizHelper.cycle_color(colors, index)
     {bar_char, color}
   end
 
-  defp build_bar_char(_row, _bar_height, _index, _bar_char, _colors) do
+  defp build_bar_char(_row, _bar_height, _index, _bar_char, _empty_char, _colors) do
     {" ", nil}
   end
 

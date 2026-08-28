@@ -19,7 +19,8 @@ Use ClusterDashboard when building distributed applications that need visibility
 
 The `ClusterDashboard.new/1` function accepts the following options:
 
-- `:update_interval` - Refresh interval in milliseconds (default: 2000)
+- `:update_interval` - Refresh interval metadata in milliseconds (default:
+  2000); the example root schedules `Command.interval/2`
 - `:show_health_metrics` - Fetch and display CPU/memory/load (default: `true`)
 - `:show_pg_groups` - Display `:pg` process groups (default: `true`)
 - `:show_global_names` - Display `:global` registered names (default: `true`)
@@ -30,7 +31,7 @@ The `ClusterDashboard.new/1` function accepts the following options:
 The example consists of:
 
 - `lib/cluster_dashboard/app.ex` - Main application demonstrating:
-  - Cluster monitoring with automatic refresh
+  - Cluster monitoring refreshed by an interval command owned by the root
   - View switching between nodes, globals, PG groups, and events
   - Interactive navigation and details panels
   - Test functions for spawning global processes and joining PG groups
@@ -69,8 +70,7 @@ ClusterDashboardExample.App.run()
 ```
 
 **Note:** TTY mode works inside IEx but has limitations:
-- No alternate screen buffer (output mixes with IEx prompt)
-- Character input works immediately (no Enter needed)
+- Input is read through the shell; some terminals buffer keys until Enter is pressed
 - For full TUI, use raw mode instead
 
 ### Multiple Nodes (Distributed)

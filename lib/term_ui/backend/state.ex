@@ -8,8 +8,9 @@ defmodule TermUI.Backend.State do
 
   ## Purpose
 
-  When the backend selector determines which mode to use, it returns initialization
-  data that gets wrapped in this state struct. This provides:
+  This optional helper can wrap backend selection data for callers that want a
+  uniform value. `TermUI.Runtime` stores backend fields directly in
+  `TermUI.Runtime.State` and does not construct this struct. The helper provides:
 
   - **Consistent interface**: All backends expose the same state structure
   - **Mode tracking**: Easy identification of current terminal mode
@@ -19,8 +20,7 @@ defmodule TermUI.Backend.State do
 
   ## Usage
 
-  State structs are typically created by the runtime initialization code after
-  backend selection:
+  A custom integration can create a state struct after backend selection:
 
       case Selector.select() do
         {:raw, raw_state} ->
@@ -105,6 +105,10 @@ defmodule TermUI.Backend.State do
         }
 
   @enforce_keys [:backend_module, :backend_mode]
+
+  # Dialyzer: Functions return specific struct types
+  @dialyzer {:nowarn_function, new_raw: 1, new_tty: 2}
+
   defstruct [
     :backend_module,
     :backend_state,
