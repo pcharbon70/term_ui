@@ -107,11 +107,10 @@ represented as complete by the local work:
   accepted release risk, not a successful manual test. Native console mode,
   raw input, and resize remain explicitly unsupported in `1.0.0`; the hosted
   Windows suite remains green.
-- An authenticated `mix hex.publish --dry-run` passed before the final
-  documentation audit. The repeat from the documentation-audit candidate built
-  the exact package but stopped because the current shell has no
-  authenticated Hex user. Authenticate a maintainer and repeat it after these
-  documentation changes are merged. Nothing has been published.
+- An authenticated `mix hex.publish --dry-run` passed for the merged,
+  documentation-audited release candidate on 2026-08-28. It must be repeated
+  from the clean `v1.0.0` checkout before publication. Nothing has been
+  published.
 
 Linux Raw, TTY, and IEx verification was completed on 2026-08-27. The
 terminal-lifecycle suite passed all 19 tests in a real PTY, including native Raw
@@ -166,10 +165,9 @@ auto-detection for all 27 example projects; and compilation of the three loose
 multi-renderer scripts. The unpacked Hex artifact was also inspected and
 contains the intended library, Mix task, guides, compatibility document,
 README, changelog, license, and usage rules while excluding development-only
-material. The authenticated Hex dry run remains the final repeatable gate after
-these documentation changes are merged into the exact release candidate. The
-attempt from the audit candidate built the package successfully but could not
-authenticate in the current shell.
+material. An authenticated Hex dry run passed after this audit was merged. The
+runbook still requires one final repeat from the clean `v1.0.0` checkout before
+publication.
 
 ## Release principles
 
@@ -403,8 +401,8 @@ Release gate:
 
 - [x] `mix.exs` reports `1.0.0`.
 - [x] README installation instructions report `~> 1.0`.
-- [x] `CHANGELOG.md` contains the prepared `1.0.0 - Unreleased` section.
-- [ ] The exact tag commit replaces `Unreleased` with the publication date.
+- [x] `CHANGELOG.md` contains the prepared `1.0.0` section.
+- [x] The release candidate records the publication date as 2026-08-28.
 - [x] Changelog comparison links are correct.
 - [x] Documentation and examples describe the code being released.
 
@@ -482,7 +480,8 @@ Release gate:
 - [x] Every supported example compiles.
 - [x] Linux manual terminal verification passes; approved platform waivers are
       recorded for unavailable environments.
-- [ ] `mix hex.publish --dry-run` passes.
+- [x] `mix hex.publish --dry-run` passes for the merged release candidate; it
+      will be repeated from the clean tag checkout.
 - [x] The unpacked package contains exactly the intended release files.
 
 ## 8. Open the release pull request into `main`
@@ -504,7 +503,7 @@ merge so the existing commit history remains intact.
 Require the following before merging:
 
 - [x] Green required CI checks.
-- [ ] Successful Hex dry run.
+- [x] Successful Hex dry run.
 - [x] Successful documentation build.
 - [x] Linux terminal verification and approved platform waivers recorded.
 - [ ] Maintainer review and approval.
@@ -723,9 +722,9 @@ environment requiring approval, and reject publishing from a branch ref.
 
 ## Final release checklist
 
-- [ ] Pre-rewrite code frozen on `release/1.0.0`.
-- [ ] All release blockers resolved.
-- [ ] Version, README, changelog, and documentation updated.
+- [x] Pre-rewrite code frozen on `release/1.0.0`.
+- [x] All release blockers resolved or explicitly waived/deferred.
+- [x] Version, README, changelog, and documentation updated.
 - [x] Automated validation passed; manual results and approved waivers recorded.
 - [ ] Release PR reviewed and merged into `main`.
 - [ ] `v1.0.0` created on the exact approved `main` commit.

@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.0.0] - Unreleased
+## [1.0.0] - 2026-08-28
 
 TermUI 1.0 establishes the pre-rewrite architecture as the stable release line,
 including the Raw, TTY, and SSH backends, the Elm-style runtime, differential
