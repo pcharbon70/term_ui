@@ -1,5 +1,92 @@
 # macOS Manual Testing Checklist
 
+> **1.0.0 status:** Interactive macOS verification was waived on 2026-08-27
+> because no macOS system was available. This checklist is retained for future
+> validation; the waiver is not a successful test result.
+
+Hosted macOS CI validates compilation and the automated suite, but it cannot
+verify the bytes emitted by a real keyboard, live window resizing, or terminal
+restoration. Complete this checklist in an interactive macOS terminal against
+the exact release commit.
+
+## Test record
+
+- Tester:
+- Date:
+- macOS version:
+- Terminal and version:
+- Elixir/OTP versions:
+- Commit (must match the intended release head):
+
+## Release-critical smoke test
+
+From the repository root:
+
+```bash
+git switch release/1.0.0
+git pull --ff-only origin release/1.0.0
+git status --porcelain
+git rev-parse HEAD
+mix deps.get
+mix compile --warnings-as-errors
+```
+
+`git status --porcelain` must print nothing. Record the commit above before
+testing.
+
+Capture the terminal mode, run the basic example, and compare the mode after a
+normal exit:
+
+```bash
+before_stty=$(stty -g)
+mix run -e 'Code.require_file("examples/multi_renderer/basic.ex"); Basic.run()'
+after_stty=$(stty -g)
+test "$before_stty" = "$after_stty"
+```
+
+- [ ] Initial content renders in the alternate screen without scrolling.
+- [ ] Arrow keys and `j`/`k` move the selection; Enter toggles details.
+- [ ] Shrinking and expanding the window redraws without stale rows or cursor
+      overflow.
+- [ ] `q` returns to a usable prompt with input echo and a visible cursor.
+- [ ] The before/after `stty` values match.
+- [ ] Repeating the run and interrupting it with Control+C restores the prompt.
+
+Verify the macOS Option+Delete path with the real TextInput example:
+
+```bash
+cd examples/text_input
+mix deps.get
+mix termui.run
+```
+
+- [ ] Typing `alpha beta` and pressing Option+Delete removes `beta` without
+      stalling later keyboard input.
+- [ ] Backspace, Delete, arrows, Home/End, Tab, and Enter behave as documented.
+- [ ] Empty the focused input and press `q` to exit cleanly.
+
+Verify IEx compatibility:
+
+```bash
+cd examples/iex_counter
+iex -S mix
+```
+
+Then run `IExCounter.App.run()`.
+
+- [ ] Arrow keys update the counter and `q` returns to the same IEx prompt.
+- [ ] The prompt remains usable and terminal echo/cursor state is restored.
+
+Run the release-critical checks in Terminal.app. Repeat them in iTerm2 if the
+release is being signed off for the guide's stated iTerm2 support. Terminal.app
+mouse limitations documented in `guides/user/08-terminal.md` are accepted and
+do not fail this gate.
+
+## Extended example matrix
+
+The following matrix records broader example coverage when time permits; it is
+not a substitute for the release-critical lifecycle checks above.
+
 | Example | Tested | Description |
 |---------|:------:|-------------|
 | alert_dialog | [ ] | Standardized message dialogs and confirmations with predefined button configurations |

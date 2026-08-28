@@ -33,8 +33,9 @@ OTP SSH channel devices.
 Native Windows console support is experimental. ANSI output can work in a
 terminal where virtual-terminal processing is already enabled, but TermUI does
 not yet configure Win32 console modes or provide native raw input and resize
-handling. On Windows, prefer WSL and verify keyboard, mouse, resize, and cleanup
-behavior for the terminal you deploy with.
+handling. On Windows, prefer WSL and verify keyboard, resize, paste, and cleanup
+behavior for the terminal you deploy with. Mouse tracking is intentionally
+disabled under WSL/ConPTY because disabling sequences are not handled reliably.
 
 OTP 26's signal API does not expose `SIGWINCH` to application handlers. The
 minimum-version TTY backend still supports size queries, but automatic local

@@ -113,8 +113,9 @@ defmodule TermUI.Integration.EventSystemTest do
 
       Executor.execute(executor, cmd, self(), :test)
 
-      # Should receive timeout error, not the result
-      assert_receive {:command_result, :test, _, {:error, :timeout}}, @default_timeout
+      # The executor's 50 ms deadline is the behavior under test. Give a loaded
+      # CI scheduler enough time to deliver the resulting message.
+      assert_receive {:command_result, :test, _, {:error, :timeout}}, @eventual_timeout
       refute_receive {:command_result, :test, _, :should_timeout}, @extended_timeout
     end
   end

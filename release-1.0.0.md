@@ -90,10 +90,23 @@ families, so required checks can be satisfied on release-branch pull requests.
 The following gates still require maintainer or platform access and are not
 represented as complete by the local work:
 
-- A live SSH client/server session, interactive macOS terminal behavior,
-  WSL/ConPTY, and applicable native Windows behavior need the manual terminal
-  sign-off listed below. Hosted CI is non-interactive and does not substitute
-  for those checks.
+- Live SSH client/server verification was waived for `1.0.0` on 2026-08-27
+  because no representative host system is available. This is an accepted
+  release risk, not a successful test; reproducible backend lifecycle coverage
+  remains green.
+- Interactive macOS terminal verification was waived for `1.0.0` on
+  2026-08-27 because no macOS system is available. This is an accepted release
+  risk, not a successful manual test; the complete hosted macOS suite remains
+  green.
+- Interactive WSL/ConPTY verification was waived for `1.0.0` on 2026-08-28
+  because no representative system is available. This is an accepted release
+  risk, not a successful manual test; the relevant automated suite remains
+  green.
+- Interactive native Windows verification was waived for `1.0.0` on
+  2026-08-28 because no representative system is available. This is an
+  accepted release risk, not a successful manual test. Native console mode,
+  raw input, and resize remain explicitly unsupported in `1.0.0`; the hosted
+  Windows suite remains green.
 - Hex authentication is required to complete `mix hex.publish --dry-run`; the
   unauthenticated command rebuilt version `1.0.0`, displayed the intended
   package contents, and stopped at authentication without publishing.
@@ -240,10 +253,33 @@ Terminal verification status:
 - [x] Normal exit, application error, and interrupted-session cleanup.
 - [x] Reproducible SSH backend input, resize, disconnect, and cleanup
       integration coverage.
-- [ ] Live SSH client/server terminal behavior.
-- [ ] macOS behavior.
-- [ ] WSL/ConPTY behavior.
-- [ ] Windows behavior where supported.
+- [ ] Live SSH client/server terminal behavior — waived for `1.0.0` on
+      2026-08-27 because no representative host system is available; not
+      verified.
+- [ ] macOS behavior — waived for `1.0.0` on 2026-08-27 because no interactive
+      macOS system is available; hosted CI passes, but manual behavior was not
+      verified. The deferred procedure remains in
+      [`test/manual/mac.md`](test/manual/mac.md).
+- [ ] WSL/ConPTY behavior — waived for `1.0.0` on 2026-08-28 because no
+      representative system is available; not manually verified. The deferred
+      procedure remains in [`test/manual/wsl.md`](test/manual/wsl.md).
+- [ ] Windows behavior where supported — waived for `1.0.0` on 2026-08-28
+      because no representative system is available; not manually verified.
+      Native console behavior remains unsupported. The deferred procedure
+      remains in [`test/manual/windows.md`](test/manual/windows.md).
+
+Deferred verification after `1.0.0`:
+
+- [ ] Exercise the SSH backend through a live client/server channel.
+- [ ] Complete the interactive macOS checklist.
+- [ ] Complete the WSL/ConPTY checklist in Windows Terminal.
+- [ ] Complete the native Windows checklist after the unsupported console-mode,
+      raw-input, and resize gaps are implemented.
+
+The waivers apply only to the `1.0.0` release decision. Keep these items open
+until representative systems are available, record their results in the
+corresponding manual checklists, and do not use the waivers as evidence of
+platform support in a later release.
 
 Document any platform limitations in the README and release notes.
 
@@ -403,7 +439,8 @@ Release gate:
 - [x] Documentation builds without warnings.
 - [x] Dependency vulnerability, lockfile, and Hex retirement audits pass.
 - [x] Every supported example compiles.
-- [ ] Manual terminal verification passes.
+- [x] Linux manual terminal verification passes; approved platform waivers are
+      recorded for unavailable environments.
 - [ ] `mix hex.publish --dry-run` passes.
 - [x] The unpacked package contains exactly the intended release files.
 
@@ -428,7 +465,7 @@ Require the following before merging:
 - [x] Green required CI checks.
 - [ ] Successful Hex dry run.
 - [x] Successful documentation build.
-- [ ] Manual terminal verification sign-off.
+- [x] Linux terminal verification and approved platform waivers recorded.
 - [ ] Maintainer review and approval.
 - [x] Confirmation that pull request #41 is not included.
 
@@ -648,7 +685,7 @@ environment requiring approval, and reject publishing from a branch ref.
 - [ ] Pre-rewrite code frozen on `release/1.0.0`.
 - [ ] All release blockers resolved.
 - [ ] Version, README, changelog, and documentation updated.
-- [ ] Automated and manual validation passed.
+- [x] Automated validation passed; manual results and approved waivers recorded.
 - [ ] Release PR reviewed and merged into `main`.
 - [ ] `v1.0.0` created on the exact approved `main` commit.
 - [ ] Hex published from a clean checkout of `v1.0.0`.

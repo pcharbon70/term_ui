@@ -60,6 +60,9 @@ rendering, constraint-based layouts, and the complete widget set.
 - Native Windows console support is experimental. TermUI 1.0 does not configure
   Win32 console modes or implement native raw input and resize handling; use WSL
   where practical and validate the chosen terminal environment.
+- Mouse tracking is disabled under WSL/ConPTY because the required disable
+  sequences are not handled reliably; keyboard, resize, paste, and cleanup
+  remain supported through the Unix backend.
 - OTP 26 TTY applications can query terminal dimensions, but its signal API
   does not provide automatic `SIGWINCH` resize notifications.
 - A resume or external terminal redraw may require `TermUI.Runtime.force_render/1`.

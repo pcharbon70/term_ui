@@ -5,6 +5,11 @@ defmodule TermUI.Backend.SelectorTest do
   alias TermUI.Backend.Selector
   import TermUI.Backend.SelectorTestHelpers
 
+  setup_all do
+    assert Code.ensure_loaded?(Selector)
+    :ok
+  end
+
   describe "module structure" do
     test "module compiles successfully" do
       assert Code.ensure_loaded?(Selector)
