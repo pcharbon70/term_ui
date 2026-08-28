@@ -6,6 +6,10 @@ defmodule TermUI.Shortcut do
   matching key events against registered shortcuts, and executing
   the associated actions.
 
+  This registry is opt-in. `TermUI.Runtime` does not start it, register
+  shortcuts, or route root events through it; an application must perform that
+  integration explicitly.
+
   ## Usage
 
       # Create a registry

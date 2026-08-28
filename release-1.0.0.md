@@ -68,8 +68,8 @@ compilation of every example. The CI
 workflow now exercises the minimum TTY-compatible Elixir/OTP pair, the current
 Raw-compatible pair, complete hosted macOS and Windows suites, quality/package
 checks, and every example on `main`, `develop`, and `release/**`. All six jobs
-passed for commit `90959fe` in
-[GitHub Actions run 33096111049](https://github.com/pcharbon70/term_ui/actions/runs/33096111049).
+passed again for the final pre-audit commit `1c42e6b` in
+[GitHub Actions run 33175381650](https://github.com/pcharbon70/term_ui/actions/runs/33175381650).
 The hosted macOS and Windows jobs each passed 5,311 tests. The final local
 current-toolchain suite also passed 5,311 tests; the earlier minimum-version
 suite passed 5,322 tests before two additional SSH lifecycle tests were added.
@@ -107,9 +107,11 @@ represented as complete by the local work:
   accepted release risk, not a successful manual test. Native console mode,
   raw input, and resize remain explicitly unsupported in `1.0.0`; the hosted
   Windows suite remains green.
-- Hex authentication is required to complete `mix hex.publish --dry-run`; the
-  unauthenticated command rebuilt version `1.0.0`, displayed the intended
-  package contents, and stopped at authentication without publishing.
+- An authenticated `mix hex.publish --dry-run` passed before the final
+  documentation audit. The repeat from the documentation-audit candidate built
+  the exact package but stopped because the current shell has no
+  authenticated Hex user. Authenticate a maintainer and repeat it after these
+  documentation changes are merged. Nothing has been published.
 
 Linux Raw, TTY, and IEx verification was completed on 2026-08-27. The
 terminal-lifecycle suite passed all 19 tests in a real PTY, including native Raw
@@ -131,6 +133,43 @@ error, and when the BEAM received `SIGTERM`.
 The `SIGTERM` probe passed for both Raw and cooked TTY backends. Raw restored
 the exact original terminal flags; TTY preserved canonical mode and echo while
 still restoring the cursor and leaving the alternate screen.
+
+### Documentation audit (2026-08-28)
+
+The release-facing documentation was checked against the implementation rather
+than against the planned 2.0 design. The audit covered the root README, user and
+developer guides, API reference, widget compatibility guide, public module
+documentation, usage rules, changelog, and all example READMEs and source.
+
+The corrected documentation now makes these architectural boundaries explicit:
+
+- the runtime owns one root Elm component and does not automatically supervise
+  or route events through the standalone component-service modules;
+- stateful widgets are embedded state machines whose messages, commands, and
+  optional timers are coordinated by their host root;
+- Raw, TTY, IEx, SSH, WSL, and native Windows behavior is described according
+  to the actual selectors, input paths, rendering paths, and support limits;
+- the command executor's implemented command set and timeout coverage are
+  documented without planned HTTP, file-write, or function commands;
+- the earlier `TermUI.Widget`, `TermUI.Style`, and `TermUI.Parser` namespaces
+  are identified as standalone compatibility APIs rather than runtime-native
+  equivalents; and
+- `notes/`, `.claude/`, and `docs/phase-05/` are explicitly classified as
+  historical planning or contributor-tooling material, not current product
+  documentation.
+
+Validation after the audit passed 5,311 tests, 10 doctests, and 8 property
+checks with zero failures; warnings-as-errors compilation; formatting; Credo;
+Dialyzer; warning-free ExDoc generation; dependency, retirement, and
+vulnerability audits; local Markdown-link validation; compilation and Mix-task
+auto-detection for all 27 example projects; and compilation of the three loose
+multi-renderer scripts. The unpacked Hex artifact was also inspected and
+contains the intended library, Mix task, guides, compatibility document,
+README, changelog, license, and usage rules while excluding development-only
+material. The authenticated Hex dry run remains the final repeatable gate after
+these documentation changes are merged into the exact release candidate. The
+attempt from the audit candidate built the package successfully but could not
+authenticate in the current shell.
 
 ## Release principles
 
@@ -313,16 +352,17 @@ to the stable line:
 
 ### Changelog
 
-Move the accumulated release notes into a dated `1.0.0` section. The release
-notes should explain both the stable 1.0 feature set and the changes made after
-`1.0.0-rc`.
+Keep the accumulated release notes in a `1.0.0 - Unreleased` section during
+release preparation. Replace `Unreleased` with the actual publication date on
+the exact commit that will be tagged. The release notes should explain both the
+stable 1.0 feature set and the changes made after `1.0.0-rc`.
 
 Suggested structure:
 
 ```markdown
 ## [Unreleased]
 
-## [1.0.0] - YYYY-MM-DD
+## [1.0.0] - Unreleased
 
 ### Added
 
@@ -363,7 +403,8 @@ Release gate:
 
 - [x] `mix.exs` reports `1.0.0`.
 - [x] README installation instructions report `~> 1.0`.
-- [x] `CHANGELOG.md` contains a dated `1.0.0` section.
+- [x] `CHANGELOG.md` contains the prepared `1.0.0 - Unreleased` section.
+- [ ] The exact tag commit replaces `Unreleased` with the publication date.
 - [x] Changelog comparison links are correct.
 - [x] Documentation and examples describe the code being released.
 

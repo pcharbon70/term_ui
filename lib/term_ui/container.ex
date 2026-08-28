@@ -2,9 +2,17 @@ defmodule TermUI.Container do
   @moduledoc """
   Behaviour for container components that manage children.
 
-  Container extends StatefulComponent with child management capabilities.
-  Use this for components that contain and organize other components,
-  like panels, forms, tabs, or split views.
+  Container declares a stateful shape plus child, layout, and routing callbacks
+  for custom component-tree integrations. Use it to describe components that
+  contain and organize other components, like panels, forms, tabs, or split
+  views.
+
+  `TermUI.Container` describes a lower-level component hierarchy; the 1.0 Elm
+  runtime does not automatically instantiate, lay out, render, or route events
+  to the returned children. `TermUI.ComponentServer` can host the common state
+  and event callbacks, but it does not invoke `children/1`, `layout/3`,
+  `route_event/2`, or `handle_child_message/3`. Supply a custom integration or
+  perform composition explicitly in an Elm root.
 
   ## Basic Usage
 
@@ -193,8 +201,9 @@ defmodule TermUI.Container do
   @doc """
   Renders the container.
 
-  Called after children are rendered. Can render container chrome
-  (borders, titles) or return empty if children handle everything.
+  A custom container host can call this after rendering children so it can
+  render chrome (borders, titles), or return empty if children handle
+  everything. TermUI 1.0 does not ship that orchestration.
 
   Same signature as `StatefulComponent.render/2`.
   """

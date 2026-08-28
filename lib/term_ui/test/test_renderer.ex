@@ -206,7 +206,8 @@ defmodule TermUI.Test.TestRenderer do
   @doc """
   Creates a snapshot of the current buffer state.
 
-  Snapshots can be compared for equality or saved for regression testing.
+  Snapshots can be compared in memory for regression testing. This module does
+  not persist snapshot files.
 
   ## Examples
 

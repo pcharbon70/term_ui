@@ -5,6 +5,9 @@ defmodule TermUI.Widget.List do
   List displays items and allows navigation with arrow keys.
   Supports single and multi-select modes.
 
+  This module uses the earlier `TermUI.Widget` namespace, accepts a props map
+  directly, and must be embedded as an explicit state machine in the Elm root.
+
   ## Usage
 
       List.render(%{

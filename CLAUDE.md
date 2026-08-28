@@ -1,50 +1,69 @@
-# CLAUDE.md
+# Repository contributor guide
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+TermUI is a direct-mode terminal UI framework for Elixir/BEAM. This branch is
+the stabilized 1.0 release line, not the proposed 2.0 rewrite.
 
-## Project Overview
+## Current 1.0 architecture
 
-TermUI is a direct-mode Terminal UI framework for Elixir/BEAM, currently in the research and design phase. The goal is to build a world-class TUI framework that leverages BEAM's unique strengths (fault tolerance, actor model, hot code reloading, distribution) while adopting proven patterns from modern TUI frameworks like BubbleTea (Go) and Ratatui (Rust).
+- `TermUI.Runtime` is one GenServer that owns one `TermUI.Elm` root and its
+  state. The root implements `init/1`, `event_to_msg/2`, `update/2`, and
+  `view/1`.
+- Interactive widgets implement `TermUI.StatefulComponent` as explicit state
+  machines. The Elm root initializes them, retains their state, forwards
+  relevant events, and renders them. The runtime does not create a process per
+  widget or route focus through a component tree.
+- `ComponentSupervisor`, `ComponentServer`, the registry, event router, focus
+  manager, spatial index, and state persistence are lower-level standalone
+  facilities. They are not wired into the main runtime automatically.
+- The dirty render loop runs at roughly 60 FPS when work is pending. Raw and
+  custom backends use differential buffer output; TTY renders a complete frame.
+- Layout uses `TermUI.Layout.Constraint`, the solver, and stack child tuples.
+  It is a deterministic constraint allocator, not a Cassowary implementation.
 
-## Target Architecture
+Start with `README.md`, `guides/component_system.md`, and
+`guides/developer/01-architecture-overview.md`. Files under `notes/` are
+historical planning, research, review, and implementation records; they are not
+authoritative descriptions of the current system.
 
-The framework uses The Elm Architecture adapted for OTP with three abstraction layers:
+## Backends and platforms
 
-1. **Port layer** - Low-level terminal interface (raw mode, escape sequences, capability detection)
-2. **Renderer layer** - Virtual screen buffer with differential updates (ETS-based double buffering)
-3. **Widget layer** - OTP-based component system with supervision
+- Elixir 1.15+ and OTP 26+ are supported for the TTY path.
+- The native Raw backend requires OTP 28+ and a supported local Unix terminal.
+- Raw is selected automatically when available; otherwise local operation falls
+  back to TTY. IEx uses TTY.
+- SSH/custom backends are supplied explicitly by the host per runtime session.
+- Native Windows raw input, resize, and console-mode setup are not implemented
+  in 1.0. Mouse tracking is disabled under WSL/ConPTY.
 
-### Key Design Decisions
+See `guides/user/08-terminal.md`, `guides/developer/06-terminal-layer.md`, and
+`docs/widget-compatibility.md` for the detailed support contract.
 
-- **OTP 28+ only** - Uses native raw mode via `shell.start_interactive({:noshell, :raw})`
-- **Process-per-component** for interactive widgets, shared state for static display elements
-- **Framerate-limited rendering** (60 FPS default) with intelligent diffing
-- **Cassowary constraint solver** for layouts with LRU caching
-- **Commands pattern** for side effects (async operations return messages to update loop)
+## Validation
 
-### Platform Targets
+Before committing a release change, run checks appropriate to its scope. The
+complete release gate is:
 
-- Elixir 1.15+, OTP 28+
-- Linux, macOS, Windows 10+
-- Major terminals: Alacritty, Kitty, WezTerm, iTerm2, GNOME Terminal, Windows Terminal
+```bash
+mix deps.get
+mix format --check-formatted
+MIX_ENV=test mix compile --warnings-as-errors
+mix test
+mix credo --strict
+mix dialyzer
+mix docs --warnings-as-errors
+mix deps.unlock --check-unused
+mix hex.audit
+mix deps.audit
+```
 
-## Project Status
+Interactive terminal behavior also requires the applicable checklist under
+`test/manual/`. Do not describe a waived platform check as verified.
 
-Currently in research phase. The `notes/research/state_of_tui.md` contains comprehensive analysis of:
-- Historical terminal architecture (terminfo, curses, VT100)
-- Modern TUI frameworks (BubbleTea, Ratatui, Textual, FTXUI, etc.)
-- BEAM-specific patterns (GenServer, Supervisors, GenStage, Ports vs NIFs)
-- Direct mode programming requirements
-- Proposed architecture and implementation roadmap
+## Working conventions
 
-## Development Notes
-
-When implementation begins, follow these patterns:
-
-- Use **GenServer** for stateful widgets with clear message-based APIs
-- Use **Supervisors** to mirror UI component hierarchies for fault isolation
-- Prefer **Ports over NIFs** for terminal I/O (crash isolation)
-- Use **ETS tables** for render buffers (`:screen_current`, `:screen_previous`)
-- Implement **cursor optimization** (compare cost of absolute vs relative positioning)
-- Support graceful degradation for terminal features (true color → 256 → 16 → mono)
-- IMPORTANT you must NEVER mention Claude or any AI assistant in your commit messages!
+- Preserve unrelated changes in a dirty worktree.
+- Add or update tests when changing behavior.
+- Keep public module documentation and the guides aligned with executable APIs.
+- Never mention Claude or any AI assistant in commit messages.
+- The files under `.claude/` are legacy repository-local workflow templates,
+  not product architecture or release documentation.

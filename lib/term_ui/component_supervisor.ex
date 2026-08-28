@@ -6,6 +6,12 @@ defmodule TermUI.ComponentSupervisor do
   providing fault isolation and automatic cleanup. Each component
   runs as a GenServer managed by `TermUI.ComponentServer`.
 
+  This is the standalone process-oriented component subsystem. It is not
+  started by the TermUI application and is not connected to `TermUI.Runtime`.
+  A host choosing this subsystem must supervise `ComponentRegistry`,
+  `Component.StatePersistence`, and this supervisor before starting components,
+  then provide its own rendering integration.
+
   ## Usage
 
       # Start a component under the supervisor
@@ -49,7 +55,8 @@ defmodule TermUI.ComponentSupervisor do
   @doc """
   Starts the component supervisor.
 
-  Called by the application supervisor during startup.
+  Add this to the host application's supervision tree after the registry and
+  persistence services; TermUI does not start it automatically.
   """
   @spec start_link(keyword()) :: Supervisor.on_start()
   def start_link(opts \\ []) do

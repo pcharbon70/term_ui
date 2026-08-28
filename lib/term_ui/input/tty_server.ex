@@ -7,6 +7,9 @@ defmodule TermUI.Input.TTY.Server do
   active IEx IO server without replacing its shell. Because the terminal stays
   in cooked mode, delivery may still be buffered until Enter.
 
+  This is a standalone alternative and is not used by `TermUI.Runtime`, which
+  runs `TermUI.Input.TTY.poll/2` in its own dedicated reader process.
+
   ## Architecture
 
   The server manages a spawned process that:
@@ -23,7 +26,7 @@ defmodule TermUI.Input.TTY.Server do
   ## Usage
 
       {:ok, server} = TermUI.Input.TTY.Server.start_link(receiver: self())
-      {:ok, event} = TermUI.Input.TTY.Server.poll(server, 100)
+      {:ok, event} = TermUI.Input.TTY.Server.poll(server)
       :ok = TermUI.Input.TTY.Server.stop(server)
 
   ## IO Server Configuration
@@ -68,12 +71,13 @@ defmodule TermUI.Input.TTY.Server do
 
   ## Options
 
-  - `:receiver` - PID to send key events to (defaults to `self()`)
+  - `:receiver` - PID to receive `{:input_event, event}` messages. Supply this
+    when using push delivery; omitting it is only safe if no input will arrive
+    before shutdown.
   - `:name` - Name for GenServer registration (optional)
 
   ## Examples
 
-      {:ok, server} = TermUI.Input.TTY.Server.start_link()
       {:ok, server} = TermUI.Input.TTY.Server.start_link(receiver: some_pid)
   """
   def start_link(opts \\ []) do
@@ -91,19 +95,21 @@ defmodule TermUI.Input.TTY.Server do
   @doc """
   Polls for a key event.
 
-  Returns the next queued event, or waits for one if none is available.
-  The timeout is in milliseconds.
+  Returns the next queued event. The timeout argument is retained for API
+  compatibility but is not used to wait; callers receive `{:error, :no_event}`
+  immediately while the reader is alive and the queue is empty.
 
   ## Returns
 
   - `{:ok, event}` - A key event was received
   - `{:error, :eof}` - End of input stream
-  - `{:error, :timeout}` - No event within timeout (rare in TTY mode)
+  - `{:error, :no_event}` - Reader is alive but no event is queued
 
   ## Examples
 
-      case TermUI.Input.TTY.Server.poll(server, 100) do
+      case TermUI.Input.TTY.Server.poll(server) do
         {:ok, %Event.Key{} = event} -> handle_key(event)
+        {:error, :no_event} -> try_again_later()
         {:error, :eof} -> handle_shutdown()
       end
   """

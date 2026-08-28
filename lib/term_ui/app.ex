@@ -5,6 +5,9 @@ defmodule TermUI.App do
   This module provides a convenient API for starting and running TermUI
   applications with automatic backend selection (raw mode or TTY mode).
 
+  The runtime owns one root module implementing `TermUI.Elm`. Lower-level
+  `TermUI.ComponentServer` processes are not automatically connected to it.
+
   ## Application Lifecycle
 
   TermUI applications follow The Elm Architecture:
@@ -17,7 +20,7 @@ defmodule TermUI.App do
 
   The API automatically selects the appropriate backend:
   - **Raw mode**: Full terminal control (mouse, colors, Unicode) - OTP 28+
-  - **TTY mode**: Line-based input with graceful degradation
+  - **TTY mode**: Cooked input with graceful degradation
 
   ## IEx Compatibility
 
@@ -34,12 +37,12 @@ defmodule TermUI.App do
       # Use keyboard input, press Q to quit
       # Returns to IEx prompt when done
 
-  Keyboard input remains available in IEx:
+  Once the cooked shell delivers their bytes, the parser supports:
   - Arrow keys for navigation
   - Tab for field switching
   - Function keys (F1-F12)
-  - Ctrl+key combinations
-  - Alt+key combinations
+  - Ctrl+key combinations not consumed by the shell
+  - Alt+key combinations emitted by the terminal
 
   IEx uses the TTY backend by default. Depending on the shell and terminal,
   cooked-mode input may be delivered a line at a time; press Enter when a key
@@ -91,67 +94,69 @@ defmodule TermUI.App do
 
   ### Blocking run (for scripts and CLI apps)
 
-      final_state = TermUI.App.run(MyApp.Root, backend: :auto)
+      {:ok, :exited_normally} = TermUI.App.run(MyApp.Root, backend: :auto)
 
   ### Query backend capabilities
 
-      :raw = TermUI.App.backend_mode()
-      true = TermUI.App.supports?(:unicode)
-      true = TermUI.App.supports?(:mouse)
+      mode = TermUI.App.backend_mode()
+      unicode? = TermUI.App.supports?(:unicode)
+      mouse? = TermUI.App.supports?(:mouse)
 
   ### Shutdown
 
-      :ok = TermUI.App.shutdown()
+      :ok = TermUI.App.shutdown(pid)
 
   ## Configuration Options
 
-  - `:backend` - Backend selection: `:auto` (default), `:raw`, `:tty`
+  - `:backend` - `:auto` (default), `:raw`, `:tty`, a backend module, or
+    `{backend_module, backend_opts}`
   - `:name` - GenServer name for the Runtime process
   - `:render_interval` - Milliseconds between renders (default: 16, ~60 FPS)
 
   ## Example
 
       defmodule MyApp.Counter do
+        use TermUI.Elm
+
         @moduledoc \"\"\"
         A simple counter application.
         \"\"\"
 
         @impl true
         def init(_opts) do
-          {:ok, %{count: 0}}
+          %{count: 0}
         end
+
+        def event_to_msg(%TermUI.Event.Key{key: \"+\"}, _state), do: {:msg, :increment}
+        def event_to_msg(%TermUI.Event.Key{key: \"q\"}, _state), do: {:msg, :quit}
+        def event_to_msg(_event, _state), do: :ignore
 
         @impl true
         def view(model) do
-          [
-            {:text, "Count: \" <> to_string(model.count)},
-            {:text, "\\nPress + to increment, - to decrement, q to quit"}
-          ]
+          stack(:vertical, [
+            text("Count: " <> to_string(model.count)),
+            text("Press + to increment, q to quit")
+          ])
         end
 
         @impl true
-        def update(msg, model) do
-          case msg do
-            {:key, ?+} -> {:ok, %{model | count: model.count + 1}}
-            {:key, ?-} -> {:ok, %{model | count: model.count - 1}}
-            {:key, ?q} -> {:quit, model}
-            _ -> {:ok, model}
-          end
-        end
+        def update(:increment, model), do: {%{model | count: model.count + 1}, []}
+        def update(:quit, model), do: {model, [TermUI.Command.quit()]}
       end
 
       # Run the application
       TermUI.App.run(MyApp.Counter, backend: :auto)
 
-  ## Component Protocol
+  ## Root Protocol
 
-  Your root component must implement the following callbacks:
+  Your root module implements `TermUI.Elm` callbacks:
 
   - `init/1` - Initialize the model, called once at startup
   - `view/1` - Render the UI based on current model
-  - `update/2` - Handle messages, return `{:ok, new_model}` or `{:quit, model}`
+  - `event_to_msg/2` - Convert terminal events into application messages
+  - `update/2` - Handle messages, returning `{new_state, commands}`
 
-  See `TermUI.Component` for full protocol documentation.
+  See `TermUI.Elm` for the full callback contract.
   """
 
   alias TermUI.PersistentTerms
@@ -162,10 +167,11 @@ defmodule TermUI.App do
 
   @type root_module :: module()
   @type option ::
-          {:backend, :auto | :raw | :tty}
+          {:backend, :auto | :raw | :tty | module() | {module(), keyword()}}
           | {:name, GenServer.name()}
           | {:render_interval, pos_integer()}
           | {:skip_terminal, boolean()}
+          | {:use_input_handler, boolean()}
   @type supports_query ::
           :unicode
           | :mouse
@@ -184,9 +190,12 @@ defmodule TermUI.App do
 
   ## Options
 
-  - `:backend` - Backend selection: `:auto` (default), `:raw`, `:tty`
+  - `:backend` - `:auto` (default), `:raw`, `:tty`, a backend module, or
+    `{backend_module, backend_opts}`
   - `:name` - GenServer name for the Runtime process
   - `:render_interval` - Milliseconds between renders (default: 16)
+  - `:skip_terminal` - Skip terminal setup (tests only; default: false)
+  - `:use_input_handler` - Select the `TermUI.Input` handler path (default: false)
 
   ## Examples
 
@@ -212,29 +221,31 @@ defmodule TermUI.App do
   Runs a TermUI application blocking until completion.
 
   This is the simplest way to run a TermUI application.
-  It starts the runtime, waits for the application to exit,
-  cleans up terminal state, and returns the final result.
-
-  Returns `{:ok, final_model}` on successful completion or
-  `{:error, reason}` if the application crashes.
+  It starts the runtime, waits for the application to exit, and cleans up
+  terminal state. Returns `{:ok, :exited_normally}` after normal shutdown or
+  `{:error, reason}` if the runtime crashes; it does not return root state.
 
   ## Options
 
-  - `:backend` - Backend selection: `:auto` (default), `:raw`, `:tty`
+  - `:backend` - `:auto` (default), `:raw`, `:tty`, a backend module, or
+    `{backend_module, backend_opts}`
   - `:render_interval` - Milliseconds between renders (default: 16)
+  - `:skip_terminal` - Skip terminal setup (tests only; default: false)
+  - `:use_input_handler` - Select the `TermUI.Input` handler path (default: false)
 
   ## Examples
 
-      {:ok, final_state} = TermUI.App.run(MyApp.Root)
+      {:ok, :exited_normally} = TermUI.App.run(MyApp.Root)
 
-      {:ok, final_state} = TermUI.App.run(MyApp.Root, backend: :tty)
+      {:ok, :exited_normally} = TermUI.App.run(MyApp.Root, backend: :tty)
 
   ## Exit Conditions
 
   The application exits when:
-  - The root component returns `{:quit, model}` from update/2
+  - The root returns `Command.quit/1` (or the legacy `:quit` command)
   - The Runtime process crashes (returns error)
-  - User interrupts with Ctrl+C (handled by Runtime)
+  - The root maps a Ctrl+C key event to `Command.quit/1`, or the surrounding
+    host terminates the runtime
 
   """
   @spec run(root_module(), [option()]) :: {:ok, term()} | {:error, term()}
@@ -266,18 +277,24 @@ defmodule TermUI.App do
   Possible values:
   - `:raw` - Full terminal control (OTP 28+)
   - `:tty` - Line-based input (fallback)
-  - `:nil` - No app running or backend not initialized
+  - `:skip` - Terminal setup was skipped (primarily tests)
+  - `nil` - No local backend context is published
+
+  This is process-global context for local Raw/TTY runtimes. An explicit
+  custom backend, including SSH sessions, does not publish its per-session
+  mode through this function.
 
   ## Examples
 
       case TermUI.App.backend_mode() do
-        :raw -> IO.puts("Running in raw mode - full features available")
-        :tty -> IO.puts("Running in TTY mode - limited features")
+        :raw -> IO.puts("Running in local Raw mode")
+        :tty -> IO.puts("Running in local TTY mode")
+        :skip -> IO.puts("Terminal setup was skipped")
         nil -> IO.puts("No app running")
       end
 
   """
-  @spec backend_mode() :: :raw | :tty | nil
+  @spec backend_mode() :: :raw | :tty | :skip | nil
   def backend_mode, do: PersistentTerms.backend_mode()
 
   @doc """
@@ -292,8 +309,10 @@ defmodule TermUI.App do
   - `:color_16` - 16-color palette support
   - `:monochrome` - No color support
 
-  Returns `true` if the capability is supported, `false` otherwise.
-  Returns `false` if no app is running.
+  Returns `true` if the capability is supported, `false` otherwise. Before a
+  local runtime has published capabilities, this compatibility helper assumes
+  Unicode and true color, while mouse support defaults to false. For exact
+  per-session custom-backend capabilities, use that backend's state.
 
   ## Examples
 
@@ -337,14 +356,14 @@ defmodule TermUI.App do
   @doc """
   Shuts down a running TermUI application.
 
-  If a named Runtime process was started with `name: :my_app`,
-  you can shut it down by passing the name. Otherwise, this
-  function attempts to find and shut down the Runtime process.
+  Pass the PID returned by `start/2` or the name supplied in its `:name`
+  option. The no-argument compatibility form only finds a runtime explicitly
+  registered as `TermUI.Runtime`; `start/2` does not use that name by default.
 
   ## Examples
 
-      # Shutdown by finding the process
-      :ok = TermUI.App.shutdown()
+      {:ok, pid} = TermUI.App.start(MyApp.Root)
+      :ok = TermUI.App.shutdown(pid)
 
       # Shutdown by name
       :ok = TermUI.App.shutdown(:my_app)

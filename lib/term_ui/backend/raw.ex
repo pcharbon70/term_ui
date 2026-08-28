@@ -79,7 +79,7 @@ defmodule TermUI.Backend.Raw do
   This backend is typically used via the runtime, not directly:
 
       # Automatic backend selection (recommended)
-      {:ok, runtime} = TermUI.Runtime.start_link()
+      {:ok, runtime} = TermUI.Runtime.start_link(root: MyApp.Root)
 
       # The runtime handles:
       # 1. Backend selection via Selector
@@ -258,8 +258,6 @@ defmodule TermUI.Backend.Raw do
   # ===========================================================================
   # Behaviour Callbacks - Lifecycle, Queries, Cursor, Rendering, Input
   # ===========================================================================
-  # Full implementations will be added in subsequent tasks
-
   @impl true
   @doc """
   Initializes the Raw backend with terminal setup.

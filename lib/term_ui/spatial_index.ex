@@ -6,6 +6,10 @@ defmodule TermUI.SpatialIndex do
   the correct component based on cursor coordinates. It maintains
   a mapping of screen regions to component references.
 
+  This is an opt-in service for `TermUI.EventRouter` and `TermUI.FocusManager`.
+  The integrated Elm runtime does not start or query it; mouse events there go
+  to the single root module.
+
   ## Usage
 
       # Register a component's bounds

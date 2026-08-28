@@ -56,8 +56,9 @@ defmodule TermUI.EventQueue do
   Default maximum queue size.
 
   This value balances memory usage with responsiveness:
-  - At 60 FPS, 1000 events = ~16 seconds of input buffer
-  - Typical key presses are <100 events/sec
+  - It bounds memory during input bursts
+  - The runtime drains queued events in batches, so queue size is not a time
+    duration or a fixed number of rendered frames
   """
   def max_size, do: 1000
 

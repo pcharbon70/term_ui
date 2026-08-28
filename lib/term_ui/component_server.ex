@@ -4,7 +4,15 @@ defmodule TermUI.ComponentServer do
 
   ComponentServer wraps any component implementing TermUI behaviours,
   managing its lifecycle stages: init, mount, update, and unmount.
-  It handles prop validation, timeout enforcement, and command execution.
+  It handles initialization timeouts, lifecycle callbacks, and its legacy
+  command tuples. It does not render the component and is not automatically
+  started or routed by `TermUI.Runtime`.
+
+  This server invokes init, mount, props-update, event, and unmount callbacks.
+  It does not delegate arbitrary GenServer calls or mailbox messages to a
+  component's optional `handle_call/3` or `handle_info/2`. Its legacy timer
+  tuple schedules a message to the server but, without a custom host, that
+  message is unhandled; `{:send, pid, message}` is the safe built-in side effect.
 
   ## Lifecycle Stages
 

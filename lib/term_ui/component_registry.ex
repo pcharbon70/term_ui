@@ -6,6 +6,9 @@ defmodule TermUI.ComponentRegistry do
   which is essential for event routing and focus management.
   Components register on mount and unregister on unmount.
 
+  This registry belongs to the standalone process-oriented component services.
+  The single-root `TermUI.Runtime` does not start or query it.
+
   ## Usage
 
       # Register a component

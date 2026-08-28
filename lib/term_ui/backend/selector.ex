@@ -3,8 +3,8 @@ defmodule TermUI.Backend.Selector do
   Determines which terminal backend to use at runtime.
 
   The Selector module implements a "try raw mode first" strategy for backend
-  selection. This approach is the **only reliable method** for determining
-  whether raw terminal mode is available.
+  selection. After the platform/version guard, attempting acquisition is the
+  authoritative check for whether native Raw mode is available.
 
   ## Why Not Use Heuristics?
 
@@ -61,31 +61,26 @@ defmodule TermUI.Backend.Selector do
 
   For testing or configuration override, use `select/1`:
 
-      # Force TTY mode
-      {:tty, caps} = Selector.select(TermUI.Backend.TTY)
+      # Select a module explicitly (initialization is performed by Runtime)
+      {:explicit, TermUI.Backend.TTY, []} = Selector.select(TermUI.Backend.TTY)
 
-      # Force raw mode (will fail if unavailable)
-      {:raw, state} = Selector.select(TermUI.Backend.Raw)
+      {:explicit, TermUI.Backend.Raw, []} = Selector.select(TermUI.Backend.Raw)
 
       # Auto-detect (same as select/0)
       result = Selector.select(:auto)
 
   ## Examples
 
-      # Typical usage in runtime initialization
+      # Inspect the selected local mode. Runtime owns backend initialization.
       case TermUI.Backend.Selector.select() do
-        {:raw, state} ->
-          # Initialize raw backend
-          TermUI.Backend.Raw.init(state)
-
-        {:tty, capabilities} ->
-          # Initialize TTY backend with detected capabilities
-          TermUI.Backend.TTY.init(capabilities: capabilities)
+        {:raw, _state} -> :raw
+        {:tty, _capabilities} -> :tty
       end
 
   ## OTP Version Requirements
 
-  - **OTP 28+**: Full support with `:shell.start_interactive/1`
+  - **OTP 28+ on a supported Unix platform**: Native Raw selection with
+    `:shell.start_interactive/1`
   - **OTP 27 and earlier**: Automatic fallback to TTY mode
   """
 
@@ -145,8 +140,6 @@ defmodule TermUI.Backend.Selector do
   """
   @spec select() :: {:raw, raw_state()} | {:tty, capabilities()}
   def select do
-    # Implementation in task 1.2.2
-    # Placeholder: attempt raw mode, fall back to TTY with capabilities
     try_raw_mode()
   end
 

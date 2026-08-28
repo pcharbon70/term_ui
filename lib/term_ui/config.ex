@@ -34,24 +34,30 @@ defmodule TermUI.Config do
 
   ### `:color_mode`
 
-  Controls color depth preference.
+  Stores a color-depth preference for application code. In the 1.0 integrated
+  runtime, the TTY backend derives its actual color mode from detected
+  capabilities and Raw emits the requested styles; this value is not applied
+  as a backend override.
 
   - `:auto` - (default) Detect terminal color support
-  - `:true_color` - Force 24-bit RGB color
-  - `:color_256` - Force 256-color palette
-  - `:color_16` - Force 16-color palette
-  - `:monochrome` - Force monochrome (no color)
+  - `:true_color` - Prefer 24-bit RGB color
+  - `:color_256` - Prefer the 256-color palette
+  - `:color_16` - Prefer the 16-color palette
+  - `:monochrome` - Prefer monochrome output
 
   Example:
       config :term_ui, color_mode: :color_256
 
   ### `:character_set`
 
-  Controls character set preference.
+  Stores a character-set preference. Before a runtime starts it is the fallback
+  used by `TermUI.CharacterSet.current/0`. Once a local runtime stores terminal
+  capabilities, the current character set is derived from detected Unicode
+  support, so this is not a force override in 1.0.
 
   - `:auto` - (default) Detect Unicode support
-  - `:unicode` - Force Unicode character set
-  - `:ascii` - Force ASCII character set
+  - `:unicode` - Prefer the Unicode character set
+  - `:ascii` - Prefer the ASCII character set
 
   Example:
       config :term_ui, character_set: :ascii
@@ -87,8 +93,10 @@ defmodule TermUI.Config do
 
   ## Runtime Options Override
 
-  Runtime options passed to `TermUI.App.start/2` or `TermUI.App.run/2`
-  always take precedence over configuration:
+  Runtime options passed to `TermUI.Runtime.start_link/1` or
+  `TermUI.Runtime.run/1` take precedence over configuration. `TermUI.App`
+  forwards its documented runtime options (`:backend`, `:name`,
+  `:render_interval`, `:skip_terminal`, and `:use_input_handler`).
 
       # Config says :tty, but runtime option says :raw
       {:ok, _pid} = TermUI.App.start(MyApp, backend: :raw)
@@ -113,6 +121,7 @@ defmodule TermUI.Config do
           | :color_mode
           | :character_set
           | :render_interval
+          | :iex_compatible
           | :skip_terminal
           | :use_input_handler
           | :name
@@ -164,9 +173,11 @@ defmodule TermUI.Config do
   end
 
   @doc """
-  Gets all configuration values as a keyword list.
+  Gets the four values merged into normal runtime startup as a keyword list.
 
-  Returns the current application configuration merged with defaults.
+  Returns backend, color-mode, character-set, and render-interval application
+  configuration merged with defaults. IEx compatibility is read separately by
+  `TermUI.iex_mode?/0`.
 
   ## Examples
 

@@ -5,6 +5,9 @@ defmodule TermUI.Focus.Indicator do
   Provides default and customizable styles for indicating
   which component has focus.
 
+  This is an opt-in styling utility; `TermUI.Runtime` does not apply focus
+  indicators to embedded widgets automatically.
+
   ## Usage
 
       # Get default focus style

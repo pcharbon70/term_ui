@@ -1,10 +1,11 @@
 defmodule TermUI.Widgets.Toast do
   @moduledoc """
-  Toast notification widget for brief, auto-dismissing messages.
+  Toast notification widget for brief messages with caller-driven expiration.
 
-  Toasts appear at the screen edge and automatically dismiss after a duration.
-  Multiple toasts stack vertically. Toasts don't capture focus or block
-  interaction.
+  Toasts appear at the screen edge and carry an expiration duration. A caller
+  must periodically call `ToastManager.tick/1` (normally from a root
+  `Command.interval/2` message) to remove expired toasts. Multiple toasts stack
+  vertically. Toasts don't capture focus or block interaction.
 
   ## Usage
 
@@ -264,7 +265,7 @@ defmodule TermUI.Widgets.ToastManager do
   Manages multiple toast notifications with stacking.
 
   ToastManager handles the lifecycle of multiple toasts, including
-  stacking, auto-dismiss, and position management.
+  stacking, tick-driven expiration, and position management.
 
   ## Usage
 

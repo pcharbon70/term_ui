@@ -74,7 +74,7 @@ end
 |--------|--------|
 | `{:msg, message}` | Send message to `update/2` |
 | `:ignore` | Discard the event |
-| `:propagate` | Pass to parent component |
+| `:propagate` | Leave unhandled; currently discarded because the 1.0 runtime has no parent |
 
 ### `update/2` - Handle Messages
 
@@ -89,15 +89,12 @@ def update({:set_name, name}, state) do
   {%{state | name: name}, []}
 end
 
-def update(:save, state) do
-  # Use timer with 0 delay to perform side effect on next tick
-  {state, [Command.timer(0, :do_save)]}
+def update({:load, path}, state) do
+  {%{state | loading: true}, [Command.file_read(path, :file_loaded)]}
 end
 
-def update(:do_save, state) do
-  # Perform the file write synchronously
-  File.write("data.txt", state.data)
-  {%{state | saved: true}, []}
+def update({:file_loaded, {:ok, contents}}, state) do
+  {%{state | loading: false, contents: contents}, []}
 end
 ```
 
@@ -136,13 +133,13 @@ Here's the complete flow when a user presses a key:
 
 1. **Input** - User presses `↑` key
 2. **Event** - Runtime creates `%Event.Key{key: :up}`
-3. **Routing** - Event sent to focused component
+3. **Routing** - Event sent to the single root module
 4. **Transform** - `event_to_msg(%Event.Key{key: :up}, state)` returns `{:msg, :increment}`
 5. **Update** - `update(:increment, state)` returns `{new_state, []}`
-6. **Dirty** - Component marked for re-render
+6. **Dirty** - Runtime marked for re-render when root state changes
 7. **Render** - On next frame, `view(new_state)` called
-8. **Diff** - Render tree compared to previous
-9. **Output** - Only changes sent to terminal
+8. **Rasterize** - Render tree converted to buffer cells
+9. **Output** - Raw/custom sends cell changes; TTY sends a complete displayable frame
 
 ## Commands
 
@@ -229,23 +226,15 @@ end
 
 ```elixir
 def init(_opts) do
-  %{status: :loading, data: nil, error: nil}
+  {%{status: :loading, data: nil, error: nil},
+   [Command.file_read("data.txt", :data_loaded)]}
 end
 
-def update(:load, state) do
-  # Use timer to trigger loading on next tick
-  {%{state | status: :loading}, [Command.timer(0, :do_load)]}
-end
+def update({:data_loaded, {:ok, data}}, state),
+  do: {%{state | status: :ready, data: data}, []}
 
-def update(:do_load, state) do
-  # Perform the fetch synchronously (or spawn a Task for async)
-  case fetch_data() do
-    {:ok, data} ->
-      {%{state | status: :ready, data: data}, []}
-    {:error, reason} ->
-      {%{state | status: :error, error: reason}, []}
-  end
-end
+def update({:data_loaded, {:error, reason}}, state),
+  do: {%{state | status: :error, error: reason}, []}
 
 def view(state) do
   case state.status do

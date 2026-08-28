@@ -13,7 +13,7 @@ The SupervisionTreeViewer displays live OTP supervision trees with status indica
 - Supervisor strategy visualization (one_for_one, one_for_all, etc.)
 - Process restart/terminate controls with confirmation
 - Tree filtering by process name
-- Auto-refresh capability
+- Refreshable state; this example root schedules automatic refresh
 
 **When to Use:**
 - Debugging OTP application structure
@@ -27,7 +27,8 @@ The SupervisionTreeViewer displays live OTP supervision trees with status indica
 The `SupervisionTreeViewer.new/1` function accepts these options:
 
 - `:root` - Root supervisor (pid, registered name, or module) (required)
-- `:update_interval` - Refresh interval in milliseconds (default: 2000)
+- `:update_interval` - Refresh interval metadata in milliseconds (default:
+  2000); it does not start a widget timer in the Elm runtime
 - `:on_select` - Callback when node is selected: `fn node -> ... end`
 - `:on_action` - Callback when action is performed: `fn {:restarted | :terminated, pid} -> ... end`
 - `:show_workers` - Show worker processes (default: true)
@@ -82,7 +83,6 @@ SupervisionTreeViewerExample.App.run()
 ```
 
 **Note:** TTY mode works inside IEx but has limitations:
-- No alternate screen buffer (output mixes with IEx prompt)
 - Input is read through the shell; some terminals buffer keys until Enter is pressed
 - For full TUI, use raw mode instead
 

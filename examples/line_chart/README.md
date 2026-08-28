@@ -8,7 +8,7 @@ The LineChart widget renders line graphs in the terminal using Unicode Braille c
 
 ### Key Features
 
-- Single and multi-series line charts
+- Single-series charts and multiple series overlaid in one chart
 - Braille patterns for smooth line rendering (2x4 dots per character)
 - Custom min/max scaling
 - Optional axis display
@@ -28,13 +28,13 @@ Use LineChart when you need to visualize:
 The LineChart widget accepts the following options in its `render/1` function:
 
 - `:data` - Single series data (list of numbers), alternative to `:series`
-- `:series` - List of series maps with `:data` and optional `:color` keys
+- `:series` - List of series maps with a `:data` list
 - `:width` - Chart width in characters (default: 40)
 - `:height` - Chart height in characters (default: 10)
 - `:min` - Minimum Y value (default: auto-calculated from data)
 - `:max` - Maximum Y value (default: auto-calculated from data)
 - `:show_axis` - Show axis lines (default: false)
-- `:style` - Style for the chart
+- `:style` - Style applied to the complete chart
 
 ### Example Usage
 
@@ -52,13 +52,17 @@ LineChart.render(
 # Multiple series
 LineChart.render(
   series: [
-    %{data: [1, 3, 5, 2, 8], color: Style.new(fg: :cyan)},
-    %{data: [2, 4, 3, 6, 4], color: Style.new(fg: :magenta)}
+    %{data: [1, 3, 5, 2, 8]},
+    %{data: [2, 4, 3, 6, 4]}
   ],
   width: 40,
-  height: 8
+  height: 8,
+  style: Style.new(fg: :cyan)
 )
 ```
+
+All series share the same Braille canvas and chart style. The current widget
+does not apply a separate color to each series.
 
 ## Example Structure
 
@@ -104,7 +108,6 @@ LineChart.App.run()
 ```
 
 **Note:** TTY mode works inside IEx but has limitations:
-- No alternate screen buffer (output mixes with IEx prompt)
 - Input is read through the shell; some terminals buffer keys until Enter is pressed
 - For full TUI, use raw mode instead
 
@@ -117,8 +120,8 @@ LineChart.App.run()
 
 ## Features Demonstrated
 
-1. **Single Series Chart** - Shows CPU usage over time with green line
-2. **Multi-Series Chart** - Displays CPU (cyan) and memory (magenta) together
+1. **Single Series Chart** - Shows CPU usage over time
+2. **Multi-Series Chart** - Overlays CPU and memory in one styled canvas
 3. **Braille Pattern Demo** - Shows various Braille characters used for rendering
 4. **Dynamic Updates** - Data can be added in real-time with sliding window
 5. **Axis Control** - Toggle axis display to see coordinate frame

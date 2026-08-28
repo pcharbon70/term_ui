@@ -201,7 +201,7 @@ defmodule MarkdownViewer.App do
   def event_to_msg(%Event.Key{key: :tab, modifiers: []}, _state), do: {:msg, :next_code_block}
   def event_to_msg(%Event.Key{key: :tab, modifiers: [:shift]}, _state), do: {:msg, :prev_code_block}
   def event_to_msg(%Event.Key{key: :enter}, _state), do: {:msg, :copy_code}
-  def event_to_msg(%Event.Key{char: ?c}, _state), do: {:msg, :copy_code}
+  def event_to_msg(%Event.Key{char: "c"}, _state), do: {:msg, :copy_code}
   def event_to_msg(%Event.Key{key: key}, _state) when key in ["q", "Q"], do: {:msg, :quit}
   def event_to_msg(_event, _state), do: :ignore
 
@@ -251,7 +251,7 @@ defmodule MarkdownViewer.App do
   end
 
   def update(:quit, state) do
-    {state, [:quit]}
+    {state, [TermUI.Command.quit()]}
   end
 
   defp update_scroll_info(state) do

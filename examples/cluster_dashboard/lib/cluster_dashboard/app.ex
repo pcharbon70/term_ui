@@ -74,10 +74,12 @@ defmodule ClusterDashboardExample.App do
 
     {:ok, dashboard_state} = ClusterDashboard.init(props)
 
-    %{
+    state = %{
       dashboard: dashboard_state,
       message: "ClusterDashboard Example - Views: [n]odes [g]lobals [p]g [e]vents"
     }
+
+    {state, [TermUI.Command.interval(2000, :tick)]}
   end
 
   @doc """
@@ -104,9 +106,6 @@ defmodule ClusterDashboardExample.App do
   # Quit
   def event_to_msg(%Event.Key{key: key}, _state) when key in ["q", "Q"], do: {:msg, :quit}
 
-  # Tick for auto-refresh
-  def event_to_msg(%Event.Tick{}, _state), do: {:msg, :tick}
-
   def event_to_msg(_event, _state), do: :ignore
 
   @doc """
@@ -119,20 +118,25 @@ defmodule ClusterDashboardExample.App do
 
   def update({:view_mode, mode}, state) do
     # Create a key event to switch view mode
-    key = case mode do
-      :nodes -> "n"
-      :globals -> "g"
-      :pg -> "p"
-      :events -> "e"
-    end
+    key =
+      case mode do
+        :nodes -> "n"
+        :globals -> "g"
+        :pg -> "p"
+        :events -> "e"
+      end
+
     event = %Event.Key{key: key}
     {:ok, dashboard} = ClusterDashboard.handle_event(event, state.dashboard)
-    message = case mode do
-      :nodes -> "Nodes view"
-      :globals -> "Global names view"
-      :pg -> "PG groups view"
-      :events -> "Events view"
-    end
+
+    message =
+      case mode do
+        :nodes -> "Nodes view"
+        :globals -> "Global names view"
+        :pg -> "PG groups view"
+        :events -> "Events view"
+      end
+
     {%{state | dashboard: dashboard, message: message}, []}
   end
 
@@ -160,13 +164,12 @@ defmodule ClusterDashboardExample.App do
   end
 
   def update(:tick, state) do
-    # Check if dashboard needs refresh based on its update interval
-    {:ok, dashboard} = ClusterDashboard.handle_info(:refresh, state.dashboard)
+    {:ok, dashboard} = ClusterDashboard.refresh(state.dashboard)
     {%{state | dashboard: dashboard}, []}
   end
 
   def update(:quit, state) do
-    {state, [:quit]}
+    {state, [TermUI.Command.quit()]}
   end
 
   @doc """
@@ -204,12 +207,24 @@ defmodule ClusterDashboardExample.App do
       text(top_border, Style.new(fg: :yellow)),
       text("│" <> String.pad_trailing("  n/g/p/e  Switch views", inner_width) <> "│", nil),
       text("│" <> String.pad_trailing("  Up/Down  Navigate list", inner_width) <> "│", nil),
-      text("│" <> String.pad_trailing("  Enter    Toggle details panel", inner_width) <> "│", nil),
-      text("│" <> String.pad_trailing("  i        Inspect selected node", inner_width) <> "│", nil),
+      text(
+        "│" <> String.pad_trailing("  Enter    Toggle details panel", inner_width) <> "│",
+        nil
+      ),
+      text(
+        "│" <> String.pad_trailing("  i        Inspect selected node", inner_width) <> "│",
+        nil
+      ),
       text("│" <> String.pad_trailing("  r        Refresh now", inner_width) <> "│", nil),
-      text("│" <> String.pad_trailing("  G        Register test global process", inner_width) <> "│", nil),
+      text(
+        "│" <> String.pad_trailing("  G        Register test global process", inner_width) <> "│",
+        nil
+      ),
       text("│" <> String.pad_trailing("  P        Join test PG group", inner_width) <> "│", nil),
-      text("│" <> String.pad_trailing("  Escape   Close details / clear alerts", inner_width) <> "│", nil),
+      text(
+        "│" <> String.pad_trailing("  Escape   Close details / clear alerts", inner_width) <> "│",
+        nil
+      ),
       text("│" <> String.pad_trailing("  q        Quit", inner_width) <> "│", nil),
       text(bottom_border, Style.new(fg: :yellow))
     ])

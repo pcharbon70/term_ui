@@ -102,7 +102,7 @@ defmodule PickList.App do
   Update state based on messages.
   """
   def update(:quit, state) do
-    {state, [:quit]}
+    {state, [TermUI.Command.quit()]}
   end
 
   def update(:open_fruit_picker, state) do

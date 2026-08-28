@@ -1,324 +1,130 @@
 # Terminal
 
-TermUI manages low-level terminal operations automatically, but understanding these features helps you build better applications.
+TermUI selects a backend, parses its input into `TermUI.Event` structs, and
+restores owned terminal state at shutdown.
 
-## Terminal Modes
+## Raw and TTY modes
 
-### Cooked Mode (Default)
+| | Raw | TTY |
+|---|---|---|
+| Minimum OTP | 28 | 26 |
+| Terminal mode | character-at-a-time | cooked; may buffer until Enter |
+| Typical use | standalone Unix TUI | IEx, remsh, constrained terminals |
+| Runtime alternate screen | yes | yes |
+| Runtime buffer strategy | double-buffered differential | temporary full frame |
+| Local mouse setup | enabled except WSL/ConPTY | not enabled by runtime |
 
-Normal terminal operation:
-- Line buffering (input sent on Enter)
-- Character echoing
-- Signal handling (Ctrl+C sends SIGINT)
-
-### Raw Mode
-
-TermUI's operating mode:
-- Character-by-character input
-- No echoing
-- No signal handling
-- Full control over display
-
-On supported Unix terminals, the runtime enables raw mode automatically and
-restores it when your app exits. It falls back to the TTY backend in constrained
-environments such as IEx.
-
-## Alternate Screen
-
-Terminals have two screen buffers:
-
-- **Main screen** - The normal scrollback buffer
-- **Alternate screen** - A separate buffer for full-screen apps
-
-TermUI uses the alternate screen, preserving the user's shell history. When your app exits, the terminal returns to the main screen with history intact.
-
-```
-┌─────────────────────┐     ┌─────────────────────┐
-│ $ ls                │     │ ┌─────────────────┐ │
-│ file1.txt           │     │ │  Your TermUI    │ │
-│ file2.txt           │ --> │ │  Application    │ │
-│ $ my_app            │     │ │                 │ │
-│                     │     │ └─────────────────┘ │
-│  Main Screen        │     │  Alternate Screen   │
-└─────────────────────┘     └─────────────────────┘
-                                     │
-                                     │ (exit)
-                                     ▼
-                            ┌─────────────────────┐
-                            │ $ ls                │
-                            │ file1.txt           │
-                            │ file2.txt           │
-                            │ $ my_app            │
-                            │ $                   │
-                            │  Back to Main       │
-                            └─────────────────────┘
-```
-
-## Mouse Tracking
-
-TermUI can capture mouse events.
-
-### Tracking Modes
-
-| Mode | Events Captured |
-|------|-----------------|
-| `:click` | Button press/release |
-| `:drag` | Click + drag movements |
-| `:all` | All mouse movement |
-
-The runtime enables click tracking by default.
-
-### Mouse Coordinates
-
-Mouse positions are 0-indexed:
-- `x` = column (0 = leftmost)
-- `y` = row (0 = topmost)
+With `backend: :auto`, a standalone runtime tries Raw and falls back to TTY.
+Inside IEx it selects TTY directly so the shell keeps terminal ownership.
 
 ```elixir
-def event_to_msg(%Event.Mouse{action: :click, x: x, y: y}, state) do
-  # Check if click is within a region
-  if x >= 10 and x < 30 and y >= 5 and y < 10 do
-    {:msg, :button_clicked}
-  else
-    :ignore
-  end
-end
+TermUI.Runtime.run(root: MyApp)                # automatic
+TermUI.Runtime.run(root: MyApp, backend: :raw)
+TermUI.Runtime.run(root: MyApp, backend: :tty)
 ```
 
-### Scroll Events
+Forcing Raw fails if native Raw mode cannot be acquired. TTY calls can block in
+their dedicated input process while the render loop continues.
 
-Mouse wheel generates scroll events:
+## Alternate screen and cursor
+
+The runtime enters the alternate screen for both local backends, hides the
+cursor, and restores both on normal shutdown. `TermUI.Backend.TTY` has a
+standalone `alternate_screen: false` default, but `TermUI.Runtime` explicitly
+passes true.
+
+Direct `TermUI.Terminal` calls are Raw/local primitives and can conflict with a
+running runtime. Prefer runtime ownership. If you use them independently, pair
+every setup operation with cleanup:
 
 ```elixir
-def event_to_msg(%Event.Mouse{action: :scroll_up}, _state) do
-  {:msg, :scroll_up}
-end
+{:ok, _state} = TermUI.Terminal.enable_raw_mode()
+:ok = TermUI.Terminal.enter_alternate_screen()
+:ok = TermUI.Terminal.hide_cursor()
 
-def event_to_msg(%Event.Mouse{action: :scroll_down}, _state) do
-  {:msg, :scroll_down}
-end
+# later
+:ok = TermUI.Terminal.show_cursor()
+:ok = TermUI.Terminal.leave_alternate_screen()
+:ok = TermUI.Terminal.disable_raw_mode()
 ```
 
-## Focus Events
+Use `TermUI.ANSI` to generate low-level clear or cursor-position sequences;
+`TermUI.Terminal` does not expose `clear_screen/0` or
+`set_cursor_position/2`.
 
-Know when the terminal window gains or loses focus:
+## Mouse
+
+Raw runtime setup requests all mouse reporting modes and parses SGR mouse input
+into 0-based `%TermUI.Event.Mouse{x: column, y: row}` coordinates. WSL/ConPTY
+mouse tracking is intentionally disabled because cleanup sequences are not
+reliable. TTY may parse mouse sequences if an external host emits them, but the
+runtime does not enable local TTY mouse reporting.
+
+Always provide keyboard alternatives for mouse interactions.
+
+## Focus and paste
+
+The input parser understands focus sequences and bracketed paste payloads, but
+the runtime does not automatically enable either terminal reporting mode in
+1.0. `TermUI.Focus` and `TermUI.Clipboard` provide enable/disable sequences for
+custom terminal integrations. When enabled by the host:
 
 ```elixir
-def event_to_msg(%Event.Focus{action: :gained}, _state) do
-  {:msg, :focus_gained}
-end
+def event_to_msg(%TermUI.Event.Focus{action: :gained}, _state),
+  do: {:msg, :focused}
 
-def event_to_msg(%Event.Focus{action: :lost}, _state) do
-  {:msg, :focus_lost}
-end
-
-def update(:focus_lost, state) do
-  # Pause updates, dim display, etc.
-  {%{state | paused: true}, []}
-end
-
-def update(:focus_gained, state) do
-  # Resume updates
-  {%{state | paused: false}, []}
-end
+def event_to_msg(%TermUI.Event.Paste{content: text}, _state),
+  do: {:msg, {:paste, text}}
 ```
 
-**Note:** Focus events require terminal support. They work on most modern terminals (xterm, iTerm2, Alacritty, Kitty, Windows Terminal).
+Without bracketed-paste reporting, pasted bytes arrive as ordinary key input.
 
-## Terminal Size
+## Size and resize
 
-### Getting Size
+`TermUI.Terminal.get_terminal_size/0` returns `{:ok, {rows, cols}}` for a local
+terminal. Runtime resize events use `%TermUI.Event.Resize{width: cols,
+height: rows}`.
 
-Query current dimensions:
+OTP 26 TTY operation can query size, but its signal API does not expose
+`SIGWINCH` to application handlers. Automatic local resize therefore requires a
+newer OTP. Raw already requires OTP 28. An SSH host must forward channel window
+changes to the session runtime.
 
-```elixir
-{:ok, {rows, cols}} = TermUI.Terminal.get_terminal_size()
-```
+## Capabilities and character sets
 
-### Handling Resize
+`TermUI.Runtime.capabilities/0` exposes detected TTY color, Unicode, dimension,
+and terminal information. `TermUI.App.supports?/1` provides convenience color
+and Unicode queries. Capability values describe detection, not a guarantee
+that the runtime enabled every reporting feature.
 
-Respond to window size changes:
+Runtime context selects Unicode/ASCII from detected capabilities; the
+application `character_set` setting is only the fallback when no
+runtime-managed value exists in 1.0. Use `TermUI.CharacterSet` helpers when
+drawing UI glyphs. Common widgets degrade to ASCII, but Braille visuals and a
+few specialized/legacy code paths have limitations documented in the
+[widget compatibility guide](../../docs/widget-compatibility.md). Color options
+range from monochrome through 16/256 colors and true color.
 
-```elixir
-def event_to_msg(%Event.Resize{width: w, height: h}, _state) do
-  {:msg, {:resize, w, h}}
-end
+## SSH
 
-def update({:resize, width, height}, state) do
-  {%{state | width: width, height: height}, []}
-end
+`TermUI.Backend.SSH` is an explicit custom backend for an OTP SSH channel
+device, not an automatic TTY fallback. Each connection gets independent runtime
+and buffer state. The channel host sends `{:ssh_input, event}` and
+`{:ssh_resize, rows, cols}` to that runtime.
 
-def view(state) do
-  if state.width < 80 do
-    render_compact_layout(state)
-  else
-    render_full_layout(state)
-  end
-end
-```
+## Platform support
 
-Automatic local resize events depend on OTP exposing `SIGWINCH` to the
-application. OTP 26 TTY applications can still query the current dimensions,
-but need a newer OTP for automatic resize notification. Raw mode requires OTP
-28 or later.
+- Linux and macOS Unix terminals are the supported local targets.
+- WSL uses Unix paths with mouse disabled; verify the specific deployment
+  terminal.
+- Native Windows support is experimental. TermUI does not configure Win32
+  console modes or implement native Raw input and resize handling.
 
-## Cursor Control
+## Cleanup
 
-The runtime manages cursor visibility and position. The cursor is hidden during normal operation to avoid flicker.
+Runtime cleanup stops input first, shuts down the backend/buffers, restores the
+terminal and cursor, restores local logger output, and uses defensive local
+TTY/stty cleanup. Custom backends perform their own device cleanup. A root Elm
+`terminate/2` callback is not invoked by the runtime.
 
-For text input widgets that need a visible cursor:
-
-```elixir
-# The cursor position is managed by the renderer
-# Your TextInput widget indicates where the cursor should be
-TextInput.render(
-  value: state.text,
-  cursor_position: state.cursor_pos,
-  focused: true  # Shows cursor
-)
-```
-
-## Color Support
-
-### Detection
-
-TermUI detects terminal color capabilities:
-- 16 colors (basic)
-- 256 colors (extended)
-- True color (24-bit RGB)
-
-### Graceful Degradation
-
-Use named colors for maximum compatibility:
-
-```elixir
-# Works everywhere
-Style.new(fg: :red)
-
-# Requires 256-color support
-Style.new(fg: 196)
-
-# Requires true color support
-Style.new(fg: {255, 100, 50})
-```
-
-The renderer automatically degrades colors for less capable terminals.
-
-## Clipboard
-
-### Paste Events
-
-Bracketed paste mode delivers pasted text as a single event:
-
-```elixir
-def event_to_msg(%Event.Paste{content: text}, _state) do
-  {:msg, {:paste, text}}
-end
-
-def update({:paste, text}, state) do
-  # Insert pasted text at cursor
-  new_text = state.text <> text
-  {%{state | text: new_text}, []}
-end
-```
-
-Without bracketed paste, pasted text would arrive as individual key events, which is slower and may trigger unintended shortcuts.
-
-## Terminal Requirements
-
-### Minimum Requirements
-
-- ANSI escape sequence support
-- UTF-8 encoding
-- 80x24 minimum size
-
-### Recommended
-
-- 256-color or true color support
-- Mouse tracking support
-- Focus event support
-- Unicode box drawing characters
-
-### Terminal compatibility
-
-The local backends are supported on Linux and macOS. Individual features still
-depend on the terminal emulator:
-
-| Terminal | Platform | Notes |
-|----------|----------|-------|
-| Alacritty | Linux/macOS | Full feature set expected |
-| Kitty | Linux/macOS | Full support |
-| iTerm2 | macOS | Full support |
-| WezTerm | Linux/macOS | Full feature set expected |
-| GNOME Terminal | Linux | Full support |
-| Terminal.app | macOS | Limited mouse |
-| xterm | Unix | Full support |
-| Windows Terminal with WSL | Windows/WSL | Unix backend; mouse tracking disabled; verify input, resize, paste, and cleanup |
-| Windows Terminal native | Windows | Experimental; native raw console mode and resize handling are not implemented |
-
-Native Windows may render ANSI output when virtual-terminal processing is
-already enabled, but TermUI 1.0 does not configure the required Win32 console
-modes. Keyboard, mouse, paste, resize, and terminal cleanup are therefore not
-claimed as supported for native Windows.
-
-### SSH Sessions
-
-TermUI works over SSH when the remote terminal supports required features. The runtime detects terminal capabilities through multiple methods to ensure SSH compatibility.
-
-## Error Handling
-
-### Terminal Not Available
-
-Handle cases where no terminal is present:
-
-```elixir
-case TermUI.Runtime.start_link(root: MyApp) do
-  {:ok, pid} ->
-    # Running normally
-    pid
-
-  {:error, :not_a_terminal} ->
-    IO.puts("Error: Must run in a terminal")
-    System.halt(1)
-end
-```
-
-### Cleanup on Crash
-
-The runtime traps exits and restores terminal state even if your app crashes:
-
-```elixir
-# In Runtime.init/1
-Process.flag(:trap_exit, true)
-
-# In Runtime.terminate/2
-Terminal.restore()  # Always runs
-```
-
-This ensures users don't get stuck in raw mode with no echo.
-
-## Direct Terminal Access
-
-For advanced use cases, access terminal functions directly:
-
-```elixir
-alias TermUI.Terminal
-
-# These are managed by Runtime, but available if needed:
-Terminal.enable_raw_mode()
-Terminal.disable_raw_mode()
-Terminal.enter_alternate_screen()
-Terminal.leave_alternate_screen()
-Terminal.show_cursor()
-Terminal.hide_cursor()
-Terminal.clear_screen()
-Terminal.set_cursor_position(row, col)
-```
-
-**Warning:** Direct terminal access can interfere with the runtime. Use only when necessary.
-
-## Next Steps
-
-- [Events](04-events.md) - Handle terminal input
-- [Commands](09-commands.md) - Async operations
-- [Styling](05-styling.md) - Colors and attributes
+Next: [Commands](09-commands.md).

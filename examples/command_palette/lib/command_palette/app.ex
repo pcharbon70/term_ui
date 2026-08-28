@@ -9,7 +9,7 @@ defmodule CommandPalette.App do
   - `/` opens the command dropdown
   - Type to filter commands
   - Up/Down to navigate
-  - Enter to execute selected command
+  - Enter to select, then Enter again to handle the selected command
   - Escape to close
   - Q (when dropdown closed) to quit
   """
@@ -38,16 +38,16 @@ defmodule CommandPalette.App do
 
   defp available_commands do
     [
-      %{id: :help, label: "/help", action: fn -> :ok end},
-      %{id: :clear, label: "/clear", action: fn -> :ok end},
-      %{id: :save, label: "/save", action: fn -> :ok end},
-      %{id: :open, label: "/open", action: fn -> :ok end},
-      %{id: :new, label: "/new", action: fn -> :ok end},
-      %{id: :quit, label: "/quit", action: fn -> :ok end},
-      %{id: :settings, label: "/settings", action: fn -> :ok end},
-      %{id: :theme, label: "/theme", action: fn -> :ok end},
-      %{id: :format, label: "/format", action: fn -> :ok end},
-      %{id: :search, label: "/search", action: fn -> :ok end}
+      %{id: :help, label: "/help"},
+      %{id: :clear, label: "/clear"},
+      %{id: :save, label: "/save"},
+      %{id: :open, label: "/open"},
+      %{id: :new, label: "/new"},
+      %{id: :quit, label: "/quit"},
+      %{id: :settings, label: "/settings"},
+      %{id: :theme, label: "/theme"},
+      %{id: :format, label: "/format"},
+      %{id: :search, label: "/search"}
     ]
   end
 
@@ -86,8 +86,7 @@ defmodule CommandPalette.App do
 
     message =
       if cmd do
-        if is_function(cmd.action, 0), do: cmd.action.()
-        "Executed: #{cmd.label}"
+        "Handled by root: #{cmd.label}"
       else
         "Unknown command: #{query}"
       end
@@ -100,7 +99,7 @@ defmodule CommandPalette.App do
   end
 
   def update(:quit, state) do
-    {state, [:quit]}
+    {state, [TermUI.Command.quit()]}
   end
 
   def view(state) do
@@ -129,7 +128,7 @@ defmodule CommandPalette.App do
       ])
     else
       if query != "" do
-        text(query <> "  (press Enter to execute)", Style.new(fg: :yellow))
+        text(query <> "  (press Enter to handle)", Style.new(fg: :yellow))
       else
         text("", nil)
       end
@@ -142,7 +141,7 @@ defmodule CommandPalette.App do
       text("  /         Open command dropdown", nil),
       text("  Type      Filter commands", nil),
       text("  Up/Down   Navigate", nil),
-      text("  Enter     Execute command", nil),
+      text("  Enter     Select / handle command", nil),
       text("  Escape    Close dropdown", nil),
       text("  Q         Quit", nil)
     ])

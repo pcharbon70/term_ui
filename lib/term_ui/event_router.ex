@@ -2,6 +2,10 @@ defmodule TermUI.EventRouter do
   @moduledoc """
   Central event routing for TermUI components.
 
+  This is a standalone service for the process-oriented component subsystem.
+  `TermUI.Runtime` does not start or call it; the integrated Elm runtime routes
+  every event to its own `:root` entry.
+
   The EventRouter manages event distribution to components based on:
   - Focus state for keyboard events
   - Spatial index for mouse events
@@ -26,7 +30,9 @@ defmodule TermUI.EventRouter do
   1. Event received by router
   2. Router determines target based on event type
   3. Event delivered to target component
-  4. If unhandled, event bubbles to parent (if propagation enabled)
+  4. An unrouted event is passed to the optional fallback handler
+
+  The router does not bubble unhandled events through registry parents.
   """
 
   use GenServer

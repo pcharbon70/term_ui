@@ -458,9 +458,10 @@ defmodule TermUI.Input.TTYTest do
                String.contains?(moduledoc, "IEx compatible")
     end
 
-    test "moduledoc mentions snake_test" do
+    test "moduledoc documents cooked-mode buffering" do
       {:docs_v1, _, :elixir, _, %{"en" => moduledoc}, _, _} = Code.fetch_docs(TTY)
-      assert String.contains?(moduledoc, "snake_test")
+      assert String.contains?(moduledoc, "cooked mode")
+      assert String.contains?(moduledoc, "buffer input until Enter")
     end
   end
 

@@ -5,6 +5,10 @@ defmodule TermUI.Event.Propagation do
   Handles bubbling and capturing phases of event propagation.
   Events bubble up from target to root until handled.
 
+  This utility operates on mounted `ComponentServer` processes registered in
+  the standalone `ComponentRegistry`. `TermUI.Runtime` does not call it; the
+  1.0 Elm runtime sends events only to its root module.
+
   ## Propagation Phases
 
   1. **Capture** - Event travels from root to target (optional)

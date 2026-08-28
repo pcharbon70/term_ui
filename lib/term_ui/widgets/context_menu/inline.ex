@@ -45,9 +45,8 @@ defmodule TermUI.Widgets.ContextMenu.Inline do
 
   ## Callback Error Handling
 
-  Callbacks (`on_select`, `on_close`) are executed synchronously. If a callback
-  raises an exception, the widget process will crash and restart. Callbacks
-  should handle their own errors to avoid disrupting the UI.
+  Callbacks (`on_select`, `on_close`) are executed synchronously. Callback
+  exceptions are rescued and logged by the shared behaviour.
 
   See `TermUI.Widgets.ContextMenu` moduledoc for callback best practices.
   """

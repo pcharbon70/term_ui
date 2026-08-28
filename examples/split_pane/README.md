@@ -12,7 +12,7 @@ The SplitPane widget divides screen space between multiple panes with resizable 
 - Min/max size constraints per pane
 - Collapsible panes for maximizing workspace
 - Nested splits for complex layouts (like IDEs)
-- Layout state persistence
+- Manual layout save/restore through `get_layout/1` and `set_layout/2`
 
 **When to Use:**
 - Multi-panel applications (editors, file browsers, terminals)
@@ -32,7 +32,8 @@ The `SplitPane.new/1` function accepts these options:
 - `:resizable` - Whether dividers can be dragged (default: true)
 - `:on_resize` - Callback function when panes are resized: `fn panes -> ... end`
 - `:on_collapse` - Callback when pane is collapsed/expanded: `fn {id, collapsed} -> ... end`
-- `:persist_key` - Key for layout persistence (optional)
+- `:persist_key` - Reserved application metadata (optional); no automatic
+  persistence is performed in 1.0
 
 **Pane Specification** using `SplitPane.pane(id, content, opts)`:
 
@@ -91,7 +92,6 @@ SplitPane.App.run()
 ```
 
 **Note:** TTY mode works inside IEx but has limitations:
-- No alternate screen buffer (output mixes with IEx prompt)
 - Input is read through the shell; some terminals buffer keys until Enter is pressed
 - For full TUI, use raw mode instead
 

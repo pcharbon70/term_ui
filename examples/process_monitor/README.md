@@ -8,9 +8,9 @@ The ProcessMonitor widget provides real-time monitoring of BEAM processes with d
 
 ### Key Features
 
-- Live process list with automatic updates
+- Live process list refreshed by the example root's interval command
 - Process information (PID, name, reductions, memory, queue length, status)
-- Configurable update interval
+- Refresh interval metadata for host scheduling
 - Sorting by any field (PID, name, reductions, memory, queue, status)
 - Filtering by name or module (regex support)
 - Process details panel with multiple views
@@ -35,7 +35,8 @@ Use ProcessMonitor when you need to:
 
 The ProcessMonitor widget accepts the following options in its `new/1` function:
 
-- `:update_interval` - Refresh interval in milliseconds (default: 1000)
+- `:update_interval` - Refresh interval metadata in milliseconds (default:
+  1000); the example root schedules `Command.interval/2`
 - `:show_system_processes` - Include system processes (default: false)
 - `:thresholds` - Warning thresholds map (default: see below)
 - `:on_select` - Callback when process is selected `fn process -> ... end`
@@ -115,7 +116,6 @@ ProcessMonitorExample.App.run()
 ```
 
 **Note:** TTY mode works inside IEx but has limitations:
-- No alternate screen buffer (output mixes with IEx prompt)
 - Input is read through the shell; some terminals buffer keys until Enter is pressed
 - For full TUI, use raw mode instead
 

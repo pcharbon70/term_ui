@@ -5,6 +5,9 @@ defmodule TermUI.Widget.Label do
   Label is the simplest widget - it renders text with optional styling,
   alignment, wrapping, and truncation.
 
+  This module uses the earlier `TermUI.Widget` namespace and accepts a props map
+  directly. Call `render/2` from the root view; the runtime does not mount it.
+
   ## Usage
 
       Label.render(%{text: "Hello, World!"}, area)

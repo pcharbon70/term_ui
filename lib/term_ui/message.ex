@@ -51,8 +51,9 @@ defmodule TermUI.Message do
 
   ## Message Routing
 
-  Messages route to the component that should handle them. The runtime
-  delivers messages and components update their state in response.
+  The 1.0 runtime delivers messages to its single root Elm module. Its internal
+  component-ID APIs reserve `:root`; there is no public registration API for
+  additional runtime components.
   """
 
   @type t :: atom() | tuple() | struct()

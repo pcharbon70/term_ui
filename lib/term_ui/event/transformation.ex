@@ -7,6 +7,9 @@ defmodule TermUI.Event.Transformation do
   - Event metadata enrichment
   - Event filtering
 
+  These are opt-in value transformations. The single-root `TermUI.Runtime`
+  does not transform coordinates for embedded widgets automatically.
+
   ## Usage
 
       # Transform mouse coordinates to component-local

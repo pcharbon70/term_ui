@@ -6,6 +6,10 @@ defmodule TermUI.Widget.Progress do
   - Bar mode: Shows a filled bar proportional to progress value
   - Spinner mode: Shows an animated indicator for indeterminate progress
 
+  This module uses the earlier `TermUI.Widget` namespace, accepts a props map
+  directly, and must be embedded as an explicit state machine in the Elm root.
+  A host must call `handle_event(:tick, state)` to advance its spinner.
+
   ## Usage
 
       # Bar mode

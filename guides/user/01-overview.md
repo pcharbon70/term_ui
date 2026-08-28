@@ -1,6 +1,8 @@
 # TermUI Overview
 
-TermUI is a direct-mode Terminal UI framework for Elixir/BEAM applications. It enables building rich, interactive terminal interfaces that leverage the BEAM's unique strengths: fault tolerance, the actor model, hot code reloading, and distribution.
+TermUI is a direct-mode Terminal UI framework for Elixir/BEAM applications. It
+combines an Elm-style root with the BEAM process model and supervision
+primitives to build rich, interactive terminal interfaces.
 
 ## What is TermUI?
 
@@ -10,8 +12,8 @@ TermUI provides everything you need to build terminal-based user interfaces:
 - **Rich Widget Library** - Pre-built components like gauges, tables, sparklines, and more
 - **Declarative Styling** - Fluent API for colors, attributes, and themes
 - **Flexible Layout** - Constraint-based layout system with automatic sizing
-- **Full Input Support** - Keyboard, mouse, paste, and focus events
-- **High Performance** - Differential rendering at 60 FPS with minimal terminal updates
+- **Normalized Input** - Keyboard, mouse, paste, focus, resize, and custom event structs when emitted by the active terminal/host
+- **Efficient Rendering** - A dirty 60 FPS loop with differential Raw/custom output and full-frame TTY output
 
 ## Architecture Overview
 
@@ -19,7 +21,7 @@ TermUI provides everything you need to build terminal-based user interfaces:
 ┌─────────────────────────────────────────────────────────┐
 │                    Your Application                      │
 │  ┌─────────────────────────────────────────────────┐    │
-│  │              Elm Components                      │    │
+│  │              Single Elm Root                     │    │
 │  │   init → event_to_msg → update → view           │    │
 │  └─────────────────────────────────────────────────┘    │
 ├─────────────────────────────────────────────────────────┤
@@ -30,7 +32,7 @@ TermUI provides everything you need to build terminal-based user interfaces:
 ├─────────────────────────────────────────────────────────┤
 │                    Terminal Layer                        │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐              │
-│  │ Raw Mode │  │  Mouse   │  │  Screen  │              │
+│  │ Raw/TTY  │  │ SSH Host │  │  Screen  │              │
 │  └──────────┘  └──────────┘  └──────────┘              │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -48,6 +50,8 @@ TermUI uses The Elm Architecture, a pattern for building interactive programs:
 ```elixir
 defmodule Counter do
   use TermUI.Elm
+
+  alias TermUI.Event
 
   def init(_opts), do: %{count: 0}
 
@@ -68,13 +72,19 @@ end
 
 Terminal input (keys, mouse, resize) arrives as **events**. Your component converts events to **messages** via `event_to_msg/2`. Messages drive state changes through `update/2`.
 
+The 1.0 runtime owns one root Elm state. Stateful widgets are embedded in that
+state and receive events only when the root forwards them; they are not
+automatically mounted as child processes.
+
 ### Commands
 
-Side effects (timers, file I/O, etc.) are represented as **commands** returned from `update/2`. The runtime executes them asynchronously and delivers results back as messages.
+Implemented side effects (timers, delayed messages, file reads, and quit) are
+represented as **commands** returned from `update/2`. The runtime executes them
+asynchronously and delivers results back as messages.
 
 ### Rendering
 
-The `view/1` function returns a **render tree** - a declarative description of what should appear on screen. TermUI diffs this against the previous frame and sends only the changes to the terminal.
+The `view/1` function returns a **render tree** - a declarative description of what should appear on screen. Raw and custom backends diff it against the previous frame; TTY uses a complete displayable frame.
 
 ## Key Features
 
@@ -117,7 +127,7 @@ stack(:horizontal, [
 TermUI supports two backend modes with automatic selection:
 
 - **Raw Mode** - Full TUI experience with alternate screen, character-by-character input, and mouse support
-- **TTY Mode** - IEx-compatible mode for development and debugging
+- **TTY Mode** - Cooked, IEx-compatible mode; the runtime still uses the alternate screen, while input may be buffered until Enter
 
 See [Getting Started: Backends](02-getting-started.md#understanding-backends-raw-vs-tty) for details on when each mode is used.
 

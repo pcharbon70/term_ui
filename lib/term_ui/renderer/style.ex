@@ -26,7 +26,25 @@ defmodule TermUI.Renderer.Style do
 
   alias TermUI.Renderer.Cell
 
-  @type color :: Cell.color()
+  @type color ::
+          :black
+          | :red
+          | :green
+          | :yellow
+          | :blue
+          | :magenta
+          | :cyan
+          | :white
+          | :bright_black
+          | :bright_red
+          | :bright_green
+          | :bright_yellow
+          | :bright_blue
+          | :bright_magenta
+          | :bright_cyan
+          | :bright_white
+          | 0..255
+          | {0..255, 0..255, 0..255}
   @type attribute :: Cell.attribute()
 
   @type t :: %__MODULE__{

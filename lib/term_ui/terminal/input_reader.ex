@@ -2,8 +2,10 @@ defmodule TermUI.Terminal.InputReader do
   @moduledoc """
   GenServer that reads keyboard input from stdin and sends events to a target process.
 
-  Uses a port to read from stdin in a non-blocking way. Parses escape sequences
-  and emits Event.Key structs to the configured target process.
+  Spawns a linked blocking IO reader so its GenServer remains responsive,
+  parses escape sequences, and emits normalized event structs to the configured
+  target process. The `port` field retains its historical name but stores the
+  reader PID in 1.0.
 
   ## Usage
 

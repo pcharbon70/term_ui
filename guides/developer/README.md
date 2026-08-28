@@ -1,69 +1,45 @@
 # Developer Guides
 
-Technical documentation for TermUI internals and architecture.
+These guides describe the code shipped in TermUI 1.0. The most important
+boundary is that the main application path is a single-root Elm runtime.
+TermUI also ships lower-level process-oriented component services, but the
+runtime does not automatically start, register, render, or route through them.
 
-## Guides
+## Reading order
 
-| Guide | Description |
-|-------|-------------|
-| [01-architecture-overview.md](01-architecture-overview.md) | System layers, process hierarchy, data flow |
-| [02-runtime-internals.md](02-runtime-internals.md) | GenServer event loop, state management, lifecycle |
-| [03-rendering-pipeline.md](03-rendering-pipeline.md) | View → Buffer → Diff → Output stages |
-| [04-event-system.md](04-event-system.md) | Input parsing, escape sequences, dispatch |
-| [05-buffer-management.md](05-buffer-management.md) | ETS double buffering, cell storage |
-| [06-terminal-layer.md](06-terminal-layer.md) | Raw mode, ANSI sequences, platform handling |
-| [07-elm-implementation.md](07-elm-implementation.md) | The Elm Architecture adapted for OTP |
-| [08-creating-widgets.md](08-creating-widgets.md) | How to create and contribute new widgets |
-| [09-testing-framework.md](09-testing-framework.md) | Component and widget testing framework |
+1. [Architecture Overview](01-architecture-overview.md)
+2. [Runtime Internals](02-runtime-internals.md)
+3. [Rendering Pipeline](03-rendering-pipeline.md)
+4. [Event System](04-event-system.md)
+5. [Buffer Management](05-buffer-management.md)
+6. [Terminal Layer](06-terminal-layer.md)
+7. [Elm Implementation](07-elm-implementation.md)
+8. [Creating Widgets](08-creating-widgets.md)
+9. [Testing Framework](09-testing-framework.md)
 
-## Reading Order
+## Integrated application path
 
-For new contributors:
-
-1. **Architecture Overview** - Understand the layers
-2. **Elm Implementation** - Learn the component model
-3. **Runtime Internals** - See how components are orchestrated
-4. **Event System** - Follow input from terminal to component
-5. **Rendering Pipeline** - Follow output from component to terminal
-6. **Buffer Management** - Understand the ETS buffer system
-7. **Terminal Layer** - Low-level terminal details
-
-## Key Concepts
-
-### Three-Layer Architecture
-
-```
-┌─────────────────────────────────────┐
-│          Widget Layer               │  ← Components (Elm Architecture)
-├─────────────────────────────────────┤
-│         Renderer Layer              │  ← Buffers, Diff, Output
-├─────────────────────────────────────┤
-│          Port Layer                 │  ← Terminal I/O
-└─────────────────────────────────────┘
+```mermaid
+flowchart LR
+  I[Raw/TTY/SSH input] --> Q[EventQueue]
+  Q --> E[root event_to_msg/2]
+  E --> M[MessageQueue]
+  M --> U[root update/2]
+  U --> C[Command.Executor]
+  U --> V[root view/1]
+  C --> M
+  V --> N[Runtime.NodeRenderer]
+  N --> B[Backend]
 ```
 
-### Data Flow
+`TermUI.Runtime` owns the root state and render loop. Stateful widgets are
+embedded state machines: the root initializes their state, forwards events,
+and renders them. Stateless widgets are called directly from `view/1`.
 
-```
-Event → event_to_msg → Message → update → State → view → Render Tree → Buffer → Diff → Terminal
-```
+## Optional component services
 
-### Key Files
-
-| File | Purpose |
-|------|---------|
-| `lib/term_ui/runtime.ex` | Central GenServer orchestrating everything |
-| `lib/term_ui/renderer/buffer.ex` | ETS-backed screen buffer |
-| `lib/term_ui/renderer/diff.ex` | Differential rendering algorithm |
-| `lib/term_ui/renderer/sequence_buffer.ex` | ANSI sequence batching |
-| `lib/term_ui/terminal.ex` | Raw mode and terminal control |
-| `lib/term_ui/terminal/input_reader.ex` | Stdin reading and event parsing |
-| `lib/term_ui/terminal/escape_parser.ex` | Escape sequence parsing |
-
-## Diagrams
-
-All guides include Mermaid diagrams. To view them:
-
-- GitHub renders Mermaid automatically
-- VS Code with Markdown Preview Mermaid extension
-- [Mermaid Live Editor](https://mermaid.live/)
+`TermUI.ComponentServer`, `TermUI.ComponentSupervisor`,
+`TermUI.ComponentRegistry`, `TermUI.EventRouter`, `TermUI.FocusManager`,
+`TermUI.SpatialIndex`, and `TermUI.Component.StatePersistence` form a separate
+toolkit for process-oriented component lifecycles. They are public, but they do
+not constitute the default runtime's component tree in 1.0.

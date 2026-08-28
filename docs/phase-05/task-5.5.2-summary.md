@@ -1,5 +1,10 @@
 # Task 5.5.2 Summary: CharacterSet Integration for ASCII Fallback
 
+> **Historical implementation record.** Widget counts, test counts, API names,
+> and completion claims below describe the Phase 5 snapshot, not the current
+> architecture or support contract. Use `README.md`, `guides/`, current module
+> documentation, and `docs/widget-compatibility.md` for release behavior.
+
 ## Task Overview
 
 Integrate the existing CharacterSet module into all TermUI widgets to enable graceful ASCII fallback for terminals that don't support Unicode characters.

@@ -2,6 +2,11 @@ defmodule TermUI.FocusManager do
   @moduledoc """
   Central focus management for TermUI components.
 
+  This service coordinates `TermUI.EventRouter`, `TermUI.ComponentRegistry`,
+  and `TermUI.SpatialIndex` when an application starts the lower-level
+  process-oriented subsystem. It is not used by `TermUI.Runtime`, whose 1.0
+  focus target remains `:root`.
+
   The FocusManager tracks which component receives keyboard input,
   provides focus traversal (Tab/Shift+Tab), and manages focus
   trapping for modal contexts.

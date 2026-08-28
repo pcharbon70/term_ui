@@ -6,7 +6,8 @@
 
 A direct-mode Terminal UI framework for Elixir/BEAM, inspired by [BubbleTea](https://github.com/charmbracelet/bubbletea) (Go) and [Ratatui](https://github.com/ratatui-org/ratatui) (Rust).
 
-TermUI leverages BEAM's unique strengths—fault tolerance, actor model, hot code reloading—to build robust terminal applications using The Elm Architecture.
+TermUI combines The Elm Architecture with the BEAM process model and
+supervision primitives to build robust terminal applications.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/pcharbon70/term_ui/main/assets/dashboard_blue.jpg" width="45%" alt="Blue Theme">
@@ -18,10 +19,10 @@ TermUI leverages BEAM's unique strengths—fault tolerance, actor model, hot cod
 
 - **Elm Architecture** - Predictable state management with `init/update/view`
 - **Rich Widget Library** - Gauges, tables, menus, charts, dialogs, and more
-- **Efficient Rendering** - Double-buffered differential updates at 60 FPS
+- **Efficient Rendering** - A dirty render loop capped at roughly 60 FPS, with differential updates in Raw/custom backends and full-frame TTY redraws
 - **Themable** - True color RGB support (16 million colors)
 - **Terminal Backends** - Raw and TTY operation on Unix terminals, plus remote SSH sessions
-- **OTP Integration** - Supervision trees, fault tolerance, hot code reload
+- **OTP Integration** - A supervised runtime plus optional lower-level component lifecycle services
 - **IEx Compatible** - Run TUI applications directly in IEx for interactive development
 
 ## Platform support
@@ -113,17 +114,17 @@ export TERM_UI_IEX_MODE=true
 | **Tabs** | Tabbed interface for switchable panels |
 | **AlertDialog** | Modal dialog for confirmations with standard button configurations |
 | **ContextMenu** | Right-click context menu with keyboard and mouse support |
-| **Toast** | Auto-dismissing notifications with stacking |
+| **Toast** | Tick-driven notifications with stacking and dismissal |
 | **Viewport** | Scrollable view with keyboard and mouse support |
 | **SplitPane** | Resizable multi-pane layouts for IDE-style interfaces |
 | **TreeView** | Hierarchical data display with expand/collapse |
 | **FormBuilder** | Structured forms with validation and multiple field types |
-| **CommandPalette** | VS Code-style command discovery with fuzzy search |
+| **CommandPalette** | Searchable command discovery with substring filtering |
 | **BarChart** | Horizontal/vertical bar charts for categorical data |
 | **LineChart** | Line charts using Braille characters for sub-character resolution |
 | **Canvas** | Direct drawing surface for custom visualizations |
 | **LogViewer** | High-performance log viewer with virtual scrolling and filtering |
-| **StreamWidget** | GenStage-integrated widget with backpressure support |
+| **StreamWidget** | Bounded stream widget with a GenStage consumer adapter |
 | **ProcessMonitor** | Live BEAM process inspection with sorting and filtering |
 | **SupervisionTreeViewer** | OTP supervision hierarchy visualization |
 | **ClusterDashboard** | Distributed Erlang cluster monitoring |
@@ -158,7 +159,7 @@ defmodule Counter do
 
   def update(:increment, state), do: {%{state | count: state.count + 1}, []}
   def update(:decrement, state), do: {%{state | count: state.count - 1}, []}
-  def update(:quit, state), do: {state, [:quit]}
+  def update(:quit, state), do: {state, [TermUI.Command.quit()]}
 
   def view(state) do
     stack(:vertical, [
@@ -222,19 +223,22 @@ The `examples/` directory contains standalone applications demonstrating each wi
 | [dialog](https://github.com/pcharbon70/term_ui/tree/main/examples/dialog) | Modal dialogs with buttons |
 | [form_builder](https://github.com/pcharbon70/term_ui/tree/main/examples/form_builder) | Structured forms with validation |
 | [gauge](https://github.com/pcharbon70/term_ui/tree/main/examples/gauge) | Progress bars and percentage indicators |
+| [iex_counter](https://github.com/pcharbon70/term_ui/tree/main/examples/iex_counter) | Minimal counter designed for IEx/TTY mode |
 | [line_chart](https://github.com/pcharbon70/term_ui/tree/main/examples/line_chart) | Braille-based line charts |
 | [log_viewer](https://github.com/pcharbon70/term_ui/tree/main/examples/log_viewer) | Real-time log display with filtering |
+| [markdown_viewer](https://github.com/pcharbon70/term_ui/tree/main/examples/markdown_viewer) | Scrollable Markdown rendering |
 | [menu](https://github.com/pcharbon70/term_ui/tree/main/examples/menu) | Nested menus with keyboard navigation |
+| [multi_renderer](https://github.com/pcharbon70/term_ui/tree/main/examples/multi_renderer) | Backend selection and capability degradation |
 | [pick_list](https://github.com/pcharbon70/term_ui/tree/main/examples/pick_list) | Modal selection with type-ahead |
 | [process_monitor](https://github.com/pcharbon70/term_ui/tree/main/examples/process_monitor) | Live BEAM process inspection |
 | [sparkline](https://github.com/pcharbon70/term_ui/tree/main/examples/sparkline) | Inline data visualization |
 | [split_pane](https://github.com/pcharbon70/term_ui/tree/main/examples/split_pane) | Resizable multi-pane layouts |
-| [stream_widget](https://github.com/pcharbon70/term_ui/tree/main/examples/stream_widget) | Backpressure-aware data streaming |
+| [stream_widget](https://github.com/pcharbon70/term_ui/tree/main/examples/stream_widget) | GenStage consumer integration with a bounded display buffer |
 | [supervision_tree_viewer](https://github.com/pcharbon70/term_ui/tree/main/examples/supervision_tree_viewer) | OTP supervision hierarchy |
 | [table](https://github.com/pcharbon70/term_ui/tree/main/examples/table) | Scrollable data tables with selection |
 | [tabs](https://github.com/pcharbon70/term_ui/tree/main/examples/tabs) | Tab-based navigation |
 | [text_input](https://github.com/pcharbon70/term_ui/tree/main/examples/text_input) | Single and multi-line text input |
-| [toast](https://github.com/pcharbon70/term_ui/tree/main/examples/toast) | Auto-dismissing notifications |
+| [toast](https://github.com/pcharbon70/term_ui/tree/main/examples/toast) | Tick-driven notification dismissal |
 | [tree_view](https://github.com/pcharbon70/term_ui/tree/main/examples/tree_view) | Hierarchical data with expand/collapse |
 | [viewport](https://github.com/pcharbon70/term_ui/tree/main/examples/viewport) | Scrollable content areas |
 
@@ -248,8 +252,10 @@ mix termui.run
 ## Requirements
 
 - Elixir 1.15+
-- OTP 28+ (required for native raw terminal mode)
-- Terminal with Unicode support
+- OTP 26+ for TTY mode; OTP 28+ for native Raw mode
+- An ANSI-capable terminal; common widgets support ASCII fallback, while
+  Braille charts and a few legacy/specialized renderers require Unicode (see
+  the [compatibility guide](docs/widget-compatibility.md))
 
 ## License
 

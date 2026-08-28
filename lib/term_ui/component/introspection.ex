@@ -5,6 +5,10 @@ defmodule TermUI.Component.Introspection do
   Provides visibility into the component tree structure, component states,
   and supervision metrics for debugging and monitoring purposes.
 
+  These functions inspect the standalone `ComponentRegistry`/
+  `ComponentServer` subsystem. They do not inspect the single Elm root owned by
+  `TermUI.Runtime`, and the required services must already be running.
+
   ## Usage
 
       # Get tree structure

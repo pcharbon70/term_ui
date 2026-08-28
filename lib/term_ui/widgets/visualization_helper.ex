@@ -397,11 +397,12 @@ defmodule TermUI.Widgets.VisualizationHelper do
   @doc """
   Validates line chart series data structure.
 
-  Each series must be a map with :data (list of numbers) and optional :color keys.
+  Each series must be a map with `:data` containing a list of numbers. Extra
+  keys are allowed but are not interpreted by this validator or `LineChart`.
 
   ## Examples
 
-      iex> series = [%{data: [1, 2, 3]}, %{data: [4, 5, 6], color: :red}]
+      iex> series = [%{data: [1, 2, 3]}, %{data: [4, 5, 6]}]
       iex> VisualizationHelper.validate_series_data(series)
       :ok
 

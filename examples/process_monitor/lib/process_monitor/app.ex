@@ -50,11 +50,13 @@ defmodule ProcessMonitorExample.App do
 
     {:ok, monitor_state} = ProcessMonitor.init(props)
 
-    %{
+    state = %{
       monitor_state: monitor_state,
       message: "ProcessMonitor Example - Press w to spawn test workers",
       worker_pids: []
     }
+
+    {state, [TermUI.Command.interval(1000, :tick)]}
   end
 
   @doc """
@@ -146,7 +148,12 @@ defmodule ProcessMonitorExample.App do
       if Process.alive?(pid), do: Process.exit(pid, :shutdown)
     end)
 
-    {model, [:quit]}
+    {model, [TermUI.Command.quit()]}
+  end
+
+  def update(:tick, model) do
+    {:ok, monitor_state} = ProcessMonitor.refresh(model.monitor_state)
+    {%{model | monitor_state: monitor_state}, []}
   end
 
   def update(:refresh_monitor, model) do

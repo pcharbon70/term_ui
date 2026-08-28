@@ -4,6 +4,10 @@ defmodule TermUI.Parser do
 
   Transforms raw terminal input bytes into structured events (key presses,
   mouse actions, paste content, focus changes).
+
+  This is a standalone compatibility parser that returns structs under
+  `TermUI.Parser.Events`. `TermUI.Runtime` does not call it; runtime Raw and TTY
+  input use `TermUI.Terminal.EscapeParser` and return `TermUI.Event` structs.
   """
 
   import Bitwise

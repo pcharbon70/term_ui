@@ -22,7 +22,7 @@ defmodule TermUI.Widgets.SplitPane do
   - Min/max size constraints per pane
   - Collapsible panes
   - Nested splits for complex layouts
-  - Layout state persistence
+  - Manual layout snapshots through `get_layout/1` and `set_layout/2`
 
   ## Keyboard Controls
 
@@ -129,7 +129,8 @@ defmodule TermUI.Widgets.SplitPane do
   - `:resizable` - Whether dividers can be dragged (default: true)
   - `:on_resize` - Callback when panes are resized: `fn panes -> ... end`
   - `:on_collapse` - Callback when pane is collapsed/expanded: `fn {id, collapsed} -> ... end`
-  - `:persist_key` - Key for layout persistence (optional)
+  - `:persist_key` - Reserved application metadata (optional); the widget does
+    not persist automatically in 1.0
   - `:ctrl_resize_step` - Step size for Ctrl+arrow resize as ratio 0.0-1.0 (default: 0.05 = 5%)
   - `:min_ratio` - Minimum ratio for first pane when using Ctrl+arrows (default: 0.1 = 10%)
   - `:max_ratio` - Maximum ratio for first pane when using Ctrl+arrows (default: 0.9 = 90%)

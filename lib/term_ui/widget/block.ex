@@ -6,6 +6,11 @@ defmodule TermUI.Widget.Block do
   optional title, and manages the layout of children within
   its bordered area.
 
+  This module uses the earlier `TermUI.Widget` namespace and accepts a props map
+  directly. It is not mounted by `TermUI.Runtime`; call its state/render
+  callbacks explicitly. Its `TermUI.Container` child callbacks require a
+  custom host and are not interpreted by the Elm runtime.
+
   ## Usage
 
       Block.render(%{

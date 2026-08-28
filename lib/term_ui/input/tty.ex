@@ -24,9 +24,6 @@ defmodule TermUI.Input.TTY do
   server instead of trying to replace it with a Raw shell. This allows a TermUI
   application to receive input and return cleanly to the IEx prompt.
 
-  This approach was verified in the `snake_test` project where TUI applications
-  run correctly inside IEx using this method.
-
   ## How Arrow Keys and Special Keys Work
 
   `IO.getn/2` requests one character, but it does not disable the operating
@@ -34,10 +31,10 @@ defmodule TermUI.Input.TTY do
   and terminal driver. Some environments deliver each key immediately; others
   buffer input until Enter. Once delivered:
 
-  - **Arrow keys**: Work normally (↑↓←→)
-  - **Tab**: Works for field/button navigation
-  - **Enter**: Detected immediately for selection
-  - **Function keys**: F1-F12 work normally
+  - **Arrow keys**: Are normalized after delivery (↑↓←→)
+  - **Tab**: Can drive field/button navigation after delivery
+  - **Enter**: Is normalized when delivered
+  - **Function keys**: Are parsed when their escape bytes are delivered
   - **Ctrl combinations**: Retain the active shell's cooked-mode behavior; some
     combinations may be handled by the terminal rather than emitted as events
 
@@ -59,11 +56,12 @@ defmodule TermUI.Input.TTY do
 
   **Important**: The timeout parameter is accepted for API compatibility but
   is **not honored** in TTY mode. `:io.get_chars/2` is blocking and will wait
-  indefinitely for input. Design your application to handle this:
+  indefinitely for input. Direct callers must account for this:
 
-  - Don't rely on `:timeout` results for animations
-  - Consider using a separate process for time-based updates
-  - For timeout support, use the Raw backend instead
+  - Do not rely on `:timeout` results
+  - Poll in a dedicated process if other work must continue
+  - `TermUI.Runtime` already uses that dedicated-reader pattern, so Elm command
+    timers and rendering can continue in TTY mode
 
   ## Comparison with Raw Input Handler
 
@@ -74,7 +72,7 @@ defmodule TermUI.Input.TTY do
   | Non-blocking poll | No | Yes |
   | Escape sequences | Yes | Yes |
   | Arrow/Tab/Enter | Yes (delivery may be buffered) | Yes |
-  | Mouse events | Yes | Yes |
+  | Mouse parsing | Parser supports supplied sequences; runtime does not enable reporting | Runtime enables reporting except on WSL/ConPTY |
 
   ## When to Use TTY Mode
 
@@ -82,11 +80,12 @@ defmodule TermUI.Input.TTY do
   - You want to run TUI applications inside IEx
   - You don't need timeout-based polling
   - You want simpler deployment (no raw mode setup)
-  - Your application can block waiting for input
+  - A direct caller can isolate blocking input in its own process
   - You're building simple interactive scripts
 
-  For applications requiring animations, periodic updates, or non-blocking
-  input checks, use the Raw backend with `Input.Raw` instead.
+  Use Raw when immediate input or polling timeouts are required. Animations and
+  periodic messages can still run under `TermUI.Runtime` in TTY mode because
+  the blocking read is isolated from the runtime process.
 
   ## Escape Sequence Handling
 

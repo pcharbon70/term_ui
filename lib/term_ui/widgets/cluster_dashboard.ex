@@ -36,6 +36,14 @@ defmodule TermUI.Widgets.ClusterDashboard do
   - e: Show events view
   - i: Inspect selected node (RPC details)
   - Escape: Close details
+
+  ## Refresh and node-event integration
+
+  `init/1` captures an initial snapshot. The Elm runtime does not invoke this
+  widget's `mount/1` or `handle_info/2`. An embedded root should schedule a
+  `Command.interval/2`, call `ClusterDashboard.refresh/1` from `update/2`, and
+  explicitly forward node events if it enables `:net_kernel` monitoring. A
+  custom host can instead own the widget lifecycle and message routing.
   """
 
   use TermUI.StatefulComponent
@@ -113,7 +121,8 @@ defmodule TermUI.Widgets.ClusterDashboard do
 
   ## Options
 
-  - `:update_interval` - Refresh interval in ms (default: 2000)
+  - `:update_interval` - Refresh interval metadata in ms (default: 2000);
+    embedded roots must schedule refresh messages
   - `:show_health_metrics` - Fetch and show CPU/memory/load (default: true)
   - `:show_pg_groups` - Show :pg process groups (default: true)
   - `:show_global_names` - Show :global registered names (default: true)
@@ -587,6 +596,10 @@ defmodule TermUI.Widgets.ClusterDashboard do
 
   @doc """
   Set the update interval.
+
+  This cancels/schedules a `:refresh` message in the calling process. Use it
+  only when that host routes the message to `handle_info/2`; an embedded Elm
+  root should own a `Command.interval/2` instead.
   """
   @spec set_interval(map(), non_neg_integer()) :: {:ok, map()}
   def set_interval(state, interval) when interval > 0 do

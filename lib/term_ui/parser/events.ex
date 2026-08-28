@@ -1,6 +1,9 @@
 defmodule TermUI.Parser.Events do
   @moduledoc """
   Event struct definitions for parsed terminal input.
+
+  These structs belong to the standalone `TermUI.Parser` compatibility API.
+  They are not the `TermUI.Event` structs delivered by `TermUI.Runtime`.
   """
 
   defmodule KeyEvent do

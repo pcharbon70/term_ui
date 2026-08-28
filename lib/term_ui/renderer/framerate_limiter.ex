@@ -6,6 +6,10 @@ defmodule TermUI.Renderer.FramerateLimiter do
   and only renders when the buffer is dirty. Multiple buffer writes between frames
   coalesce into a single render, creating smooth animation while being efficient.
 
+  This is an opt-in limiter. `TermUI.Runtime` implements its own
+  `render_interval` timer and dirty-state check and does not start or call this
+  module.
+
   ## Features
 
     * **Frame timing** - Configurable FPS (30, 60, 120)

@@ -31,13 +31,12 @@ defmodule TermUI.Widgets.ContextMenu do
 
   ## Callback Error Handling
 
-  The `on_select` and `on_close` callbacks are executed synchronously within
-  the menu's event handling process. If a callback raises an exception, the
-  widget process will crash and be restarted by its supervisor.
+  The `on_select` and `on_close` callbacks are executed synchronously by the
+  caller. Callback exceptions are rescued and logged by the shared behaviour;
+  they do not crash the widget state machine.
 
   **Best Practices:**
   - Callbacks should not raise exceptions
-  - Use try/catch within callbacks for error handling
   - Return quickly to avoid blocking the UI
   - Dispatch long-running work to separate processes
 

@@ -5,6 +5,9 @@ defmodule TermUI.Widget.Button do
   Button responds to Enter/Space keys when focused and mouse clicks.
   It displays visual feedback for different states.
 
+  This module uses the earlier `TermUI.Widget` namespace, accepts a props map
+  directly, and must be embedded as an explicit state machine in the Elm root.
+
   ## Usage
 
       Button.render(%{

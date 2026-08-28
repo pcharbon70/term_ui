@@ -16,7 +16,7 @@ defmodule TermUI.Widgets.ProcessMonitor do
   ## Features
 
   - Live process list with PID, name, reductions, memory
-  - Configurable update interval
+  - Refresh interval metadata for host scheduling
   - Message queue depth display with warnings
   - Process links/monitors visualization
   - Stack trace display
@@ -38,6 +38,14 @@ defmodule TermUI.Widgets.ProcessMonitor do
   - l: Show links/monitors
   - t: Show stack trace
   - Escape: Clear filter/close details
+
+  ## Refresh integration
+
+  `init/1` captures the first process snapshot. The Elm runtime does not invoke
+  this widget's `mount/1` or `handle_info/2` callbacks. When embedding it in a
+  root, return `Command.interval(update_interval, :refresh_monitor)` from root
+  `init/1`, then call `ProcessMonitor.refresh/1` in `update/2`. A custom host may
+  instead invoke the widget lifecycle and route `:refresh` messages itself.
   """
 
   use TermUI.StatefulComponent
@@ -142,7 +150,8 @@ defmodule TermUI.Widgets.ProcessMonitor do
 
   ## Options
 
-  - `:update_interval` - Refresh interval in ms (default: 1000)
+  - `:update_interval` - Refresh interval metadata in ms (default: 1000);
+    embedded roots must schedule refresh messages
   - `:show_system_processes` - Include system processes (default: false)
   - `:thresholds` - Warning thresholds map
   - `:on_select` - Callback when process is selected
@@ -650,6 +659,10 @@ defmodule TermUI.Widgets.ProcessMonitor do
 
   @doc """
   Set the update interval.
+
+  This cancels/schedules a `:refresh` message in the calling process. Use it
+  only when that host routes the message to `handle_info/2`; an embedded Elm
+  root should own a `Command.interval/2` instead.
   """
   @spec set_interval(map(), non_neg_integer()) :: {:ok, map()}
   def set_interval(state, interval) when interval > 0 do

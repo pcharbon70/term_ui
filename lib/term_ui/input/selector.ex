@@ -6,6 +6,12 @@ defmodule TermUI.Input.Selector do
   providing a way to choose the correct input handler for the current
   terminal mode.
 
+  The runtime calls `select/1` after it has selected a backend. `select/0` is a
+  standalone convenience that calls `Backend.Selector.select/0`; on a capable
+  system that call may activate OTP's Raw shell, so do not use it as a
+  read-only query. Use `TermUI.Runtime.backend_mode/0` to query published local
+  runtime context.
+
   ## Relationship with Backend.Selector
 
   The `TermUI.Backend.Selector` determines which terminal backend to use

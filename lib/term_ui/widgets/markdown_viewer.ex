@@ -19,7 +19,7 @@ defmodule TermUI.Widgets.MarkdownViewer do
 
   ## Props
 
-  - `:content` - Markdown content to display (required)
+  - `:content` - Markdown content to display (default: `""`)
   - `:width` - Display width (default: 80)
   - `:height` - Display height (default: 24)
   - `:on_copy` - Callback called when code block is copied (optional)
@@ -114,7 +114,7 @@ defmodule TermUI.Widgets.MarkdownViewer do
     copy_focused_code_block(state)
   end
 
-  def handle_event(%Event.Key{char: ?c}, state) do
+  def handle_event(%Event.Key{char: "c"}, state) do
     copy_focused_code_block(state)
   end
 

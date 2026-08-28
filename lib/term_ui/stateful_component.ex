@@ -6,6 +6,12 @@ defmodule TermUI.StatefulComponent do
   and event handling. Use this for components that need to maintain internal
   state and respond to user input.
 
+  In a normal `TermUI.Runtime` application, a stateful widget is an explicit
+  state machine embedded in the root Elm state: call `init/1`, keep the returned
+  state, forward relevant events to `handle_event/2`, and call `render/2` from
+  the root view. `TermUI.ComponentServer` can host this behaviour in its own
+  process, but that subsystem is not automatically connected to the Elm runtime.
+
   ## Basic Usage
 
       defmodule MyApp.Counter do
@@ -17,11 +23,11 @@ defmodule TermUI.StatefulComponent do
         end
 
         @impl true
-        def handle_event(%KeyEvent{key: :up}, state) do
+        def handle_event(%TermUI.Event.Key{key: :up}, state) do
           {:ok, %{state | count: state.count + 1}}
         end
 
-        def handle_event(%KeyEvent{key: :down}, state) do
+        def handle_event(%TermUI.Event.Key{key: :down}, state) do
           {:ok, %{state | count: state.count - 1}}
         end
 
@@ -43,17 +49,30 @@ defmodule TermUI.StatefulComponent do
 
   ## Commands
 
-  Event handlers can return commands for side effects:
+  When hosted by `TermUI.ComponentServer`, event handlers can return its legacy
+  command tuples for side effects:
 
-      def handle_event(%KeyEvent{key: :enter}, state) do
+      def handle_event(%TermUI.Event.Key{key: :enter}, state) do
         {:ok, state, [{:send, parent_pid, {:submitted, state.value}}]}
       end
+
+  `ComponentServer` recognizes `{:send, pid, message}` and
+  `{:timer, milliseconds, message}`. It does not delegate arbitrary process
+  messages to the component's `handle_info/2` callback in 1.0, so a timer
+  command needs a different/custom host and should not be used with
+  `ComponentServer` alone.
 
   ## Optional Callbacks
 
   - `terminate/2` - Cleanup when component stops
-  - `handle_info/2` - Handle non-event messages
-  - `handle_call/3` - Handle synchronous calls
+  - `handle_info/2` - Handle non-event messages when the chosen integration
+    invokes it
+  - `handle_call/3` - Handle synchronous calls when the chosen integration
+    invokes it
+
+  The 1.0 `ComponentServer` does not delegate arbitrary GenServer calls or
+  messages to these optional callbacks. An embedded root or custom host can
+  invoke them explicitly.
   """
 
   alias TermUI.Component.RenderNode
@@ -70,7 +89,7 @@ defmodule TermUI.StatefulComponent do
   @type rect :: %{x: integer(), y: integer(), width: integer(), height: integer()}
 
   @typedoc "Render tree output"
-  @type render_tree :: RenderNode.t() | [render_tree()] | String.t()
+  @type render_tree :: RenderNode.t() | [render_tree()] | String.t() | tuple() | map()
 
   @typedoc "Event types from user input"
   @type event :: term()
@@ -79,7 +98,6 @@ defmodule TermUI.StatefulComponent do
   @type command ::
           {:send, pid(), term()}
           | {:timer, non_neg_integer(), term()}
-          | {:focus, term()}
           | term()
 
   @typedoc "Event handler return value"
@@ -125,7 +143,8 @@ defmodule TermUI.StatefulComponent do
 
   ## Parameters
 
-  - `event` - The input event (KeyEvent, MouseEvent, FocusEvent)
+  - `event` - A normalized event such as `TermUI.Event.Key`,
+    `TermUI.Event.Mouse`, or `TermUI.Event.Focus`
   - `state` - Current component state
 
   ## Returns
@@ -137,11 +156,11 @@ defmodule TermUI.StatefulComponent do
   ## Examples
 
       @impl true
-      def handle_event(%KeyEvent{key: :enter}, state) do
+      def handle_event(%TermUI.Event.Key{key: :enter}, state) do
         {:ok, state, [{:send, state.parent, {:submit, state.value}}]}
       end
 
-      def handle_event(%KeyEvent{char: char}, state) when char != nil do
+      def handle_event(%TermUI.Event.Key{char: char}, state) when char != nil do
         {:ok, %{state | text: state.text <> char}}
       end
 
@@ -164,7 +183,8 @@ defmodule TermUI.StatefulComponent do
 
   ## Returns
 
-  A render tree (RenderNode, list, or string).
+  A render tree accepted by `TermUI.Runtime.NodeRenderer` (RenderNode, list,
+  string, tuple node, or supported map node).
 
   ## Examples
 
@@ -241,8 +261,9 @@ defmodule TermUI.StatefulComponent do
   @doc """
   Handles non-event messages.
 
-  Called for messages that aren't input events, like timer callbacks
-  or messages from other processes.
+  Available to integrations that explicitly invoke it for messages that are
+  not input events. The 1.0 `ComponentServer` does not delegate its GenServer
+  mailbox to this callback.
 
   ## Parameters
 
@@ -258,7 +279,9 @@ defmodule TermUI.StatefulComponent do
   @doc """
   Handles synchronous calls.
 
-  For request-response patterns where the caller needs a reply.
+  Available to integrations that explicitly invoke it for request-response
+  patterns. The 1.0 `ComponentServer` does not delegate `GenServer.call/3` to
+  this callback.
 
   ## Parameters
 
