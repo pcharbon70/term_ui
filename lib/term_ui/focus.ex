@@ -6,6 +6,10 @@ defmodule TermUI.Focus do
   terminal window gains or loses system focus. This enables optimization
   opportunities like pausing animations when backgrounded.
 
+  `TermUI.Runtime` parses focus events but does not enable terminal focus
+  reporting automatically. A custom host must write the enable sequence and
+  pair it with `disable/0` during cleanup.
+
   ## Usage
 
       # Enable focus reporting
@@ -118,6 +122,10 @@ defmodule TermUI.Focus.Tracker do
   Maintains focus state and executes registered actions when
   focus changes. Supports optimization hooks for reducing work
   when the application is backgrounded.
+
+  This is a standalone service. It is not started by the TermUI application or
+  wired to `TermUI.Runtime`; a custom host must start it and forward focus
+  events explicitly.
 
   ## Usage
 

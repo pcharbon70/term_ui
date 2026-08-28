@@ -9,12 +9,17 @@ defmodule TermUI.Widgets.LineChart do
 
       LineChart.render(
         series: [
-          %{data: [1, 3, 5, 2, 8], color: :blue},
-          %{data: [2, 4, 3, 6, 4], color: :red}
+          %{data: [1, 3, 5, 2, 8]},
+          %{data: [2, 4, 3, 6, 4]}
         ],
         width: 40,
-        height: 10
+        height: 10,
+        style: TermUI.Renderer.Style.new(fg: :cyan)
       )
+
+  The current renderer overlays every series into one Braille canvas and applies
+  one optional `:style` to the completed chart. Per-series colors are not
+  supported.
 
   ## Braille Patterns
 
@@ -60,14 +65,14 @@ defmodule TermUI.Widgets.LineChart do
 
   ## Options
 
-  - `:series` - List of series with data and optional color
+  - `:series` - List of `%{data: [number()]}` series maps
   - `:data` - Single series data (alternative to :series)
   - `:width` - Chart width in characters (default: 40, max: #{VizHelper.max_width()})
   - `:height` - Chart height in characters (default: 10, max: #{VizHelper.max_height()})
   - `:min` - Minimum Y value (default: auto)
   - `:max` - Maximum Y value (default: auto)
   - `:show_axis` - Show axis lines (default: false)
-  - `:style` - Style for the chart
+  - `:style` - Style applied to the complete chart
   """
   @spec render(keyword()) :: TermUI.Component.RenderNode.t()
   def render(opts) do

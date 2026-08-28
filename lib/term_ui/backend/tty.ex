@@ -3,7 +3,7 @@ defmodule TermUI.Backend.TTY do
   TTY terminal backend for constrained environments.
 
   The TTY backend provides terminal rendering when raw mode is unavailable. This
-  includes Nerves devices, SSH sessions, remote IEx consoles, and other scenarios
+  includes Nerves devices, shell-based SSH sessions, remote IEx consoles, and other scenarios
   where `:shell.start_interactive({:noshell, :raw})` returns `{:error, :already_started}`.
 
   ## When This Backend is Selected
@@ -15,8 +15,10 @@ defmodule TermUI.Backend.TTY do
 
   ## Key Difference from Raw Backend
 
-  **This backend is still fully interactive.** Even without raw mode, we can:
-  - Read individual characters and escape sequences using `IO.getn/2`
+  **This backend remains event-capable, but delivery is terminal-dependent.**
+  Without raw mode, it can:
+  - Request characters and escape sequences using `IO.getn/2`; the shell or
+    terminal driver may still buffer them until Enter
   - Process arrow keys, Tab, function keys, and control sequences
   - Position the cursor and render styled text
 
@@ -69,7 +71,7 @@ defmodule TermUI.Backend.TTY do
   This backend is typically used via the runtime, not directly:
 
       # Automatic backend selection (recommended)
-      {:ok, runtime} = TermUI.Runtime.start_link()
+      {:ok, runtime} = TermUI.Runtime.start_link(root: MyApp.Root)
 
       # The runtime handles backend selection based on environment
 
@@ -1150,7 +1152,7 @@ defmodule TermUI.Backend.TTY do
   # This function provides minimal ESC removal as a safety net in case
   # unsanitized content somehow reaches the rendering layer.
   #
-  # For comprehensive sanitization, see TermUI.Renderer.Cell.sanitize/1.
+  # For comprehensive sanitization, see TermUI.Sanitize.sanitize/1.
   @spec sanitize_char(String.t()) :: String.t()
   defp sanitize_char(char) when is_binary(char) do
     String.replace(char, "\e", "")

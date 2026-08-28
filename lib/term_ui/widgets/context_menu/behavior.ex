@@ -174,9 +174,9 @@ defmodule TermUI.Widgets.ContextMenu.Behavior do
 
   ## Callback Execution
 
-  The `on_select` callback is executed synchronously. If the callback raises an
-  exception, the widget process will crash and restart. Callbacks should handle
-  their own errors to avoid disrupting the UI.
+  The `on_select` callback is executed synchronously. Callback exceptions are
+  rescued, logged, and returned internally as errors without crashing the
+  caller.
 
   ## Examples
 
@@ -233,7 +233,7 @@ defmodule TermUI.Widgets.ContextMenu.Behavior do
   ## Callback Execution
 
   The `on_close` callback is executed synchronously before setting visibility.
-  If the callback raises an exception, the widget process will crash and restart.
+  Callback exceptions are rescued and logged.
 
   ## Examples
 

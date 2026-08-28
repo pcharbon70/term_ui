@@ -2,9 +2,10 @@ defmodule TermUI.Backend.Config do
   @moduledoc """
   Configuration handling for terminal backends.
 
-  The Config module provides a clean interface for reading backend configuration
+  This legacy backend-specific helper provides an interface for reading backend configuration
   from the application environment. All configuration options have sensible
-  defaults, allowing TermUI to work out of the box without explicit configuration.
+  defaults. The primary `TermUI.Runtime` reads `TermUI.Config` instead; use that
+  module and runtime options for normal applications.
 
   ## Configuration Options
 
@@ -24,7 +25,10 @@ defmodule TermUI.Backend.Config do
   - `:auto` (default) - Automatically detect the best backend using the selector
   - `TermUI.Backend.Raw` - Force raw mode backend
   - `TermUI.Backend.TTY` - Force TTY mode backend
-  - `TermUI.Backend.Test` - Use test backend for testing
+
+  This legacy validator accepts only the three values above. The primary
+  `TermUI.Runtime` also accepts a custom backend module implementing
+  `TermUI.Backend`.
 
   ### Character Set
 
@@ -79,7 +83,7 @@ defmodule TermUI.Backend.Config do
   @app :term_ui
 
   # Valid configuration values
-  @valid_backends [:auto, TermUI.Backend.Raw, TermUI.Backend.TTY, TermUI.Backend.Test]
+  @valid_backends [:auto, TermUI.Backend.Raw, TermUI.Backend.TTY]
   @valid_character_sets [:unicode, :ascii]
   @valid_line_modes [:full_redraw, :incremental]
 
@@ -243,7 +247,7 @@ defmodule TermUI.Backend.Config do
 
       # With invalid config: [backend: :invalid]
       iex> Config.validate!()
-      ** (ArgumentError) invalid :backend value: :invalid, expected one of [:auto, TermUI.Backend.Raw, TermUI.Backend.TTY, TermUI.Backend.Test]
+      ** (ArgumentError) invalid :backend value: :invalid
   """
   @spec validate!() :: :ok
   def validate! do

@@ -1,4 +1,4 @@
-defmodule StreamWidget.App do
+defmodule StreamWidgetExample.App do
   @moduledoc """
   Example application demonstrating the StreamWidget.
 
@@ -76,7 +76,7 @@ defmodule StreamWidget.App do
     # Stop producer and consumer
     if state.producer_pid, do: GenStage.stop(state.producer_pid)
     if state.consumer_pid, do: GenStage.stop(state.consumer_pid)
-    {state, [:quit]}
+    {state, [TermUI.Command.quit()]}
   end
 
   def update(:toggle_stream, state) when state.producer_pid == nil do

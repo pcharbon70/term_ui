@@ -3,7 +3,10 @@ defmodule TermUI.Markdown do
   Markdown processor for rendering styled text in TermUI.
 
   Converts markdown content to styled segments that can be rendered
-  by TermUI components.
+  by TermUI components. MDEx parses CommonMark input; this renderer handles
+  headings, paragraphs, emphasis, code, lists, blockquotes, thematic breaks,
+  links, and image alt text. Unsupported nodes degrade to their text/children
+  where possible.
 
   ## Usage
 

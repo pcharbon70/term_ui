@@ -5,6 +5,10 @@ defmodule TermUI.Dev.HotReload do
   Watches .ex files for changes and reloads modules without restarting
   the application. State is preserved across reloads where possible.
 
+  This server is not started by TermUI or by `DevMode.start_link/1`. A custom
+  development integration must start `HotReload` before calling `start/0` or
+  enabling DevMode's hot-reload toggle.
+
   ## Usage
 
       # Start hot reload

@@ -8,6 +8,11 @@ defmodule TermUI.Dev.DevMode do
   - Hot Reload - Updates code without restart
   - Performance Monitor - Shows FPS, memory, frame times
 
+  DevMode is a standalone coordinator in 1.0. It is not supervised or fed
+  component/render metrics by `TermUI.Runtime`, and its keyboard shortcuts are
+  not registered automatically. A custom integration must start it, submit
+  component data and metrics, route shortcuts, and compose its overlays.
+
   ## Usage
 
       # Enable development mode

@@ -55,7 +55,7 @@ defmodule Dashboard.App do
 
   def update(:quit, state) do
     # Return :quit command to trigger runtime shutdown
-    {state, [:quit]}
+    {state, [TermUI.Command.quit()]}
   end
 
   def update(:refresh, state) do

@@ -3,9 +3,9 @@ defmodule TermUI.Widgets.TextInput.Line do
   Line-based text input widget using shell line editing.
 
   This widget provides a simple text input experience using `IO.gets/1` through
-  the `TermUI.Input.LineReader` module. Unlike the standard `TextInput` widget
-  which handles character-by-character input, this widget delegates to the shell
-  for line editing, providing familiar shell features.
+  the `TermUI.Input.LineReader` module. Unlike the standard event-driven
+  `TextInput` widget, this widget delegates to the shell for line editing,
+  providing familiar shell features.
 
   ## When to Use TextInput.Line
 
@@ -15,7 +15,7 @@ defmodule TermUI.Widgets.TextInput.Line do
   - **Simple input flow**: Just prompt → read → validate → done
 
   Use the standard `TextInput` widget when you need:
-  - Character-by-character input handling
+  - Event-driven key handling (delivery depends on the selected backend)
   - Custom key bindings or input transformations
   - Real-time validation as the user types
   - Multi-line text editing
@@ -36,13 +36,15 @@ defmodule TermUI.Widgets.TextInput.Line do
   ## TTY Mode Compatibility
 
   This widget is designed for TTY mode where shell line editing is available.
-  It also works in raw mode, but the shell editing features may be limited.
+  It should not be mixed with a running Raw runtime, which already owns local
+  terminal input.
 
   > #### Standard TextInput Works in TTY Mode {: .info}
   >
-  > The standard `TermUI.Widgets.TextInput` widget works perfectly in TTY mode
-  > for character-by-character input. Use `TextInput.Line` only when you
-  > specifically want shell line editing features.
+  > The standard `TermUI.Widgets.TextInput` consumes the same normalized key
+  > events in either backend. In cooked TTY mode those events may be buffered
+  > until Enter; Raw mode provides character-at-a-time delivery. Use
+  > `TextInput.Line` when you intentionally want a blocking shell line read.
 
   ## Usage
 
@@ -90,7 +92,7 @@ defmodule TermUI.Widgets.TextInput.Line do
 
   | Feature | TextInput.Line | TextInput |
   |---------|----------------|-----------|
-  | Input style | Line-based (Enter to submit) | Character-by-character |
+  | Input style | Line-based (Enter to submit) | Event-driven; backend-dependent delivery |
   | Line editing | Shell-provided | Widget-handled |
   | Real-time validation | No | Yes |
   | Multi-line | No | Yes (optional) |

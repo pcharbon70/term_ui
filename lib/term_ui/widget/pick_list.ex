@@ -6,6 +6,9 @@ defmodule TermUI.Widget.PickList do
   keyboard navigation, and type-ahead filtering. Used for provider
   and model selection dialogs.
 
+  This module uses the earlier `TermUI.Widget` namespace, accepts a props map
+  directly, and must be embedded as an explicit state machine in the Elm root.
+
   ## Usage
 
       PickList.render(%{

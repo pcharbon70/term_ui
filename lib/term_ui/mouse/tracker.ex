@@ -7,6 +7,10 @@ defmodule TermUI.Mouse.Tracker do
   - Hover detection (enter/leave events)
   - Last known mouse position
 
+  This is an opt-in state machine. The integrated runtime parses mouse input
+  but does not instantiate `Mouse.Tracker`; applications that need synthesized
+  drag/hover tuples must keep and update the tracker themselves.
+
   ## Usage
 
       # Create new tracker

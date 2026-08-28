@@ -6,6 +6,9 @@ defmodule TermUI.ViewCache do
   When a component's state hasn't changed, we return the cached render tree
   instead of re-calling the view function.
 
+  This is an opt-in utility. `TermUI.Runtime` does not use it automatically;
+  the runtime's dirty flag controls whether a frame is rendered.
+
   ## Usage
 
       cache = ViewCache.new()
@@ -26,7 +29,9 @@ defmodule TermUI.ViewCache do
   ## Performance Considerations
 
   State hashing uses `:erlang.phash2/1` which is fast but may have collisions.
-  For most UI state this is acceptable—the worst case is a redundant render.
+  A collision can return a cached tree for different state, so this opt-in cache
+  trades strict correctness for speed. Use a collision-resistant key or direct
+  state equality in a custom cache when stale output is unacceptable.
   """
 
   # Dialyzer: Functions return specific struct types

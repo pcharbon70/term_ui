@@ -126,13 +126,13 @@ defmodule TextInput.App do
   Update state based on messages.
   """
   def update(:quit, state) do
-    {state, [:quit]}
+    {state, [TermUI.Command.quit()]}
   end
 
   def update(:check_quit_single, state) do
     # Only quit if single input is empty, otherwise treat as character
     if TI.get_value(state.single_input) == "" do
-      {state, [:quit]}
+      {state, [TermUI.Command.quit()]}
     else
       # Pass Q as a character to the input
       {:ok, new_input} = TI.handle_event(%Event.Key{key: "q", char: "q"}, state.single_input)

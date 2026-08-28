@@ -21,6 +21,8 @@ Welcome to the TermUI documentation. These guides cover everything you need to b
 defmodule MyApp do
   use TermUI.Elm
 
+  alias TermUI.Event
+
   def init(_opts), do: %{count: 0}
 
   def event_to_msg(%Event.Key{key: :up}, _), do: {:msg, :inc}
@@ -30,7 +32,7 @@ defmodule MyApp do
 
   def update(:inc, s), do: {%{s | count: s.count + 1}, []}
   def update(:dec, s), do: {%{s | count: s.count - 1}, []}
-  def update(:quit, s), do: {s, [:quit]}
+  def update(:quit, s), do: {s, [TermUI.Command.quit()]}
 
   def view(state), do: text("Count: #{state.count}")
 end

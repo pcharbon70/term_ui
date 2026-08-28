@@ -4,11 +4,11 @@ defmodule TermUI.Runtime.State do
 
   Contains all runtime state including:
   - Root component module and state
-  - Component registry
+  - The reserved `:root` component entry (there is no public 1.0 registration API)
   - Message queue
   - Event queue (bounded, prevents DoS)
   - Render configuration
-  - Focus tracking
+  - Root focus bookkeeping
   - Shutdown status
   - Backend selection and capabilities
   - Input handler (Raw or TTY mode)
@@ -19,7 +19,7 @@ defmodule TermUI.Runtime.State do
   alias TermUI.EventQueue
   alias TermUI.MessageQueue
 
-  @type backend_mode :: :raw | :tty | nil
+  @type backend_mode :: :raw | :tty | :custom | :skip | nil
 
   @type capabilities :: %{
           optional(:colors) => :true_color | :color_256 | :color_16 | :monochrome,

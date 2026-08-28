@@ -6,6 +6,10 @@ defmodule TermUI.Input.Raw do
   applications running with the Raw backend. It reads single characters
   from stdin and parses escape sequences into `TermUI.Event` structs.
 
+  `TermUI.Runtime` selects this handler for Raw mode only when
+  `use_input_handler: true`. The default Raw path uses the asynchronous
+  `TermUI.Terminal.InputReader` instead.
+
   ## Features
 
   - **Non-blocking input**: Supports timeout-based polling (including 0ms for

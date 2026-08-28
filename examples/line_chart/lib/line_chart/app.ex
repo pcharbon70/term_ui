@@ -91,7 +91,7 @@ defmodule LineChart.App do
   end
 
   def update(:quit, state) do
-    {state, [:quit]}
+    {state, [TermUI.Command.quit()]}
   end
 
   @doc """
@@ -120,16 +120,17 @@ defmodule LineChart.App do
       text("Multi Series (CPU + Memory):", nil),
       LineChart.render(
         series: [
-          %{data: state.cpu_data, color: Style.new(fg: :cyan)},
-          %{data: state.memory_data, color: Style.new(fg: :magenta)}
+          %{data: state.cpu_data},
+          %{data: state.memory_data}
         ],
         width: 40,
         height: 8,
         min: 0,
         max: 100,
-        show_axis: state.show_axis
+        show_axis: state.show_axis,
+        style: Style.new(fg: :cyan)
       ),
-      text("  Cyan = CPU, Magenta = Memory", nil),
+      text("  CPU and memory are overlaid", nil),
       text("", nil),
 
       # Braille pattern demo

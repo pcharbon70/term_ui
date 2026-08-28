@@ -8,6 +8,12 @@ defmodule TermUI.Capabilities do
   - Conservative VT100 fallbacks
 
   Results are cached in ETS for fast concurrent access.
+
+  This is a standalone capability detector used by opt-in helpers. The
+  integrated Raw/TTY runtime publishes the map returned by
+  `TermUI.Backend.Selector` through `TermUI.PersistentTerms`; use
+  `TermUI.Runtime.capabilities/0` or `TermUI.App.supports?/1` when asking about
+  that active local runtime context.
   """
 
   @type color_mode :: :true_color | :color_256 | :color_16 | :monochrome

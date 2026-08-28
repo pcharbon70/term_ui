@@ -84,7 +84,7 @@ defmodule ContextMenu.App do
   end
 
   def update(:quit, state) do
-    {state, [:quit]}
+    {state, [TermUI.Command.quit()]}
   end
 
   # Helper to create and initialize a context menu

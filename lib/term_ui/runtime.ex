@@ -4,12 +4,17 @@ defmodule TermUI.Runtime do
 
   The runtime implements The Elm Architecture dispatch loop:
   1. Receive event from terminal
-  2. Route to appropriate component
-  3. Call component's event_to_msg
-  4. Call component's update with message
+  2. Deliver it to the single root Elm module
+  3. Call the root's event_to_msg
+  4. Call the root's update with the resulting message
   5. Collect commands from update
   6. Mark component dirty
   7. On render timer, call view and render
+
+  The `components` field in runtime state currently contains only the reserved
+  `:root` entry. `TermUI.ComponentServer`, `TermUI.EventRouter`, and the other
+  process-oriented component services are separate lower-level APIs; they are
+  not mounted or consulted by this runtime loop.
 
   ## Usage
 
@@ -93,8 +98,11 @@ defmodule TermUI.Runtime do
   - `:root` - The root component module (required)
   - `:name` - GenServer name (optional)
   - `:render_interval` - Milliseconds between renders (default: 16)
-  - `:backend` - Backend selection: `:auto` (default), `:raw`, `:tty`
+  - `:backend` - `:auto` (default), `:raw`, `:tty`, a backend module, or
+    `{backend_module, backend_opts}`
   - `:skip_terminal` - Skip terminal initialization (default: false, for testing)
+  - `:use_input_handler` - Use the `TermUI.Input` handler path instead of the
+    legacy local input reader (default: false)
 
   ## Backend Selection
 
@@ -143,8 +151,10 @@ defmodule TermUI.Runtime do
   - `:root` - The root component module (required)
   - `:name` - GenServer name (optional)
   - `:render_interval` - Milliseconds between renders (default: 16)
-  - `:backend` - Backend selection: `:auto`, `:raw`, `:tty`
+  - `:backend` - `:auto`, `:raw`, `:tty`, a backend module, or
+    `{backend_module, backend_opts}`
   - `:skip_terminal` - Skip terminal initialization (default: false)
+  - `:use_input_handler` - Use the `TermUI.Input` handler path (default: false)
 
   ## Examples
 
@@ -176,7 +186,10 @@ defmodule TermUI.Runtime do
   end
 
   @doc """
-  Sends a message directly to a component.
+  Sends a message to a runtime component ID.
+
+  In the 1.0 runtime, only `:root` is registered. Messages sent to any other ID
+  are ignored.
   """
   @spec send_message(GenServer.server(), term(), term()) :: :ok
   def send_message(runtime, component_id, message) do
@@ -229,8 +242,9 @@ defmodule TermUI.Runtime do
   @doc """
   Gets the current backend mode.
 
-  Returns `:raw` if raw mode is active, `:tty` if TTY mode is active,
-  or `nil` if no runtime has been started.
+  Returns the node-global local backend context: `:raw`, `:tty`, `:skip`, or
+  `nil`. Explicit custom/SSH runtimes do not publish a mode here; query their
+  host/session state instead.
 
   ## Examples
 
@@ -249,7 +263,9 @@ defmodule TermUI.Runtime do
   - `:dimensions` - `{rows, cols}` tuple or `nil`
   - `:terminal` - Boolean indicating terminal presence
 
-  Returns `nil` if no runtime has been started.
+  Returns the node-global local Raw/TTY capability map, or `nil` when no local
+  context is published. Explicit custom/SSH runtimes keep capabilities in
+  their session/backend state and do not publish them here.
 
   ## Examples
 
@@ -259,7 +275,7 @@ defmodule TermUI.Runtime do
   def capabilities, do: PersistentTerms.capabilities()
 
   @doc """
-  Forces an immediate render (bypassing framerate limiter).
+  Marks the runtime dirty and performs an immediate render.
   """
   @spec force_render(GenServer.server()) :: :ok
   def force_render(runtime) do
@@ -1065,8 +1081,7 @@ defmodule TermUI.Runtime do
   end
 
   defp dispatch_event(%Event.Mouse{} = event, state) do
-    # Mouse events go to component at position
-    # For now, just send to root (spatial index will be added later)
+    # The integrated 1.0 runtime has one root and does not use SpatialIndex.
     dispatch_to_component(:root, event, state)
   end
 
@@ -1111,7 +1126,7 @@ defmodule TermUI.Runtime do
               state
 
             :propagate ->
-              # Would propagate to parent, for now just ignore
+              # The single-root runtime has no parent target.
               state
           end
         rescue

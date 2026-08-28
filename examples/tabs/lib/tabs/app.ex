@@ -2,8 +2,8 @@ defmodule Tabs.App do
   @moduledoc """
   Tabs Widget Example
 
-  This example demonstrates how to use the TermUI.Widgets.Tabs widget
-  for organizing content into switchable panels.
+  This example implements tab interaction directly in an Elm root. It
+  demonstrates the behavior, but does not embed `TermUI.Widgets.Tabs`.
 
   Features demonstrated:
   - Tab bar with multiple tabs
@@ -149,7 +149,7 @@ defmodule Tabs.App do
   end
 
   def update(:quit, state) do
-    {state, [:quit]}
+    {state, [TermUI.Command.quit()]}
   end
 
   @doc """

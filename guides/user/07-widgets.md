@@ -48,12 +48,17 @@ Gauge.render(
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `value` | number | required | Current value (0-100) |
-| `width` | integer | 20 | Width in characters |
+| `value` | number | `0` | Current value |
+| `min` | number | `0` | Lower end of the range |
+| `max` | number | `100` | Upper end of the range |
+| `width` | integer | `40` | Width in characters (clamped to the visualization limit) |
+| `type` | atom | `:bar` | `:bar` or `:arc` |
 | `zones` | list | `[]` | Color zones `[{threshold, style}]` |
-| `show_value` | boolean | `false` | Display numeric value |
-| `show_range` | boolean | `false` | Display min/max |
-| `style` | Style | default | Base style |
+| `show_value` | boolean | `true` | Display numeric value |
+| `show_range` | boolean | `true` | Display min/max |
+| `label` | string | `nil` | Optional label |
+| `bar_char` | string | detected | Filled character from the active character set |
+| `empty_char` | string | detected | Empty character from the active character set |
 
 **Example Output:**
 ```
@@ -115,6 +120,16 @@ props = Widget.new(option: value)
 node = Widget.render(widget_state, %{width: 80, height: 24})
 ```
 
+### Earlier `TermUI.Widget` namespace
+
+`TermUI.Widget.Label`, `Button`, `List`, `Block`, `Progress`, `TextInput`, and
+`PickList` remain public compatibility widgets. They accept props maps directly
+rather than consistently providing `new/1`. The runtime does not mount them:
+initialize/forward/render stateful ones explicitly. Prefer the newer
+`TermUI.Widgets.TextInput` for current single-line or multiline input. `Block`
+declares `TermUI.Container` child callbacks, but only a custom component host
+interprets those callbacks.
+
 ### Table
 
 > **Example:** See [`examples/table/`](https://github.com/pcharbon70/term_ui/tree/main/examples/table/) for a complete demonstration.
@@ -124,13 +139,14 @@ Scrollable data table with selection and sorting.
 ```elixir
 alias TermUI.Widgets.Table
 alias TermUI.Widgets.Table.Column
+alias TermUI.Layout.Constraint
 
 # Create props
 props = Table.new(
   columns: [
     Column.new(:name, "Name"),
-    Column.new(:age, "Age", width: 10, align: :right),
-    Column.new(:city, "City", width: 15)
+    Column.new(:age, "Age", width: Constraint.length(10), align: :right),
+    Column.new(:city, "City", width: Constraint.length(15))
   ],
   data: [
     %{name: "Alice", age: 30, city: "NYC"},
@@ -327,7 +343,7 @@ Dialog.render(dialog_state, %{width: 80, height: 24})
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `title` | string | required | Dialog title |
-| `content` | node | `nil` | Dialog body content |
+| `content` | node | empty node | Dialog body content |
 | `buttons` | list | `[{id: :ok, label: "OK"}]` | Button definitions |
 | `width` | integer | 40 | Dialog width |
 | `closeable` | boolean | `true` | Escape closes dialog |
@@ -546,7 +562,7 @@ defmodule MyApp.SearchForm do
     {:msg, {:input_event, event}}
   end
 
-  def update(:quit, state), do: {state, [:quit]}
+  def update(:quit, state), do: {state, [TermUI.Command.quit()]}
 
   def update({:input_event, event}, state) do
     {:ok, new_input} = TextInput.handle_event(event, state.input)

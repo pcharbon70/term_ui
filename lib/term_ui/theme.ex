@@ -5,6 +5,11 @@ defmodule TermUI.Theme do
   Themes define colors, semantic meanings, and component style defaults.
   The theme system supports runtime switching and notifies subscribers of changes.
 
+  `TermUI.Runtime` does not start or subscribe to this server. Without a running
+  theme server, read helpers return the built-in dark theme. To switch themes,
+  supervise `TermUI.Theme`, subscribe from an application-owned process, and
+  cause the Elm root to update or force a render when a notification arrives.
+
   ## Theme Structure
 
   A theme contains:

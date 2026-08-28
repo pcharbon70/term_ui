@@ -2,9 +2,11 @@ defmodule TermUI.Event do
   @moduledoc """
   Event type definitions for TermUI.
 
-  Events represent user input from the terminal: keyboard presses,
-  mouse actions, and focus changes. Events are routed to components
-  by the EventRouter based on focus state and position.
+  Events represent user input from the terminal: keyboard presses, mouse
+  actions, focus changes, resize, paste, ticks, and custom input. The primary
+  `TermUI.Runtime` delivers events to its single root Elm module.
+  `TermUI.EventRouter` is an independent lower-level service for applications
+  that explicitly start and populate the process-oriented component subsystem.
 
   ## Event Types
 
@@ -12,6 +14,9 @@ defmodule TermUI.Event do
   - `Mouse` - Mouse actions (click, move, scroll)
   - `Focus` - Focus changes (gained, lost)
   - `Custom` - Application-defined events
+  - `Resize` - Terminal dimensions changed
+  - `Paste` - Bracketed-paste content
+  - `Tick` - Host-created timing metadata (commands normally deliver messages)
 
   ## Examples
 
@@ -27,6 +32,11 @@ defmodule TermUI.Event do
       # Focus event
       event = Event.focus(:gained)
       event = Event.focus(:lost)
+
+      # Resize, paste, and host-created tick events
+      event = Event.resize(120, 40)
+      event = Event.paste("pasted text")
+      event = Event.tick(16)
   """
 
   @typedoc "Union type for all event types"
@@ -49,7 +59,7 @@ defmodule TermUI.Event do
     """
 
     @type t :: %__MODULE__{
-            key: atom(),
+            key: atom() | String.t(),
             char: String.t() | nil,
             modifiers: [atom()],
             timestamp: integer()
@@ -241,9 +251,11 @@ defmodule TermUI.Event do
 
   defmodule Tick do
     @moduledoc """
-    Timer tick event.
+    Host-created timer tick event.
 
-    Represents a periodic timer event for animations and time-based updates.
+    Represents timing metadata for animations and time-based updates. The 1.0
+    runtime's `Command.timer/2` and `Command.interval/2` deliver their configured
+    messages; they do not construct `%Event.Tick{}` automatically.
     """
 
     @type t :: %__MODULE__{
@@ -283,7 +295,7 @@ defmodule TermUI.Event do
       Event.key(:a, char: "a")
       Event.key(:c, modifiers: [:ctrl])
   """
-  @spec key(atom(), keyword()) :: __MODULE__.Key.t()
+  @spec key(atom() | String.t(), keyword()) :: __MODULE__.Key.t()
   def key(key, opts \\ []) do
     Key.new(key, opts)
   end

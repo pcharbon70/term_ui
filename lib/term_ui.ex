@@ -2,7 +2,9 @@ defmodule TermUI do
   @moduledoc """
   TermUI - A direct-mode Terminal UI framework for Elixir/BEAM.
 
-  This module provides the main entry point for terminal operations.
+  `TermUI.Runtime` and `TermUI.App` are the normal application entry points.
+  This module exposes lower-level local terminal conveniences plus IEx-mode
+  detection; `init/0` always attempts native Raw mode.
   """
 
   alias TermUI.Terminal
@@ -36,7 +38,7 @@ defmodule TermUI do
 
   This is a convenience function that performs complete terminal restoration.
   """
-  @spec shutdown() :: :ok
+  @spec shutdown() :: :ok | {:error, term()}
   def shutdown do
     Terminal.restore()
   end

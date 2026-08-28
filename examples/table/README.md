@@ -96,7 +96,6 @@ Table.App.run()
 ```
 
 **Note:** TTY mode works inside IEx but has limitations:
-- No alternate screen buffer (output mixes with IEx prompt)
 - Input is read through the shell; some terminals buffer keys until Enter is pressed
 - For full TUI, use raw mode instead
 
@@ -221,7 +220,10 @@ This shows how to transform data values into formatted display text with visual 
 
 ## Note on Implementation
 
-This example demonstrates a simplified approach where the Table widget is rendered as a static display with manual state management in the app. For production use with stateful components, the Table widget can be integrated as a StatefulComponent with automatic state handling for selection, sorting, and scrolling.
+This example uses the Table column helpers but manually renders rows and owns
+selection/scroll state in its Elm root. To use the full stateful `Table`, keep
+its state inside root state, forward relevant events to `Table.handle_event/2`,
+and render it with `Table.render/2`; the runtime does not mount it automatically.
 
 ## Widget API
 

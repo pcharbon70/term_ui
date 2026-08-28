@@ -27,7 +27,6 @@ defmodule TermUI.Widgets.BarChart do
   - `:show_values` - Display value labels (default: true)
   - `:show_labels` - Display bar labels (default: true)
   - `:bar_char` - Character for bars (default: "█")
-  - `:empty_char` - Character for empty space (default: " ")
   - `:colors` - List of colors for series
   """
 

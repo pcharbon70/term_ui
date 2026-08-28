@@ -5,6 +5,12 @@ defmodule TermUI.Style do
   Styles define colors, text attributes, and visual properties for components.
   Styles are immutable—modifications return new styles.
 
+  This is an older standalone style vocabulary retained for compatibility. The
+  integrated 1.0 render tree, themes, and backends use
+  `TermUI.Renderer.Style`. The two structs are not interchangeable: this module
+  uses tagged `{:indexed, n}` and `{:rgb, r, g, b}` colors, while the renderer
+  style uses integer palette indexes and untagged `{r, g, b}` tuples.
+
   ## Color Types
 
   - Named colors: `:black`, `:red`, `:green`, `:yellow`, `:blue`, `:magenta`, `:cyan`, `:white`

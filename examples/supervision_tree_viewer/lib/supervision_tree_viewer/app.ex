@@ -51,10 +51,12 @@ defmodule SupervisionTreeViewerExample.App do
 
     {:ok, viewer_state} = SupervisionTreeViewer.init(props)
 
-    %{
+    state = %{
       viewer_state: viewer_state,
       message: "SupervisionTreeViewer Example - Press 'i' for process info"
     }
+
+    {state, [TermUI.Command.interval(2000, :tick)]}
   end
 
   @doc """
@@ -127,7 +129,12 @@ defmodule SupervisionTreeViewerExample.App do
   """
   @impl true
   def update(:quit, state) do
-    {state, [:quit]}
+    {state, [TermUI.Command.quit()]}
+  end
+
+  def update(:tick, state) do
+    {:ok, viewer_state} = SupervisionTreeViewer.refresh(state.viewer_state)
+    {%{state | viewer_state: viewer_state}, []}
   end
 
   def update(:refresh_tree, state) do

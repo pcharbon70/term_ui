@@ -5,6 +5,11 @@ defmodule TermUI.Widget.TextInput do
   TextInput allows users to type text, navigate with arrow keys,
   and delete with backspace/delete.
 
+  This is the earlier single-line widget retained under `TermUI.Widget`. It
+  accepts a props map directly and must be embedded explicitly. New code should
+  normally use `TermUI.Widgets.TextInput`, which provides the current
+  single-line/multiline API and a `new/1` constructor.
+
   ## Usage
 
       TextInput.render(%{

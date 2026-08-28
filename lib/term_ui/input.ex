@@ -54,7 +54,10 @@ defmodule TermUI.Input do
         end
 
         @impl true
-        def mode(_state), do: :custom
+        def mode(_state), do: :tty
+
+        @impl true
+        def stop(_state), do: :ok
       end
 
   ## Built-in Handlers
@@ -138,8 +141,10 @@ defmodule TermUI.Input do
   - **Raw mode**: Supports non-blocking reads; timeout is honored accurately
   - **TTY mode**: Uses blocking `IO.getn/2`; timeout may not be honored
 
-  Components should not rely on precise timeout behavior. Use `:timeout`
-  results for periodic updates, but design for the blocking case.
+  Direct callers should not use input polling to schedule application work;
+  use timers in another process. `TermUI.Runtime` already places blocking TTY
+  polling in a dedicated reader process, so its render and command timers keep
+  running while input waits.
 
   ## Escape Sequences
 

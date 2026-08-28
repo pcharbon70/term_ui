@@ -6,6 +6,10 @@ defmodule TermUI.Layout.Cache do
   providing O(1) lookup for unchanged layouts. LRU eviction keeps memory
   bounded while maintaining frequently-used layouts.
 
+  This cache is opt-in and must be started before `solve/3` is used.
+  `TermUI.Runtime.NodeRenderer` calls `TermUI.Layout.Solver` directly and does
+  not start or consult this cache.
+
   ## Usage
 
       # Start cache (typically in supervision tree)

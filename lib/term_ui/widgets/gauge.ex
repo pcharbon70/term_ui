@@ -39,7 +39,7 @@ defmodule TermUI.Widgets.Gauge do
 
   ## Options
 
-  - `:value` - Current value (required)
+  - `:value` - Current value (default: 0)
   - `:min` - Minimum value (default: 0)
   - `:max` - Maximum value (default: 100)
   - `:width` - Gauge width (default: 40, max: #{VizHelper.max_width()})
@@ -303,7 +303,7 @@ defmodule TermUI.Widgets.Gauge do
 
   ## Options
 
-  - `:value` - Current value (required)
+  - `:value` - Current value (default: 0)
   - `:warning` - Yellow zone threshold (default: 60)
   - `:danger` - Red zone threshold (default: 80)
   - `:zones` - Override with custom zones

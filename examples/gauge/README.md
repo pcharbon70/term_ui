@@ -25,7 +25,7 @@ The Gauge widget provides visual representation of values with support for color
 
 The `Gauge.render/1` function accepts the following options:
 
-- `:value` (required) - Current numeric value to display
+- `:value` - Current numeric value to display (default: `0`)
 - `:min` - Minimum value (default: 0)
 - `:max` - Maximum value (default: 100)
 - `:width` - Gauge width in characters (default: 40)
@@ -105,7 +105,6 @@ Gauge.App.run()
 ```
 
 **Note:** TTY mode works inside IEx but has limitations:
-- No alternate screen buffer (output mixes with IEx prompt)
 - Input is read through the shell; some terminals buffer keys until Enter is pressed
 - For full TUI, use raw mode instead
 

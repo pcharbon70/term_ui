@@ -74,13 +74,13 @@ defmodule Gauge.App do
 
   def update(:quit, state) do
     # Return :quit command to exit the application
-    {state, [:quit]}
+    {state, [TermUI.Command.quit()]}
   end
 
   @doc """
   Render the current state to a render tree.
 
-  This is called every frame to produce the UI.
+  This is called whenever the dirty runtime needs to render the UI.
   """
   def view(state) do
     stack(:vertical, [

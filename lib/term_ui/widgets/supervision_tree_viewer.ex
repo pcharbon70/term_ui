@@ -21,7 +21,7 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
   - Supervisor strategy display
   - Process state inspection
   - Restart/terminate controls with confirmation
-  - Auto-refresh on supervision tree changes
+  - Explicit refresh API for supervision tree changes
 
   ## Keyboard Controls
 
@@ -50,6 +50,11 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
 
   The widget uses both theme component styles and explicit text indicators
   for complete monochrome compatibility.
+
+  The `:update_interval` option is stored as refresh metadata but does not start
+  a timer. In an Elm root, schedule `Command.interval/2` yourself and call
+  `refresh/1` for each message. `TermUI.Runtime` does not invoke this widget's
+  `handle_info/2` callback automatically.
   """
 
   use TermUI.StatefulComponent
@@ -169,7 +174,8 @@ defmodule TermUI.Widgets.SupervisionTreeViewer do
   ## Options
 
   - `:root` - Root supervisor (pid, registered name, or module) - required
-  - `:update_interval` - Refresh interval in ms (default: 2000)
+  - `:update_interval` - Refresh interval metadata in ms (default: 2000); no
+    timer is started by the widget
   - `:on_select` - Callback when node is selected: `fn node -> ... end`
   - `:on_action` - Callback when action is performed: `fn {:restarted | :terminated, pid} -> ... end`
   - `:show_workers` - Show worker processes (default: true)

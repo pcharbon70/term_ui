@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.0.0] - 2026-08-26
+## [1.0.0] - Unreleased
 
 TermUI 1.0 establishes the pre-rewrite architecture as the stable release line,
 including the Raw, TTY, and SSH backends, the Elm-style runtime, differential
@@ -74,11 +74,11 @@ rendering, constraint-based layouts, and the complete widget set.
 - **New Widgets**
   - PickList - Modal selection list for choosing items from a scrollable list
   - FormBuilder - Structured form handling with validation and field management
-  - CommandPalette - VS Code-style fuzzy-search command discovery interface
+  - CommandPalette - VS Code-style searchable command discovery interface
   - TreeView - Hierarchical data display with expand/collapse navigation
   - SplitPane - Resizable multi-pane layouts with draggable dividers
   - LogViewer - Real-time log display with filtering and scrolling
-  - StreamWidget - Backpressure-aware data streaming with GenStage integration
+  - StreamWidget - Bounded stream display with a GenStage consumer adapter
   - ProcessMonitor - BEAM process introspection and monitoring
   - SupervisionTreeViewer - OTP supervision hierarchy visualization
   - ClusterDashboard - Distributed cluster node visualization and monitoring
@@ -88,7 +88,7 @@ rendering, constraint-based layouts, and the complete widget set.
   - Backend behaviour for terminal abstraction
   - Raw backend for full terminal control
   - TTY backend for line-based terminals
-  - Test backend for unit testing
+  - Test renderers and component testing helpers
   - Automatic backend selection based on terminal capabilities
   - Character set selection (Unicode/ASCII) with graceful degradation
 
@@ -139,7 +139,7 @@ rendering, constraint-based layouts, and the complete widget set.
 
 - **Terminal Support**
   - Raw mode activation
-  - Cross-platform compatibility (Linux, macOS, Windows 10+)
+  - Unix terminal support plus initial Windows VT capability scaffolding
   - Terminal capability detection
   - Color degradation (true color → 256 → 16)
 
@@ -157,5 +157,5 @@ rendering, constraint-based layouts, and the complete widget set.
 
 [Unreleased]: https://github.com/pcharbon70/term_ui/compare/v1.0.0...HEAD
 [1.0.0]: https://github.com/pcharbon70/term_ui/compare/v1.0.0-rc...v1.0.0
-[0.2.0]: https://github.com/pcharbon70/term_ui/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/pcharbon70/term_ui/releases/tag/v0.1.0
+[0.2.0]: https://github.com/pcharbon70/term_ui/tree/v0.2.0
+[0.1.0]: https://hex.pm/packages/term_ui/0.1.0

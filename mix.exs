@@ -95,6 +95,7 @@ defmodule TermUI.MixProject do
         lib
         mix/tasks
         guides
+        docs/widget-compatibility.md
         mix.exs
         README.md
         LICENSE
@@ -112,6 +113,9 @@ defmodule TermUI.MixProject do
       extras: [
         "README.md",
         "CHANGELOG.md",
+        "guides/api_reference.md": [title: "TermUI 1.0 API Map"],
+        "guides/component_system.md": [title: "Component Systems"],
+        "docs/widget-compatibility.md": [title: "Widget Compatibility"],
         "guides/user/README.md": [filename: "user-guides", title: "User Guides"],
         "guides/user/01-overview.md": [title: "Overview"],
         "guides/user/02-getting-started.md": [title: "Getting Started"],
@@ -135,26 +139,56 @@ defmodule TermUI.MixProject do
         "guides/developer/09-testing-framework.md": [title: "Testing Framework"]
       ],
       groups_for_extras: [
+        "Reference Guides":
+          ~r/(guides\/(api_reference|component_system)|docs\/widget-compatibility)\.md/,
         "User Guides": ~r/guides\/user\/.*/,
         "Developer Guides": ~r/guides\/developer\/.*/
       ],
       groups_for_modules: [
         Core: [
           TermUI,
+          TermUI.App,
+          TermUI.Config,
           TermUI.Elm,
           TermUI.Runtime,
-          TermUI.Component,
-          TermUI.Event
+          TermUI.Command,
+          TermUI.Event,
+          TermUI.Message
         ],
+        "Component APIs": [
+          TermUI.Component,
+          TermUI.StatefulComponent,
+          TermUI.Container
+        ],
+        "Standalone component services": [
+          TermUI.ComponentServer,
+          TermUI.ComponentSupervisor,
+          TermUI.ComponentRegistry,
+          TermUI.Component.StatePersistence,
+          TermUI.Component.Introspection,
+          TermUI.EventRouter,
+          TermUI.Event.Propagation,
+          TermUI.Event.Transformation,
+          TermUI.FocusManager,
+          TermUI.Focus.Tracker,
+          TermUI.Focus.Indicator,
+          TermUI.Focus.Traversal,
+          TermUI.SpatialIndex
+        ],
+        "Standalone compatibility APIs": ~r/TermUI\.(?:(?:Style|Parser)(?:\..*)?|Widget\..*)/,
         Widgets: ~r/TermUI\.Widgets\..*/,
         Rendering: [
           TermUI.Renderer.Style,
           TermUI.Renderer.Cell,
           TermUI.Renderer.Buffer,
+          TermUI.Renderer.BufferManager,
+          TermUI.Runtime.NodeRenderer,
           TermUI.Component.RenderNode
         ],
         Layout: ~r/TermUI\.Layout\..*/,
-        Terminal: ~r/TermUI\.Terminal\..*/
+        Backends: ~r/TermUI\.Backend(\..*)?/,
+        Terminal: ~r/TermUI\.(Terminal|Input)(\..*)?/,
+        Testing: ~r/TermUI\.Test\..*/
       ],
       before_closing_body_tag: %{
         html: """

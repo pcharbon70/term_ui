@@ -2,16 +2,17 @@ defmodule TermUI.Widgets.CommandPalette do
   @moduledoc """
   Simple command dropdown for filtering and selecting commands.
 
-  Shows a list of commands filtered by prefix as the user types.
+  Shows a list of commands filtered by case-insensitive substring as the user
+  types.
   Similar to typing `/` in Claude Code to see available slash commands.
 
   ## Usage
 
       # Define commands
       commands = [
-        %{id: :help, label: "/help", action: fn -> :ok end},
-        %{id: :save, label: "/save", action: fn -> :ok end},
-        %{id: :quit, label: "/quit", action: fn -> :ok end}
+        %{id: :help, label: "/help"},
+        %{id: :save, label: "/save"},
+        %{id: :quit, label: "/quit"}
       ]
 
       # Create and show palette
@@ -25,9 +26,9 @@ defmodule TermUI.Widgets.CommandPalette do
 
   ## Keyboard Navigation
 
-  - Type to filter by prefix
+  - Type to filter by case-insensitive substring
   - Up/Down: Navigate through results
-  - Enter: Execute selected command
+  - Enter: Select the highlighted command and close the palette
   - Escape: Close dropdown
   - Backspace: Delete character
 
@@ -59,7 +60,8 @@ defmodule TermUI.Widgets.CommandPalette do
   - `:commands` - List of command maps (required). Each command has:
     - `:id` - Unique identifier (atom)
     - `:label` - Display text (string)
-    - `:action` - Function to execute (fn -> ... end)
+    - Any other fields are application-owned metadata. The widget never invokes
+      an `:action` function; the root application interprets the selection.
   - `:max_visible` - Maximum visible results (default: 8)
   """
   @spec new(keyword()) :: map()
@@ -135,7 +137,7 @@ defmodule TermUI.Widgets.CommandPalette do
     end
   end
 
-  # Filter commands by prefix match
+  # Filter commands by case-insensitive substring match
   defp filter_commands(state) do
     filtered =
       if state.query == "" do

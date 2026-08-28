@@ -6,6 +6,9 @@ defmodule TermUI.Component.StatePersistence do
   and recover it on restart. State is stored in an ETS table that survives
   component process crashes.
 
+  This service supports `TermUI.ComponentServer`. It does not persist the Elm
+  root state owned by `TermUI.Runtime`.
+
   ## Usage
 
       # Persist state (typically called on state changes)

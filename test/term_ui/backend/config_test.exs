@@ -235,7 +235,7 @@ defmodule TermUI.Backend.ConfigTest do
     end
 
     test "returns :ok with all valid backends" do
-      for backend <- [:auto, TermUI.Backend.Raw, TermUI.Backend.TTY, TermUI.Backend.Test] do
+      for backend <- [:auto, TermUI.Backend.Raw, TermUI.Backend.TTY] do
         Application.put_env(:term_ui, :backend, backend)
         assert Config.validate!() == :ok
       end

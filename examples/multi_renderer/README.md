@@ -58,9 +58,9 @@ elixir -r examples/multi_renderer/text_input.ex -e "TextInputExample.run(backend
 
 **Controls:**
 - Type text and press Enter to submit
-- `c` - Clear submitted values
-- `h` - Toggle help
-- `q` - Quit
+- `Ctrl+L` - Clear submitted values
+- `Ctrl+H` - Toggle help
+- `Ctrl+Q` - Quit
 
 ---
 
@@ -78,7 +78,8 @@ elixir -r examples/multi_renderer/capabilities.ex -e "CapabilitiesExample.run(de
 
 **Features:**
 - Shows detected backend mode (raw/tty)
-- Displays color support level (true_color, color_256, color_16, monochrome)
+- Displays color support level (`true_color`, `color_256`, `color_16`, or
+  `monochrome`)
 - Shows Unicode support status
 - Displays terminal dimensions
 - Interactive tabs for different capability categories
@@ -105,20 +106,18 @@ Full terminal control with:
 ### TTY Mode (Fallback)
 
 Graceful degradation with:
-- Line-based input (type and press Enter)
-- Single key commands
+- Cooked input; delivery may be buffered until Enter
+- The same normalized key events after the shell delivers them
 - Reduced but functional UI
-- Works in non-terminal environments
+- Uses detected or fallback capabilities when Raw cannot be acquired; interactive
+  behavior still depends on the active IO device
 
 ### Auto-Detection
 
 By default, TermUI automatically selects the appropriate backend:
-1. Attempts raw mode first (OTP 28+)
-2. Falls back to TTY mode if:
-   - OTP < 28
-   - A shell is already running
-   - Raw mode activation fails
-   - Not in a terminal (piped input, etc.)
+1. Selects TTY directly when the runtime inherits IEx mode
+2. Otherwise attempts Raw mode on OTP 28+ Unix systems
+3. Falls back to TTY when Raw acquisition is unsupported or fails
 
 ## Running Examples in Different Environments
 
@@ -129,12 +128,15 @@ By default, TermUI automatically selects the appropriate backend:
 elixir -r examples/multi_renderer/basic.ex -e "Basic.run()"
 ```
 
-### SSH Session
+### Local Shell over SSH
 
 ```bash
-# Should auto-detect and use appropriate mode
+# Auto-detects Raw or TTY according to local shell ownership
 elixir -r examples/multi_renderer/basic.ex -e "Basic.run()"
 ```
+
+An independent OTP SSH channel instead supplies `TermUI.Backend.SSH`
+explicitly; automatic local selection never chooses that backend.
 
 ### Within IEx
 
@@ -212,5 +214,5 @@ To create your own application:
 ## See Also
 
 - [TermUI Documentation](../../README.md)
-- [Multi-Renderer Planning Document](../../notes/planning/multi-renderer/)
+- [Historical multi-renderer planning archive](../../notes/planning/multi-renderer/)
 - [Configuration Guide](../../lib/term_ui/config.ex)

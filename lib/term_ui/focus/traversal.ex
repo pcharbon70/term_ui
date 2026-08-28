@@ -5,6 +5,10 @@ defmodule TermUI.Focus.Traversal do
   Provides utilities for determining the order in which components
   receive focus during Tab/Shift+Tab navigation.
 
+  It reads the standalone `SpatialIndex` when calculating positions. The Elm
+  runtime does not register embedded widgets there or invoke this module; the
+  root must own its focus order explicitly.
+
   ## Tab Order
 
   Components are ordered by:

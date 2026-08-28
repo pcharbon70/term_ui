@@ -2,7 +2,7 @@
 #
 # This example demonstrates text input that works in both modes:
 # - Raw mode: Character-by-character input with live editing
-# - TTY mode: Line-based input (press Enter after typing)
+# - TTY mode: The same events after cooked input is delivered (often on Enter)
 #
 # Usage:
 #   elixir -r examples/multi_renderer/text_input.ex -e "TextInputExample.run()"
@@ -12,7 +12,7 @@
 
 defmodule TextInputExample do
   @moduledoc """
-  Text input example demonstrating character vs line input modes.
+  Text input example demonstrating immediate versus cooked event delivery.
 
   In raw mode (OTP 28+):
   - See characters appear as you type
@@ -20,46 +20,51 @@ defmodule TextInputExample do
   - Press Enter to submit
 
   In TTY mode (fallback):
-  - Type your input
-  - Press Enter to see the result
-  - Line-by-line input (no live editing)
+  - The same stateful widget is used
+  - The shell/terminal may buffer input until Enter
   """
 
   use TermUI.Elm
-  alias TermUI.Widget.TextInput
+  alias TermUI.Event
+  alias TermUI.Renderer.Style
+  alias TermUI.Widgets.TextInput
 
   # State structure
   # %{
-  #   input_value: String.t(),
+  #   input: map(),
   #   submitted_values: [String.t()],
   #   show_help: boolean()
   # }
 
   def init(_opts) do
-    %{input_value: "", submitted_values: [], show_help: true}
+    {:ok, input} =
+      TextInput.init(TextInput.new(placeholder: "Enter text...", width: 40))
+
+    %{input: TextInput.set_focused(input, true), submitted_values: [], show_help: true}
   end
 
   # Event handling
-  def event_to_msg(%TermUI.Event.Key{key: :enter}, _state), do: {:msg, :submit}
-  def event_to_msg(%TermUI.Event.Key{key: ?c}, _state), do: {:msg, :clear}
-  def event_to_msg(%TermUI.Event.Key{key: ?h}, _state), do: {:msg, :toggle_help}
-  def event_to_msg(%TermUI.Event.Key{key: ?q}, _state), do: {:msg, :quit}
-  def event_to_msg(_event, _state), do: :ignore
+  def event_to_msg(%Event.Key{key: :enter}, _state), do: {:msg, :submit}
 
-  # Handle TextInput messages
-  def handle_info({:changed, value}, state) do
-    {state, []}
+  def event_to_msg(%Event.Key{key: "l", modifiers: modifiers} = event, _state) do
+    if :ctrl in modifiers, do: {:msg, :clear}, else: {:msg, {:input_event, event}}
   end
 
-  def handle_info({:submit, value}, state) do
-    new_values = [value | state.submitted_values]
-    {%{state | submitted_values: new_values}, []}
+  def event_to_msg(%Event.Key{key: "h", modifiers: modifiers} = event, _state) do
+    if :ctrl in modifiers, do: {:msg, :toggle_help}, else: {:msg, {:input_event, event}}
   end
+
+  def event_to_msg(%Event.Key{key: "q", modifiers: modifiers} = event, _state) do
+    if :ctrl in modifiers, do: {:msg, :quit}, else: {:msg, {:input_event, event}}
+  end
+
+  def event_to_msg(event, _state), do: {:msg, {:input_event, event}}
 
   # State updates
   def update(:submit, state) do
-    # Value is submitted via TextInput's on_submit
-    {state, []}
+    value = TextInput.get_value(state.input)
+    input = state.input |> TextInput.clear() |> TextInput.set_focused(true)
+    {%{state | input: input, submitted_values: [value | state.submitted_values]}, []}
   end
 
   def update(:clear, state) do
@@ -71,7 +76,12 @@ defmodule TextInputExample do
   end
 
   def update(:quit, state) do
-    {state, [:quit]}
+    {state, [TermUI.Command.quit()]}
+  end
+
+  def update({:input_event, event}, state) do
+    {:ok, input} = TextInput.handle_event(event, state.input)
+    {%{state | input: input}, []}
   end
 
   # View rendering
@@ -79,17 +89,19 @@ defmodule TextInputExample do
     backend_mode = TermUI.App.backend_mode()
     mode_label = mode_label(backend_mode)
 
-    box([
+    stack(:vertical, [
       # Header
-      text("TermUI Text Input Example",
-        TermUI.Renderer.Style.new()
-        |> TermUI.Renderer.Style.fg(:green)
-        |> TermUI.Renderer.Style.bright()
+      text(
+        "TermUI Text Input Example",
+        Style.new()
+        |> Style.fg(:green)
+        |> Style.bold()
       ),
       text(""),
-      text("Mode: " <> mode_label,
-        TermUI.Renderer.Style.new()
-        |> TermUI.Renderer.Style.fg(:cyan)
+      text(
+        "Mode: " <> mode_label,
+        Style.new()
+        |> Style.fg(:cyan)
       ),
       text(""),
 
@@ -98,62 +110,54 @@ defmodule TextInputExample do
       text(""),
 
       # Text input field
-      box([
-        text("Enter text: "),
-        text(state.input_value || "",
-          TermUI.Renderer.Style.new()
-          |> TermUI.Renderer.Style.fg(:yellow)
-        ),
-        text("_" |> String.duplicate(30),
-          TermUI.Renderer.Style.new()
-          |> TermUI.Renderer.Style.fg(:bright_black)
-        )
-      ], style: %{
-        border: :none,
-        padding: {0, 0}
-      }),
+      text("Enter text:"),
+      TextInput.render(state.input, %{x: 0, y: 0, width: 40, height: 1}),
       text(""),
 
       # Submitted values
-      if(state.submitted_values == [], do: empty(), else: render_submitted(state.submitted_values)),
+      if(state.submitted_values == [],
+        do: empty(),
+        else: render_submitted(state.submitted_values)
+      ),
       text(""),
 
       # Footer
-      text("c=clear | h=toggle help | q=quit",
-        TermUI.Renderer.Style.new()
-        |> TermUI.Renderer.Style.fg(:bright_black)
+      text(
+        "Ctrl+L=clear | Ctrl+H=help | Ctrl+Q=quit",
+        Style.new()
+        |> Style.fg(:bright_black)
       )
     ])
   end
 
   defp mode_label(:raw), do: "Raw Mode (character input with live editing)"
-  defp mode_label(:tty), do: "TTY Mode (line-based input)"
+  defp mode_label(:tty), do: "TTY Mode (cooked input; delivery may be buffered)"
   defp mode_label(:skip), do: "Test Mode"
   defp mode_label(_), do: "Unknown"
 
   defp render_help(false, _mode), do: empty()
 
   defp render_help(true, :raw) do
-    box([
+    stack(:vertical, [
       text("Raw Mode Instructions:"),
       text("  • Type to see characters appear"),
       text("  • Press Enter to submit"),
       text("  • Backspace deletes last character"),
       text("  • Arrow keys move cursor")
-    ], border: :single)
+    ])
   end
 
   defp render_help(true, :tty) do
-    box([
+    stack(:vertical, [
       text("TTY Mode Instructions:"),
       text("  • Type your text"),
       text("  • Press Enter to submit"),
-      text("  • Line-based input (live editing not available)")
-    ], border: :single)
+      text("  • Editing updates after each event the shell delivers")
+    ])
   end
 
   defp render_help(true, _) do
-    box([text("Run without skip_terminal to see input modes")], border: :single)
+    box([text("Run without skip_terminal to see input modes")])
   end
 
   defp render_submitted(values) when length(values) > 5 do
@@ -161,91 +165,29 @@ defmodule TextInputExample do
   end
 
   defp render_submitted(values) do
-    box([
-      text("Submitted Values:",
-        TermUI.Renderer.Style.new()
-        |> TermUI.Renderer.Style.fg(:green)
+    stack(:vertical, [
+      text(
+        "Submitted Values:",
+        Style.new()
+        |> Style.fg(:green)
       )
-    | Enum.concat(
-      values
-      |> Enum.reverse()
-      |> Enum.map(fn v ->
-        text("  • " <> v,
-          TermUI.Renderer.Style.new()
-          |> TermUI.Renderer.Style.fg(:yellow)
+      | Enum.concat(
+          values
+          |> Enum.reverse()
+          |> Enum.map(fn v ->
+            text(
+              "  • " <> v,
+              Style.new()
+              |> Style.fg(:yellow)
+            )
+          end)
         )
-      end)
-    )
-    ], border: :single)
+    ])
   end
 
   # Run the application
   def run(opts \\ []) do
-    # For this example, we'll use a simplified approach
-    # The full TextInput integration with StatefulComponent
-    # would require more setup
-
     all_opts = Keyword.put_new(opts, :name, :text_input_example)
-
-    case Keyword.get(opts, :backend, TermUI.Config.get(:backend, :auto)) do
-      :tty ->
-        # In TTY mode, we demonstrate line-based input
-        run_tty_demo(all_opts)
-
-      _ ->
-        # In raw mode or auto, try full example
-        run_full_example(all_opts)
-    end
-  end
-
-  # Simplified demo for TTY mode
-  defp run_tty_demo(opts) do
-    IO.puts("""
-    TermUI Text Input Example - TTY Mode
-    ====================================
-
-    In TTY mode, text input is line-based:
-    - Type your input and press Enter
-    - No live editing (submitted as-is)
-
-    This is a simplified demo for TTY mode.
-    For full functionality, use raw mode (OTP 28+).
-
-    Press Enter to continue...
-    """)
-
-    IO.gets("> ")
-
-    IO.puts("""
-
-    Thank you for trying the Text Input example!
-
-    In raw mode, you would see:
-    - Live character-by-character input
-    - Cursor navigation with arrow keys
-    - Backspace/delete for editing
-    """)
-
-    :ok
-  end
-
-  # Full example for raw mode
-  defp run_full_example(opts) do
-    # This would use the full TextInput widget
-    # For now, return a simplified version
-    IO.puts("""
-    TermUI Text Input Example
-    ==========================
-
-    Starting with options: #{inspect(opts)}
-
-    Note: This example demonstrates the structure.
-    The full TextInput widget integration is shown in the
-    widget documentation and test suite.
-
-    Press q to quit...
-    """)
-
-    :ok
+    TermUI.App.run(__MODULE__, all_opts)
   end
 end

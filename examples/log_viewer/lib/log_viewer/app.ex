@@ -122,7 +122,7 @@ defmodule LogViewer.App do
   Update state based on messages.
   """
   def update(:quit, state) do
-    {state, [:quit]}
+    {state, [TermUI.Command.quit()]}
   end
 
   def update(:add_logs, state) do

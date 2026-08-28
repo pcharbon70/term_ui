@@ -79,7 +79,7 @@ defmodule Sparkline.App do
   end
 
   def update(:quit, state) do
-    {state, [:quit]}
+    {state, [TermUI.Command.quit()]}
   end
 
   @doc """
