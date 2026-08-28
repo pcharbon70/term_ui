@@ -1,5 +1,11 @@
 # Windows Manual Testing Checklist
 
+> **1.0.0 status:** Interactive native Windows verification was waived on
+> 2026-08-28 because no representative system was available. Native console
+> mode, raw input, and resize remain unsupported in `1.0.0`. Retain this
+> checklist for validation after those gaps are implemented; the waiver is not
+> a successful test result.
+
 | Example | Tested | Description |
 |---------|:------:|-------------|
 | alert_dialog | [ ] | Standardized message dialogs and confirmations with predefined button configurations |

@@ -253,7 +253,7 @@ depend on the terminal emulator:
 | GNOME Terminal | Linux | Full support |
 | Terminal.app | macOS | Limited mouse |
 | xterm | Unix | Full support |
-| Windows Terminal with WSL | Windows/WSL | Unix backend; verify input and cleanup for the deployed environment |
+| Windows Terminal with WSL | Windows/WSL | Unix backend; mouse tracking disabled; verify input, resize, paste, and cleanup |
 | Windows Terminal native | Windows | Experimental; native raw console mode and resize handling are not implemented |
 
 Native Windows may render ANSI output when virtual-terminal processing is
