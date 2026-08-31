@@ -105,4 +105,14 @@ defmodule TermUI.Command do
   @doc "Requests a final render and runtime shutdown."
   @spec shutdown(term()) :: shutdown_command()
   def shutdown(reason \\ :normal), do: %__MODULE__{kind: :shutdown, value: reason}
+
+  @doc "Deprecated alias for `shutdown/0`."
+  @deprecated "Use TermUI.Command.shutdown/0 instead."
+  @spec quit() :: shutdown_command()
+  def quit, do: shutdown()
+
+  @doc "Deprecated alias for `shutdown/1`."
+  @deprecated "Use TermUI.Command.shutdown/1 instead."
+  @spec quit(term()) :: shutdown_command()
+  def quit(reason), do: shutdown(reason)
 end

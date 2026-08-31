@@ -88,6 +88,23 @@ defmodule TermUI.Runtime do
   @spec send_message(GenServer.server(), term()) :: :ok
   def send_message(runtime, message), do: GenServer.cast(runtime, {:message, message})
 
+  @doc """
+  Deprecated v1 target form for a root application message.
+
+  The `:root` target delegates to `send_message/2`. A component identifier
+  returns a migration error because v2 has no component process routing.
+  """
+  @deprecated "Use TermUI.Runtime.send_message/2 and route the message in the root application."
+  @spec send_message(GenServer.server(), :root | term(), term()) ::
+          :ok | {:error, {:component_routing_removed, term(), String.t()}}
+  def send_message(runtime, :root, message), do: send_message(runtime, message)
+
+  def send_message(_runtime, component_id, _message) do
+    {:error,
+     {:component_routing_removed, component_id,
+      "Use TermUI.Runtime.send_message/2 and route the message in the root update/2 function."}}
+  end
+
   @doc "Requests a final render and clean shutdown."
   @spec shutdown(GenServer.server()) :: :ok
   def shutdown(runtime), do: GenServer.cast(runtime, {:shutdown, :normal})

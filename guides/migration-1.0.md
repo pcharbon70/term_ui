@@ -33,6 +33,12 @@ the v1 `{:ok, :exited_normally}` result. New code must use the replacements in
 the table. The facade does not include the v1 global `backend_mode/0` and
 `supports?/1` queries. Use `TermUI.Runtime.capabilities/1` for one runtime.
 
+`TermUI.Command.quit/0` and `quit/1` are deprecated aliases for
+`TermUI.Command.shutdown/0` and `shutdown/1`. The deprecated
+`TermUI.Runtime.send_message/3` accepts only the old `:root` target and sends
+the value through `send_message/2`. A component target returns a migration
+error. Move that routing into the root application's `update/2` function.
+
 Public boundary structs derive their fields and defaults from Zoi schemas.
 Private runtime and widget state uses plain structs. Direct struct update
 syntax still works. Use the public `schema/0` functions when untrusted data
