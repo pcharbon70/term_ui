@@ -1,9 +1,14 @@
 defmodule TermUI.Widget.MarkdownViewer do
-  @moduledoc "A pure, scrollable MDEx Markdown viewer with selectable code blocks."
+  @moduledoc """
+  A pure, scrollable MDEx Markdown viewer with selectable code blocks.
+
+  The optional `:highlighter` is a `TermUI.SyntaxHighlighter` adapter module.
+  `:highlight_limit` bounds the source bytes sent to that adapter.
+  """
 
   @behaviour TermUI.Widget
 
-  alias TermUI.{Event, Frame, Markdown}
+  alias TermUI.{Event, Frame, Markdown, SyntaxHighlighter}
   alias TermUI.Markdown.Document
 
   @type t :: %__MODULE__{
@@ -13,6 +18,8 @@ defmodule TermUI.Widget.MarkdownViewer do
           elements: [Markdown.element()],
           focused: non_neg_integer(),
           content_limit: pos_integer(),
+          highlighter: module() | nil,
+          highlight_limit: pos_integer(),
           document: Document.t()
         }
 
@@ -22,6 +29,8 @@ defmodule TermUI.Widget.MarkdownViewer do
             elements: [],
             focused: 0,
             content_limit: 2_000_000,
+            highlighter: nil,
+            highlight_limit: 100_000,
             document: %Document{}
 
   @impl true
@@ -36,6 +45,9 @@ defmodule TermUI.Widget.MarkdownViewer do
       page_size: max(Keyword.get(opts, :page_size, 20), 1),
       elements: Markdown.code_blocks(document),
       content_limit: content_limit,
+      highlighter: Keyword.get(opts, :highlighter),
+      highlight_limit:
+        max(Keyword.get(opts, :highlight_limit, SyntaxHighlighter.default_max_bytes()), 1),
       document: document
     }
   end
@@ -60,7 +72,13 @@ defmodule TermUI.Widget.MarkdownViewer do
   @impl true
   def view(state, {width, height} = dimensions) do
     focused_id = state.elements |> Enum.at(state.focused) |> then(&if(&1, do: &1.id))
-    result = Markdown.render_with_elements(state.document, width, focused_element_id: focused_id)
+
+    result =
+      Markdown.render_with_elements(state.document, width,
+        focused_element_id: focused_id,
+        highlighter: state.highlighter,
+        highlight_limit: state.highlight_limit
+      )
 
     offset =
       if state.scroll == :end,

@@ -32,7 +32,7 @@ The status terms have these meanings:
 | `TermUI.Widgets.Gauge` | `TermUI.Widget.Gauge` | Reduced | No facade. V2 uses horizontal or vertical bars and does not claim old arc or traffic-light parity. |
 | `TermUI.Widgets.LineChart` | `TermUI.Widget.LineChart` | Reduced | No facade. V2 keeps the pure series view but has a smaller option set. |
 | `TermUI.Widgets.LogViewer` | `TermUI.Widget.LogViewer` | Reduced | No facade. Search, bookmark, selection, and callback state differ. |
-| `TermUI.Widgets.MarkdownViewer` | `TermUI.Widget.MarkdownViewer` | Deferred | No facade. V2 uses bounded documents and parent-owned copy messages; optional syntax highlighting is separate work. |
+| `TermUI.Widgets.MarkdownViewer` | `TermUI.Widget.MarkdownViewer` | Reduced | No facade. V2 uses bounded documents, parent-owned copy messages, and an optional bounded syntax-highlighter adapter. The old process API does not match. |
 | `TermUI.Widgets.Menu` | `TermUI.Widget.Menu` | Reduced | No facade. Nested open-path behavior is pure, but v1 checkbox items and callback results do not match. |
 | `TermUI.Widgets.ProcessMonitor` | `TermUI.Widget.ProcessMonitor` plus application commands | Application-owned | No facade. The parent collects process snapshots and owns actions. |
 | `TermUI.Widgets.ScrollBar` | `TermUI.Widget.ScrollBar` | Reduced | No facade. Size fields and callback results changed to pure state and messages. |

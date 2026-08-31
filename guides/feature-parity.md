@@ -19,7 +19,7 @@ missing. `Deferred` means that the old form is not safe to restore.
 | Stream buffer controls | Four overflow modes, pause, clear, rate display, callbacks, and a render-rate setting | Batch push, clear, lifetime counters, drop-oldest, drop-newest, whole-batch reject, pause, follow, scroll, and formatting | Replaced with pure state. Rate calculation belongs in application data. |
 | Streaming Markdown | The viewer replaced its full content through a GenServer call | A bounded incremental document parses completed top-level blocks once and retains the last extensible block as a pending tail | Improved and retained without a viewer process. |
 | Markdown grammar | MDEx headings, emphasis, links, quotes, lists, code blocks, and rules | MDEx plus strike-through, task lists, autolinks, images, tables, and terminal-safe raw HTML | Improved and retained. |
-| Code syntax highlighting | Makeup highlighted Elixir and Erlang fenced code | Fenced code keeps language labels and code-block focus, but uses one code style | Partial. Restore optional lexer-based highlighting without making Makeup a required runtime service. |
+| Code syntax highlighting | Makeup highlighted Elixir and Erlang fenced code | A bounded library-neutral adapter maps tokens to terminal styles; the optional Makeup adapter supports Elixir and Erlang | Replaced. Plain code has no Makeup dependency, and unknown or failed tokens fall back safely. |
 | Code block copy | The widget callback wrote through caller code from a component process | The pure widget returns `{:copy, code}` and the parent can issue a bounded clipboard command | Replaced with safer effect ownership. |
 | Diff viewing | No dedicated diff viewer | Unified and side-by-side views, Myers line comparison, input bounds, and mode switching | Added in the rewrite. |
 | Tables | Sorting, single or multi-selection, callbacks, and constraint widths | Pure stable sorting and filtering, identity-based single or multiple selection, vertical scrolling, mouse or keyboard selection, and row replacement | Replaced for data interaction. Callbacks are parent messages, and v2 uses direct column widths. |
@@ -38,10 +38,8 @@ missing. `Deferred` means that the old form is not safe to restore.
 
 ## Recommended order
 
-1. Add optional Elixir and Erlang code highlighting with terminal capability
-   fallback.
-2. Add richer form field data when a Jido Console use case needs it.
-3. Add optional inspection data APIs before any live developer tool.
+1. Add richer form field data when a Jido Console use case needs it.
+2. Add optional inspection data APIs before any live developer tool.
 
 Bounded assistant output and rich Markdown no longer need the old component
-ownership model. Syntax highlighting is the main remaining rich-Markdown gap.
+ownership model. Optional syntax highlighting also keeps pure widget state.

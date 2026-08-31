@@ -33,6 +33,30 @@ The viewer supports headings, emphasis, strong and strike-through text, inline
 code, links, images, quotes, ordered and unordered lists, task lists, code
 blocks, rules, and tables. Raw HTML is reduced to terminal-safe text.
 
+### Optional syntax highlighting
+
+Plain code rendering has no lexer dependency. To enable highlighting, set a
+module that implements `TermUI.SyntaxHighlighter`:
+
+```elixir
+viewer =
+  TermUI.Widget.MarkdownViewer.init(
+    content: markdown,
+    highlighter: MyApp.SyntaxAdapter,
+    highlight_limit: 100_000
+  )
+```
+
+An adapter returns `{:ok, [{token_type, text}]}`, `:skip`, or
+`{:error, reason}`. Token text must reproduce the complete input. Known token
+families receive terminal styles. Unknown token types keep the plain code
+style. An absent or failed adapter also falls back to plain code.
+
+`TermUI.SyntaxHighlighter.Makeup` supports Elixir and Erlang when the host
+application installs `:makeup`, `:makeup_elixir`, and `:makeup_erlang`. TermUI
+does not require those packages. The default `:highlight_limit` is 100,000
+bytes per code block. Larger blocks remain complete but bypass the adapter.
+
 ## Diffs
 
 Create a diff from two texts:

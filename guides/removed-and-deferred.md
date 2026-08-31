@@ -52,7 +52,7 @@ The widget names are present, but some old adapters and services are not:
 | Process, supervision, and cluster views | Parent-supplied snapshots | Process inspection, polling, distributed RPC, and monitoring processes |
 | Toast | Pure state with explicit `tick/2` | Timer process and global stack service |
 | Line input | Pure event-driven input | Blocking shell `IO.gets/1` adapter |
-| Markdown code blocks | Emits copy data that the parent can send as a clipboard command | Direct clipboard writes |
+| Markdown code blocks | Emits copy data and supports bounded optional syntax-highlighter adapters | Direct clipboard writes and required Makeup integration |
 | Menu and context menu | Nested data, pure open-path state, keyboard and mouse control, and edge-fitted overlay positions | Submenu processes and inline service variants |
 | Table | Pure sorting, filtering, scrolling, columns, and identity-based row selection | Callback execution and a sorting service process |
 | Form | Text, checkbox, select, and pure field, group, and submit validation | Field processes and callback execution |

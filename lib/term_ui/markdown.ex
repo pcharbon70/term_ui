@@ -5,10 +5,10 @@ defmodule TermUI.Markdown do
   The renderer supports headings, emphasis, strong text, strike-through text,
   inline code, links, images, quotes, lists, task lists, fenced code blocks,
   rules, and tables. Raw HTML is shown as plain text and never becomes terminal
-  control data.
+  control data. Fenced blocks can use an optional syntax-highlighter adapter.
   """
 
-  alias TermUI.{DisplayWidth, Frame, Style}
+  alias TermUI.{DisplayWidth, Frame, Style, SyntaxHighlighter}
   alias TermUI.Markdown.Document
   alias TermUI.Markdown.Parser
 
@@ -64,23 +64,19 @@ defmodule TermUI.Markdown do
   def render_with_elements(markdown, width, opts \\ [])
 
   def render_with_elements(%Document{} = document, width, opts) when width > 0 do
-    focused_id = Keyword.get(opts, :focused_element_id)
-
     groups =
       Enum.map(document.segments, &{:nodes, &1.nodes}) ++
         if(document.pending == "", do: [], else: [pending_group(document.pending)])
 
-    {lines, elements} = render_groups(groups, width, focused_id)
+    {lines, elements} = render_groups(groups, width, opts)
     lines = if lines == [], do: [[""]], else: trim_blank_tail(lines)
     %{lines: lines, elements: elements, content_height: length(lines)}
   end
 
   def render_with_elements(markdown, width, opts) when is_binary(markdown) and width > 0 do
-    focused_id = Keyword.get(opts, :focused_element_id)
-
     case parse(markdown) do
       {:ok, %MDEx.Document{nodes: nodes}} ->
-        {lines, elements} = render_nodes(nodes, width, focused_id)
+        {lines, elements} = render_nodes(nodes, width, opts)
         lines = if lines == [], do: [[""]], else: trim_blank_tail(lines)
         %{lines: lines, elements: elements, content_height: length(lines)}
 
@@ -98,10 +94,10 @@ defmodule TermUI.Markdown do
     render_with_elements(markdown, 80).elements
   end
 
-  defp render_nodes(nodes, width, focused_id, start_index \\ 0) do
+  defp render_nodes(nodes, width, opts, start_index \\ 0) do
     {lines, elements, _index} =
       Enum.reduce(nodes, {[], [], start_index}, fn node, {lines, elements, line_index} ->
-        {node_lines, node_elements} = render_block(node, width, focused_id, line_index)
+        {node_lines, node_elements} = render_block(node, width, opts, line_index)
         separator = if lines == [] or node_lines == [], do: [], else: [[""]]
         start_shift = length(separator)
         node_elements = Enum.map(node_elements, &shift_element(&1, start_shift))
@@ -119,7 +115,7 @@ defmodule TermUI.Markdown do
     end
   end
 
-  defp render_groups(groups, width, focused_id) do
+  defp render_groups(groups, width, opts) do
     Enum.reduce(groups, {[], []}, fn group, {lines, elements} ->
       separator = if lines == [], do: [], else: [[""]]
       start_index = length(lines) + length(separator)
@@ -127,7 +123,7 @@ defmodule TermUI.Markdown do
       {group_lines, group_elements} =
         case group do
           {:nodes, nodes} ->
-            render_nodes(nodes, width, focused_id, start_index)
+            render_nodes(nodes, width, opts, start_index)
 
           {:source, source} ->
             rendered =
@@ -154,15 +150,15 @@ defmodule TermUI.Markdown do
   defp render_block(%MDEx.Paragraph{nodes: nodes}, width, _focused, _index),
     do: {wrap_spans(inline(nodes, @plain), width), []}
 
-  defp render_block(%MDEx.BlockQuote{nodes: nodes}, width, focused, line_index) do
+  defp render_block(%MDEx.BlockQuote{nodes: nodes}, width, opts, line_index) do
     {lines, elements} =
-      render_nodes_without_spacing(nodes, max(width - 2, 1), focused, line_index)
+      render_nodes_without_spacing(nodes, max(width - 2, 1), opts, line_index)
 
     quoted = Enum.map(lines, fn line -> [{"│ ", @quote} | line] end)
     {quoted, elements}
   end
 
-  defp render_block(%MDEx.List{} = list, width, focused, line_index) do
+  defp render_block(%MDEx.List{} = list, width, opts, line_index) do
     {lines, elements, _number} =
       Enum.reduce(list.nodes, {[], [], list.start || 1}, fn item, {lines, elements, number} ->
         marker = list_marker(list, item, number)
@@ -171,7 +167,7 @@ defmodule TermUI.Markdown do
           render_list_item(
             item,
             max(width - DisplayWidth.width(marker), 1),
-            focused,
+            opts,
             line_index + length(lines)
           )
 
@@ -183,9 +179,10 @@ defmodule TermUI.Markdown do
     {lines, elements}
   end
 
-  defp render_block(%MDEx.CodeBlock{literal: code, info: info}, width, focused_id, line_index) do
+  defp render_block(%MDEx.CodeBlock{literal: code, info: info}, width, opts, line_index) do
     language = info |> to_string() |> String.trim() |> empty_to_nil()
     id = "code-" <> Integer.to_string(:erlang.phash2({code, line_index}))
+    focused_id = Keyword.get(opts, :focused_element_id)
     focused? = id == focused_id
     border_style = if focused?, do: Style.new(fg: :cyan, attrs: [:bold]), else: @code_border
 
@@ -199,8 +196,11 @@ defmodule TermUI.Markdown do
     body =
       code
       |> String.trim_trailing("\n")
-      |> String.split("\n", trim: false)
-      |> Enum.flat_map(fn line -> wrap_spans([{"│ ", border_style}, {line, @code}], width) end)
+      |> SyntaxHighlighter.lines(language,
+        adapter: Keyword.get(opts, :highlighter),
+        max_bytes: Keyword.get(opts, :highlight_limit, SyntaxHighlighter.default_max_bytes())
+      )
+      |> Enum.flat_map(fn line -> wrap_spans([{"│ ", border_style} | line], width) end)
 
     bottom = [[{"└" <> String.duplicate("─", max(width - 1, 0)), border_style}]]
     lines = top ++ body ++ bottom
@@ -246,8 +246,8 @@ defmodule TermUI.Markdown do
     {text |> String.split("\n", trim: false) |> Enum.flat_map(&wrap_spans([&1], width)), []}
   end
 
-  defp render_block(%{nodes: nodes}, width, focused, line_index) when is_list(nodes),
-    do: render_nodes_without_spacing(nodes, width, focused, line_index)
+  defp render_block(%{nodes: nodes}, width, opts, line_index) when is_list(nodes),
+    do: render_nodes_without_spacing(nodes, width, opts, line_index)
 
   defp render_block(_node, _width, _focused, _index), do: {[], []}
 
@@ -269,13 +269,13 @@ defmodule TermUI.Markdown do
   defp prefix_list_line(line, _index, marker),
     do: [{String.duplicate(" ", String.length(marker)), @bullet} | line]
 
-  defp render_list_item(%{nodes: nodes}, width, focused, line_index),
-    do: render_nodes_without_spacing(nodes, width, focused, line_index)
+  defp render_list_item(%{nodes: nodes}, width, opts, line_index),
+    do: render_nodes_without_spacing(nodes, width, opts, line_index)
 
-  defp render_nodes_without_spacing(nodes, width, focused, line_index) do
+  defp render_nodes_without_spacing(nodes, width, opts, line_index) do
     {lines, elements, _index} =
       Enum.reduce(nodes, {[], [], line_index}, fn node, {lines, elements, index} ->
-        {node_lines, node_elements} = render_block(node, width, focused, index)
+        {node_lines, node_elements} = render_block(node, width, opts, index)
         {lines ++ node_lines, elements ++ node_elements, index + length(node_lines)}
       end)
 
