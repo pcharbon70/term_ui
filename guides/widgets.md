@@ -131,7 +131,8 @@ A spinner does not start a timer. The parent calls
 ## Layout and composition
 
 `TermUI.Layout` allocates zero-based rectangles. Fixed tracks use an integer.
-Flexible tracks use `:fill` or `{:weight, value}`.
+Flexible tracks use `:fill` or `{:weight, value}`. Pure helpers also create
+percentage, ratio, minimum, maximum, and bounded-content tracks.
 
 ```elixir
 root = TermUI.Layout.new({80, 24})
@@ -143,8 +144,9 @@ frame =
   |> TermUI.Layout.place(main_frame, main)
 ```
 
-Use `column/3` for vertical tracks. Use `grid/3` for equal grid cells. The
-`:columns` and optional `:rows` values keep the configured grid tracks even
+Use `column/3` for vertical tracks. Use `grid/3` for equal grid cells. Set
+`:column_tracks` and `:row_tracks` when grid tracks need different sizing
+modes. The `:columns` and optional `:rows` values keep equal configured tracks
 when the grid has fewer items.
 `Block.compose/3`, `Dialog.compose/3`, and `Tabs.compose/3` can render a frame,
 a `{widget_module, widget_state}` pair, or a one-argument renderer function.

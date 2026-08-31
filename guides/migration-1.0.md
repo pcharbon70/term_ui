@@ -21,6 +21,7 @@ runtime design.
 | Printable `Event.Key.char` input | `TermUI.Event.Text` |
 | Component command tuples | `TermUI.Command` constructors |
 | `TermUI.Widgets.*` | The matching parent-owned module under `TermUI.Widget.*` |
+| `TermUI.Layout.Constraint` values and solver | Direct pure `TermUI.Layout` tracks |
 
 The widget feature set is available under the singular namespace. For example,
 `TermUI.Widgets.Table` becomes `TermUI.Widget.Table`, and
@@ -38,6 +39,45 @@ the table. The facade does not include the v1 global `backend_mode/0` and
 `TermUI.Runtime.send_message/3` accepts only the old `:root` target and sends
 the value through `send_message/2`. A component target returns a migration
 error. Move that routing into the root application's `update/2` function.
+
+## Layout constraint replacements
+
+The v2 layout allocator covers the common v1 constraint inputs directly. It
+does not use the v1 constraint structs, solver, or cache.
+
+| v1 input | v2 track |
+| --- | --- |
+| `Constraint.length(20)` | `Layout.fixed(20)` or `20` |
+| `Constraint.fill()` | `Layout.fill()` or `:fill` |
+| `Constraint.percentage(30)` | `Layout.percentage(30)` |
+| `Constraint.ratio(2)` | `Layout.ratio(2)` or `{:weight, 2}` |
+| `constraint |> Constraint.with_min(10)` | `Layout.bounded(track, min: 10)` |
+| `constraint |> Constraint.with_max(50)` | `Layout.bounded(track, max: 50)` |
+| Measured content with bounds | `Layout.content(measured_size, min: 5, max: 50)` |
+
+Use the tracks in `row/3` and `column/3`. A constrained grid accepts
+`:column_tracks` and `:row_tracks`.
+
+```elixir
+root = TermUI.Layout.new({100, 30})
+[header, body] = TermUI.Layout.column(root, [3, :fill])
+
+[navigation, main] =
+  TermUI.Layout.row(body, [
+    TermUI.Layout.percentage(25),
+    TermUI.Layout.bounded(:fill, min: 30)
+  ])
+
+cells =
+  TermUI.Layout.grid(main, 4,
+    column_tracks: [TermUI.Layout.content(label_width, max: 20), :fill],
+    row_tracks: [TermUI.Layout.ratio(1), TermUI.Layout.ratio(1)]
+  )
+```
+
+Minimum bounds apply when the parent has sufficient space. If all minimums
+are larger than the parent, the allocator reduces them proportionally. Thus,
+all rectangles stay inside the parent.
 
 ## Temporary v1 configuration
 

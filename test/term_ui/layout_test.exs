@@ -90,4 +90,107 @@ defmodule TermUI.LayoutTest do
     oversized = Layout.place(Frame.new(2, 2), child, {1, 1, 10_000, 10_000})
     assert Frame.cell(oversized, 2, 2).char == "a"
   end
+
+  test "creates fixed, fill, percentage, ratio, bounded, and content tracks" do
+    assert Layout.fixed(8) == 8
+    assert Layout.fill() == :fill
+    assert Layout.percentage(25) == {:percentage, 25}
+    assert Layout.ratio(2) == {:weight, 2}
+    assert Layout.bounded(:fill, min: 4, max: 12) == {:bounded, :fill, 4, 12}
+    assert Layout.content(30, max: 9) == {:bounded, 30, 0, 9}
+
+    tracks = [
+      Layout.fixed(8),
+      Layout.percentage(25),
+      Layout.ratio(1),
+      Layout.bounded(Layout.fill(), min: 10, max: 12),
+      Layout.content(30, max: 9)
+    ]
+
+    assert Layout.row({0, 0, 60, 4}, tracks) == [
+             {0, 0, 8, 4},
+             {8, 0, 15, 4},
+             {23, 0, 16, 4},
+             {39, 0, 12, 4},
+             {51, 0, 9, 4}
+           ]
+  end
+
+  test "nests constrained rows, columns, and grids without a solver" do
+    root = Layout.new({100, 30})
+    [header, body] = Layout.column(root, [Layout.fixed(3), Layout.fill()])
+    [navigation, main] = Layout.row(body, [Layout.percentage(20), Layout.ratio(3)])
+
+    assert header == {0, 0, 100, 3}
+    assert navigation == {0, 3, 20, 27}
+    assert main == {20, 3, 80, 27}
+
+    cells =
+      Layout.grid(main, 6,
+        column_tracks: [
+          Layout.content(12, max: 10),
+          Layout.bounded(Layout.ratio(1), min: 8),
+          Layout.fill()
+        ],
+        row_tracks: [
+          Layout.fixed(5),
+          Layout.bounded(Layout.fill(), min: 6, max: 10)
+        ],
+        column_gap: 1,
+        row_gap: 1
+      )
+
+    assert cells == [
+             {20, 3, 10, 5},
+             {31, 3, 38, 5},
+             {70, 3, 30, 5},
+             {20, 9, 10, 10},
+             {31, 9, 38, 10},
+             {70, 9, 30, 10}
+           ]
+  end
+
+  test "resize keeps percentage, ratio, minimum, maximum, and content bounds" do
+    for {width, expected} <- [{40, [10, 10, 20]}, {80, [20, 20, 40]}, {120, [30, 30, 60]}] do
+      rects =
+        Layout.row(
+          {0, 0, width, 1},
+          [Layout.percentage(25), Layout.ratio(1), Layout.ratio(2)]
+        )
+
+      assert Enum.map(rects, fn {_x, _y, track_width, _height} -> track_width end) == expected
+    end
+
+    for width <- [40, 80, 120] do
+      [bounded, content, _fill] =
+        Layout.row(
+          {0, 0, width, 1},
+          [Layout.bounded(:fill, min: 10, max: 20), Layout.content(50, max: 15), :fill]
+        )
+
+      assert elem(bounded, 2) in 10..20
+      assert elem(content, 2) == 15
+    end
+
+    assert Layout.row(
+             {0, 0, 5, 1},
+             [Layout.bounded(:fill, min: 4), Layout.bounded(:fill, min: 4)]
+           ) == [
+             {0, 0, 3, 1},
+             {3, 0, 2, 1}
+           ]
+  end
+
+  test "rejects invalid constraint helper values" do
+    assert_raise ArgumentError, fn -> Layout.fixed(-1) end
+    assert_raise ArgumentError, fn -> Layout.percentage(101) end
+    assert_raise ArgumentError, fn -> Layout.ratio(0) end
+    assert_raise ArgumentError, fn -> Layout.bounded(:fill, min: 5, max: 4) end
+    assert_raise ArgumentError, fn -> Layout.bounded(:fill, unknown: 1) end
+    assert_raise ArgumentError, fn -> Layout.row({0, 0, 10, 1}, [{:percentage, 101}]) end
+
+    assert_raise ArgumentError, fn ->
+      Layout.grid({0, 0, 10, 5}, 1, column_tracks: [])
+    end
+  end
 end
