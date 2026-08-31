@@ -37,7 +37,7 @@ The status terms have these meanings:
 | `TermUI.Widgets.ProcessMonitor` | `TermUI.Widget.ProcessMonitor` plus application commands | Application-owned | No facade. The parent collects process snapshots and owns actions. |
 | `TermUI.Widgets.ScrollBar` | `TermUI.Widget.ScrollBar` | Reduced | No facade. Size fields and callback results changed to pure state and messages. |
 | `TermUI.Widgets.Sparkline` | `TermUI.Widget.Sparkline` | Direct | Deprecated facade available. Both paths use the same pure state, scaling, character mapping, and frame view. |
-| `TermUI.Widgets.SplitPane` | `TermUI.Widget.SplitPane` | Deferred | No facade until pane serialization and restore behavior are explicit. |
+| `TermUI.Widgets.SplitPane` | `TermUI.Widget.SplitPane` | Reduced | No facade. V2 has explicit versioned layout serialization and safe restore, but it does not restore the process API or automatic file persistence. |
 | `TermUI.Widgets.StreamWidget` | `TermUI.Widget.Stream` and `TermUI.Stream.ProducerAdapter` | Application-owned | No facade. The parent owns the pure buffer and connects producers through bounded batches. |
 | `TermUI.Widgets.StreamWidget.Consumer` | `TermUI.Stream.ProducerAdapter` | Removed | No facade. The hidden GenStage consumer process is not restored. |
 | `TermUI.Widgets.SupervisionTreeViewer` | `TermUI.Widget.SupervisionTree` plus application commands | Application-owned | No facade. The parent collects the supervision snapshot and owns process actions. |

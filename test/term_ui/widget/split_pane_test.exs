@@ -111,4 +111,101 @@ defmodule TermUI.Widget.SplitPaneTest do
     state = SplitPane.init(first: oversized_cursor, second: "R", ratio: 0.5)
     assert SplitPane.view(state, {10, 2}).cursor == nil
   end
+
+  test "versioned multi-pane state round trips without content or drag state" do
+    source =
+      SplitPane.init(
+        panes: [nav: "source nav", main: "source main", inspector: "source inspector"],
+        ratios: [1, 3, 2],
+        direction: :vertical,
+        min_size: 2,
+        keyboard_resize: true
+      )
+      |> SplitPane.focus_separator(1)
+      |> SplitPane.collapse(:inspector)
+
+    serialized = SplitPane.serialize(source)
+
+    assert serialized == %{
+             version: 1,
+             mode: :multi,
+             pane_ids: [:nav, :main, :inspector],
+             direction: :vertical,
+             ratios: [1.0, 3.0, 2.0],
+             collapsed: [:inspector],
+             focused_separator: 1,
+             min_size: 2,
+             keyboard_resize: true
+           }
+
+    target =
+      SplitPane.init(
+        panes: [nav: "target nav", main: "target main", inspector: "target inspector"],
+        ratios: [2, 1, 1]
+      )
+      |> Map.merge(%{dragging: true, drag_separator: 0})
+
+    assert {:ok, restored} = SplitPane.restore(target, serialized)
+    assert SplitPane.serialize(restored) == serialized
+
+    assert Enum.map(restored.panes, & &1.content) == [
+             "target nav",
+             "target main",
+             "target inspector"
+           ]
+
+    refute restored.dragging
+    assert restored.drag_separator == nil
+  end
+
+  test "legacy state round trips into the current content" do
+    serialized =
+      SplitPane.init(
+        first: "old left",
+        second: "old right",
+        ratio: 0.7,
+        direction: :vertical
+      )
+      |> SplitPane.serialize()
+
+    target = SplitPane.init(first: "new left", second: "new right", ratio: 0.2)
+
+    assert {:ok, restored} = SplitPane.restore(target, serialized)
+    assert restored.ratio == 0.7
+    assert restored.ratios == serialized.ratios
+    assert_in_delta Enum.at(restored.ratios, 1), 0.3, 1.0e-12
+    assert restored.first == "new left"
+    assert restored.second == "new right"
+    assert SplitPane.serialize(restored) == serialized
+  end
+
+  test "invalid, old, and mismatched stored values return safe errors" do
+    state = SplitPane.init(panes: [nav: "nav", main: "main"], ratios: [1, 2])
+    serialized = SplitPane.serialize(state)
+
+    assert SplitPane.restore(state, %{serialized | version: 0}) ==
+             {:error, {:unsupported_version, 0}}
+
+    assert SplitPane.restore(state, Map.delete(serialized, :ratios)) ==
+             {:error, :invalid_state}
+
+    assert SplitPane.restore(state, %{serialized | pane_ids: [:main, :nav]}) ==
+             {:error, :pane_mismatch}
+
+    assert SplitPane.restore(state, %{serialized | mode: :legacy}) ==
+             {:error, :pane_mismatch}
+
+    for invalid <- [
+          %{serialized | direction: :diagonal},
+          %{serialized | ratios: [1.0, 0.0]},
+          %{serialized | collapsed: [:missing]},
+          %{serialized | focused_separator: 2},
+          %{serialized | min_size: 0},
+          %{serialized | keyboard_resize: :yes}
+        ] do
+      assert SplitPane.restore(state, invalid) == {:error, :invalid_state}
+    end
+
+    assert state == SplitPane.init(panes: [nav: "nav", main: "main"], ratios: [1, 2])
+  end
 end

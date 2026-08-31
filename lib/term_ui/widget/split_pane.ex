@@ -12,6 +12,8 @@ defmodule TermUI.Widget.SplitPane do
   alias TermUI.{Event, Frame, Style}
   alias TermUI.Widget.Helpers
 
+  @state_version 1
+
   @type content ::
           Frame.t()
           | [Frame.row()]
@@ -34,6 +36,18 @@ defmodule TermUI.Widget.SplitPane do
           after_index: non_neg_integer()
         }
   @type layout :: %{panes: [layout_entry()], separators: [separator()]}
+  @type serialized_state :: %{
+          version: 1,
+          mode: :legacy | :multi,
+          pane_ids: [term()],
+          direction: :horizontal | :vertical,
+          ratios: [float()],
+          collapsed: [term()],
+          focused_separator: non_neg_integer(),
+          min_size: pos_integer(),
+          keyboard_resize: boolean()
+        }
+  @type restore_error :: :invalid_state | :pane_mismatch | {:unsupported_version, term()}
 
   @type t :: %__MODULE__{
           first: content(),
@@ -272,6 +286,158 @@ defmodule TermUI.Widget.SplitPane do
     maximum = max(visible_count(state) - 2, 0)
     %{state | focused_separator: Helpers.clamp(index, 0, maximum)}
   end
+
+  @doc """
+  Returns the versioned pure layout state for application-owned storage.
+
+  Pane content and transient drag state are intentionally not included.
+  """
+  @spec serialize(t()) :: serialized_state()
+  def serialize(state) do
+    %{
+      version: @state_version,
+      mode: if(state.legacy, do: :legacy, else: :multi),
+      pane_ids: Enum.map(state.panes, & &1.id),
+      direction: state.direction,
+      ratios: effective_ratios(state),
+      collapsed: state.collapsed,
+      focused_separator: state.focused_separator,
+      min_size: state.min_size,
+      keyboard_resize: state.keyboard_resize
+    }
+  end
+
+  @doc """
+  Validates and restores versioned layout state into the current panes.
+
+  The ordered pane IDs and legacy or multi-pane mode must match. Content stays
+  in the current widget value. Unknown versions and invalid values return an
+  error without changing that value.
+  """
+  @spec restore(t(), term()) :: {:ok, t()} | {:error, restore_error()}
+  def restore(state, %{version: @state_version} = serialized) do
+    with {:ok, fields} <- validate_serialized(state, serialized) do
+      {:ok, apply_serialized(state, fields)}
+    end
+  end
+
+  def restore(_state, %{version: version}), do: {:error, {:unsupported_version, version}}
+  def restore(_state, _invalid), do: {:error, :invalid_state}
+
+  defp validate_serialized(
+         state,
+         %{
+           mode: mode,
+           pane_ids: pane_ids,
+           direction: direction,
+           ratios: ratios,
+           collapsed: collapsed,
+           focused_separator: focused_separator,
+           min_size: min_size,
+           keyboard_resize: keyboard_resize
+         }
+       ) do
+    with :ok <- validate_mode(state, mode),
+         :ok <- validate_pane_ids(state, pane_ids),
+         :ok <- validate_direction(direction),
+         {:ok, ratios} <- validate_saved_ratios(ratios, length(state.panes), mode),
+         :ok <- validate_collapsed(collapsed, pane_ids),
+         :ok <- validate_focused_separator(focused_separator, length(state.panes)),
+         :ok <- validate_min_size(min_size),
+         :ok <- validate_keyboard_resize(keyboard_resize) do
+      {:ok,
+       %{
+         direction: direction,
+         ratios: ratios,
+         collapsed: collapsed,
+         focused_separator: focused_separator,
+         min_size: min_size,
+         keyboard_resize: keyboard_resize
+       }}
+    end
+  end
+
+  defp validate_serialized(_state, _invalid), do: {:error, :invalid_state}
+
+  defp apply_serialized(state, fields) do
+    state =
+      %{
+        state
+        | direction: fields.direction,
+          ratios: fields.ratios,
+          collapsed: fields.collapsed,
+          focused_separator: fields.focused_separator,
+          min_size: fields.min_size,
+          keyboard_resize: fields.keyboard_resize,
+          dragging: false,
+          drag_separator: nil
+      }
+
+    if state.legacy do
+      [before, after_pane] = fields.ratios
+      %{state | ratio: before / (before + after_pane)}
+    else
+      state
+    end
+  end
+
+  defp validate_mode(%{legacy: legacy}, mode) do
+    if mode == if(legacy, do: :legacy, else: :multi),
+      do: :ok,
+      else: {:error, :pane_mismatch}
+  end
+
+  defp validate_pane_ids(state, pane_ids) when is_list(pane_ids) do
+    if pane_ids == Enum.map(state.panes, & &1.id),
+      do: :ok,
+      else: {:error, :pane_mismatch}
+  end
+
+  defp validate_pane_ids(_state, _invalid), do: {:error, :invalid_state}
+
+  defp validate_direction(direction) when direction in [:horizontal, :vertical], do: :ok
+  defp validate_direction(_invalid), do: {:error, :invalid_state}
+
+  defp validate_saved_ratios(ratios, count, mode)
+       when is_list(ratios) and length(ratios) == count do
+    if Enum.all?(ratios, &(is_number(&1) and &1 > 0)) do
+      validate_saved_ratio_mode(Enum.map(ratios, &(&1 * 1.0)), mode)
+    else
+      {:error, :invalid_state}
+    end
+  end
+
+  defp validate_saved_ratios(_ratios, _count, _mode), do: {:error, :invalid_state}
+
+  defp validate_saved_ratio_mode([before, after_pane] = ratios, :legacy) do
+    share = before / (before + after_pane)
+    if share >= 0.1 and share <= 0.9, do: {:ok, ratios}, else: {:error, :invalid_state}
+  end
+
+  defp validate_saved_ratio_mode(ratios, :multi), do: {:ok, ratios}
+  defp validate_saved_ratio_mode(_ratios, _invalid), do: {:error, :invalid_state}
+
+  defp validate_collapsed(collapsed, pane_ids) when is_list(collapsed) do
+    valid_ids = MapSet.new(pane_ids)
+
+    if collapsed == Enum.uniq(collapsed) and Enum.all?(collapsed, &MapSet.member?(valid_ids, &1)),
+      do: :ok,
+      else: {:error, :invalid_state}
+  end
+
+  defp validate_collapsed(_collapsed, _pane_ids), do: {:error, :invalid_state}
+
+  defp validate_focused_separator(index, pane_count)
+       when is_integer(index) and index >= 0 and index <= max(pane_count - 2, 0),
+       do: :ok
+
+  defp validate_focused_separator(_index, _pane_count), do: {:error, :invalid_state}
+
+  defp validate_min_size(min_size) when is_integer(min_size) and min_size > 0, do: :ok
+  defp validate_min_size(_invalid), do: {:error, :invalid_state}
+
+  defp validate_keyboard_resize(value) when is_boolean(value), do: :ok
+  defp validate_keyboard_resize(_invalid), do: {:error, :invalid_state}
 
   defp resize_to_pointer(state, separator_index, event, dimensions) do
     current_layout = layout(state, dimensions)

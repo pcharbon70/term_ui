@@ -299,6 +299,27 @@ panes = TermUI.Widget.SplitPane.expand(panes, :inspector)
 layout = TermUI.Widget.SplitPane.layout(panes, dimensions)
 ```
 
+Use `serialize/1` to get only the persistent layout fields. The returned
+Elixir map has `version: 1`, the ordered pane IDs, direction, weights,
+collapsed IDs, separator focus, minimum size, and keyboard-resize setting. It
+does not contain pane content or drag state.
+
+```elixir
+saved_layout = TermUI.Widget.SplitPane.serialize(panes)
+# The application selects the encoding, storage, and write time.
+
+case TermUI.Widget.SplitPane.restore(panes, saved_layout) do
+  {:ok, panes} -> panes
+  {:error, reason} -> handle_invalid_layout(reason)
+end
+```
+
+Restore requires the same ordered pane IDs and mode. It accepts only format
+version 1. A missing, invalid, or unknown version returns an error and does not
+change the widget value. Future incompatible formats must increment the
+version. The host application must migrate old data explicitly. TermUI does
+not read or write layout files.
+
 ## Theme, focus, and shortcuts
 
 `TermUI.Theme` stores named styles, style variants, and non-style values. Use
