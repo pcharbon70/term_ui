@@ -14,6 +14,36 @@ frame = TermUI.Frame.overlay(frame, child, 1, 3)
 parent can convert those messages to application updates or `TermUI.Command`
 values.
 
+### Table state and row identity
+
+The table keeps sorting, filtering, cursor, and selection in its pure state.
+Use a stable row identity when rows can move or change:
+
+```elixir
+table =
+  TermUI.Widget.Table.init(
+    columns: [{:name, "Name"}, {:score, "Score"}],
+    rows: users,
+    row_id: :id,
+    selection_mode: :multiple
+  )
+
+table = TermUI.Widget.Table.sort_by(table, :score, :desc)
+table = TermUI.Widget.Table.set_filter(table, & &1.active)
+selected_users = TermUI.Widget.Table.selected_rows(table)
+```
+
+Each row ID must be unique. It must not change when other row values change.
+The table stores selected IDs, so sorting and filtering do not change the
+selection. `set_rows/2` removes a selected ID only when the new row list no
+longer contains that ID. Without `:row_id`, the complete row value is the ID.
+Use that default only for unique rows whose values do not change.
+
+Selection mode can be `:none`, `:single`, or `:multiple`. Enter selects the
+cursor row. Space toggles the cursor row in multiple mode. A left-button
+release uses the same selection transition. The parent can also use
+`set_selection/2` and `clear_selection/1`.
+
 Use `TermUI.Widget.mouse/4` after the parent routes a mouse event to local
 widget coordinates. A widget can implement the optional `mouse/3` callback.
 The helper uses `update/2` as the fallback.

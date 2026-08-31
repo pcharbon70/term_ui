@@ -54,7 +54,7 @@ The widget names are present, but some old adapters and services are not:
 | Line input | Pure event-driven input | Blocking shell `IO.gets/1` adapter |
 | Markdown code blocks | Emits copy data that the parent can send as a clipboard command | Direct clipboard writes |
 | Menu and context menu | Flat actions, separators, keyboard and mouse control, and an overlay position | Submenu processes and inline service variants |
-| Table | Scrolling, columns, and row selection | Built-in sorting service |
+| Table | Pure sorting, filtering, scrolling, columns, and identity-based row selection | Callback execution and a sorting service process |
 | Form | Text, checkbox, select, and required-field validation | General validation framework and field processes |
 | Split pane and viewport | Pure multi-pane, collapse, geometry, scrollbar, and local drag state | Global mouse routing and persistence services |
 

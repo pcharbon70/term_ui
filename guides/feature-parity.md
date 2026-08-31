@@ -22,7 +22,7 @@ missing. `Deferred` means that the old form is not safe to restore.
 | Code syntax highlighting | Makeup highlighted Elixir and Erlang fenced code | Fenced code keeps language labels and code-block focus, but uses one code style | Partial. Restore optional lexer-based highlighting without making Makeup a required runtime service. |
 | Code block copy | The widget callback wrote through caller code from a component process | The pure widget returns `{:copy, code}` and the parent can issue a bounded clipboard command | Replaced with safer effect ownership. |
 | Diff viewing | No dedicated diff viewer | Unified and side-by-side views, Myers line comparison, input bounds, and mode switching | Added in the rewrite. |
-| Tables | Sorting, single or multi-selection, callbacks, and constraint widths | Column widths, vertical scrolling, mouse or keyboard row selection, and row replacement | Partial. Add pure sort state and optional multi-selection. Keep data sorting outside render code. |
+| Tables | Sorting, single or multi-selection, callbacks, and constraint widths | Pure stable sorting and filtering, identity-based single or multiple selection, vertical scrolling, mouse or keyboard selection, and row replacement | Replaced for data interaction. Callbacks are parent messages, and v2 uses direct column widths. |
 | Menus | Actions, checkboxes, separators, and nested submenus | Flat actions, separators, disabled items, keyboard and mouse control, and context positions | Partial. Add nested menu data and pure open-path state. Do not restore submenu processes. |
 | Forms | Six field types, custom validators, groups, visibility rules, reset, and submit callbacks | Text, checkbox, select, required checks, paste cleaning, mouse focus, and submit messages | Partial. Add validator functions and richer field data in small steps. |
 | Viewports | Scroll bars, drag control, `scroll_into_view/3`, content dimensions, and visible fractions | Pure geometry, visible ranges, `scroll_into_view/3`, optional local scrollbars, keyboard and wheel scroll, and drag state | Retained through a pure replacement. |
@@ -40,7 +40,7 @@ missing. `Deferred` means that the old form is not safe to restore.
 
 1. Add optional Elixir and Erlang code highlighting with terminal capability
    fallback.
-2. Add pure table sorting and nested menu state.
+2. Add nested menu state.
 3. Add form validators and richer field data when a Jido Console use case
    needs them.
 4. Add optional inspection data APIs before any live developer tool.

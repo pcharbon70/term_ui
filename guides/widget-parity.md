@@ -41,7 +41,7 @@ The status terms have these meanings:
 | `TermUI.Widgets.StreamWidget` | `TermUI.Widget.Stream` and `TermUI.Stream.ProducerAdapter` | Application-owned | No facade. The parent owns the pure buffer and connects producers through bounded batches. |
 | `TermUI.Widgets.StreamWidget.Consumer` | `TermUI.Stream.ProducerAdapter` | Removed | No facade. The hidden GenStage consumer process is not restored. |
 | `TermUI.Widgets.SupervisionTreeViewer` | `TermUI.Widget.SupervisionTree` plus application commands | Application-owned | No facade. The parent collects the supervision snapshot and owns process actions. |
-| `TermUI.Widgets.Table` and `TermUI.Widgets.Table.Column` | `TermUI.Widget.Table` and `TermUI.Widget.Table.Column` | Deferred | No facade until sorting and multi-selection behavior match. |
+| `TermUI.Widgets.Table` and `TermUI.Widgets.Table.Column` | `TermUI.Widget.Table` and `TermUI.Widget.Table.Column` | Reduced | No facade. Sorting, filtering, and identity-based multi-selection are pure. V1 callbacks and constraint values do not match the v2 state and message API. |
 | `TermUI.Widgets.Tabs` | `TermUI.Widget.Tabs` | Reduced | No facade. Dynamic tab callbacks and state do not match the pure v2 selection contract. |
 | `TermUI.Widgets.TextInput` | `TermUI.Widget.TextInput` and `TermUI.Widget.TextArea` | Reduced | No facade. V2 separates single-line and multiline state and uses normalized text events. |
 | `TermUI.Widgets.TextInput.Line` | `TermUI.Widget.LineInput` | Reduced | No facade. Validation returns parent messages and no blocking read occurs inside the widget. |
