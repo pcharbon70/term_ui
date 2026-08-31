@@ -77,6 +77,11 @@ TermUI.run(Counter)
 as `Event.Text`. Named and modified keys arrive as `Event.Key`. Paste, mouse,
 resize, and focus input have separate event types.
 
+External input adapters can use `TermUI.Input` as one normalization boundary.
+Its helpers keep printable text and committed composition in `Event.Text`,
+paste in `Event.Paste`, and named or modified keys in `Event.Key`. It rejects
+an unmodified printable value passed as a special key.
+
 `view/1` must return one complete `TermUI.Frame`. A frame contains its size,
 cells, and optional cursor. The cursor is `{column, row}` and is one-based.
 

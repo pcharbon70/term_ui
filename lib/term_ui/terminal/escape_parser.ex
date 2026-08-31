@@ -3,7 +3,7 @@ defmodule TermUI.Terminal.EscapeParser do
 
   import Bitwise
 
-  alias TermUI.Event
+  alias TermUI.{Event, Input}
 
   @escape 0x1B
   @delete 0x7F
@@ -46,19 +46,19 @@ defmodule TermUI.Terminal.EscapeParser do
 
   # Backspace / Ctrl+H
   defp parse_bytes(<<8, rest::binary>>, events) do
-    event = Event.key(:backspace)
+    event = Input.special_key(:backspace)
     parse_bytes(rest, [event | events])
   end
 
   # Tab / Ctrl+I
   defp parse_bytes(<<9, rest::binary>>, events) do
-    event = Event.key(:tab)
+    event = Input.special_key(:tab)
     parse_bytes(rest, [event | events])
   end
 
   # Enter / Ctrl+J or Ctrl+M
   defp parse_bytes(<<char, rest::binary>>, events) when char in [10, 13] do
-    event = Event.key(:enter)
+    event = Input.special_key(:enter)
     parse_bytes(rest, [event | events])
   end
 
@@ -66,20 +66,20 @@ defmodule TermUI.Terminal.EscapeParser do
   defp parse_bytes(<<char, rest::binary>>, events) when char in 1..26 do
     # Convert to lowercase letter
     key = <<char + 96>>
-    event = Event.key(key, modifiers: [:ctrl])
+    event = Input.special_key(key, modifiers: [:ctrl])
     parse_bytes(rest, [event | events])
   end
 
   # Delete key
   defp parse_bytes(<<@delete, rest::binary>>, events) do
-    event = Event.key(:backspace)
+    event = Input.special_key(:backspace)
     parse_bytes(rest, [event | events])
   end
 
   # Regular printable ASCII
   defp parse_bytes(<<char, rest::binary>>, events) when char in 32..126 do
     char_str = <<char>>
-    event = Event.text(char_str)
+    event = Input.text(char_str)
     parse_bytes(rest, [event | events])
   end
 
@@ -105,7 +105,7 @@ defmodule TermUI.Terminal.EscapeParser do
     <<character::binary-size(expected_bytes), rest::binary>> = input
 
     if String.valid?(character) do
-      parse_bytes(rest, [Event.text(character) | events])
+      parse_bytes(rest, [Input.text(character) | events])
     else
       <<_invalid_lead, rest::binary>> = input
       parse_bytes(rest, events)
@@ -130,7 +130,7 @@ defmodule TermUI.Terminal.EscapeParser do
   # Alt+key (ESC followed by printable character)
   defp parse_escape_sequence(<<char, rest::binary>>) when char in 32..126 do
     char_str = <<char>>
-    event = Event.key(char_str, modifiers: [:alt])
+    event = Input.special_key(char_str, modifiers: [:alt])
     {:ok, event, rest}
   end
 
@@ -145,17 +145,17 @@ defmodule TermUI.Terminal.EscapeParser do
   end
 
   # Arrow keys
-  defp parse_csi_sequence(<<"A", rest::binary>>), do: {:ok, Event.key(:up), rest}
-  defp parse_csi_sequence(<<"B", rest::binary>>), do: {:ok, Event.key(:down), rest}
-  defp parse_csi_sequence(<<"C", rest::binary>>), do: {:ok, Event.key(:right), rest}
-  defp parse_csi_sequence(<<"D", rest::binary>>), do: {:ok, Event.key(:left), rest}
+  defp parse_csi_sequence(<<"A", rest::binary>>), do: {:ok, Input.special_key(:up), rest}
+  defp parse_csi_sequence(<<"B", rest::binary>>), do: {:ok, Input.special_key(:down), rest}
+  defp parse_csi_sequence(<<"C", rest::binary>>), do: {:ok, Input.special_key(:right), rest}
+  defp parse_csi_sequence(<<"D", rest::binary>>), do: {:ok, Input.special_key(:left), rest}
 
   defp parse_csi_sequence(<<"Z", rest::binary>>),
-    do: {:ok, Event.key(:tab, modifiers: [:shift]), rest}
+    do: {:ok, Input.special_key(:tab, modifiers: [:shift]), rest}
 
   # Home/End
-  defp parse_csi_sequence(<<"H", rest::binary>>), do: {:ok, Event.key(:home), rest}
-  defp parse_csi_sequence(<<"F", rest::binary>>), do: {:ok, Event.key(:end), rest}
+  defp parse_csi_sequence(<<"H", rest::binary>>), do: {:ok, Input.special_key(:home), rest}
+  defp parse_csi_sequence(<<"F", rest::binary>>), do: {:ok, Input.special_key(:end), rest}
 
   # Terminal focus tracking
   defp parse_csi_sequence(<<"I", rest::binary>>), do: {:ok, Event.focus(:gained), rest}
@@ -172,12 +172,12 @@ defmodule TermUI.Terminal.EscapeParser do
   end
 
   # Tilde sequences: ESC [ number ~
-  defp parse_csi_sequence(<<"1~", rest::binary>>), do: {:ok, Event.key(:home), rest}
-  defp parse_csi_sequence(<<"2~", rest::binary>>), do: {:ok, Event.key(:insert), rest}
-  defp parse_csi_sequence(<<"3~", rest::binary>>), do: {:ok, Event.key(:delete), rest}
-  defp parse_csi_sequence(<<"4~", rest::binary>>), do: {:ok, Event.key(:end), rest}
-  defp parse_csi_sequence(<<"5~", rest::binary>>), do: {:ok, Event.key(:page_up), rest}
-  defp parse_csi_sequence(<<"6~", rest::binary>>), do: {:ok, Event.key(:page_down), rest}
+  defp parse_csi_sequence(<<"1~", rest::binary>>), do: {:ok, Input.special_key(:home), rest}
+  defp parse_csi_sequence(<<"2~", rest::binary>>), do: {:ok, Input.special_key(:insert), rest}
+  defp parse_csi_sequence(<<"3~", rest::binary>>), do: {:ok, Input.special_key(:delete), rest}
+  defp parse_csi_sequence(<<"4~", rest::binary>>), do: {:ok, Input.special_key(:end), rest}
+  defp parse_csi_sequence(<<"5~", rest::binary>>), do: {:ok, Input.special_key(:page_up), rest}
+  defp parse_csi_sequence(<<"6~", rest::binary>>), do: {:ok, Input.special_key(:page_down), rest}
 
   # Bracketed paste: ESC [ 200 ~ content ESC [ 201 ~
   # Scan forward for the end marker and emit the parked content as a single
@@ -190,10 +190,10 @@ defmodule TermUI.Terminal.EscapeParser do
       {pos, _len} ->
         content = binary_part(rest, 0, pos)
         tail = binary_part(rest, pos + 6, byte_size(rest) - pos - 6)
-        {:ok, Event.paste(content), tail}
+        {:ok, Input.paste(content), tail}
 
       :nomatch when byte_size(rest) > @max_paste_buffer ->
-        {:ok, Event.paste(rest), <<>>}
+        {:ok, Input.paste(rest), <<>>}
 
       :nomatch ->
         :incomplete
@@ -201,23 +201,24 @@ defmodule TermUI.Terminal.EscapeParser do
   end
 
   # Stray paste-end marker (defensive): consume silently.
-  defp parse_csi_sequence(<<"201~", rest::binary>>), do: {:ok, Event.key(:unknown), rest}
+  defp parse_csi_sequence(<<"201~", rest::binary>>),
+    do: {:ok, Input.special_key(:unknown), rest}
 
   # Function keys F1-F4 (some terminals)
-  defp parse_csi_sequence(<<"11~", rest::binary>>), do: {:ok, Event.key(:f1), rest}
-  defp parse_csi_sequence(<<"12~", rest::binary>>), do: {:ok, Event.key(:f2), rest}
-  defp parse_csi_sequence(<<"13~", rest::binary>>), do: {:ok, Event.key(:f3), rest}
-  defp parse_csi_sequence(<<"14~", rest::binary>>), do: {:ok, Event.key(:f4), rest}
+  defp parse_csi_sequence(<<"11~", rest::binary>>), do: {:ok, Input.special_key(:f1), rest}
+  defp parse_csi_sequence(<<"12~", rest::binary>>), do: {:ok, Input.special_key(:f2), rest}
+  defp parse_csi_sequence(<<"13~", rest::binary>>), do: {:ok, Input.special_key(:f3), rest}
+  defp parse_csi_sequence(<<"14~", rest::binary>>), do: {:ok, Input.special_key(:f4), rest}
 
   # Function keys F5-F12
-  defp parse_csi_sequence(<<"15~", rest::binary>>), do: {:ok, Event.key(:f5), rest}
-  defp parse_csi_sequence(<<"17~", rest::binary>>), do: {:ok, Event.key(:f6), rest}
-  defp parse_csi_sequence(<<"18~", rest::binary>>), do: {:ok, Event.key(:f7), rest}
-  defp parse_csi_sequence(<<"19~", rest::binary>>), do: {:ok, Event.key(:f8), rest}
-  defp parse_csi_sequence(<<"20~", rest::binary>>), do: {:ok, Event.key(:f9), rest}
-  defp parse_csi_sequence(<<"21~", rest::binary>>), do: {:ok, Event.key(:f10), rest}
-  defp parse_csi_sequence(<<"23~", rest::binary>>), do: {:ok, Event.key(:f11), rest}
-  defp parse_csi_sequence(<<"24~", rest::binary>>), do: {:ok, Event.key(:f12), rest}
+  defp parse_csi_sequence(<<"15~", rest::binary>>), do: {:ok, Input.special_key(:f5), rest}
+  defp parse_csi_sequence(<<"17~", rest::binary>>), do: {:ok, Input.special_key(:f6), rest}
+  defp parse_csi_sequence(<<"18~", rest::binary>>), do: {:ok, Input.special_key(:f7), rest}
+  defp parse_csi_sequence(<<"19~", rest::binary>>), do: {:ok, Input.special_key(:f8), rest}
+  defp parse_csi_sequence(<<"20~", rest::binary>>), do: {:ok, Input.special_key(:f9), rest}
+  defp parse_csi_sequence(<<"21~", rest::binary>>), do: {:ok, Input.special_key(:f10), rest}
+  defp parse_csi_sequence(<<"23~", rest::binary>>), do: {:ok, Input.special_key(:f11), rest}
+  defp parse_csi_sequence(<<"24~", rest::binary>>), do: {:ok, Input.special_key(:f12), rest}
 
   # Modified arrow keys with modifiers: ESC [ 1 ; modifier A/B/C/D
   defp parse_csi_sequence(<<"1;", modifier, dir, rest::binary>>)
@@ -231,14 +232,14 @@ defmodule TermUI.Terminal.EscapeParser do
       end
 
     modifiers = decode_modifier(modifier - ?0)
-    event = Event.key(key, modifiers: modifiers)
+    event = Input.special_key(key, modifiers: modifiers)
     {:ok, event, rest}
   end
 
   # Modified Shift+Tab sequence: ESC [ 1 ; modifier Z
   defp parse_csi_sequence(<<"1;", modifier, "Z", rest::binary>>) when modifier in ?0..?9 do
     modifiers = decode_modifier(modifier - ?0)
-    event = Event.key(:tab, modifiers: modifiers)
+    event = Input.special_key(:tab, modifiers: modifiers)
     {:ok, event, rest}
   end
 
@@ -251,7 +252,7 @@ defmodule TermUI.Terminal.EscapeParser do
   # original input here would parse its parameters as ordinary text.
   defp parse_csi_sequence(input) do
     case consume_unknown_csi(input) do
-      {:ok, rest} -> {:ok, Event.key(:unknown), rest}
+      {:ok, rest} -> {:ok, Input.special_key(:unknown), rest}
       :incomplete -> :incomplete
     end
   end
@@ -272,20 +273,20 @@ defmodule TermUI.Terminal.EscapeParser do
   end
 
   # Function keys F1-F4
-  defp parse_ss3_sequence(<<"P", rest::binary>>), do: {:ok, Event.key(:f1), rest}
-  defp parse_ss3_sequence(<<"Q", rest::binary>>), do: {:ok, Event.key(:f2), rest}
-  defp parse_ss3_sequence(<<"R", rest::binary>>), do: {:ok, Event.key(:f3), rest}
-  defp parse_ss3_sequence(<<"S", rest::binary>>), do: {:ok, Event.key(:f4), rest}
+  defp parse_ss3_sequence(<<"P", rest::binary>>), do: {:ok, Input.special_key(:f1), rest}
+  defp parse_ss3_sequence(<<"Q", rest::binary>>), do: {:ok, Input.special_key(:f2), rest}
+  defp parse_ss3_sequence(<<"R", rest::binary>>), do: {:ok, Input.special_key(:f3), rest}
+  defp parse_ss3_sequence(<<"S", rest::binary>>), do: {:ok, Input.special_key(:f4), rest}
 
   # Keypad arrows (application mode)
-  defp parse_ss3_sequence(<<"A", rest::binary>>), do: {:ok, Event.key(:up), rest}
-  defp parse_ss3_sequence(<<"B", rest::binary>>), do: {:ok, Event.key(:down), rest}
-  defp parse_ss3_sequence(<<"C", rest::binary>>), do: {:ok, Event.key(:right), rest}
-  defp parse_ss3_sequence(<<"D", rest::binary>>), do: {:ok, Event.key(:left), rest}
+  defp parse_ss3_sequence(<<"A", rest::binary>>), do: {:ok, Input.special_key(:up), rest}
+  defp parse_ss3_sequence(<<"B", rest::binary>>), do: {:ok, Input.special_key(:down), rest}
+  defp parse_ss3_sequence(<<"C", rest::binary>>), do: {:ok, Input.special_key(:right), rest}
+  defp parse_ss3_sequence(<<"D", rest::binary>>), do: {:ok, Input.special_key(:left), rest}
 
   # Home/End (keypad)
-  defp parse_ss3_sequence(<<"H", rest::binary>>), do: {:ok, Event.key(:home), rest}
-  defp parse_ss3_sequence(<<"F", rest::binary>>), do: {:ok, Event.key(:end), rest}
+  defp parse_ss3_sequence(<<"H", rest::binary>>), do: {:ok, Input.special_key(:home), rest}
+  defp parse_ss3_sequence(<<"F", rest::binary>>), do: {:ok, Input.special_key(:end), rest}
 
   defp parse_ss3_sequence(_input) do
     :incomplete
@@ -302,7 +303,7 @@ defmodule TermUI.Terminal.EscapeParser do
             {:ok, event, rest}
 
           :error ->
-            {:ok, Event.key(:unknown), rest}
+            {:ok, Input.special_key(:unknown), rest}
         end
 
       :incomplete ->

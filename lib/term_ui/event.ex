@@ -3,8 +3,9 @@ defmodule TermUI.Event do
   Normalized input from a terminal backend.
 
   Printable input is `Text`. Named or modified keys are `Key`. Paste, mouse,
-  resize, and focus input have separate types. Applications do not parse
-  terminal byte sequences.
+  resize, and focus input have separate types. Use `TermUI.Input` to normalize
+  data from an external input adapter. Applications do not parse terminal byte
+  sequences.
   """
 
   @type t ::

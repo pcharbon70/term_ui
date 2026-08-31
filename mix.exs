@@ -229,6 +229,7 @@ defmodule TermUI.MixProject do
           TermUI.Elm,
           TermUI.Runtime,
           TermUI.Event,
+          TermUI.Input,
           TermUI.Command,
           TermUI.Clipboard,
           TermUI.Clipboard.Operation,

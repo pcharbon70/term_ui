@@ -3,6 +3,31 @@
 TermUI keeps interaction state in the Elm application. It does not use a
 global mouse registry, a selection process, or direct clipboard writes.
 
+## External input normalization
+
+Use `TermUI.Input` when an external UI adapter sends input to TermUI. Keep
+printable text, committed input-method composition, paste, and special keys
+explicit:
+
+```elixir
+text = TermUI.Input.text("Jido 👩‍💻")
+composition = TermUI.Input.composition("e\u0301")
+paste = TermUI.Input.paste("first\nsecond")
+enter = TermUI.Input.special_key("Return")
+save = TermUI.Input.special_key("s", modifiers: [:control])
+```
+
+Pass `text`, `composition`, or `paste` to a focused text widget. `text/2` and
+`composition/2` keep a Unicode or multi-codepoint string in one
+`TermUI.Event.Text` value. Call `composition/2` only for committed text, not
+for an input method's partial display value. Paste stays a
+`TermUI.Event.Paste` value.
+
+Pass `save` to `TermUI.Shortcut.route/2`. The key helper converts common names
+such as `Return` and `ArrowUp`, and modifiers such as `control` and `option`.
+It rejects unmodified printable input. Use `text/2` for that input. No helper
+turns all printable text into legacy key-character values.
+
 ## Clipboard commands
 
 `TermUI.Clipboard.copy/2` and `TermUI.Clipboard.clear/1` create command data.
