@@ -20,13 +20,21 @@ runtime design.
 | External-input SSH adapter | `TermUI.Backend.SSH` complete session backend |
 | Printable `Event.Key.char` input | `TermUI.Event.Text` |
 | Component command tuples | `TermUI.Command` constructors |
-| `TermUI.Widgets.*` | The matching parent-owned module under `TermUI.Widget.*` |
+| `TermUI.Widgets.Sparkline` | Deprecated facade for `TermUI.Widget.Sparkline` |
+| Other `TermUI.Widgets.*` modules | Use the [widget parity table](widget-parity.md); no plural facade exists unless the row is `Direct` |
 | `TermUI.Layout.Constraint` values and solver | Direct pure `TermUI.Layout` tracks |
 
-The widget feature set is available under the singular namespace. For example,
-`TermUI.Widgets.Table` becomes `TermUI.Widget.Table`, and
-`TermUI.Widgets.MarkdownViewer` becomes `TermUI.Widget.MarkdownViewer`.
-Widgets now return `TermUI.Frame` and never require a component PID.
+The widget feature set is available under the singular namespace, but a name
+match does not prove behavior parity. For example, the v2 table and Markdown
+viewer have different state or effect contracts, so their plural names are
+not available. Use the [widget parity table](widget-parity.md) to select the
+documented replacement. Widgets now return `TermUI.Frame` and never require a
+component PID.
+
+`TermUI.Widgets.Sparkline` is the only deprecated plural facade. Its stateless
+numeric mapping has a direct pure replacement. The facade returns a v2 frame,
+not a v1 render node. All its deprecation messages name
+`TermUI.Widget.Sparkline`.
 
 `TermUI.App.start/2`, `TermUI.App.run/2`, and `TermUI.App.shutdown/1` remain as
 deprecated v2 runtime delegates for all v2 releases. `TermUI.App.run/2` keeps

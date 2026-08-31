@@ -201,6 +201,7 @@ pure BEAM TTY backend when a source build is not available.
 - [Architecture](guides/architecture.md)
 - [Backend contract](guides/backend.md)
 - [Pure widgets](guides/widgets.md)
+- [Widget migration parity](guides/widget-parity.md)
 - [Clipboard, selection, and mouse](guides/interaction.md)
 - [Markdown and diff viewers](guides/markdown-and-diffs.md)
 - [Advanced feature parity](guides/feature-parity.md)

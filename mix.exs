@@ -214,6 +214,7 @@ defmodule TermUI.MixProject do
         "guides/architecture.md": [title: "Architecture"],
         "guides/backend.md": [title: "Backend Contract"],
         "guides/widgets.md": [title: "Pure Widgets"],
+        "guides/widget-parity.md": [title: "Widget Migration Parity"],
         "guides/showcase.md": [title: "Interactive Showcase"],
         "guides/interaction.md": [title: "Clipboard, Selection, and Mouse"],
         "guides/markdown-and-diffs.md": [title: "Markdown and Diffs"],
@@ -301,6 +302,9 @@ defmodule TermUI.MixProject do
           TermUI.Backend.SSH,
           TermUI.Backend.SSH.Channel,
           TermUI.Test.DeterministicBackend
+        ],
+        Compatibility: [
+          TermUI.Widgets.Sparkline
         ]
       ]
     ]
