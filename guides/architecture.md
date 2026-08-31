@@ -43,6 +43,11 @@ Widgets that show processes, supervision trees, streams, or cluster nodes only
 format snapshots. The parent application owns polling, subscriptions, RPC, and
 other effects.
 
+The optional `TermUI.Snapshot` provider modules perform one synchronous,
+bounded collection only when the parent calls them. Their output separates
+usable items from partial source errors. Remote cluster RPC needs an explicit
+parent-supplied function. Providers do not monitor, retry, or schedule work.
+
 An external stream can use `TermUI.Stream.ProducerAdapter`. This adapter is not
 a widget owner. It bounds queued items and permits only one unacknowledged
 batch in the application mailbox. The application remains the only owner of

@@ -146,6 +146,40 @@ Snapshot widgets do not call `Process.list/0`, monitor nodes, perform RPC, or
 subscribe to streams. The parent performs those effects and supplies bounded
 data with each widget's setter function.
 
+### Optional snapshot providers
+
+The one-shot providers return `%TermUI.Snapshot{status, items, errors}`.
+`status` is `:ok`, `:partial`, or `:error`. Each error has the stable shape
+`%{source: source, reason: reason}`. Provider items can go directly to the
+matching widget setter:
+
+```elixir
+processes = TermUI.Snapshot.ProcessProvider.collect(selected_pids)
+monitor = TermUI.Widget.ProcessMonitor.set_snapshots(monitor, processes.items)
+
+tree = TermUI.Snapshot.SupervisionTreeProvider.collect(root_supervisor)
+viewer = TermUI.Widget.SupervisionTree.set_nodes(viewer, tree.items)
+
+cluster = TermUI.Snapshot.ClusterProvider.collect(selected_nodes, rpc: rpc_fun)
+dashboard = TermUI.Widget.ClusterDashboard.set_nodes(dashboard, cluster.items)
+```
+
+Process items always contain `:pid`, `:name`, `:memory`, `:reductions`, and
+`:message_queue_len`. Supervision items use the public tree-node shape with a
+path-based ID, label, children, and disabled flag. Cluster items always contain
+`:node`, `:status`, `:processes`, `:memory`, and `:uptime`.
+
+`ProcessProvider.local/1` is an explicit one-shot convenience call.
+`ClusterProvider` does not call `Node.list/0`, and remote RPC is disabled until
+the parent supplies a five-argument `:rpc` function. The supervision root and
+child lookup callback are also explicit. Each provider returns unavailable and
+partial source errors instead of selecting a retry policy.
+
+The application can run a provider in `TermUI.Command.async/2`. If it wants
+polling, it can schedule the next request with `TermUI.Command.timer/2` after it
+handles the result. TermUI starts no provider process and chooses no polling
+interval, node policy, authorization policy, or failure policy.
+
 ## Controls and messages
 
 Checkboxes and toggles emit `{:changed, id, checked}`. Radio groups and select
