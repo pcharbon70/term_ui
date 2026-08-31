@@ -27,20 +27,29 @@ jobs:
       test_command: mix coveralls --warnings-as-errors
 
   tty-nif-policy:
-    name: TTY NIF (${{ matrix.mode }})
+    name: TTY NIF (${{ matrix.mode }}, OTP ${{ matrix.otp }}, Elixir ${{ matrix.elixir }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        mode: [source, disabled]
+        include:
+          - mode: source
+            otp: "28"
+            elixir: "1.18.4"
+          - mode: source
+            otp: "29"
+            elixir: "1.20"
+          - mode: disabled
+            otp: "29"
+            elixir: "1.20"
     env:
       TERM_UI_TTY_NIF: ${{ matrix.mode }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1.24.0
         with:
-          otp-version: "29"
-          elixir-version: "1.20"
+          otp-version: ${{ matrix.otp }}
+          elixir-version: ${{ matrix.elixir }}
       - name: Compile selected native policy
         run: |
           mix deps.get
