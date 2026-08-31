@@ -27,6 +27,12 @@ The widget feature set is available under the singular namespace. For example,
 `TermUI.Widgets.MarkdownViewer` becomes `TermUI.Widget.MarkdownViewer`.
 Widgets now return `TermUI.Frame` and never require a component PID.
 
+`TermUI.App.start/2`, `TermUI.App.run/2`, and `TermUI.App.shutdown/1` remain as
+deprecated v2 runtime delegates for all v2 releases. `TermUI.App.run/2` keeps
+the v1 `{:ok, :exited_normally}` result. New code must use the replacements in
+the table. The facade does not include the v1 global `backend_mode/0` and
+`supports?/1` queries. Use `TermUI.Runtime.capabilities/1` for one runtime.
+
 Public boundary structs derive their fields and defaults from Zoi schemas.
 Private runtime and widget state uses plain structs. Direct struct update
 syntax still works. Use the public `schema/0` functions when untrusted data

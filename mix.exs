@@ -164,6 +164,7 @@ defmodule TermUI.MixProject do
       groups_for_modules: [
         Core: [
           TermUI,
+          TermUI.App,
           TermUI.Elm,
           TermUI.Runtime,
           TermUI.Event,
