@@ -34,7 +34,7 @@ missing. `Deferred` means that the old form is not safe to restore.
 | Layout solver | Constraint solver, alignment values, and a layout cache | Direct frame composition and a pure row, column, and fixed-grid rectangle allocator | Partial. Keep layout functions bounded and pure. Do not add a global cache. |
 | Developer tools | Hot reload, UI and state inspectors, and a performance monitor | Deterministic backend tests and runtime instrumentation through normal application state | Partial. Add optional inspection data APIs before any live tool. |
 | Test toolkit | Component harness, event simulator, and test renderer shipped in `lib/` | Public backend behaviour and deterministic test backend in test support | Replaced for internal tests. A separate public test package is better than shipping test code in the runtime package. |
-| Platform and SSH adapters | Unix and Windows adapter modules; the published Hex archive did not contain an SSH backend | Raw and TTY backends own complete sessions; SSH is explicitly deferred | Retained for local terminals. SSH needs a full backend lifecycle contract before it can return. |
+| Platform and SSH adapters | Unix and Windows adapter modules; the published Hex archive did not contain an SSH backend | Raw, TTY, and SSH backends own complete sessions | Replaced. SSH has a direct host API and an OTP SSH channel callback with isolated runtimes and bounded frame output. |
 
 ## Recommended order
 

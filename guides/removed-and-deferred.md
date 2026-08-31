@@ -21,7 +21,6 @@ These systems will not return in their old form:
 
 These features are not in the new package:
 
-- SSH backend support.
 - A global theme registry.
 - A constraint layout solver, layout cache, and alignment objects.
 - A shared shortcut service and global focus traversal groups.
@@ -31,7 +30,9 @@ These features are not in the new package:
 - The old set of one application for each widget. The counter is the retained
   general example.
 
-SSH can return only as a normal backend that owns its complete state.
+SSH has returned as a normal backend that owns one complete remote session.
+`TermUI.Backend.SSH.Channel` connects OTP SSH channel data and PTY changes to
+that backend. It does not own daemon authentication or connection policy.
 `TermUI.Theme`, `TermUI.Focus`, and `TermUI.Shortcut` now provide the safe pure
 forms. The global service forms remain removed. These values keep the core
 design unchanged.

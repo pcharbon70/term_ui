@@ -166,8 +166,10 @@ TermUI.start_link(Counter, backend: {MyTestBackend, owner: self()})
 ```
 
 Raw mode needs OTP 28 or later. TTY mode is the fallback when raw mode is not
-available. The SSH backend from the pre-1.0 design is not part of this release
-candidate because its input was owned outside the backend contract.
+available. `TermUI.Backend.SSH` runs one isolated v2 runtime for each remote
+session. Applications that own an SSH server can use its direct session API.
+OTP SSH daemons can use `TermUI.Backend.SSH.Channel` as their `:ssh_cli`
+callback. The host keeps control of authentication and session limits.
 
 ## Documents
 

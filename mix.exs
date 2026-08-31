@@ -57,7 +57,7 @@ defmodule TermUI.MixProject do
 
   def application do
     [
-      extra_applications: [:logger]
+      extra_applications: [:logger, :ssh]
     ]
   end
 
@@ -234,7 +234,11 @@ defmodule TermUI.MixProject do
           TermUI.Widget.TreeView,
           TermUI.Widget.Viewport
         ],
-        Backends: [TermUI.Backend]
+        Backends: [
+          TermUI.Backend,
+          TermUI.Backend.SSH,
+          TermUI.Backend.SSH.Channel
+        ]
       ]
     ]
   end

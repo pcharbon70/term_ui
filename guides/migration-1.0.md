@@ -17,6 +17,7 @@ runtime design.
 | `TermUI.Renderer.Cell` | `TermUI.Cell` |
 | `TermUI.Renderer.Style` | `TermUI.Style` |
 | `TermUI.Input.*` and terminal input readers | The `TermUI.Backend` input callback |
+| External-input SSH adapter | `TermUI.Backend.SSH` complete session backend |
 | Printable `Event.Key.char` input | `TermUI.Event.Text` |
 | Component command tuples | `TermUI.Command` constructors |
 | `TermUI.Widgets.*` | The matching parent-owned module under `TermUI.Widget.*` |
@@ -47,5 +48,7 @@ Replace cursor, clear, and cell-list render callbacks with `draw/2`. The value
 passed to `draw/2` is the complete frame. Keep terminal input, output, size,
 cursor, capability detection, setup, and cleanup inside the backend.
 
-The old SSH backend is removed. Add a new SSH backend only when it can own the
-complete input and terminal lifecycle for its session.
+The old external-input SSH adapter becomes `TermUI.Backend.SSH`. Start one
+session for each remote channel. The backend owns parsing, size, rendering,
+output bounds, and cleanup. Use `TermUI.Backend.SSH.Channel` with OTP SSH, or
+use the direct session API when the application already owns an SSH server.

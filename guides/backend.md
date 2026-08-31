@@ -39,3 +39,50 @@ checks are available. It uses a 1 second interval when detection must start
 `stty`. Set `backend_opts: [size_poll_interval: milliseconds]` to use an
 interval of at least 50 ms. Use `:disabled` when the application supplies all
 resize events through its backend input stream.
+
+## SSH sessions
+
+`TermUI.Backend.SSH` owns one remote terminal session and one v2 runtime. It
+does not start an SSH daemon. Thus, the host application keeps control of
+authentication, host keys, network policy, and connection limits.
+
+An application that already owns an SSH server can use the direct session API:
+
+```elixir
+{:ok, session} =
+  TermUI.Backend.SSH.start_session(MyApp,
+    size: {24, 80},
+    output: fn data -> MySSHTransport.send(data) end
+  )
+
+:ok = TermUI.Backend.SSH.input(session, remote_bytes)
+:ok = TermUI.Backend.SSH.resize(session, 40, 120)
+:ok = TermUI.Backend.SSH.stop_session(session)
+```
+
+Some SSH libraries require output from the channel process. Set `:output` to
+that process. It receives this message:
+
+```elixir
+{:term_ui_ssh_output, session, token, data}
+```
+
+After it sends the data, it must call
+`TermUI.Backend.SSH.ack_output(session, token, result)`. Only one output is in
+flight. One newer frame can wait, and each later frame replaces the stale
+waiting frame. Frame diffs use the last confirmed frame, so a slow client does
+not receive an invalid diff.
+
+OTP SSH daemons can use the supplied channel callback:
+
+```elixir
+:ssh.daemon(port,
+  system_dir: system_dir,
+  pwdfun: password_fun,
+  ssh_cli: {TermUI.Backend.SSH.Channel, [MyApp, runtime_options: []]}
+)
+```
+
+The callback accepts PTY input and window changes. It sends Unicode text,
+bracketed paste, mouse, focus, and resize values through the normal v2 event
+contract. The SSH path does not select raw mode or call the local terminal NIF.
