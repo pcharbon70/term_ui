@@ -28,7 +28,7 @@ The status terms have these meanings:
 | `TermUI.Widgets.ContextMenu` | `TermUI.Widget.ContextMenu` | Reduced | No facade. V2 has one flat, parent-owned menu value. |
 | `TermUI.Widgets.ContextMenu.Behavior`, `TermUI.Widgets.ContextMenu.Factory`, and `TermUI.Widgets.ContextMenu.Inline` | `TermUI.Widget.ContextMenu` and `TermUI.Widget.Menu` | Removed | No facade. The process and factory variants are not part of v2. |
 | `TermUI.Widgets.Dialog` | `TermUI.Widget.Dialog` | Reduced | No facade. V2 returns messages instead of calling close and confirm callbacks. |
-| `TermUI.Widgets.FormBuilder` | `TermUI.Widget.FormBuilder` | Deferred | No facade until validation groups and error flow have equivalent pure behavior. |
+| `TermUI.Widgets.FormBuilder` | `TermUI.Widget.FormBuilder` | Reduced | No facade. Pure field, group, and submit validation restore the error flow, but field types and callback results do not match. |
 | `TermUI.Widgets.Gauge` | `TermUI.Widget.Gauge` | Reduced | No facade. V2 uses horizontal or vertical bars and does not claim old arc or traffic-light parity. |
 | `TermUI.Widgets.LineChart` | `TermUI.Widget.LineChart` | Reduced | No facade. V2 keeps the pure series view but has a smaller option set. |
 | `TermUI.Widgets.LogViewer` | `TermUI.Widget.LogViewer` | Reduced | No facade. Search, bookmark, selection, and callback state differ. |

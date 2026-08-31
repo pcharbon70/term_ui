@@ -24,7 +24,7 @@ missing. `Deferred` means that the old form is not safe to restore.
 | Diff viewing | No dedicated diff viewer | Unified and side-by-side views, Myers line comparison, input bounds, and mode switching | Added in the rewrite. |
 | Tables | Sorting, single or multi-selection, callbacks, and constraint widths | Pure stable sorting and filtering, identity-based single or multiple selection, vertical scrolling, mouse or keyboard selection, and row replacement | Replaced for data interaction. Callbacks are parent messages, and v2 uses direct column widths. |
 | Menus | Actions, checkboxes, separators, and nested submenus | Flat actions, separators, disabled items, keyboard and mouse control, and context positions | Partial. Add nested menu data and pure open-path state. Do not restore submenu processes. |
-| Forms | Six field types, custom validators, groups, visibility rules, reset, and submit callbacks | Text, checkbox, select, required checks, paste cleaning, mouse focus, and submit messages | Partial. Add validator functions and richer field data in small steps. |
+| Forms | Six field types, custom validators, groups, visibility rules, reset, and submit callbacks | Text, checkbox, select, pure field, group, and submit validators, field errors, first-error focus, paste cleaning, mouse focus, and submit messages | Replaced for validation flow. Some field types and conditional visibility remain reduced. |
 | Viewports | Scroll bars, drag control, `scroll_into_view/3`, content dimensions, and visible fractions | Pure geometry, visible ranges, `scroll_into_view/3`, optional local scrollbars, keyboard and wheel scroll, and drag state | Retained through a pure replacement. |
 | Split panes | Multiple panes, collapse, keyboard resize, persistence, and mouse drag | Named multi-pane weights, collapse state, measured layout, keyboard resize, and local separator drag; legacy two-pane fields remain | Retained except automatic persistence. The parent can persist the pure value. |
 | Toasts | Timed toast collection with callback-style control | Pure bounded manager with explicit `tick/2`, expiry, dismiss messages, and four types | Retained through a pure replacement. |
@@ -41,8 +41,7 @@ missing. `Deferred` means that the old form is not safe to restore.
 1. Add optional Elixir and Erlang code highlighting with terminal capability
    fallback.
 2. Add nested menu state.
-3. Add form validators and richer field data when a Jido Console use case
-   needs them.
+3. Add richer form field data when a Jido Console use case needs it.
 4. Add optional inspection data APIs before any live developer tool.
 
 Bounded assistant output and rich Markdown no longer need the old component

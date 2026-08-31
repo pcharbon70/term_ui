@@ -152,6 +152,41 @@ Checkboxes and toggles emit `{:changed, id, checked}`. Radio groups and select
 controls emit `{:selected, id, value}`. Disabled options do not receive focus
 and do not emit messages.
 
+### Form validation
+
+`TermUI.Widget.FormBuilder` stores values, errors, and the active field in its
+pure state. Fields can have one-argument `:validators`. Validation groups
+receive a map for their configured field IDs. Submit validators receive all
+form values.
+
+```elixir
+form =
+  TermUI.Widget.FormBuilder.init(
+    fields: [
+      %{id: :password, label: "Password", required: true},
+      %{id: :confirmation, label: "Confirm", required: true}
+    ],
+    groups: [
+      %{
+        id: :passwords,
+        fields: [:password, :confirmation],
+        validators: [fn values ->
+          if values.password == values.confirmation,
+            do: :ok,
+            else: {:error, :confirmation, "does not match"}
+        end]
+      }
+    ]
+  )
+```
+
+Field rules return `:ok` or `{:error, message}`. Group and submit rules can
+return `{:error, field_id, message}` or `{:error, errors_by_field}`. Enter runs
+field, group, and submit validation in that order. If validation fails,
+`active` points to the first invalid field and the form returns
+`{:invalid, errors}`. When a displayed rule succeeds after an edit, only that
+rule's errors clear. The form does not start a process or call a registry.
+
 A select control renders its option list in its own frame while it is open.
 Give it more than one row when the option list must be visible.
 
