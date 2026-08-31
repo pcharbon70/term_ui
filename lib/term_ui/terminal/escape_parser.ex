@@ -102,7 +102,8 @@ defmodule TermUI.Terminal.EscapeParser do
     do: {Enum.reverse(events), input}
 
   defp parse_utf8(input, expected_bytes, events) do
-    <<character::binary-size(expected_bytes), rest::binary>> = input
+    character = binary_part(input, 0, expected_bytes)
+    rest = binary_part(input, expected_bytes, byte_size(input) - expected_bytes)
 
     if String.valid?(character) do
       parse_bytes(rest, [Input.text(character) | events])

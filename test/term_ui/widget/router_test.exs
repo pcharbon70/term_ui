@@ -71,8 +71,11 @@ defmodule TermUI.Widget.RouterTest do
   end
 
   test "requires explicit valid route data" do
+    send(self(), {:route_path, []})
+    assert_receive {:route_path, invalid_path}
+
     assert_raise ArgumentError, ~r/path must not be empty/, fn ->
-      Router.new(:child, Checkbox, [])
+      Router.new(:child, Checkbox, invalid_path)
     end
 
     assert_raise Zoi.ParseError, fn ->

@@ -11,6 +11,7 @@ defmodule TermUI.SyntaxHighlighter.Makeup do
 
   @elixir_lexer Module.concat(["Makeup", "Lexers", "ElixirLexer"])
   @erlang_lexer Module.concat(["Makeup", "Lexers", "ErlangLexer"])
+  @compile {:no_warn_undefined, [{@elixir_lexer, :lex, 1}, {@erlang_lexer, :lex, 1}]}
 
   @impl true
   def highlight(source, language) when is_binary(source) do

@@ -10,7 +10,7 @@ defmodule TermUI.Terminal.TtyNif do
   @doc false
   @spec ensure_loaded() :: :ok | {:error, load_error()}
   def ensure_loaded do
-    if loaded?(), do: :ok, else: load_nif()
+    if apply(__MODULE__, :loaded?, []), do: :ok, else: load_nif()
   end
 
   @doc false
