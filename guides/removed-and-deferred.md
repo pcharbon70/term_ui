@@ -22,6 +22,9 @@ These systems will not return in their old form:
 These features are not in the new package:
 
 - A global theme registry.
+- A generic theme, focus, shortcut, and mouse context. The
+  [UI context decision](ui-context.md) keeps these values in their smallest
+  application-owned scopes.
 - A constraint layout solver, layout cache, and alignment objects.
 - A shared shortcut service and global focus traversal groups.
 - Development hot reload, UI inspection, state inspection, and performance tools.

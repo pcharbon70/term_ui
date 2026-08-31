@@ -212,6 +212,7 @@ defmodule TermUI.MixProject do
         "guides/package-quality.md": [title: "Package Quality"],
         "guides/feature-parity.md": [title: "Feature Parity"],
         "guides/architecture.md": [title: "Architecture"],
+        "guides/ui-context.md": [title: "UI Context Decision"],
         "guides/backend.md": [title: "Backend Contract"],
         "guides/widgets.md": [title: "Pure Widgets"],
         "guides/widget-parity.md": [title: "Widget Migration Parity"],

@@ -204,6 +204,7 @@ pure BEAM TTY backend when a source build is not available.
 ## Documents
 
 - [Architecture](guides/architecture.md)
+- [UI context decision](guides/ui-context.md)
 - [Backend contract](guides/backend.md)
 - [Pure widgets](guides/widgets.md)
 - [Widget migration parity](guides/widget-parity.md)

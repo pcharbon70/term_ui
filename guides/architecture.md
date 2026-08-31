@@ -55,7 +55,9 @@ the stream widget and applies each delivered batch in update order.
 
 Themes, focus traversal, shortcut sequences, viewport drag, and pane collapse
 are pure values stored by the application. TermUI does not register them or
-start a service for them.
+start a service for them. The [UI context decision](ui-context.md) records why
+TermUI keeps theme, focus, shortcut, and mouse values independent and shows the
+preferred explicit wiring pattern.
 
 ## Data schemas
 
