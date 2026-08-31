@@ -50,7 +50,7 @@ The widget names are present, but some old adapters and services are not:
 | --- | --- | --- |
 | Stream | Bounded batches, counters, overflow policies, and an optional acknowledged producer adapter | Widget-owned GenStage consumer |
 | Process, supervision, and cluster views | Parent-supplied data or optional bounded one-shot providers | Widget-owned polling, implicit distributed RPC, and monitoring processes |
-| Toast | Pure state with explicit `tick/2` | Timer process and global stack service |
+| Toast | Independent pure managers with explicit timer commands, safe expiry messages, and manual `tick/2` | Timer process and global stack service |
 | Line input | Pure event-driven input | Blocking shell `IO.gets/1` adapter |
 | Markdown code blocks | Emits copy data and supports bounded optional syntax-highlighter adapters | Direct clipboard writes and required Makeup integration |
 | Menu and context menu | Nested data, pure open-path state, keyboard and mouse control, and edge-fitted overlay positions | Submenu processes and inline service variants |

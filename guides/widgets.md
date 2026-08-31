@@ -227,6 +227,35 @@ Give it more than one row when the option list must be visible.
 A spinner does not start a timer. The parent calls
 `TermUI.Widget.Spinner.tick/1` from its timer update.
 
+### Toast timing
+
+Each `TermUI.Widget.Toast.Manager` is pure application state. Give each toast
+area a distinct ID. `add_with_timer/4` and `replace_with_timer/5` return the
+new manager and zero or one `TermUI.Command.timer/2` values:
+
+```elixir
+manager = TermUI.Widget.Toast.Manager.new(id: :top_right, limit: 5)
+
+{manager, commands} =
+  TermUI.Widget.Toast.Manager.add_with_timer(
+    manager,
+    "Saved",
+    :success,
+    id: :save,
+    duration: 3_000
+  )
+```
+
+The timer message contains the manager ID, toast ID, and a unique expiry
+token. Pass it to `Manager.expire/2` in the application update function. A
+message for a dismissed, replaced, count-limited, or different-area toast is a
+safe no-op. `:infinity` returns no timer command. `dismiss/2`, `replace/5`,
+`set_limit/2`, and the existing manual `tick/2` path are also pure.
+
+The application stores each manager independently and returns its timer
+commands through the normal v2 update result. No toast registry, named process,
+or hidden timer service exists.
+
 ## Layout and composition
 
 `TermUI.Layout` allocates zero-based rectangles. Fixed tracks use an integer.

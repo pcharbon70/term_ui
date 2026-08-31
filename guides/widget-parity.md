@@ -46,7 +46,7 @@ The status terms have these meanings:
 | `TermUI.Widgets.TextInput` | `TermUI.Widget.TextInput` and `TermUI.Widget.TextArea` | Reduced | No facade. V2 separates single-line and multiline state and uses normalized text events. |
 | `TermUI.Widgets.TextInput.Line` | `TermUI.Widget.LineInput` | Reduced | No facade. Validation returns parent messages and no blocking read occurs inside the widget. |
 | `TermUI.Widgets.Toast` | `TermUI.Widget.Toast` | Reduced | No facade. Position and callback state do not match. |
-| `TermUI.Widgets.ToastManager` | `TermUI.Widget.Toast.Manager` | Deferred | No facade until timer commands and expiry scheduling have an explicit parent-owned contract. |
+| `TermUI.Widgets.ToastManager` | `TermUI.Widget.Toast.Manager` | Reduced | No facade. V2 returns explicit token-safe timer commands and supports independent pure areas, but it does not restore a named global service. |
 | `TermUI.Widgets.TreeView` | `TermUI.Widget.TreeView` | Reduced | No facade. Lazy loading, filtering, and multi-selection state differ. |
 | `TermUI.Widgets.Viewport` | `TermUI.Widget.Viewport` | Reduced | No facade. The scrolling capability remains, but v2 measures frame rows and owns local scrollbar drag state. |
 | `TermUI.Widgets.VisualizationHelper` and `TermUI.Widgets.WidgetHelpers` | Direct `TermUI.Frame`, `TermUI.Style`, and widget functions | Removed | No facade. These implementation helpers are not a compatibility boundary. |
