@@ -165,6 +165,7 @@ defmodule TermUI.MixProject do
         Core: [
           TermUI,
           TermUI.App,
+          TermUI.Config,
           TermUI.Elm,
           TermUI.Runtime,
           TermUI.Event,

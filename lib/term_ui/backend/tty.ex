@@ -4,7 +4,7 @@ defmodule TermUI.Backend.TTY do
   @behaviour TermUI.Backend
 
   alias TermUI.{ANSI, Clipboard, Frame}
-  alias TermUI.Backend.{EventStream, Renderer}
+  alias TermUI.Backend.{CapabilityFilter, EventStream, Renderer}
   alias TermUI.Terminal.SizeDetector
   alias TermUI.TerminalOutput
 
@@ -45,13 +45,16 @@ defmodule TermUI.Backend.TTY do
   @impl true
   @spec init(keyword()) :: {:ok, t()} | {:error, term()}
   def init(opts) do
-    capabilities = Keyword.get(opts, :capabilities, %{})
+    capabilities =
+      opts
+      |> Keyword.get(:capabilities, %{})
+      |> CapabilityFilter.filter(opts)
 
     state = %__MODULE__{
       size: determine_size(opts, capabilities),
       capabilities: capabilities,
       line_mode: Keyword.get(opts, :line_mode, :full_redraw),
-      character_set: if(Map.get(capabilities, :unicode, true), do: :unicode, else: :ascii),
+      character_set: if(capabilities.unicode, do: :unicode, else: :ascii),
       color_mode: determine_color_mode(capabilities),
       alternate_screen: Keyword.get(opts, :alternate_screen, false),
       bracketed_paste: Keyword.get(opts, :bracketed_paste, true),

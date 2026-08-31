@@ -39,6 +39,24 @@ the table. The facade does not include the v1 global `backend_mode/0` and
 the value through `send_message/2`. A component target returns a migration
 error. Move that routing into the root application's `update/2` function.
 
+## Temporary v1 configuration
+
+The v2 entry points read these v1 application environment keys when the
+matching explicit option is absent:
+
+| v1 application environment key | Temporary v2 mapping |
+| --- | --- |
+| `:backend` | `:backend` runtime option |
+| `:color_mode` | `:backend_opts` `:color_mode` preference |
+| `:character_set` | `:backend_opts` `:character_set` preference |
+| `:render_interval` | `:render_interval` runtime option |
+| `:iex_compatible` | `:tty` for `true`; automatic backend selection for `false` or `:auto` |
+
+Each used key emits one deprecation warning for the life of the VM. Explicit
+v2 options take precedence. Built-in backends can reduce detected color and
+Unicode support from these preferences. They do not increase reported
+capabilities. Invalid old values return an `:invalid_legacy_config` error.
+
 Public boundary structs derive their fields and defaults from Zoi schemas.
 Private runtime and widget state uses plain structs. Direct struct update
 syntax still works. Use the public `schema/0` functions when untrusted data

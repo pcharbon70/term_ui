@@ -7,17 +7,21 @@ defmodule TermUI do
   and renders one `TermUI.Frame`.
   """
 
-  alias TermUI.Runtime
+  alias TermUI.{Config, Runtime}
 
   @doc "Runs an Elm application until it stops."
   @spec run(module(), keyword()) :: :ok | {:error, term()}
   def run(root, opts \\ []) when is_atom(root) and is_list(opts) do
-    Runtime.run(Keyword.put(opts, :root, root))
+    with {:ok, opts} <- Config.merge_runtime_options(opts) do
+      Runtime.run(Keyword.put(opts, :root, root))
+    end
   end
 
   @doc "Starts a linked Elm application runtime."
   @spec start_link(module(), keyword()) :: GenServer.on_start()
   def start_link(root, opts \\ []) when is_atom(root) and is_list(opts) do
-    Runtime.start_link(Keyword.put(opts, :root, root))
+    with {:ok, opts} <- Config.merge_runtime_options(opts) do
+      Runtime.start_link(Keyword.put(opts, :root, root))
+    end
   end
 end

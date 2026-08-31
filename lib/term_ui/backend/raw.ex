@@ -4,7 +4,7 @@ defmodule TermUI.Backend.Raw do
   @behaviour TermUI.Backend
 
   alias TermUI.{ANSI, Clipboard, Frame}
-  alias TermUI.Backend.{EventStream, Renderer}
+  alias TermUI.Backend.{CapabilityFilter, EventStream, Renderer}
   alias TermUI.Terminal.{RawMode, SizeDetector}
   alias TermUI.{TerminalOutput, TermUtils}
 
@@ -13,6 +13,7 @@ defmodule TermUI.Backend.Raw do
   @type mouse_mode :: :none | :click | :drag | :all
   @type t :: %__MODULE__{
           size: TermUI.Backend.size(),
+          capabilities: map(),
           alternate_screen: boolean(),
           mouse_mode: mouse_mode(),
           input_buffer: binary(),
@@ -27,6 +28,7 @@ defmodule TermUI.Backend.Raw do
         }
 
   defstruct size: {24, 80},
+            capabilities: %{colors: :true_color, unicode: true, mouse: true},
             alternate_screen: true,
             mouse_mode: :none,
             input_buffer: "",
@@ -43,8 +45,13 @@ defmodule TermUI.Backend.Raw do
   @spec init(keyword()) :: {:ok, t()} | {:error, term()}
   def init(opts) do
     with {:ok, size} <- SizeDetector.detect(size: Keyword.get(opts, :size)) do
+      capabilities =
+        %{colors: :true_color, unicode: true, mouse: true, size: size}
+        |> CapabilityFilter.filter(opts)
+
       state = %__MODULE__{
         size: size,
+        capabilities: capabilities,
         alternate_screen: Keyword.get(opts, :alternate_screen, true),
         mouse_mode: Keyword.get(opts, :mouse_tracking, :none),
         bracketed_paste: Keyword.get(opts, :bracketed_paste, true),
@@ -80,9 +87,7 @@ defmodule TermUI.Backend.Raw do
 
   @impl true
   @spec capabilities(t()) :: map()
-  def capabilities(state) do
-    %{colors: :true_color, unicode: true, mouse: true, size: state.size}
-  end
+  def capabilities(state), do: Map.put(state.capabilities, :size, state.size)
 
   @spec refresh_size(t()) :: {:ok, TermUI.Backend.size(), t()} | {:error, term()}
   def refresh_size(state) do
@@ -101,7 +106,11 @@ defmodule TermUI.Backend.Raw do
     output = [
       ANSI.cursor_hide(),
       if(reset?, do: [ANSI.clear_screen(), ANSI.cursor_position(1, 1)], else: []),
-      Renderer.render(changes, :true_color, :unicode),
+      Renderer.render(
+        changes,
+        state.capabilities.colors,
+        if(state.capabilities.unicode, do: :unicode, else: :ascii)
+      ),
       cursor_sequence(frame.cursor)
     ]
 
@@ -141,8 +150,12 @@ defmodule TermUI.Backend.Raw do
   def resize(state, {rows, columns} = size)
       when is_integer(rows) and rows > 0 and is_integer(columns) and columns > 0 do
     case TerminalOutput.write([ANSI.clear_screen(), ANSI.cursor_position(1, 1)]) do
-      :ok -> {:ok, %{state | size: size, last_frame: nil}}
-      {:error, reason} -> {:error, {:terminal_write_failed, reason}}
+      :ok ->
+        capabilities = Map.put(state.capabilities, :size, size)
+        {:ok, %{state | size: size, capabilities: capabilities, last_frame: nil}}
+
+      {:error, reason} ->
+        {:error, {:terminal_write_failed, reason}}
     end
   end
 

@@ -3,7 +3,7 @@ defmodule TermUI.Backend.SSH.Session do
 
   use GenServer
 
-  alias TermUI.Backend.InputBuffer
+  alias TermUI.Backend.{CapabilityFilter, InputBuffer}
   alias TermUI.Backend.SSH
   alias TermUI.Backend.SSH.Renderer
   alias TermUI.Event
@@ -325,9 +325,16 @@ defmodule TermUI.Backend.SSH.Session do
       remote: :ssh
     }
 
+    preferences =
+      opts
+      |> Keyword.get(:runtime_options, [])
+      |> Keyword.get(:backend_opts, [])
+      |> Keyword.merge(Keyword.take(opts, [:color_mode, :character_set]))
+
     defaults
     |> Map.merge(Keyword.get(opts, :capabilities, %{}))
     |> Map.put(:dimensions, size)
+    |> CapabilityFilter.filter(preferences)
   end
 
   defp to_binary(data) do
