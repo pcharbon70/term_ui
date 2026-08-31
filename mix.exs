@@ -215,6 +215,7 @@ defmodule TermUI.MixProject do
           TermUI.Widget.ProcessMonitor,
           TermUI.Widget.Progress,
           TermUI.Widget.RadioGroup,
+          TermUI.Widget.Router,
           TermUI.Widget.ScrollBar,
           TermUI.Widget.Select,
           TermUI.Widget.Sparkline,

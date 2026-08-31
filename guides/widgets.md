@@ -22,6 +22,44 @@ Text input selection emits `{:copy, text}` for copy and cut actions. Convert
 that message to `TermUI.Clipboard.copy/2` in the parent application. See the
 [interaction guide](interaction.md).
 
+## Parent-owned child routing
+
+`TermUI.Widget.Router` removes repeated state access and message mapping for
+nested widgets. Each route has an explicit child ID and parent-state path.
+The route is data. It does not own state or use a process.
+
+```elixir
+alias TermUI.Widget.{Checkbox, Router}
+
+model = %{
+  save: Checkbox.init(id: :save),
+  publish: Checkbox.init(id: :publish)
+}
+
+save = Router.new(:save, Checkbox, [:save])
+publish = Router.new(:publish, Checkbox, [:publish])
+
+{model, messages} = Router.update(save, event, model)
+# messages use the form {:widget, :save, child_message}
+
+focus = TermUI.Focus.new([:save, :publish], current: :save)
+true = Router.focused?(save, focus)
+
+regions = [
+  Router.region(save, 0, 0, 20, 1),
+  Router.region(publish, 0, 2, 20, 1)
+]
+
+routed = TermUI.Mouse.route(regions, mouse_event)
+{model, messages} = Router.mouse(save, routed, model, {20, 1})
+```
+
+Call `mouse/4` for each possible route, or select one route by the returned
+ID. A route that does not own the returned ID leaves the parent unchanged.
+Use `:map_message` in `new/4` when the parent needs a different message form.
+Two child routes can use the same widget module because their IDs and state
+paths are independent.
+
 ## Text and content
 
 - `TermUI.Widget.Label`

@@ -4,6 +4,7 @@ defmodule TermUI.SourceConventionsTest do
   alias TermUI.{Cell, Command, Event, Frame, Mouse, Selection, Style}
   alias TermUI.Clipboard.Operation
   alias TermUI.Mouse.Region
+  alias TermUI.Widget.Router
   alias TermUI.Widget.Table.Column
 
   @source_files Path.wildcard("lib/**/*.ex")
@@ -16,6 +17,7 @@ defmodule TermUI.SourceConventionsTest do
     "lib/term_ui/mouse.ex" => 1,
     "lib/term_ui/selection.ex" => 1,
     "lib/term_ui/style.ex" => 1,
+    "lib/term_ui/widget/router.ex" => 1,
     "lib/term_ui/widget/table/column.ex" => 1
   }
 
@@ -71,6 +73,7 @@ defmodule TermUI.SourceConventionsTest do
       {Command.schema(), Command.shutdown()},
       {Operation.schema(), TermUI.Clipboard.operation("text")},
       {Region.schema(), Mouse.region(:button, 0, 0, 4, 1)},
+      {Router.schema(), Router.new(:child, TermUI.Widget.Checkbox, [:child])},
       {Selection.schema(), Selection.new() |> Selection.start(0) |> Selection.extend(1)},
       {Column.schema(), Column.new(:name, "Name")}
     ]
@@ -94,6 +97,7 @@ defmodule TermUI.SourceConventionsTest do
       {Command.schema(), %Command{kind: :timer, value: {-1, :message}}},
       {Operation.schema(), %Operation{kind: :write, max_bytes: 0}},
       {Region.schema(), %Region{id: :bad, x: 0, y: 0, width: 0, height: 1}},
+      {Router.schema(), %Router{id: :bad, module: :not_a_module, path: [], map_message: :bad}},
       {Selection.schema(), %Selection{anchor: -1}},
       {Column.schema(), %Column{key: :name, label: "Name", align: :diagonal}}
     ]
@@ -141,6 +145,7 @@ defmodule TermUI.SourceConventionsTest do
       {Event.Focus, Event.Focus.schema()},
       {Frame, Frame.schema()},
       {Region, Region.schema()},
+      {Router, Router.schema()},
       {Selection, Selection.schema()},
       {Style, Style.schema()},
       {Column, Column.schema()}
