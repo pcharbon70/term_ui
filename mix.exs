@@ -240,7 +240,8 @@ defmodule TermUI.MixProject do
         Backends: [
           TermUI.Backend,
           TermUI.Backend.SSH,
-          TermUI.Backend.SSH.Channel
+          TermUI.Backend.SSH.Channel,
+          TermUI.Test.DeterministicBackend
         ]
       ]
     ]

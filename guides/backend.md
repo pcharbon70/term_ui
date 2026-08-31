@@ -27,8 +27,41 @@ to application dimensions `{columns, rows}`.
 must be safe during error cleanup. `draw/2` must retain the last successful
 frame or equivalent backend state so that a later frame can clear old cells.
 
-A test backend must avoid real terminal I/O. It can receive frames and return a
-fixed size. See `test/support/deterministic_backend.ex`.
+`TermUI.Test.DeterministicBackend` is the public v2 test boundary. It uses a
+fixed size, reports explicit capabilities, accepts normalized event and resize
+injection, and captures every complete frame. It does not open a terminal or
+call the TTY NIF.
+
+```elixir
+alias TermUI.Test.DeterministicBackend
+
+{:ok, runtime} =
+  TermUI.start_link(MyApp,
+    backend: {
+      DeterministicBackend,
+      owner: self(),
+      size: {12, 40},
+      capabilities: %{colors: :ansi_16, unicode: true}
+    },
+    backend_opts: [size_poll_interval: :disabled]
+  )
+
+assert_receive {:backend, :draw, %TermUI.Frame{} = initial}
+
+:ok = DeterministicBackend.send_event(runtime, TermUI.Event.key(:enter))
+:ok = DeterministicBackend.resize(runtime, 60, 20)
+
+assert_receive {:backend, :resize, {20, 60}}
+assert_receive {:backend, :draw, %TermUI.Frame{width: 60, height: 20}}
+
+TermUI.Runtime.shutdown(runtime)
+assert_receive {:backend, :shutdown_snapshot, snapshot}
+```
+
+The snapshot contains `:frames` in draw order, the final `:size`, the explicit
+`:capabilities`, pending queued events, clipboard operations, flush count, and
+`:shutdown_reason`. This test path needs no native terminal state. Use normal
+ExUnit message assertions. No v1 component harness or test renderer is used.
 
 The runtime puts each backend behind one serialized owner. State returned by
 input, size, draw, flush, and resize callbacks becomes the state for the next

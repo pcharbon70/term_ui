@@ -25,7 +25,8 @@ These features are not in the new package:
 - A constraint layout solver, layout cache, and alignment objects.
 - A shared shortcut service and global focus traversal groups.
 - Development hot reload, UI inspection, state inspection, and performance tools.
-- The component test harness, event simulator, and test renderer.
+- The component test harness and mutable test renderer. Use
+  `TermUI.Test.DeterministicBackend` for v2 runtime tests.
 - Dedicated Unix and Windows platform adapter modules.
 - The old set of one application for each widget. The counter is the retained
   general example.

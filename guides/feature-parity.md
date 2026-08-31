@@ -33,7 +33,7 @@ missing. `Deferred` means that the old form is not safe to restore.
 | Focus and shortcuts | Global focus manager, traversal groups, and shortcut sequence service | `TermUI.Focus` routes enabled traversal order; `TermUI.Shortcut` routes chords and timestamp-bounded sequences | Replaced with application-owned pure values. |
 | Layout solver | Constraint solver, alignment values, and a layout cache | Direct frame composition and a pure row, column, and fixed-grid rectangle allocator | Partial. Keep layout functions bounded and pure. Do not add a global cache. |
 | Developer tools | Hot reload, UI and state inspectors, and a performance monitor | Deterministic backend tests and runtime instrumentation through normal application state | Partial. Add optional inspection data APIs before any live tool. |
-| Test toolkit | Component harness, event simulator, and test renderer shipped in `lib/` | Public backend behaviour and deterministic test backend in test support | Replaced for internal tests. A separate public test package is better than shipping test code in the runtime package. |
+| Test toolkit | Component harness, event simulator, and test renderer shipped in `lib/` | Public deterministic v2 backend with event injection, complete frames, and shutdown snapshots | Replaced. Tests use the runtime, event, command, and frame contracts without component processes. |
 | Platform and SSH adapters | Unix and Windows adapter modules; the published Hex archive did not contain an SSH backend | Raw, TTY, and SSH backends own complete sessions | Replaced. SSH has a direct host API and an OTP SSH channel callback with isolated runtimes and bounded frame output. |
 
 ## Recommended order

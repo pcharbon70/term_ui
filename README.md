@@ -158,12 +158,19 @@ reparsed as new fragments arrive.
 
 ## Backends
 
-Use `:auto`, `:raw`, or `:tty` with the `:backend` option. Tests can inject a
-module that implements `TermUI.Backend`.
+Use `:auto`, `:raw`, or `:tty` with the `:backend` option. Tests can use the
+public deterministic backend or inject another module that implements
+`TermUI.Backend`.
 
 ```elixir
-TermUI.start_link(Counter, backend: {MyTestBackend, owner: self()})
+TermUI.start_link(Counter,
+  backend: {TermUI.Test.DeterministicBackend, owner: self(), size: {8, 40}}
+)
 ```
+
+`TermUI.Test.DeterministicBackend` captures complete frames and final shutdown
+state. It supports normalized event and resize injection without a terminal or
+TTY NIF. See the [backend guide](guides/backend.md).
 
 Raw mode needs OTP 28 or later. TTY mode is the fallback when raw mode is not
 available. `TermUI.Backend.SSH` runs one isolated v2 runtime for each remote
