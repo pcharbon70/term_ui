@@ -27,10 +27,10 @@ end
 
 TermUI uses MDEx to parse Markdown for terminal display. It uses Zoi schemas
 for public data that crosses application, runtime, backend, or configuration
-boundaries. Private runtime and widget state uses plain structs. TermUI also
-builds a small C NIF for complete control-key input on OTP 28 and OTP 29.
-Source builds must have a platform C compiler and build tool (`make`, or
-`nmake` on Windows).
+boundaries. Private runtime and widget state uses plain structs. TermUI has an
+optional small C NIF for complete control-key input in the local raw backend
+on OTP 28 and OTP 29. The TTY, SSH, and deterministic test backends do not
+need this NIF or a source compiler.
 
 ## Application contract
 
@@ -177,6 +177,24 @@ available. `TermUI.Backend.SSH` runs one isolated v2 runtime for each remote
 session. Applications that own an SSH server can use its direct session API.
 OTP SSH daemons can use `TermUI.Backend.SSH.Channel` as their `:ssh_cli`
 callback. The host keeps control of authentication and session limits.
+
+### Optional local TTY NIF
+
+`TERM_UI_TTY_NIF` controls the native build:
+
+- `auto` is the default. It builds the NIF from source when `make` and a C
+  compiler are available. If a tool is absent, it uses the pure BEAM TTY
+  fallback.
+- `source` requires a source build. A build error names each missing tool and
+  identifies the non-native backend paths.
+- `disabled` does not build the NIF. Use this mode for SSH servers, tests, and
+  installations that use `backend: :tty`.
+
+The NIF loads only when the local raw backend needs the native control-flag
+fallback. It does not load when the runtime uses the TTY, SSH, deterministic,
+or another custom backend. TermUI does not ship precompiled NIF artifacts.
+This policy keeps platform binaries out of the package and uses the existing
+pure BEAM TTY backend when a source build is not available.
 
 ## Documents
 

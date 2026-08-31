@@ -1,6 +1,8 @@
 defmodule TermUI.Terminal.RawModePtyTest do
   use ExUnit.Case, async: false
 
+  @moduletag :tty_nif
+
   @control_bytes <<15, 3, 19, 17>>
   @result "__TERM_UI_RESULT__:0F031311::ok"
   @timeout 10_000

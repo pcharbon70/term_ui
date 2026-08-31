@@ -26,6 +26,37 @@ jobs:
       docs_command: mix docs --warnings-as-errors -f html && mix doctor --raise
       test_command: mix coveralls --warnings-as-errors
 
+  tty-nif-policy:
+    name: TTY NIF (${{ matrix.mode }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [source, disabled]
+    env:
+      TERM_UI_TTY_NIF: ${{ matrix.mode }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1.24.0
+        with:
+          otp-version: "29"
+          elixir-version: "1.20"
+      - name: Compile selected native policy
+        run: |
+          mix deps.get
+          mix compile --warnings-as-errors
+      - name: Verify selected native policy
+        run: |
+          if [ "$TERM_UI_TTY_NIF" = "source" ]; then
+            mix run --no-start --no-compile -e \
+              'unless TermUI.Terminal.TtyNif.ensure_loaded() == :ok and TermUI.Terminal.TtyNif.loaded?(), do: raise("TTY NIF did not load")'
+          else
+            test ! -e _build/dev/lib/term_ui/priv/term_ui_tty_nif.so
+            mix run --no-start --no-compile test/support/no_nif_backend_probe.exs
+          fi
+      - name: Test selected native policy
+        run: mix test --warnings-as-errors
+
   examples:
     name: Example (${{ matrix.directory }})
     runs-on: ubuntu-latest

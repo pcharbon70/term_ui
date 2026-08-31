@@ -87,13 +87,27 @@ defmodule TermUI.Terminal.RawMode do
   end
 
   defp disable_native_flags(shell_start, tty_nif) do
-    case call_native(tty_nif, :disable_control_flags, []) do
-      {:ok, flags} ->
-        {:ok, {:native, flags}}
-
+    with :ok <- ensure_native_loaded(tty_nif),
+         {:ok, flags} <- call_native(tty_nif, :disable_control_flags, []) do
+      {:ok, {:native, flags}}
+    else
       {:error, reason} ->
         rollback = call_shell(shell_start, {:noshell, :cooked})
         {:error, {:control_flags_unavailable, reason, rollback}}
+    end
+  end
+
+  defp ensure_native_loaded(module) do
+    case Code.ensure_loaded(module) do
+      {:module, ^module} ->
+        if function_exported?(module, :ensure_loaded, 0) do
+          call_native(module, :ensure_loaded, [])
+        else
+          :ok
+        end
+
+      {:error, reason} ->
+        {:error, {:native_module_unavailable, module, reason}}
     end
   end
 

@@ -1,25 +1,33 @@
 defmodule TermUI.Terminal.TtyNif do
   @moduledoc false
 
-  @on_load :load_nif
-
   @dialyzer {:nowarn_function, [loaded?: 0, disable_control_flags: 0, restore_control_flags: 1]}
 
   @type control_flags :: {non_neg_integer(), non_neg_integer()}
   @type error_reason :: :nif_not_loaded | {:posix | :win32, non_neg_integer()}
+  @type load_error :: {:priv_dir_unavailable, term()} | {:load_failed, term(), String.t()}
 
   @doc false
-  @spec load_nif() :: :ok
+  @spec ensure_loaded() :: :ok | {:error, load_error()}
+  def ensure_loaded do
+    if loaded?(), do: :ok, else: load_nif()
+  end
+
+  @doc false
+  @spec load_nif() :: :ok | {:error, load_error()}
   def load_nif do
-    with directory when is_list(directory) <- :code.priv_dir(:term_ui),
-         path <- :filename.join(directory, ~c"term_ui_tty_nif") do
-      case :erlang.load_nif(path, 0) do
-        :ok -> :ok
-        {:error, {operation, _detail}} when operation in [:reload, :upgrade] -> :ok
-        {:error, _reason} -> :ok
-      end
-    else
-      _error -> :ok
+    case :code.priv_dir(:term_ui) do
+      directory when is_list(directory) ->
+        path = :filename.join(directory, ~c"term_ui_tty_nif")
+
+        case :erlang.load_nif(path, 0) do
+          :ok -> :ok
+          {:error, {operation, _detail}} when operation in [:reload, :upgrade] -> :ok
+          {:error, {reason, detail}} -> {:error, {:load_failed, reason, to_string(detail)}}
+        end
+
+      {:error, reason} ->
+        {:error, {:priv_dir_unavailable, reason}}
     end
   end
 

@@ -4,6 +4,11 @@ defmodule TermUI.Terminal.RawModeTest do
   alias TermUI.Terminal.{RawMode, TtyNif}
 
   defmodule FakeTtyNif do
+    def ensure_loaded do
+      send(self(), :ensure_tty_nif_loaded)
+      Process.get({__MODULE__, :load_result}, :ok)
+    end
+
     def disable_control_flags do
       send(self(), :disable_control_flags)
       Process.get({__MODULE__, :disable_result}, {:ok, {1, 2}})
@@ -15,7 +20,9 @@ defmodule TermUI.Terminal.RawModeTest do
     end
   end
 
-  test "the compiled NIF loads" do
+  @tag :tty_nif
+  test "the source-built NIF loads on request" do
+    assert :ok = TtyNif.ensure_loaded()
     assert TtyNif.loaded?()
   end
 
@@ -30,6 +37,7 @@ defmodule TermUI.Terminal.RawModeTest do
              )
 
     assert_receive {:shell_start, {:noshell, :raw}}
+    assert_receive :ensure_tty_nif_loaded
     assert_receive :disable_control_flags
 
     assert :ok =
@@ -87,6 +95,23 @@ defmodule TermUI.Terminal.RawModeTest do
 
     assert_receive {:shell_start, {:noshell, :raw}}
     assert_receive :disable_control_flags
+    assert_receive {:shell_start, {:noshell, :cooked}}
+  end
+
+  test "an unavailable native module returns the terminal to cooked mode" do
+    Process.put({FakeTtyNif, :load_result}, {:error, :missing_artifact})
+    shell_start = successful_shell_start()
+
+    assert {:error, {:control_flags_unavailable, :missing_artifact, :ok}} =
+             RawMode.enter(
+               shell_start: shell_start,
+               signals_api?: false,
+               tty_nif: FakeTtyNif
+             )
+
+    assert_receive {:shell_start, {:noshell, :raw}}
+    assert_receive :ensure_tty_nif_loaded
+    refute_receive :disable_control_flags
     assert_receive {:shell_start, {:noshell, :cooked}}
   end
 

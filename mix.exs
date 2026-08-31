@@ -12,7 +12,7 @@ defmodule TermUI.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       elixirc_paths: elixirc_paths(Mix.env()),
-      compilers: [:elixir_make] ++ Mix.compilers(),
+      compilers: tty_nif_compilers(),
       make_targets: ["all"],
       make_clean: ["clean"],
 
@@ -59,6 +59,65 @@ defmodule TermUI.MixProject do
     [
       extra_applications: [:logger, :ssh]
     ]
+  end
+
+  @doc false
+  def tty_nif_compilers(
+        mode \\ System.get_env("TERM_UI_TTY_NIF", "auto"),
+        executable_finder \\ &System.find_executable/1,
+        os_type \\ :os.type()
+      ) do
+    case String.downcase(mode) do
+      "auto" ->
+        if missing_tty_nif_tools(executable_finder, os_type) == [] do
+          [:elixir_make | Mix.compilers()]
+        else
+          Mix.compilers()
+        end
+
+      "source" ->
+        require_tty_nif_tools!(executable_finder, os_type)
+        [:elixir_make | Mix.compilers()]
+
+      "disabled" ->
+        Mix.compilers()
+
+      invalid ->
+        Mix.raise(
+          "TERM_UI_TTY_NIF must be auto, source, or disabled; received #{inspect(invalid)}"
+        )
+    end
+  end
+
+  defp require_tty_nif_tools!(executable_finder, os_type) do
+    case missing_tty_nif_tools(executable_finder, os_type) do
+      [] ->
+        :ok
+
+      missing ->
+        Mix.raise("""
+        TermUI cannot build its optional local TTY NIF because these tools are missing: \
+        #{Enum.join(missing, ", ")}.
+
+        Install the missing tools, or set TERM_UI_TTY_NIF=disabled. The :tty,
+        TermUI.Backend.SSH, and TermUI.Test.DeterministicBackend paths do not need the NIF.
+        """)
+    end
+  end
+
+  defp missing_tty_nif_tools(executable_finder, os_type) do
+    os_type
+    |> tty_nif_tools()
+    |> Enum.reject(fn {_label, executable} -> executable_finder.(executable) end)
+    |> Enum.map(&elem(&1, 0))
+  end
+
+  defp tty_nif_tools({:win32, _name}),
+    do: [{"nmake build tool", "nmake"}, {"Microsoft C/C++ compiler (cl)", "cl"}]
+
+  defp tty_nif_tools(_os_type) do
+    compiler = System.get_env("CC", "cc")
+    [{"make build tool", "make"}, {"C compiler (#{compiler})", compiler}]
   end
 
   defp deps do

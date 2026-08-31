@@ -67,6 +67,27 @@ The runtime puts each backend behind one serialized owner. State returned by
 input, size, draw, flush, and resize callbacks becomes the state for the next
 callback and for final cleanup.
 
+## Native build policy
+
+Only the local raw backend can need the TTY NIF. OTP 28 and OTP 29 need this
+small native helper to stop the terminal driver from consuming Ctrl+O,
+Ctrl+C, Ctrl+S, and Ctrl+Q. The `:tty` backend is the pure BEAM local fallback.
+The SSH and deterministic backends also use only BEAM code.
+
+The `TERM_UI_TTY_NIF` build setting has these values:
+
+| Value | Build and runtime behavior |
+| --- | --- |
+| `auto` | Build from source when `make` and a C compiler exist. Otherwise, do not build the NIF. |
+| `source` | Require a source build. Stop with a clear list of missing tools when the toolchain is incomplete. |
+| `disabled` | Do not build the NIF. Keep TTY, SSH, deterministic, and custom backends available. |
+
+`auto` is the default. TermUI does not ship precompiled artifacts. The local
+raw path loads the NIF on demand. Backend selection falls back to `:tty` when
+the NIF is absent and OTP cannot manage control signals. An explicit `:raw`
+selection returns a structured `:raw_mode_unavailable` error. It does not
+leave the terminal in raw mode.
+
 Size polling uses a 200 ms interval when direct terminal or environment size
 checks are available. It uses a 1 second interval when detection must start
 `stty`. Set `backend_opts: [size_poll_interval: milliseconds]` to use an
