@@ -22,6 +22,7 @@ CFLAGS += -O2 -Wall -Wextra -fPIC -I"$(ERTS_INCLUDE_DIR)"
 all: $(NIF)
 
 $(PRIV_DIR):
+	test ! -L $@ || test -e $@ || rm -f $@
 	mkdir -p $@
 
 $(NIF): $(SRC) | $(PRIV_DIR)
