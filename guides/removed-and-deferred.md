@@ -53,7 +53,7 @@ The widget names are present, but some old adapters and services are not:
 | Toast | Pure state with explicit `tick/2` | Timer process and global stack service |
 | Line input | Pure event-driven input | Blocking shell `IO.gets/1` adapter |
 | Markdown code blocks | Emits copy data that the parent can send as a clipboard command | Direct clipboard writes |
-| Menu and context menu | Flat actions, separators, keyboard and mouse control, and an overlay position | Submenu processes and inline service variants |
+| Menu and context menu | Nested data, pure open-path state, keyboard and mouse control, and edge-fitted overlay positions | Submenu processes and inline service variants |
 | Table | Pure sorting, filtering, scrolling, columns, and identity-based row selection | Callback execution and a sorting service process |
 | Form | Text, checkbox, select, and pure field, group, and submit validation | Field processes and callback execution |
 | Split pane and viewport | Pure multi-pane, collapse, geometry, scrollbar, and local drag state | Global mouse routing and persistence services |

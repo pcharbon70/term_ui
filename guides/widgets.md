@@ -222,6 +222,35 @@ shortcuts. Menus support vertical and horizontal orientation. Tabs support
 left, center, and right alignment. Tabs, menus, radio groups, selects, trees,
 and dialogs skip disabled choices during keyboard navigation.
 
+### Nested menus
+
+Use `TermUI.Widget.Menu.submenu/4` to keep command structure in the menu data.
+The `open_path` field contains submenu IDs from the root to the active level.
+
+```elixir
+menu =
+  TermUI.Widget.Menu.init(
+    items: [
+      TermUI.Widget.Menu.submenu(:file, "File", [
+        TermUI.Widget.Menu.action(:new, "New"),
+        TermUI.Widget.Menu.submenu(:recent, "Recent", [
+          TermUI.Widget.Menu.action(:notes, "notes.md")
+        ])
+      ])
+    ]
+  )
+```
+
+Right or Enter opens the current submenu. Left closes one level. Escape closes
+one level, or dismisses the root menu when no submenu is open. Mouse release
+uses the same open or action transition. The menu frame clips nested rows to
+its dimensions.
+
+The parent can use `Menu.fit_overlay/3` to fit a root menu inside terminal
+dimensions. `Menu.fit_submenu/3` opens a submenu on the right when it fits. It
+opens on the left at the right edge. Both helpers move content up at the
+bottom edge and clip a menu that is larger than the terminal.
+
 ## Bounded streams
 
 The pure stream supports batches, counters, clear, and three overflow modes:

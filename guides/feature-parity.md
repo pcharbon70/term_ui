@@ -23,7 +23,7 @@ missing. `Deferred` means that the old form is not safe to restore.
 | Code block copy | The widget callback wrote through caller code from a component process | The pure widget returns `{:copy, code}` and the parent can issue a bounded clipboard command | Replaced with safer effect ownership. |
 | Diff viewing | No dedicated diff viewer | Unified and side-by-side views, Myers line comparison, input bounds, and mode switching | Added in the rewrite. |
 | Tables | Sorting, single or multi-selection, callbacks, and constraint widths | Pure stable sorting and filtering, identity-based single or multiple selection, vertical scrolling, mouse or keyboard selection, and row replacement | Replaced for data interaction. Callbacks are parent messages, and v2 uses direct column widths. |
-| Menus | Actions, checkboxes, separators, and nested submenus | Flat actions, separators, disabled items, keyboard and mouse control, and context positions | Partial. Add nested menu data and pure open-path state. Do not restore submenu processes. |
+| Menus | Actions, checkboxes, separators, and nested submenus | Actions, separators, disabled items, nested submenu data, pure open-path state, keyboard and mouse control, and edge-fitted context positions | Replaced for nested navigation. Checkbox items remain reduced, and no submenu process exists. |
 | Forms | Six field types, custom validators, groups, visibility rules, reset, and submit callbacks | Text, checkbox, select, pure field, group, and submit validators, field errors, first-error focus, paste cleaning, mouse focus, and submit messages | Replaced for validation flow. Some field types and conditional visibility remain reduced. |
 | Viewports | Scroll bars, drag control, `scroll_into_view/3`, content dimensions, and visible fractions | Pure geometry, visible ranges, `scroll_into_view/3`, optional local scrollbars, keyboard and wheel scroll, and drag state | Retained through a pure replacement. |
 | Split panes | Multiple panes, collapse, keyboard resize, persistence, and mouse drag | Named multi-pane weights, collapse state, measured layout, keyboard resize, and local separator drag; legacy two-pane fields remain | Retained except automatic persistence. The parent can persist the pure value. |
@@ -40,9 +40,8 @@ missing. `Deferred` means that the old form is not safe to restore.
 
 1. Add optional Elixir and Erlang code highlighting with terminal capability
    fallback.
-2. Add nested menu state.
-3. Add richer form field data when a Jido Console use case needs it.
-4. Add optional inspection data APIs before any live developer tool.
+2. Add richer form field data when a Jido Console use case needs it.
+3. Add optional inspection data APIs before any live developer tool.
 
 Bounded assistant output and rich Markdown no longer need the old component
 ownership model. Syntax highlighting is the main remaining rich-Markdown gap.

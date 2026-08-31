@@ -25,7 +25,7 @@ The status terms have these meanings:
 | `TermUI.Widgets.Canvas` | `TermUI.Widget.Canvas` | Reduced | No facade. Core character, line, rectangle, and Braille drawing remain, but the old read, fill, and render-node helpers do not. |
 | `TermUI.Widgets.ClusterDashboard` | `TermUI.Widget.ClusterDashboard` plus application commands | Application-owned | No facade. The parent supplies node snapshots and handles refresh requests. |
 | `TermUI.Widgets.CommandPalette` | `TermUI.Widget.CommandPalette` | Reduced | No facade. Selection returns parent messages and uses pure pick-list state. |
-| `TermUI.Widgets.ContextMenu` | `TermUI.Widget.ContextMenu` | Reduced | No facade. V2 has one flat, parent-owned menu value. |
+| `TermUI.Widgets.ContextMenu` | `TermUI.Widget.ContextMenu` | Reduced | No facade. V2 has nested parent-owned menu data and pure edge placement, but no process variants. |
 | `TermUI.Widgets.ContextMenu.Behavior`, `TermUI.Widgets.ContextMenu.Factory`, and `TermUI.Widgets.ContextMenu.Inline` | `TermUI.Widget.ContextMenu` and `TermUI.Widget.Menu` | Removed | No facade. The process and factory variants are not part of v2. |
 | `TermUI.Widgets.Dialog` | `TermUI.Widget.Dialog` | Reduced | No facade. V2 returns messages instead of calling close and confirm callbacks. |
 | `TermUI.Widgets.FormBuilder` | `TermUI.Widget.FormBuilder` | Reduced | No facade. Pure field, group, and submit validation restore the error flow, but field types and callback results do not match. |
@@ -33,7 +33,7 @@ The status terms have these meanings:
 | `TermUI.Widgets.LineChart` | `TermUI.Widget.LineChart` | Reduced | No facade. V2 keeps the pure series view but has a smaller option set. |
 | `TermUI.Widgets.LogViewer` | `TermUI.Widget.LogViewer` | Reduced | No facade. Search, bookmark, selection, and callback state differ. |
 | `TermUI.Widgets.MarkdownViewer` | `TermUI.Widget.MarkdownViewer` | Deferred | No facade. V2 uses bounded documents and parent-owned copy messages; optional syntax highlighting is separate work. |
-| `TermUI.Widgets.Menu` | `TermUI.Widget.Menu` | Deferred | No facade until nested menu state has equivalent pure behavior. |
+| `TermUI.Widgets.Menu` | `TermUI.Widget.Menu` | Reduced | No facade. Nested open-path behavior is pure, but v1 checkbox items and callback results do not match. |
 | `TermUI.Widgets.ProcessMonitor` | `TermUI.Widget.ProcessMonitor` plus application commands | Application-owned | No facade. The parent collects process snapshots and owns actions. |
 | `TermUI.Widgets.ScrollBar` | `TermUI.Widget.ScrollBar` | Reduced | No facade. Size fields and callback results changed to pure state and messages. |
 | `TermUI.Widgets.Sparkline` | `TermUI.Widget.Sparkline` | Direct | Deprecated facade available. Both paths use the same pure state, scaling, character mapping, and frame view. |

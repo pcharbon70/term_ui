@@ -5,11 +5,12 @@ defmodule TermUI.Widget.ContextMenu do
 
   alias TermUI.Widget.Menu
 
-  @type t :: %__MODULE__{menu: Menu.t(), position: {non_neg_integer(), non_neg_integer()}}
+  @type t :: %__MODULE__{menu: Menu.t(), position: {integer(), integer()}}
   defstruct menu: %Menu{},
             position: {0, 0}
 
   defdelegate action(id, label, opts \\ []), to: Menu
+  defdelegate submenu(id, label, children, opts \\ []), to: Menu
   defdelegate separator(), to: Menu
 
   @impl true
@@ -33,10 +34,19 @@ defmodule TermUI.Widget.ContextMenu do
   def view(state, dimensions), do: Menu.view(state.menu, dimensions)
 
   @doc "Returns the requested zero-based overlay position."
-  @spec position(t()) :: {non_neg_integer(), non_neg_integer()}
+  @spec position(t()) :: {integer(), integer()}
   def position(state), do: state.position
 
+  @doc "Returns a clipped and repositioned overlay rectangle for terminal dimensions."
+  @spec placement(
+          t(),
+          {non_neg_integer(), non_neg_integer()},
+          {non_neg_integer(), non_neg_integer()}
+        ) :: TermUI.Layout.rect()
+  def placement(state, menu_dimensions, terminal_dimensions),
+    do: Menu.fit_overlay(state.position, menu_dimensions, terminal_dimensions)
+
   @doc "Moves the context menu."
-  @spec move_to(t(), {non_neg_integer(), non_neg_integer()}) :: t()
+  @spec move_to(t(), {integer(), integer()}) :: t()
   def move_to(state, position), do: %{state | position: position}
 end
