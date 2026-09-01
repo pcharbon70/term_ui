@@ -38,7 +38,7 @@ missing. `Deferred` means that the old form is not safe to restore.
 
 ## Recommended order
 
-1. Add richer form field data when a Jido Console use case needs it.
+1. Add richer form field data when an application use case needs it.
 2. Add optional inspection data APIs before any live developer tool.
 
 Bounded assistant output and rich Markdown no longer need the old component

@@ -9,14 +9,16 @@ explains the ownership rules from inside a running terminal application.
 Use a terminal of at least 80 columns by 24 rows when possible.
 
 ```sh
-git clone https://github.com/pcharbon70/term_ui.git
-cd term_ui/examples/showcase
+git clone https://github.com/agentjido/term_ui.git
+cd term_ui
+git switch next/v2
+cd examples/showcase
 mix deps.get
 mix run run.exs
 ```
 
 See the [showcase source and full control
-list](https://github.com/pcharbon70/term_ui/tree/develop/examples/showcase).
+list](https://github.com/agentjido/term_ui/tree/next/v2/examples/showcase).
 
 Press Escape and then 1 through 6 to select a page. This command menu does not
 depend on terminal function-key settings.

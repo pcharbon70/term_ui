@@ -19,7 +19,7 @@ still contains some older v4 examples.
 | CI | The v5 shared CI caller tests each declared Elixir and OTP pair. The native-policy jobs also test the source NIF on the minimum pair. CI checks audit, docs, package content, and unused dependencies. |
 | Dependency updates | Dependabot checks Mix and GitHub Actions dependencies each week with Conventional Commit titles. |
 | Releases | The v5 shared release caller uses `git_ops` for release preparation and Hex publication. |
-| Review | The v5 shared advisory review caller checks pull requests to `develop`. |
+| Review | The v5 shared advisory review caller checks pull requests to `develop` and `next/v2`. |
 | Examples | The runnable counter and showcase examples are outside `lib/` and have their own Mix projects. |
 | Worktree safety | The package does not auto-install Git hooks and does not store local worktree paths. |
 
@@ -32,8 +32,8 @@ still contains some older v4 examples.
   the public failure contract.
 - TermUI has no installer. It needs no project files, configuration, database
   changes, or generated code, so an Igniter installer would have no work to do.
-- `develop` is the default branch, so CI push and review filters use `develop`
-  instead of the shared examples' `main` branch.
+- `develop` remains the default stable integration branch. The v2 work stays
+  on `next/v2`, so CI push and review filters include both branches.
 
 Review these exceptions before a stable 1.0 release. Do not remove them by
 changing the runtime or public namespace in a quality-only change.

@@ -234,13 +234,13 @@ Suggested structure:
 Update the comparison links at the bottom of `CHANGELOG.md`:
 
 ```markdown
-[Unreleased]: https://github.com/pcharbon70/term_ui/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/pcharbon70/term_ui/compare/v1.0.0-rc...v1.0.0
+[Unreleased]: https://github.com/agentjido/term_ui/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/agentjido/term_ui/compare/v1.0.0-rc...v1.0.0
 ```
 
 Review the actual Git comparison before finalizing the notes:
 
-<https://github.com/pcharbon70/term_ui/compare/v1.0.0-rc...develop>
+<https://github.com/agentjido/term_ui/compare/v1.0.0-rc...develop>
 
 Release gate:
 

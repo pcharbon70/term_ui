@@ -7,72 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-
-- Added a tested interactive showcase for live widgets, input, rich content,
-  BEAM snapshots, and the TermUI architecture.
-- Added pure checkbox, toggle, radio group, select, spinner, and breadcrumb
-  widgets, with a Controls page in the showcase.
-- Added pure row, column, fixed-grid, inset, placement, and mouse-region layout
-  helpers.
-- Added complete raw control-byte input on OTP 28 and OTP 29. A small native
-  terminal layer now passes Ctrl+O, Ctrl+C, Ctrl+S, and Ctrl+Q to applications
-  and restores the original terminal flags during shutdown.
-- Restored the general widget feature set as parent-owned pure widgets under
-  `TermUI.Widget`.
-- Added an MDEx Markdown renderer and scrollable Markdown viewer.
-- Added unified and side-by-side terminal diff views.
-- Added frame overlay composition for widget frames.
-- Added Zoi schemas for public boundary data, including cells, styles, frames,
-  events, commands, clipboard operations, mouse regions, selections, and table
-  columns.
-- Added bounded clipboard commands that run through the serialized backend owner.
-- Added pure Unicode grapheme selection for single-line and multiline text input.
-- Added pure mouse regions, local-coordinate routing, hover state, and drag tracking.
-- Added local mouse behavior for interactive widgets, scrollbars, and split panes.
-
-### Changed
-
-- Private backend, parser, stream, and widget state now uses plain structs.
-  Zoi remains at public data boundaries instead of defining every struct.
-- Boundary schemas now validate colors, cell invariants, frame bounds, nested
-  cells, and command payloads.
-- Process, stream, supervision, and cluster widgets now render data snapshots
-  supplied by the parent application. They do not own effect processes.
-- Markdown rendering and incremental documents now share one internal parser
-  dependency, which removes their cross-reference cycle.
-- Buttons, lists, menus, tabs, trees, blocks, and dialogs now support richer
-  decoration, disabled-item navigation, and child-frame composition.
-
-### Fixed
-
-- Unsupported terminal control sequences no longer emit their parameter bytes
-  as application text.
-- Frame mutations preserve wide-grapheme pairs and cannot place a wide
-  grapheme past the frame boundary.
-- Timed-out terminal command tasks are now stopped.
-- SGR mouse releases retain their button, and X10 releases are no longer
-  reported as presses.
-
-## [1.0.0-rc] - 2026-08-19
-
-### Changed
-
-- Replaced the component process system with one Elm application runtime.
-- Made `TermUI.Frame` the only application render value.
-- Moved terminal lifecycle, input, output, size, cursor, and capabilities into backends.
-- Split printable text from named and modified key events.
-- Replaced effect tuples with `TermUI.Command` data.
-- Replaced process widgets with parent-owned pure widgets.
-
-### Removed
-
-- Removed component servers, registries, supervisors, event routers, and focus managers.
-- Removed legacy input handlers, render nodes, renderer buffers, and duplicate widget namespaces.
-- Removed the SSH backend until it can own a complete terminal session lifecycle.
-
-See `guides/migration-1.0.md` for the replacement map.
-
 ## [0.2.0] - 2024-12-01
 
 ### Added
@@ -161,7 +95,6 @@ See `guides/migration-1.0.md` for the replacement map.
 - Developer guides (architecture, runtime, rendering, events, buffers, terminal, creating widgets)
 - Widget examples with READMEs
 
-[Unreleased]: https://github.com/mikehostetler/term_ui/compare/v1.0.0-rc...HEAD
-[1.0.0-rc]: https://github.com/mikehostetler/term_ui/compare/v0.2.0...v1.0.0-rc
-[0.2.0]: https://github.com/mikehostetler/term_ui/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/mikehostetler/term_ui/releases/tag/v0.1.0
+[Unreleased]: https://github.com/pcharbon70/term_ui/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/pcharbon70/term_ui/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/pcharbon70/term_ui/releases/tag/v0.1.0

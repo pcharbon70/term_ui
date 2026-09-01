@@ -2,7 +2,7 @@ defmodule TermUI.MixProject do
   use Mix.Project
 
   @version "1.0.0-rc.1"
-  @source_url "https://github.com/pcharbon70/term_ui"
+  @source_url "https://github.com/agentjido/term_ui"
 
   def project do
     [

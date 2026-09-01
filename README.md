@@ -216,7 +216,7 @@ pure BEAM TTY backend when a source build is not available.
 - [Migration to 1.0](guides/migration-1.0.md)
 - [Interactive showcase](guides/showcase.md)
 - [Runnable showcase application](examples/showcase/README.md)
-- [Counter example](https://github.com/pcharbon70/term_ui/tree/develop/examples/iex_counter)
+- [Counter example](https://github.com/agentjido/term_ui/tree/next/v2/examples/iex_counter)
 
 ## License
 
