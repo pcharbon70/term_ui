@@ -1,53 +1,89 @@
 name: CI
 
 on:
-  push:
-    branches: [main]
   pull_request:
-    branches: [main]
+  merge_group:
+  push:
+    branches:
+      - develop
+      - next/v2
 
-env:
-  MIX_ENV: test
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  actions: read
+  contents: read
 
 jobs:
-  test:
-    name: Test (Elixir ${{ matrix.elixir }} / OTP ${{ matrix.otp }})
-    runs-on: ubuntu-latest
+  ci:
+    name: CI
+    uses: agentjido/github-actions/.github/workflows/jido-ci.yml@v5
+    secrets: inherit
+    with:
+      test_matrix: '[{"otp":"28","elixir":"1.18.4"},{"otp":"28","elixir":"1.19"},{"otp":"28","elixir":"1.20"},{"otp":"29","elixir":"1.20"}]'
+      format_command: mix do format --check-formatted, xref graph --format cycles --fail-above 0
+      docs_command: mix docs --warnings-as-errors -f html && mix doctor --raise
+      test_command: mix coveralls --warnings-as-errors
 
+  tty-nif-policy:
+    name: TTY NIF (${{ matrix.mode }}, OTP ${{ matrix.otp }}, Elixir ${{ matrix.elixir }})
+    runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         include:
-          - elixir: "1.19"
+          - mode: source
             otp: "28"
-
+            elixir: "1.18.4"
+          - mode: source
+            otp: "29"
+            elixir: "1.20"
+          - mode: disabled
+            otp: "29"
+            elixir: "1.20"
+    env:
+      TERM_UI_TTY_NIF: ${{ matrix.mode }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Elixir
-        uses: erlef/setup-beam@v1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1.24.0
         with:
-          elixir-version: ${{ matrix.elixir }}
           otp-version: ${{ matrix.otp }}
+          elixir-version: ${{ matrix.elixir }}
+      - name: Compile selected native policy
+        run: |
+          mix deps.get
+          mix compile --warnings-as-errors
+      - name: Verify selected native policy
+        run: |
+          if [ "$TERM_UI_TTY_NIF" = "source" ]; then
+            mix run --no-start --no-compile -e \
+              'unless TermUI.Terminal.TtyNif.ensure_loaded() == :ok and TermUI.Terminal.TtyNif.loaded?(), do: raise("TTY NIF did not load")'
+          else
+            test ! -e _build/dev/lib/term_ui/priv/term_ui_tty_nif.so
+            mix run --no-start --no-compile test/support/no_nif_backend_probe.exs
+          fi
+      - name: Test selected native policy
+        run: mix test --warnings-as-errors
 
-      - name: Cache dependencies
-        uses: actions/cache@v4
+  examples:
+    name: Example (${{ matrix.directory }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        directory: [iex_counter, showcase]
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1.24.0
         with:
-          path: |
-            deps
-            _build
-          key: ${{ runner.os }}-mix-${{ matrix.otp }}-${{ matrix.elixir }}-${{ hashFiles('**/mix.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-mix-${{ matrix.otp }}-${{ matrix.elixir }}-
-
-      - name: Install dependencies
-        run: mix deps.get
-
-      - name: Check formatting
-        run: mix format --check-formatted
-
-      - name: Compile with warnings as errors
-        run: mix compile --warnings-as-errors
-
-      - name: Run tests
-        run: mix test
+          otp-version: "29"
+          elixir-version: "1.20"
+      - name: Compile and test example
+        working-directory: examples/${{ matrix.directory }}
+        run: |
+          mix deps.get
+          mix deps.unlock --check-unused
+          git diff --exit-code -- mix.lock
+          mix test --warnings-as-errors

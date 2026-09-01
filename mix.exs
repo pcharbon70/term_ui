@@ -1,33 +1,37 @@
 defmodule TermUI.MixProject do
   use Mix.Project
 
-  @version "1.0.0-rc"
-  @source_url "https://github.com/pcharbon70/term_ui"
+  @version "1.0.0-rc.1"
+  @source_url "https://github.com/agentjido/term_ui"
 
   def project do
     [
       app: :term_ui,
       version: @version,
-      elixir: "~> 1.15",
+      elixir: ">= 1.18.4 and < 2.0.0",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       elixirc_paths: elixirc_paths(Mix.env()),
+      compilers: tty_nif_compilers(),
+      make_targets: ["all"],
+      make_clean: ["clean"],
 
       # Hex package
       name: "TermUI",
-      description: "A direct-mode Terminal UI framework for Elixir/BEAM",
+      description: "A small Elm terminal runtime for Elixir and the BEAM",
       package: package(),
       source_url: @source_url,
       homepage_url: @source_url,
       docs: docs(),
+      aliases: aliases(),
 
       # Test coverage
-      test_coverage: [tool: ExCoveralls],
+      test_coverage: [tool: ExCoveralls, summary: [threshold: 90]],
 
       # Dialyzer
-      # Note: call_without_opaque warnings suppressed with :no_opaque in widget modules
-      # due to MapSet nested in opaque Style type
       dialyzer: [
+        ignore_warnings: ".dialyzer_ignore.exs",
+        list_unused_filters: true,
         flags: [
           :error_handling,
           :underspecs,
@@ -53,53 +57,144 @@ defmodule TermUI.MixProject do
 
   def application do
     [
-      extra_applications: [:logger]
+      extra_applications: [:logger, :ssh]
     ]
+  end
+
+  @doc false
+  def tty_nif_compilers(
+        mode \\ System.get_env("TERM_UI_TTY_NIF", "auto"),
+        executable_finder \\ &System.find_executable/1,
+        os_type \\ :os.type()
+      ) do
+    case String.downcase(mode) do
+      "auto" ->
+        if missing_tty_nif_tools(executable_finder, os_type) == [] do
+          [:elixir_make | Mix.compilers()]
+        else
+          Mix.compilers()
+        end
+
+      "source" ->
+        require_tty_nif_tools!(executable_finder, os_type)
+        [:elixir_make | Mix.compilers()]
+
+      "disabled" ->
+        Mix.compilers()
+
+      invalid ->
+        Mix.raise(
+          "TERM_UI_TTY_NIF must be auto, source, or disabled; received #{inspect(invalid)}"
+        )
+    end
+  end
+
+  defp require_tty_nif_tools!(executable_finder, os_type) do
+    case missing_tty_nif_tools(executable_finder, os_type) do
+      [] ->
+        :ok
+
+      missing ->
+        Mix.raise("""
+        TermUI cannot build its optional local TTY NIF because these tools are missing: \
+        #{Enum.join(missing, ", ")}.
+
+        Install the missing tools, or set TERM_UI_TTY_NIF=disabled. The :tty,
+        TermUI.Backend.SSH, and TermUI.Test.DeterministicBackend paths do not need the NIF.
+        """)
+    end
+  end
+
+  defp missing_tty_nif_tools(executable_finder, os_type) do
+    os_type
+    |> tty_nif_tools()
+    |> Enum.reject(fn {_label, executable} -> executable_finder.(executable) end)
+    |> Enum.map(&elem(&1, 0))
+  end
+
+  defp tty_nif_tools({:win32, _name}),
+    do: [{"nmake build tool", "nmake"}, {"Microsoft C/C++ compiler (cl)", "cl"}]
+
+  defp tty_nif_tools(_os_type) do
+    compiler = System.get_env("CC", "cc")
+    [{"make build tool", "make"}, {"C compiler (#{compiler})", compiler}]
   end
 
   defp deps do
     [
+      # Markdown parsing
+      {:mdex, "~> 0.13.5"},
+
+      # Public boundary data schemas and struct definitions
+      {:zoi, "~> 0.18.7"},
+
+      # Native terminal control for OTP 28 and OTP 29
+      {:elixir_make, "~> 0.9", runtime: false},
+
       # Documentation
       {:ex_doc, "~> 0.31", only: :dev, runtime: false},
+      {:doctor, "~> 0.23", only: :dev, runtime: false},
 
       # Code quality
-      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:credo, "~> 1.7.19", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
 
       # Testing
       {:excoveralls, "~> 0.18", only: :test},
-      {:stream_data, "~> 1.0", only: :test},
-
-      # Streaming
-      {:gen_stage, "~> 1.2"},
-
-      # Markdown processing
-      {:mdex, "~> 0.10"},
-
-      # Syntax highlighting for code blocks
-      {:makeup, "~> 1.1"},
-      {:makeup_elixir, "~> 1.0"},
 
       # LLM usage rules
-      {:usage_rules, "~> 0.1", only: :dev, runtime: false}
+      {:usage_rules, "~> 0.1", only: :dev, runtime: false},
+
+      # Release tooling
+      {:git_ops, "~> 2.9", only: :dev, runtime: false}
+    ]
+  end
+
+  defp aliases do
+    [
+      setup: ["deps.get"],
+      q: ["quality"],
+      quality: [
+        "format --check-formatted",
+        "compile --warnings-as-errors",
+        "xref graph --format cycles --fail-above 0",
+        "credo --strict",
+        "dialyzer",
+        "doctor --raise"
+      ]
     ]
   end
 
   defp package do
     [
       name: "term_ui",
+      maintainers: ["Pascal Charbonneau"],
       licenses: ["MIT"],
       links: %{
-        "GitHub" => @source_url
+        "Changelog" => "https://hexdocs.pm/term_ui/changelog.html",
+        "Documentation" => "https://hexdocs.pm/term_ui",
+        "Discord" => "https://jido.run/discord",
+        "GitHub" => @source_url,
+        "Issues" => @source_url <> "/issues",
+        "Website" => "https://jido.run"
       },
       files: ~w(
+        c_src
         lib
         mix/tasks
         guides
+        examples/showcase/README.md
+        examples/showcase/lib
+        examples/showcase/mix.exs
+        examples/showcase/mix.lock
+        examples/showcase/run.exs
+        Makefile
+        Makefile.win
         mix.exs
         README.md
         LICENSE
         CHANGELOG.md
+        CONTRIBUTING.md
         usage-rules.md
       )
     ]
@@ -113,73 +208,107 @@ defmodule TermUI.MixProject do
       extras: [
         "README.md",
         "CHANGELOG.md",
-        "guides/user/README.md": [filename: "user-guides", title: "User Guides"],
-        "guides/user/01-overview.md": [title: "Overview"],
-        "guides/user/02-getting-started.md": [title: "Getting Started"],
-        "guides/user/03-elm-architecture.md": [title: "The Elm Architecture"],
-        "guides/user/04-events.md": [title: "Events"],
-        "guides/user/05-styling.md": [title: "Styling"],
-        "guides/user/06-layout.md": [title: "Layout"],
-        "guides/user/07-widgets.md": [title: "Widgets"],
-        "guides/user/08-terminal.md": [title: "Terminal"],
-        "guides/user/09-commands.md": [title: "Commands"],
-        "guides/user/10-advanced-widgets.md": [title: "Advanced Widgets"],
-        "guides/developer/README.md": [filename: "developer-guides", title: "Developer Guides"],
-        "guides/developer/01-architecture-overview.md": [title: "Architecture Overview"],
-        "guides/developer/02-runtime-internals.md": [title: "Runtime Internals"],
-        "guides/developer/03-rendering-pipeline.md": [title: "Rendering Pipeline"],
-        "guides/developer/04-event-system.md": [title: "Event System"],
-        "guides/developer/05-buffer-management.md": [title: "Buffer Management"],
-        "guides/developer/06-terminal-layer.md": [title: "Terminal Layer"],
-        "guides/developer/07-elm-implementation.md": [title: "Elm Implementation"],
-        "guides/developer/08-creating-widgets.md": [title: "Creating Widgets"],
-        "guides/developer/09-testing-framework.md": [title: "Testing Framework"]
-      ],
-      groups_for_extras: [
-        "User Guides": ~r/guides\/user\/.*/,
-        "Developer Guides": ~r/guides\/developer\/.*/
+        "CONTRIBUTING.md",
+        "guides/package-quality.md": [title: "Package Quality"],
+        "guides/feature-parity.md": [title: "Feature Parity"],
+        "guides/architecture.md": [title: "Architecture"],
+        "guides/ui-context.md": [title: "UI Context Decision"],
+        "guides/backend.md": [title: "Backend Contract"],
+        "guides/widgets.md": [title: "Pure Widgets"],
+        "guides/widget-parity.md": [title: "Widget Migration Parity"],
+        "guides/showcase.md": [title: "Interactive Showcase"],
+        "guides/interaction.md": [title: "Clipboard, Selection, and Mouse"],
+        "guides/markdown-and-diffs.md": [title: "Markdown and Diffs"],
+        "guides/removed-and-deferred.md": [title: "Removed and Deferred Features"],
+        "guides/migration-1.0.md": [title: "Migration to 1.0"]
       ],
       groups_for_modules: [
         Core: [
           TermUI,
+          TermUI.App,
+          TermUI.Config,
           TermUI.Elm,
           TermUI.Runtime,
-          TermUI.Component,
-          TermUI.Event
+          TermUI.Event,
+          TermUI.Input,
+          TermUI.Command,
+          TermUI.Clipboard,
+          TermUI.Clipboard.Operation,
+          TermUI.Frame,
+          TermUI.Cell,
+          TermUI.Style,
+          TermUI.Theme,
+          TermUI.Focus,
+          TermUI.Layout,
+          TermUI.Shortcut,
+          TermUI.DisplayWidth,
+          TermUI.Markdown,
+          TermUI.Markdown.Document,
+          TermUI.Stream.ProducerAdapter,
+          TermUI.Mouse,
+          TermUI.Mouse.Region,
+          TermUI.Mouse.Tracker,
+          TermUI.Selection
         ],
-        Widgets: ~r/TermUI\.Widgets\..*/,
-        Rendering: [
-          TermUI.Renderer.Style,
-          TermUI.Renderer.Cell,
-          TermUI.Renderer.Buffer,
-          TermUI.Component.RenderNode
+        Widgets: [
+          TermUI.Widget,
+          TermUI.Widget.AlertDialog,
+          TermUI.Widget.BarChart,
+          TermUI.Widget.Block,
+          TermUI.Widget.Breadcrumb,
+          TermUI.Widget.Button,
+          TermUI.Widget.Canvas,
+          TermUI.Widget.ClusterDashboard,
+          TermUI.Widget.Checkbox,
+          TermUI.Widget.CommandPalette,
+          TermUI.Widget.ContextMenu,
+          TermUI.Widget.Dialog,
+          TermUI.Widget.DiffViewer,
+          TermUI.Widget.FormBuilder,
+          TermUI.Widget.Gauge,
+          TermUI.Widget.Label,
+          TermUI.Widget.LineChart,
+          TermUI.Widget.LineInput,
+          TermUI.Widget.List,
+          TermUI.Widget.LogViewer,
+          TermUI.Widget.MarkdownViewer,
+          TermUI.Widget.Menu,
+          TermUI.Widget.PickList,
+          TermUI.Widget.ProcessMonitor,
+          TermUI.Widget.Progress,
+          TermUI.Widget.RadioGroup,
+          TermUI.Widget.Router,
+          TermUI.Widget.ScrollBar,
+          TermUI.Widget.Select,
+          TermUI.Widget.Sparkline,
+          TermUI.Widget.Spinner,
+          TermUI.Widget.SplitPane,
+          TermUI.Widget.Stream,
+          TermUI.Widget.StreamWidget,
+          TermUI.Widget.SupervisionTree,
+          TermUI.Widget.SupervisionTreeViewer,
+          TermUI.Widget.Table,
+          TermUI.Widget.Table.Column,
+          TermUI.Widget.Tabs,
+          TermUI.Widget.TextArea,
+          TermUI.Widget.TextInput,
+          TermUI.Widget.TextInput.Line,
+          TermUI.Widget.Toast,
+          TermUI.Widget.Toast.Manager,
+          TermUI.Widget.Toggle,
+          TermUI.Widget.TreeView,
+          TermUI.Widget.Viewport
         ],
-        Layout: ~r/TermUI\.Layout\..*/,
-        Terminal: ~r/TermUI\.Terminal\..*/
-      ],
-      before_closing_body_tag: %{
-        html: """
-        <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
-        <script>
-          document.addEventListener("DOMContentLoaded", function () {
-            mermaid.initialize({ startOnLoad: false, theme: "default" });
-            let id = 0;
-            for (const codeEl of document.querySelectorAll("pre code.mermaid")) {
-              const preEl = codeEl.parentElement;
-              const graphDefinition = codeEl.textContent;
-              const graphEl = document.createElement("div");
-              const graphId = "mermaid-graph-" + id++;
-              mermaid.render(graphId, graphDefinition).then(({svg, bindFunctions}) => {
-                graphEl.innerHTML = svg;
-                bindFunctions?.(graphEl);
-                preEl.insertAdjacentElement("afterend", graphEl);
-                preEl.remove();
-              });
-            }
-          });
-        </script>
-        """
-      }
+        Backends: [
+          TermUI.Backend,
+          TermUI.Backend.SSH,
+          TermUI.Backend.SSH.Channel,
+          TermUI.Test.DeterministicBackend
+        ],
+        Compatibility: [
+          TermUI.Widgets.Sparkline
+        ]
+      ]
     ]
   end
 end

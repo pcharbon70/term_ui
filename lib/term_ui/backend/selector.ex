@@ -1,95 +1,13 @@
 defmodule TermUI.Backend.Selector do
-  @moduledoc """
-  Determines which terminal backend to use at runtime.
-
-  The Selector module implements a "try raw mode first" strategy for backend
-  selection. This approach is the **only reliable method** for determining
-  whether raw terminal mode is available.
-
-  ## Why Not Use Heuristics?
-
-  Environment-based detection (checking `$TERM`, `IO.getopts/0`, etc.) cannot
-  reliably detect all cases where raw mode is unavailable:
-
-  - **Nerves devices**: The erlinit process may have already started a shell,
-    making raw mode unavailable even though `$TERM` suggests a capable terminal
-
-  - **SSH sessions**: Remote SSH connections often have a shell already running
-    in the PTY, preventing raw mode activation
-
-  - **Remote IEx**: Connecting to a running node via `--remsh` or distributed
-    Erlang inherits the remote node's terminal state
-
-  - **Docker containers**: Terminal allocation varies by configuration; a TTY
-    may be allocated but a shell may already be running
-
-  - **IDE terminals**: Integrated terminals may report capabilities they don't
-    fully support in raw mode
-
-  ## The Selection Strategy
-
-  The selector attempts to start raw mode using OTP 28's
-  `:shell.start_interactive({:noshell, :raw})`:
-
-  1. **If raw mode succeeds** (returns `:ok`):
-     - The terminal is now in raw mode
-     - Return `{:raw, state}` for the Raw backend
-
-  2. **If raw mode fails** with `{:error, :already_started}`:
-     - A shell is already running, raw mode unavailable
-     - Detect terminal capabilities for graceful degradation
-     - Return `{:tty, capabilities}` for the TTY backend
-
-  3. **If the function is undefined** (pre-OTP 28):
-     - Fall back to TTY mode
-     - Return `{:tty, capabilities}` with detected capabilities
-
-  ## Return Values
-
-  The `select/0` function returns one of:
-
-  - `{:raw, state}` - Raw mode is active. The `state` map contains:
-    - `:raw_mode_started` - `true` indicating raw mode was activated
-
-  - `{:tty, capabilities}` - TTY mode should be used. The `capabilities` map contains:
-    - `:colors` - Color depth (`:true_color`, `:color_256`, `:color_16`, `:monochrome`)
-    - `:unicode` - Boolean indicating Unicode support
-    - `:dimensions` - `{rows, cols}` tuple or `nil` if unknown
-    - `:terminal` - Boolean indicating terminal presence
-
-  ## Explicit Selection
-
-  For testing or configuration override, use `select/1`:
-
-      # Force TTY mode
-      {:tty, caps} = Selector.select(TermUI.Backend.TTY)
-
-      # Force raw mode (will fail if unavailable)
-      {:raw, state} = Selector.select(TermUI.Backend.Raw)
-
-      # Auto-detect (same as select/0)
-      result = Selector.select(:auto)
-
-  ## Examples
-
-      # Typical usage in runtime initialization
-      case TermUI.Backend.Selector.select() do
-        {:raw, state} ->
-          # Initialize raw backend
-          TermUI.Backend.Raw.init(state)
-
-        {:tty, capabilities} ->
-          # Initialize TTY backend with detected capabilities
-          TermUI.Backend.TTY.init(capabilities: capabilities)
-      end
-
-  ## OTP Version Requirements
-
-  - **OTP 28+**: Full support with `:shell.start_interactive/1`
-  - **OTP 27 and earlier**: Automatic fallback to TTY mode
-  """
+  @moduledoc false
 
   require Logger
+
+  alias TermUI.Terminal.RawMode
+
+  # OTP types start_interactive/1 as :ok, but it also returns runtime errors
+  # such as :already_started. This function must handle those results.
+  @dialyzer {:nowarn_function, attempt_raw_mode: 0}
 
   @typedoc """
   Result of backend selection.
@@ -106,7 +24,10 @@ defmodule TermUI.Backend.Selector do
   @typedoc """
   State returned when raw mode is successfully activated.
   """
-  @type raw_state :: %{raw_mode_started: boolean()}
+  @type raw_state :: %{
+          raw_mode_started: true,
+          raw_mode_session: RawMode.session()
+        }
 
   @typedoc """
   Detected terminal capabilities for TTY mode.
@@ -198,20 +119,14 @@ defmodule TermUI.Backend.Selector do
   @doc false
   @spec attempt_raw_mode() :: {:raw, raw_state()} | {:tty, capabilities()}
   def attempt_raw_mode do
-    case :shell.start_interactive({:noshell, :raw}) do
-      :ok ->
-        # Raw mode successfully activated
-        {:raw, %{raw_mode_started: true}}
+    case RawMode.enter() do
+      {:ok, session} ->
+        {:raw, %{raw_mode_started: true, raw_mode_session: session}}
 
       {:error, :already_started} ->
-        # A shell is already running, fall back to TTY mode
         {:tty, detect_capabilities()}
 
       {:error, reason} ->
-        # Defensive programming: handle unexpected errors from :shell.start_interactive/1.
-        # While OTP 28 documentation only specifies :ok and {:error, :already_started},
-        # we gracefully handle other error conditions for forward compatibility and
-        # robustness. The error reason is preserved in the capabilities map for debugging.
         {:tty, Map.put(detect_capabilities(), :raw_mode_error, reason)}
     end
   end
@@ -309,20 +224,13 @@ defmodule TermUI.Backend.Selector do
   end
 
   # Detects if we're connected to a terminal
-  @dialyzer {:nowarn_function,
-             detect_terminal_presence: 0,
-             select: 0,
-             select: 1,
-             try_raw_mode: 0,
-             attempt_raw_mode: 0,
-             detect_capabilities: 0}
-  @spec detect_terminal_presence() :: term()
+  @spec detect_terminal_presence() :: boolean()
   defp detect_terminal_presence do
     case :io.getopts() do
-      {:ok, opts} ->
-        Keyword.get(opts, :terminal, false)
+      opts when is_list(opts) ->
+        Keyword.get(opts, :terminal, false) == true
 
-      _ ->
+      {:error, _reason} ->
         false
     end
   end

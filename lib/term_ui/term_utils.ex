@@ -38,6 +38,7 @@ defmodule TermUI.TermUtils do
   @type reason ::
           :timeout
           | :command_not_found
+          | :not_tty
           | :invalid_arguments
           | :execution_failed
           | :output_validation_failed
@@ -54,10 +55,6 @@ defmodule TermUI.TermUtils do
 
   # Known-safe command locations (will be resolved at runtime)
   @allowed_commands ~w(stty test infocmp)
-
-  # Dialyzer: Functions return specific types
-  @dialyzer {:nowarn_function,
-             default_validate: 1, validate_stty_settings: 1, validate_stty_size: 1}
 
   # ===========================================================================
   # Public API
@@ -78,6 +75,7 @@ defmodule TermUI.TermUtils do
   - `{:ok, output}` - Command succeeded with validated output
   - `{:error, :timeout}` - Command exceeded timeout
   - `{:error, :command_not_found}` - stty not found in PATH
+  - `{:error, :not_tty}` - the process has no controlling terminal
   - `{:error, :invalid_arguments}` - Arguments failed validation
   - `{:error, reason}` - Other execution error
 
@@ -263,7 +261,9 @@ defmodule TermUI.TermUtils do
     message = String.downcase(output)
 
     String.contains?(message, "inappropriate ioctl for device") or
-      String.contains?(message, "not a tty")
+      String.contains?(message, "not a tty") or
+      String.contains?(message, "not a terminal") or
+      String.contains?(message, "isn't a terminal")
   end
 
   # Separate function to have access to timeout variable in catch block
@@ -274,7 +274,7 @@ defmodule TermUI.TermUtils do
     end
   catch
     :exit, {:timeout, _} ->
-      # Task was killed due to timeout
+      _result = Task.shutdown(task, :brutal_kill)
       Logger.warning("TermUtils: Command '#{command}' timed out after #{timeout}ms")
       {:error, :timeout}
   end
@@ -398,7 +398,8 @@ defmodule TermUI.TermUtils do
   # - Null bytes
   # - Excessively long output (>64KB)
   # - Shell metacharacters that might indicate injection
-  @spec default_validate(binary()) :: :ok | {:error, term()}
+  @spec default_validate(binary()) ::
+          :ok | {:error, :null_byte_detected | :output_too_large}
   defp default_validate(output) when is_binary(output) do
     cond do
       byte_size(output) > 64 * 1024 ->
@@ -423,7 +424,7 @@ defmodule TermUI.TermUtils do
   This is the output we later pass to stty for restoration, so we must validate
   it carefully to prevent command injection.
   """
-  @spec validate_stty_settings(binary()) :: :ok | {:error, term()}
+  @spec validate_stty_settings(binary()) :: :ok | {:error, :invalid_stty_settings}
   def validate_stty_settings(output) when is_binary(output) do
     # stty -g output should contain only safe characters
     # Allowed: alphanumeric, spaces, semicolons, colons, dashes, dots
@@ -442,7 +443,7 @@ defmodule TermUI.TermUtils do
 
   Stty size returns: "rows cols" (two integers)
   """
-  @spec validate_stty_size(binary()) :: :ok | {:error, term()}
+  @spec validate_stty_size(binary()) :: :ok | {:error, :invalid_size_format}
   def validate_stty_size(output) when is_binary(output) do
     case String.split(String.trim(output)) do
       [rows, cols] ->
